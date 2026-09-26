@@ -1,6 +1,9 @@
 export type CandidateSessionId = `candidate-session-${string}`
 export type SourceProfileFactId = `source-fact-${string}`
 export type SourceProfilePropositionKey = `proposition-${string}`
+export type JobRequirementId = `job-requirement-${string}`
+export type JobRequirementGroupId = `job-requirement-group-${string}`
+export type JobRequirementGroupKey = `requirement-group-${string}`
 
 export const sensitiveContentKinds = [
   'email',
@@ -69,6 +72,35 @@ export type SourceProfileReview = Readonly<{
   facts: readonly SourceProfileFact[]
 }>
 
+export const jobRequirementClassifications = ['required', 'preferred'] as const
+
+export type JobRequirementClassification = typeof jobRequirementClassifications[number]
+
+export type JobRequirementContent = Readonly<{
+  classification: JobRequirementClassification
+  groupKey: JobRequirementGroupKey
+  sourceExcerpt: string
+  value: string
+}>
+
+export type JobRequirement = Omit<JobRequirementContent, 'groupKey'> & Readonly<{
+  id: JobRequirementId
+  groupId: JobRequirementGroupId
+}>
+
+export type JobPostingReview = Readonly<{
+  status: 'reviewing-posting' | 'reviewing-requirements'
+  outgoingContent: string
+  processingNotice: Readonly<{
+    version: string
+    confirmedAt: number
+    provider: string
+    retentionPolicy: string
+    transmittedDataCategories: readonly string[]
+  }> | null
+  requirements: readonly JobRequirement[]
+}>
+
 export type ResumeTailoringState =
   | { readonly status: 'not-started' }
   | {
@@ -76,6 +108,7 @@ export type ResumeTailoringState =
       readonly sessionId: CandidateSessionId
       readonly expiresAt: number
       readonly sourceProfile?: SourceProfileReview
+      readonly jobPosting?: JobPostingReview
     }
 
 export type DomainResult<TValue, TError> =

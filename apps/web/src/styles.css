@@ -325,12 +325,14 @@ h1 {
   font-weight: 600;
 }
 
-.source-profile-workspace {
+.source-profile-workspace,
+.job-posting-workspace {
   padding: 72px 0;
   border-bottom: 1px solid #dfe1df;
 }
 
-.source-profile-workspace > h2 {
+.source-profile-workspace > h2,
+.job-posting-workspace > h2 {
   margin: 0 0 30px;
   font-family: 'DM Serif Display', Georgia, serif;
   font-size: clamp(36px, 4vw, 54px);
@@ -471,6 +473,12 @@ h1 {
 .source-fact-rejected,
 .source-fact-superseded {
   opacity: 0.58;
+}
+
+.source-excerpt {
+  display: grid;
+  gap: 6px;
+  color: #666c79;
 }
 
 .fact-actions {

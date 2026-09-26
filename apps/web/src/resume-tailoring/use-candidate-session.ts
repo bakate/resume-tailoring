@@ -13,6 +13,9 @@ import {
   createBrowserCandidateSessionClock,
   createBrowserCandidateSessionIdentity,
   createBrowserCandidateSessionPersistence,
+  createBrowserJobRequirementExtractor,
+  createBrowserJobRequirementGroupIdentity,
+  createBrowserJobRequirementIdentity,
   createBrowserSourceDocumentReader,
   createBrowserSourceProfileFactIdentity,
   createBrowserSourceProfileExtractor,
@@ -33,6 +36,9 @@ export type CandidateSessionFailureMessageKey =
   | 'sourceProfile.failure'
   | 'sourceProfile.unreadableFailure'
   | 'sourceProfile.unsupportedFailure'
+  | 'jobPosting.extractionFailure'
+  | 'jobPosting.failure'
+  | 'jobPosting.transportFailure'
 
 type CandidateSessionStateSetter = Dispatch<SetStateAction<CandidateSessionState>>
 type CandidateSessionActionDependencies = Readonly<{
@@ -54,6 +60,7 @@ export function useCandidateSession() {
     ...createCandidateSessionActions({ workflow, setState }),
     ...createSourceDocumentActions({ workflow, setState }),
     ...createSourceProfileFactActions({ workflow, setState }),
+    ...createJobPostingActions({ workflow, setState }),
   }
 }
 
@@ -97,6 +104,22 @@ function createSourceProfileFactActions({ workflow, setState }: CandidateSession
   }
 }
 
+function createJobPostingActions({ workflow, setState }: CandidateSessionActionDependencies) {
+  const execute = (command: ResumeTailoringCommand) => executeCommand({ workflow, setState, command })
+  return {
+    reviewJobPosting: ({ content }: Readonly<{ content: string }>) => execute({
+      type: 'review-job-posting', content,
+    }),
+    updateJobPostingContent: ({ outgoingContent }: Readonly<{ outgoingContent: string }>) => execute({
+      type: 'update-job-posting-content', outgoingContent,
+    }),
+    confirmJobPostingProcessingNotice: () => execute({
+      type: 'confirm-job-posting-processing-notice',
+    }),
+    extractJobRequirements: () => execute({ type: 'extract-job-requirements' }),
+  }
+}
+
 export type CandidateSessionController = ReturnType<typeof useCandidateSession>
 
 function createBrowserResumeTailoringWorkflow() {
@@ -104,6 +127,9 @@ function createBrowserResumeTailoringWorkflow() {
     candidateSessionClock: createBrowserCandidateSessionClock(),
     candidateSessionIdentity: createBrowserCandidateSessionIdentity(),
     candidateSessionPersistence: createBrowserCandidateSessionPersistence(),
+    jobRequirementExtractor: createBrowserJobRequirementExtractor(),
+    jobRequirementGroupIdentity: createBrowserJobRequirementGroupIdentity(),
+    jobRequirementIdentity: createBrowserJobRequirementIdentity(),
     sourceDocumentReader: createBrowserSourceDocumentReader(),
     sourceProfileFactIdentity: createBrowserSourceProfileFactIdentity(),
     sourceProfileExtractor: createBrowserSourceProfileExtractor(),
@@ -156,7 +182,15 @@ async function executeCommand({
 function readFailureMessageKey(command: ResumeTailoringCommand): CandidateSessionFailureMessageKey {
   if (command.type === 'open-workflow') return 'session.openFailure'
   if (command.type === 'delete-session') return 'session.deleteFailure'
+  if (isJobPostingCommand(command)) return 'jobPosting.failure'
   return 'sourceProfile.failure'
+}
+
+function isJobPostingCommand(command: ResumeTailoringCommand) {
+  return command.type === 'review-job-posting'
+    || command.type === 'update-job-posting-content'
+    || command.type === 'confirm-job-posting-processing-notice'
+    || command.type === 'extract-job-requirements'
 }
 
 function applyResult({
@@ -191,6 +225,12 @@ function readTypedFailureMessageKey({
   if (result.error.type === 'unreadable-source-document') return 'sourceProfile.unreadableFailure'
   if (result.error.type === 'source-profile-extraction-unavailable') {
     return 'sourceProfile.extractionFailure'
+  }
+  if (result.error.type === 'job-requirement-extraction-unavailable') {
+    return 'jobPosting.extractionFailure'
+  }
+  if (result.error.type === 'job-requirement-transport-unavailable') {
+    return 'jobPosting.transportFailure'
   }
   return fallback
 }
