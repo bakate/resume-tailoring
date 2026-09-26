@@ -141,6 +141,10 @@ export function useLocalization() {
 export const defaultDocumentTitle = englishCatalog['brand.name']
 export const localizationUnavailableMessage = englishCatalog['locale.unavailable']
 
+export function LocalizationFailure() {
+  return <p role="alert">{localizationUnavailableMessage}</p>
+}
+
 function readInitialLocale(): LocaleState {
   const storedLocale = readStoredLocale()
   if (storedLocale.ok && storedLocale.value !== null) {

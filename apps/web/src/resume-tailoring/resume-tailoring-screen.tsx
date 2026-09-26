@@ -1,7 +1,7 @@
 import type { ResumeTailoringView } from '@resume-tailoring/application/resume-tailoring-workflow'
 
 import {
-  localizationUnavailableMessage,
+  LocalizationFailure,
   useLocalization,
 } from '../localization/localization'
 import type { Locale, Localization } from '../localization/localization'
@@ -267,10 +267,6 @@ function LockIcon() {
       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
     </svg>
   )
-}
-
-function LocalizationFailure() {
-  return <p role="alert">{localizationUnavailableMessage}</p>
 }
 
 const workflowStatusCopy = {
