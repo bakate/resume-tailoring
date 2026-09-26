@@ -37,7 +37,7 @@ import type {
 import {
   createReviewingJobPosting,
   identifyJobRequirements,
-  updateReviewingJobPosting,
+  updateJobPosting,
 } from './job-requirement'
 import {
   correctSourceProfileFact,
@@ -155,10 +155,10 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     }>,
   ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
     const currentState = await this.#readActiveState()
-    if (!hasReviewingJobPosting(currentState)) return unavailableResult
+    if (!hasJobPosting(currentState)) return unavailableResult
     return this.#persistJobPosting({
       currentState: currentState.value,
-      jobPosting: updateReviewingJobPosting({
+      jobPosting: updateJobPosting({
         jobPosting: currentState.value.jobPosting,
         outgoingContent,
       }),
@@ -587,6 +587,15 @@ function hasReviewingJobPosting(
   value: ReadyResumeTailoringState & { readonly jobPosting: JobPostingReview }
 }> {
   return hasReadyState(result) && result.value.jobPosting?.status === 'reviewing-posting'
+}
+
+function hasJobPosting(
+  result: ResumeTailoringResult<ResumeTailoringView>,
+): result is Readonly<{
+  ok: true
+  value: ReadyResumeTailoringState & { readonly jobPosting: JobPostingReview }
+}> {
+  return hasReadyState(result) && result.value.jobPosting !== undefined
 }
 
 const workflowAlreadyOpenResult = {

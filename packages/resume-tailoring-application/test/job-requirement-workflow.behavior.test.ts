@@ -84,7 +84,7 @@ describe('Job Requirement workflow', () => {
     system.givenTheCandidatePreviouslyConfirmedProcessing()
 
     // Action
-    await system.minimizeJobPosting()
+    await system.removeJobPostingPreference()
 
     // Then
     system.expectJobPostingProcessingConsentToBePending()
@@ -117,6 +117,26 @@ describe('Job Requirement workflow', () => {
 
     // Then
     system.expectAtomicRequirementsToShareTheirSourceGroup()
+  })
+
+  it('returns to Job Posting review when extracted content changes', async () => {
+    const system = createSystemUnderTest({ jobPosting: extractedJobPosting })
+
+    // Action
+    await system.updateJobPostingContent({ outgoingContent: compoundSourceExcerpt })
+
+    // Then
+    system.expectChangedExtractedJobPostingToRequireFreshReview()
+  })
+
+  it('preserves extracted requirements when Job Posting content is unchanged', async () => {
+    const system = createSystemUnderTest({ jobPosting: extractedJobPosting })
+
+    // Action
+    await system.updateJobPostingContent({ outgoingContent: extractedJobPosting.outgoingContent })
+
+    // Then
+    system.expectExtractedJobPostingToRemainUnchanged()
   })
 
   it('rejects extraction output beyond the supported requirement count', async () => {
@@ -248,9 +268,17 @@ class JobRequirementWorkflowTestSystem {
   }
 
   async minimizeJobPosting() {
+    await this.updateJobPostingContent({ outgoingContent: compoundSourceExcerpt })
+  }
+
+  async removeJobPostingPreference() {
+    await this.updateJobPostingContent({ outgoingContent: 'You must know TypeScript.' })
+  }
+
+  async updateJobPostingContent({ outgoingContent }: Readonly<{ outgoingContent: string }>) {
     this.#actionResult = await this.#workflow.execute({
       type: 'update-job-posting-content',
-      outgoingContent: compoundSourceExcerpt,
+      outgoingContent,
     })
   }
 
@@ -318,6 +346,19 @@ class JobRequirementWorkflowTestSystem {
       ],
     })
     expect(this.#modelRequests).toEqual([compoundSourceExcerpt])
+  }
+
+  expectChangedExtractedJobPostingToRequireFreshReview() {
+    expect(this.#readJobPosting()).toMatchObject({
+      status: 'reviewing-posting',
+      outgoingContent: compoundSourceExcerpt,
+      processingNotice: null,
+      requirements: [],
+    })
+  }
+
+  expectExtractedJobPostingToRemainUnchanged() {
+    expect(this.#readJobPosting()).toEqual(extractedJobPosting)
   }
 
   async expectRecoverableFailureWithoutLosingJobPosting({ failureType }: Readonly<{
@@ -407,6 +448,19 @@ const confirmedJobPosting = {
     retentionPolicy: 'standard-abuse-monitoring',
     transmittedDataCategories: ['job-posting-content'],
   },
+} as const satisfies JobPostingReview
+
+const extractedJobPosting = {
+  ...confirmedJobPosting,
+  status: 'reviewing-requirements',
+  outgoingContent: `${compoundSourceExcerpt}\nSalary: competitive`,
+  requirements: [{
+    id: 'job-requirement-1',
+    groupId: 'job-requirement-group-1',
+    classification: 'required',
+    sourceExcerpt: compoundSourceExcerpt,
+    value: 'Know TypeScript',
+  }],
 } as const satisfies JobPostingReview
 
 const changedProcessingNotices = [

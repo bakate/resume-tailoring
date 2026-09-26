@@ -24,14 +24,17 @@ export function createReviewingJobPosting({ content }: Readonly<{
   }
 }
 
-export function updateReviewingJobPosting({
+export function updateJobPosting({
   jobPosting,
   outgoingContent,
 }: Readonly<{ jobPosting: JobPostingReview; outgoingContent: string }>): JobPostingReview {
+  if (outgoingContent === jobPosting.outgoingContent) return jobPosting
   return {
     ...jobPosting,
+    status: 'reviewing-posting',
     ...minimizeSensitiveContent({ content: outgoingContent }),
     processingNotice: null,
+    requirements: [],
   }
 }
 
