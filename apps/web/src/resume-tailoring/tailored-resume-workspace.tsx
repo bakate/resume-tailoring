@@ -9,6 +9,12 @@ type WorkspaceProps = Readonly<{
   localization: Localization
 }>
 
+type ResumeClaimCardProps = WorkspaceProps & Readonly<{
+  claim: ResumeClaim
+  claimIndex: number
+  claims: readonly ResumeClaim[]
+}>
+
 export function TailoredResumeWorkspace({ candidateSession, localization }: WorkspaceProps) {
   const { view } = candidateSession
   if (view.status !== 'ready' || view.matchAnalysis === undefined) return null
@@ -78,46 +84,56 @@ function ResumeClaimCard({
   claimIndex,
   claims,
   localization,
-}: WorkspaceProps & Readonly<{
-  claim: ResumeClaim
-  claimIndex: number
-  claims: readonly ResumeClaim[]
-}>) {
-  const [reformulationRequest, setReformulationRequest] = useState('')
+}: ResumeClaimCardProps) {
   return (
     <article className="source-profile-card resume-claim-card">
       <p className="resume-claim-text">
         {claim.segments.map(({ text }) => text).join('')}
       </p>
-      <div className="resume-claim-actions">
-        <button disabled={claimIndex === 0}
-          onClick={() => {
-            reorderClaim({ candidateSession, claimIndex, claims, offset: -1 })
-          }}
-          type="button">
-          {localization.translate('resumeClaims.moveUp')}
-        </button>
-        <button disabled={claimIndex === claims.length - 1}
-          onClick={() => {
-            reorderClaim({ candidateSession, claimIndex, claims, offset: 1 })
-          }}
-          type="button">
-          {localization.translate('resumeClaims.moveDown')}
-        </button>
-        <button onClick={() => void candidateSession.removeResumeClaim({ claimId: claim.id })}
-          type="button">
-          {localization.translate('resumeClaims.remove')}
-        </button>
-      </div>
-      <form className="reformulation-form" onSubmit={(event) => {
-        event.preventDefault()
-        void candidateSession.reformulateResumeClaim({
-          claimId: claim.id,
-          request: reformulationRequest,
-        }).then(() => {
-          setReformulationRequest('')
-        })
-      }}>
+      <ClaimActions {...{ candidateSession, claim, claimIndex, claims, localization }} />
+      <ReformulationForm {...{ candidateSession, claim, localization }} />
+      <p className="claim-editing-note">{localization.translate('resumeClaims.noFreeEdit')}</p>
+    </article>
+  )
+}
+
+function ClaimActions(props: ResumeClaimCardProps) {
+  const { candidateSession, claim, localization } = props
+  return (
+    <div className="resume-claim-actions">
+      <MoveClaimButton {...props} direction="up" />
+      <MoveClaimButton {...props} direction="down" />
+      <button onClick={() => void candidateSession.removeResumeClaim({ claimId: claim.id })}
+        type="button">
+        {localization.translate('resumeClaims.remove')}
+      </button>
+    </div>
+  )
+}
+
+function MoveClaimButton(props: ResumeClaimCardProps & Readonly<{ direction: 'up' | 'down' }>) {
+  const { candidateSession, claimIndex, claims, direction, localization } = props
+  const offset = direction === 'up' ? -1 : 1
+  const disabled = direction === 'up' ? claimIndex === 0 : claimIndex === claims.length - 1
+  return (
+    <button disabled={disabled}
+      onClick={() => { reorderClaim({ candidateSession, claimIndex, claims, offset }) }}
+      type="button">
+      {localization.translate(direction === 'up' ? 'resumeClaims.moveUp' : 'resumeClaims.moveDown')}
+    </button>
+  )
+}
+
+function ReformulationForm({ candidateSession, claim, localization }: WorkspaceProps & Readonly<{
+  claim: ResumeClaim
+}>) {
+  const [reformulationRequest, setReformulationRequest] = useState('')
+  return (
+    <form className="reformulation-form" onSubmit={(event) => {
+      event.preventDefault()
+      void submitReformulation({ candidateSession, claim, reformulationRequest })
+        .then(() => { setReformulationRequest('') })
+    }}>
         <label htmlFor={`reformulate-${claim.id}`}>
           {localization.translate('resumeClaims.reformulationLabel')}
         </label>
@@ -128,10 +144,19 @@ function ResumeClaimCard({
         <button disabled={reformulationRequest.trim().length === 0} type="submit">
           {localization.translate('resumeClaims.reformulate')}
         </button>
-      </form>
-      <p className="claim-editing-note">{localization.translate('resumeClaims.noFreeEdit')}</p>
-    </article>
+    </form>
   )
+}
+
+function submitReformulation({ candidateSession, claim, reformulationRequest }: Readonly<{
+  candidateSession: CandidateSessionController
+  claim: ResumeClaim
+  reformulationRequest: string
+}>) {
+  return candidateSession.reformulateResumeClaim({
+    claimId: claim.id,
+    request: reformulationRequest,
+  })
 }
 
 function reorderClaim({

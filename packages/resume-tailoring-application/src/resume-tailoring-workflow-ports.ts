@@ -192,6 +192,14 @@ export type ResumeClaimValidationFeedback = Readonly<{
     | 'missing-segment-provenance'
     | 'unsupported-number-or-date'
     | 'unsupported-meaning'
+    | 'strengthened-autonomy'
+    | 'strengthened-causality'
+    | 'strengthened-duration'
+    | 'strengthened-frequency'
+    | 'strengthened-outcome'
+    | 'strengthened-quantity'
+    | 'strengthened-scope'
+    | 'strengthened-seniority'
   segmentIndex?: number
 }>
 
@@ -224,7 +232,13 @@ export type ResumeClaimSemanticValidator = Readonly<{
     claim: ResumeClaim
     verifiedFacts: ResumeClaimWritingInputs['verifiedFacts']
   }>) => Promise<
-    | { readonly ok: true; readonly value: boolean }
+    | {
+        readonly ok: true
+        readonly value: Readonly<{
+          supported: boolean
+          feedback: readonly ResumeClaimValidationFeedback[]
+        }>
+      }
     | { readonly ok: false; readonly error: { readonly type: 'resume-claim-validation-unavailable' } }
   >
 }>

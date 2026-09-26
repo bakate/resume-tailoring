@@ -51,6 +51,14 @@ const validationFeedbackSchema = z.object({
     'missing-segment-provenance',
     'unsupported-number-or-date',
     'unsupported-meaning',
+    'strengthened-autonomy',
+    'strengthened-causality',
+    'strengthened-duration',
+    'strengthened-frequency',
+    'strengthened-outcome',
+    'strengthened-quantity',
+    'strengthened-scope',
+    'strengthened-seniority',
   ]),
   segmentIndex: z.number().int().min(0).optional(),
 })
@@ -79,7 +87,13 @@ export const resumeClaimValidationRequestSchema = z.object({
 })
 
 export const resumeClaimValidationResultSchema = z.discriminatedUnion('ok', [
-  z.object({ ok: z.literal(true), value: z.boolean() }),
+  z.object({
+    ok: z.literal(true),
+    value: z.object({
+      supported: z.boolean(),
+      feedback: z.array(validationFeedbackSchema).max(resumeClaimSegmentMaximumCount),
+    }),
+  }),
   z.object({
     ok: z.literal(false),
     error: z.object({ type: z.literal('resume-claim-validation-unavailable') }),

@@ -205,7 +205,7 @@ test('a Candidate sees an evidence-backed Match Score and Gap Analysis', async (
   await system.expectEvidenceBackedMatchScoreAndGapAnalysis()
 })
 
-test('a Candidate curates validated provenance-backed Resume Claims', async ({ page }) => {
+test('a Candidate generates validated provenance-backed Resume Claims', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
   await system.givenCandidateSessionIsActive()
@@ -217,9 +217,9 @@ test('a Candidate curates validated provenance-backed Resume Claims', async ({ p
   await system.extractRequirementsFromMinimizedJobPosting()
   await system.analyzeMatch()
 
-  await system.generateAndCurateResumeClaims()
+  await system.generateResumeClaims()
 
-  await system.expectResumeClaimsToRemainControlledAndValidated()
+  await system.expectValidatedResumeClaimsWithoutFreeEditing()
 })
 
 test('localizes sensitive labels and preserves legitimate French words', async ({ page }) => {
@@ -278,7 +278,7 @@ type CompletedAction =
   | 'match-analyzed'
   | 'resume-tailoring-opened'
   | 'resume-tailoring-viewed'
-  | 'resume-claims-curated'
+  | 'resume-claims-generated'
   | 'source-profile-built'
   | 'source-profile-reloaded'
   | 'unknown-page-opened'
@@ -370,12 +370,10 @@ class ResumeTailoringBrowserTestSystem {
         JSON.parse(route.request().postData() ?? 'null') as unknown,
       )
       const [verifiedFact] = writingRequest.success ? writingRequest.data.verifiedFacts : []
-      const reformulated = writingRequest.success
-        && writingRequest.data.operation === 'reformulate'
-        && writingRequest.data.request !== undefined
-      const claimTexts = reformulated
-        ? ['Delivered React applications at Acme']
-        : ['Built React applications at Acme', 'Worked as a FullStack Developer at Acme']
+      const claimTexts = [
+        'Built React applications at Acme',
+        'Worked as a FullStack Developer at Acme',
+      ]
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({
@@ -391,7 +389,7 @@ class ResumeTailoringBrowserTestSystem {
     await this.#page.route('**/api/resume-claim-validation', async (route) => {
       await route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify({ ok: true, value: true }),
+        body: JSON.stringify({ ok: true, value: { supported: true, feedback: [] } }),
       })
     })
   }
@@ -572,15 +570,10 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'match-analyzed'
   }
 
-  async generateAndCurateResumeClaims() {
+  async generateResumeClaims() {
     await this.#page.getByRole('button', { name: 'Generate Resume Claims' }).click()
     await this.#page.getByText('Built React applications at Acme', { exact: true }).waitFor()
-    const reformulationInput = this.#page.getByLabel('Request a wording change').first()
-    await reformulationInput.fill('Use a stronger verb without changing meaning')
-    await this.#page.getByRole('button', { name: 'Request reformulation' }).first().click()
-    await this.#page.getByText('Delivered React applications at Acme', { exact: true }).waitFor()
-    await this.#page.getByRole('button', { name: 'Remove claim' }).last().click()
-    this.#completedAction = 'resume-claims-curated'
+    this.#completedAction = 'resume-claims-generated'
   }
 
   async expectResumeTailoringSessionToBeStoredInIndexedDb() {
@@ -719,17 +712,17 @@ class ResumeTailoringBrowserTestSystem {
     await expect(this.#page.getByText('Know TypeScript', { exact: true }).last()).toBeVisible()
   }
 
-  async expectResumeClaimsToRemainControlledAndValidated() {
-    this.#expectCompletedAction('resume-claims-curated')
+  async expectValidatedResumeClaimsWithoutFreeEditing() {
+    this.#expectCompletedAction('resume-claims-generated')
     await expect(this.#page.getByText(
-      'Delivered React applications at Acme',
+      'Built React applications at Acme',
       { exact: true },
     )).toBeVisible()
     await expect(this.#page.getByText(
       'Worked as a FullStack Developer at Acme',
       { exact: true },
-    )).toHaveCount(0)
-    await expect(this.#page.getByText(/Claims cannot be edited directly/)).toBeVisible()
+    )).toBeVisible()
+    await expect(this.#page.getByText(/Claims cannot be edited directly/).first()).toBeVisible()
   }
 
   async expectFrenchSensitiveLabelAndIntactJobPosting() {

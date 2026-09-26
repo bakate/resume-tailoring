@@ -69,13 +69,41 @@ function hasOnlySupportedNumericTokens({
   supportedText,
   text,
 }: Readonly<{ supportedText: string; text: string }>) {
-  const supportedTokens = new Set(readConstrainedTokens({ value: supportedText }))
-  return readConstrainedTokens({ value: text }).every((token) => supportedTokens.has(token))
+  const supportedNumbers = readNumericExpressions({ value: supportedText })
+  const supportedDates = new Set(readDateTokens({ value: supportedText }))
+  return readNumericExpressions({ value: text })
+    .every((expression) => supportedNumbers.some((candidate) =>
+      supportsNumericExpression({ candidate, expression })))
+    && readDateTokens({ value: text }).every((token) => supportedDates.has(token))
 }
 
-function readConstrainedTokens({ value }: Readonly<{ value: string }>) {
-  const normalizedValue = value.toLocaleLowerCase('en-US')
-  return normalizedValue.match(
-    /\b(?:\d+(?:[.,]\d+)?%?|jan(?:uary|vier)?|feb(?:ruary)?|f[eé]v(?:rier)?|mar(?:ch|s)?|apr(?:il)?|avr(?:il)?|may|mai|jun(?:e)?|juin|jul(?:y)?|juil(?:let)?|aug(?:ust)?|ao[uû]t|sep(?:tember|tembre)?|oct(?:ober|obre)?|nov(?:ember|embre)?|dec(?:ember)?|d[eé]c(?:embre)?)\b/giu,
-  ) ?? []
+type NumericExpression = Readonly<{
+  amount: string
+  prefix: string
+  suffix: string
+}>
+
+function supportsNumericExpression({
+  candidate,
+  expression,
+}: Readonly<{ candidate: NumericExpression; expression: NumericExpression }>) {
+  return candidate.amount === expression.amount
+    && (expression.prefix.length === 0 || candidate.prefix === expression.prefix)
+    && (expression.suffix.length === 0 || candidate.suffix === expression.suffix)
 }
+
+function readNumericExpressions({ value }: Readonly<{ value: string }>): NumericExpression[] {
+  return [...value.toLocaleLowerCase('en-US').matchAll(numericExpressionPattern)]
+    .map((match) => ({
+      amount: match.groups?.amount ?? '',
+      prefix: match.groups?.prefix ?? '',
+      suffix: match.groups?.suffix ?? '',
+    }))
+}
+
+function readDateTokens({ value }: Readonly<{ value: string }>) {
+  return value.toLocaleLowerCase('en-US').match(dateTokenPattern) ?? []
+}
+
+const numericExpressionPattern = /(?<prefix>[-+$€£])?\s*(?<amount>\d+(?:[.,]\d+)?)\s*(?<suffix>%|years?|ans?|months?|mois|days?|jours?|hours?|heures?|usd|eur|gbp|k|m|millions?)?/giu
+const dateTokenPattern = /\b(?:jan(?:uary|vier)?|feb(?:ruary)?|f[eé]v(?:rier)?|mar(?:ch|s)?|apr(?:il)?|avr(?:il)?|may|mai|jun(?:e)?|juin|jul(?:y)?|juil(?:let)?|aug(?:ust)?|ao[uû]t|sep(?:tember|tembre)?|oct(?:ober|obre)?|nov(?:ember|embre)?|dec(?:ember)?|d[eé]c(?:embre)?)\b/giu

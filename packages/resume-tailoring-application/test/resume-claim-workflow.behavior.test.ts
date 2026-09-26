@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { assert, describe, expect, it } from 'vitest'
 
 import type {
   ProposedResumeClaim,
@@ -24,7 +24,6 @@ describe('Resume Claim workflow', () => {
   it('generates claims whose semantic segments reference their exact Verified Facts', async () => {
     const system = createSystemUnderTest()
 
-    system.givenAClaimSupportedByTwoExactFacts()
     await system.generateTailoredResume()
 
     system.expectAProvenanceBackedClaim()
@@ -33,7 +32,7 @@ describe('Resume Claim workflow', () => {
   it('regenerates a deterministically invalid claim once before semantic validation', async () => {
     const system = createSystemUnderTest()
 
-    system.givenAClaimThatInventsAQuantityThenAValidReformulation()
+    system.givenAClaimThatAddsACurrencyThenAValidReformulation()
     await system.generateTailoredResume()
 
     system.expectOnlyTheRegeneratedClaimToReachSemanticValidation()
@@ -84,6 +83,7 @@ type ReadyState = Extract<ResumeTailoringState, { readonly status: 'ready' }>
 
 class ResumeClaimWorkflowTestSystem {
   readonly #semanticValidationRequests: ResumeClaim[] = []
+  readonly #reformulationFactIds: string[][] = []
   readonly #writer: ResumeClaimWriter
   readonly #workflow: ResumeTailoringWorkflow
   #actionResult: ResumeTailoringResult<ResumeTailoringView> | undefined
@@ -94,17 +94,23 @@ class ResumeClaimWorkflowTestSystem {
   constructor({ tailoredResume }: Readonly<{ tailoredResume?: ReadyState['tailoredResume'] }>) {
     this.#writer = {
       write: () => Promise.resolve({ ok: true, value: this.#generatedClaims }),
-      reformulate: () => Promise.resolve({
-        ok: true,
-        value: this.#reformulatedClaims.shift() ?? defaultProposedClaim,
-      }),
+      reformulate: ({ verifiedFacts }) => {
+        this.#reformulationFactIds.push(verifiedFacts.map(({ id }) => id))
+        return Promise.resolve({
+          ok: true,
+          value: this.#reformulatedClaims.shift() ?? defaultProposedClaim,
+        })
+      },
     }
     const semanticValidator: ResumeClaimSemanticValidator = {
       validate: ({ claim }) => {
         this.#semanticValidationRequests.push(claim)
         return Promise.resolve({
           ok: true,
-          value: this.#semanticResults.shift() ?? true,
+          value: {
+            supported: this.#semanticResults.shift() ?? true,
+            feedback: [{ code: 'strengthened-scope', segmentIndex: 0 }],
+          },
         })
       },
     }
@@ -130,11 +136,9 @@ class ResumeClaimWorkflowTestSystem {
     })
   }
 
-  givenAClaimSupportedByTwoExactFacts() {}
-
-  givenAClaimThatInventsAQuantityThenAValidReformulation() {
+  givenAClaimThatAddsACurrencyThenAValidReformulation() {
     this.#generatedClaims = [{
-      segments: [{ factIds: ['source-fact-typescript'], text: 'Built 12 TypeScript services' }],
+      segments: [{ factIds: ['source-fact-experience'], text: 'Built APIs for $2022' }],
     }]
     this.#reformulatedClaims = [defaultProposedClaim]
   }
@@ -146,7 +150,7 @@ class ResumeClaimWorkflowTestSystem {
 
   givenAConciseSupportedReformulation() {
     this.#reformulatedClaims = [{
-      segments: [{ factIds: ['source-fact-typescript'], text: 'Delivered TypeScript services' }],
+      segments: [{ factIds: ['source-fact-experience'], text: 'Built APIs at Acme' }],
     }]
   }
 
@@ -207,12 +211,15 @@ class ResumeClaimWorkflowTestSystem {
   }
 
   expectOnlyTheRequestedClaimToBeReformulated() {
+    expect(this.#reformulationFactIds).toEqual([[
+      'source-fact-experience',
+    ]])
     expect(this.#readTailoredResume().claims).toEqual([
       {
         id: 'resume-claim-experience',
         segments: [{
-          factIds: ['source-fact-typescript'],
-          text: 'Delivered TypeScript services',
+          factIds: ['source-fact-experience'],
+          text: 'Built APIs at Acme',
         }],
       },
       existingTailoredResume.claims[1],
@@ -229,12 +236,10 @@ class ResumeClaimWorkflowTestSystem {
     expect(this.#actionResult, 'Expected a Resume Claim action before reading its result')
       .toBeDefined()
     expect(this.#actionResult?.ok).toBe(true)
-    if (this.#actionResult?.ok !== true || this.#actionResult.value.status !== 'ready') {
-      throw new Error('Expected the action to return a ready Candidate session')
-    }
+    assert(this.#actionResult?.ok === true && this.#actionResult.value.status === 'ready')
     const tailoredResume = this.#actionResult.value.tailoredResume
     expect(tailoredResume, 'Expected a Tailored Resume').toBeDefined()
-    if (tailoredResume === undefined) throw new Error('Expected a Tailored Resume')
+    assert(tailoredResume !== undefined)
     return tailoredResume
   }
 }

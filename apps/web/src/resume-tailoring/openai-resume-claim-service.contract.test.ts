@@ -63,7 +63,7 @@ describe('OpenAI Resume Claim service contract', () => {
       apiKey: 'test-api-key',
       model: 'structured-model',
       reasoningEffort: 'low',
-      request: createRequestSpy({ requests, value: { supported: true } }),
+      request: createRequestSpy({ requests, value: { supported: true, feedback: [] } }),
     })
 
     const result = await validator.validate({
@@ -71,7 +71,7 @@ describe('OpenAI Resume Claim service contract', () => {
       verifiedFacts: writingInputs.verifiedFacts,
     })
 
-    expect(result).toEqual({ ok: true, value: true })
+    expect(result).toEqual({ ok: true, value: { supported: true, feedback: [] } })
     const requestBody = await readRequestBody({ requests })
     expect(requestBody).toMatchObject({
       model: 'structured-model',

@@ -8,7 +8,6 @@ import type {
   JobRequirement,
   MatchAnalysis,
   ResumeClaim,
-  ResumeClaimId,
   ResumeTailoringState,
   SourceProfileFact,
   SourceProfileFactContent,
@@ -38,14 +37,12 @@ import type {
   JobRequirementGroupIdentity,
   JobRequirementIdentity,
   MatchEvidenceMatcher,
-  ProposedResumeClaim,
   ResumeClaimIdentity,
   ResumeClaimSemanticValidator,
-  ResumeClaimValidationFeedback,
   ResumeClaimWriter,
   ResumeClaimWritingInputs,
 } from './resume-tailoring-workflow-ports'
-import { toProposedResumeClaim, validateProposedResumeClaim } from './resume-claims'
+import { createResumeClaimGeneration } from './resume-claim-generation'
 import { createMatchAnalysis } from './match-analysis'
 import {
   createReviewingJobPosting,
@@ -168,109 +165,16 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
   async #generateResumeClaims(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
     const currentState = await this.#readActiveState()
     if (!hasResumeClaimInputs(currentState)) return resumeClaimUnavailableResult
-    const writer = this.#dependencies.resumeClaimWriter
-    if (writer === undefined) return resumeClaimWritingUnavailableResult
+    const generation = createResumeClaimGenerationFrom(this.#dependencies)
+    if (generation === null) return resumeClaimUnavailableResult
     const inputs = createResumeClaimWritingInputs({ state: currentState.value })
-    const writingResult = await writer.write(inputs)
-    if (!writingResult.ok) return writingResult
-    const validation = await this.#validateGeneratedClaims({
-      inputs,
-      proposals: writingResult.value,
-    })
-    if (!validation.ok) return validation.error
+    const result = await generation.generate(inputs)
+    if (!result.ok) return result
     return this.#persistTailoredResume({
       currentState: currentState.value,
-      claims: validation.claims,
-      exclusions: validation.exclusions,
+      claims: result.value.claims,
+      exclusions: result.value.exclusions,
     })
-  }
-
-  async #validateGeneratedClaims({
-    inputs,
-    proposals,
-  }: Readonly<{
-    inputs: ResumeClaimWritingInputs
-    proposals: readonly ProposedResumeClaim[]
-  }>) {
-    const claims: ResumeClaim[] = []
-    const exclusions: { readonly reason: 'unsupported-after-regeneration' }[] = []
-    for (const proposal of proposals) {
-      const identity = this.#dependencies.resumeClaimIdentity?.create()
-      if (identity === undefined || !identity.ok) {
-        return { ok: false, error: resumeClaimUnavailableResult } as const
-      }
-      const validation = await this.#validateClaimWithOneRetry({
-        claimId: identity.value,
-        inputs,
-        proposal,
-      })
-      if (!validation.ok) return validation
-      if (validation.claim === null) exclusions.push(unsupportedClaimExclusion)
-      else claims.push(validation.claim)
-    }
-    return { ok: true, claims, exclusions } as const
-  }
-
-  async #validateClaimWithOneRetry({
-    claimId,
-    inputs,
-    proposal,
-  }: Readonly<{
-    claimId: ResumeClaimId
-    inputs: ResumeClaimWritingInputs
-    proposal: ProposedResumeClaim
-  }>) {
-    const firstValidation = await this.#validateClaim({ claimId, inputs, proposal })
-    if (!firstValidation.ok) return firstValidation
-    if (firstValidation.claim !== null) return firstValidation
-    const writer = this.#dependencies.resumeClaimWriter
-    if (writer === undefined) return { ok: false, error: resumeClaimWritingUnavailableResult } as const
-    const rewrite = await writer.reformulate({
-      ...inputs,
-      claim: proposal,
-      feedback: firstValidation.feedback,
-    })
-    if (!rewrite.ok) return { ok: false, error: rewrite } as const
-    const secondValidation = await this.#validateClaim({
-      claimId,
-      inputs,
-      proposal: rewrite.value,
-    })
-    if (!secondValidation.ok) return secondValidation
-    return secondValidation.claim === null
-      ? { ok: true, claim: null, feedback: secondValidation.feedback } as const
-      : secondValidation
-  }
-
-  async #validateClaim({
-    claimId,
-    inputs,
-    proposal,
-  }: Readonly<{
-    claimId: ResumeClaimId
-    inputs: ResumeClaimWritingInputs
-    proposal: ProposedResumeClaim
-  }>) {
-    const deterministicValidation = validateProposedResumeClaim({
-      claimId,
-      proposal,
-      verifiedFacts: inputs.verifiedFacts,
-    })
-    if (!deterministicValidation.ok) {
-      return { ok: true, claim: null, feedback: deterministicValidation.feedback } as const
-    }
-    const validator = this.#dependencies.resumeClaimSemanticValidator
-    if (validator === undefined) {
-      return { ok: false, error: resumeClaimValidationUnavailableResult } as const
-    }
-    const semanticValidation = await validator.validate({
-      claim: deterministicValidation.value,
-      verifiedFacts: inputs.verifiedFacts,
-    })
-    if (!semanticValidation.ok) return { ok: false, error: semanticValidation } as const
-    return semanticValidation.value
-      ? { ok: true, claim: deterministicValidation.value, feedback: [] } as const
-      : { ok: true, claim: null, feedback: unsupportedMeaningFeedback } as const
   }
 
   async #removeResumeClaim(
@@ -318,22 +222,18 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     const claimIndex = currentState.value.tailoredResume.claims
       .findIndex((claim) => claim.id === command.claimId)
     const claim = currentState.value.tailoredResume.claims[claimIndex]
-    const writer = this.#dependencies.resumeClaimWriter
-    if (claim === undefined || writer === undefined) return resumeClaimUnavailableResult
-    const inputs = createResumeClaimWritingInputs({ state: currentState.value })
-    const rewrite = await writer.reformulate({
-      ...inputs,
-      claim: toProposedResumeClaim({ claim }),
-      feedback: [],
+    const generation = createResumeClaimGenerationFrom(this.#dependencies)
+    if (claim === undefined || generation === null) return resumeClaimUnavailableResult
+    const inputs = createReformulationInputs({
+      claim,
+      inputs: createResumeClaimWritingInputs({ state: currentState.value }),
+    })
+    const validation = await generation.reformulate({
+      claim,
+      inputs,
       request: command.request,
     })
-    if (!rewrite.ok) return rewrite
-    const validation = await this.#validateClaimWithOneRetry({
-      claimId: claim.id,
-      inputs,
-      proposal: rewrite.value,
-    })
-    if (!validation.ok) return validation.error
+    if (!validation.ok) return validation
     const claims = [...currentState.value.tailoredResume.claims]
     if (validation.claim === null) claims.splice(claimIndex, 1)
     else claims[claimIndex] = validation.claim
@@ -932,6 +832,33 @@ function createResumeClaimWritingInputs({
   }
 }
 
+function createReformulationInputs({
+  claim,
+  inputs,
+}: Readonly<{
+  claim: ResumeClaim
+  inputs: ResumeClaimWritingInputs
+}>): ResumeClaimWritingInputs {
+  const supportingFactIds = new Set(claim.segments.flatMap(({ factIds }) => factIds))
+  return {
+    ...inputs,
+    evidence: inputs.evidence.flatMap((item) => {
+      const factIds = item.factIds.filter((factId) => supportingFactIds.has(factId))
+      return factIds.length === 0 ? [] : [{ ...item, factIds }]
+    }),
+    verifiedFacts: inputs.verifiedFacts
+      .filter(({ id }) => supportingFactIds.has(id)),
+  }
+}
+
+function createResumeClaimGenerationFrom(dependencies: ResumeTailoringDependencies) {
+  const identity = dependencies.resumeClaimIdentity
+  const semanticValidator = dependencies.resumeClaimSemanticValidator
+  const writer = dependencies.resumeClaimWriter
+  if (identity === undefined || semanticValidator === undefined || writer === undefined) return null
+  return createResumeClaimGeneration({ identity, semanticValidator, writer })
+}
+
 function hasCurrentMatchProcessingConsent({ state }: Readonly<{
   state: ReadyResumeTailoringState & {
     readonly jobPosting: JobPostingReview & { readonly status: 'reviewing-requirements' }
@@ -977,16 +904,6 @@ const matchAnalysisUnavailableResult = {
   error: { type: 'match-analysis-unavailable' },
 } as const satisfies ResumeTailoringResult<ResumeTailoringView>
 
-const resumeClaimWritingUnavailableResult = {
-  ok: false,
-  error: { type: 'resume-claim-writing-unavailable' },
-} as const satisfies ResumeTailoringResult<ResumeTailoringView>
-
-const resumeClaimValidationUnavailableResult = {
-  ok: false,
-  error: { type: 'resume-claim-validation-unavailable' },
-} as const satisfies ResumeTailoringResult<ResumeTailoringView>
-
 const resumeClaimUnavailableResult = {
   ok: false,
   error: { type: 'resume-claim-unavailable' },
@@ -995,7 +912,3 @@ const resumeClaimUnavailableResult = {
 const unsupportedClaimExclusion = {
   reason: 'unsupported-after-regeneration',
 } as const
-
-const unsupportedMeaningFeedback = [{
-  code: 'unsupported-meaning',
-}] as const satisfies readonly ResumeClaimValidationFeedback[]

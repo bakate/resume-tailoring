@@ -17,33 +17,23 @@ type OpenAiModelConfiguration = Readonly<{
   request?: typeof fetch
 }>
 
+type ActiveOpenAiModelConfiguration = Readonly<{
+  apiKey: string
+  model: string
+  reasoningEffort: 'low' | 'medium'
+  request: typeof fetch
+}>
+
 export function createOpenAiResumeClaimWriter({
   apiKey,
   model,
   reasoningEffort,
   request = fetch,
 }: OpenAiModelConfiguration): ResumeClaimWriter {
+  const configuration = { apiKey, model, reasoningEffort, request }
   return {
-    write: (writingInputs) => writeResumeClaims({
-      apiKey,
-      model,
-      reasoningEffort,
-      request,
-      writingInputs,
-    }),
-    reformulate: async ({ claim, feedback, request: candidateRequest, ...writingInputs }) => {
-      const result = await writeResumeClaims({
-        apiKey,
-        model,
-        reasoningEffort,
-        request,
-        writingInputs,
-        revision: { candidateRequest, claim, feedback },
-      })
-      return result.ok && result.value.length === 1
-        ? { ok: true, value: result.value[0] ?? claim }
-        : resumeClaimWritingUnavailableResult
-    },
+    write: (writingInputs) => writeResumeClaims({ configuration, writingInputs }),
+    reformulate: (reformulation) => reformulateResumeClaim({ configuration, reformulation }),
   }
 }
 
@@ -53,30 +43,33 @@ export function createOpenAiResumeClaimSemanticValidator({
   reasoningEffort,
   request = fetch,
 }: OpenAiModelConfiguration): ResumeClaimSemanticValidator {
+  const configuration = { apiKey, model, reasoningEffort, request }
   return {
-    validate: ({ claim, verifiedFacts }) => validateResumeClaim({
-      apiKey,
-      claim,
-      model,
-      reasoningEffort,
-      request,
-      verifiedFacts,
-    }),
+    validate: (validationRequest) => validateResumeClaim({ configuration, validationRequest }),
   }
 }
 
+async function reformulateResumeClaim({ configuration, reformulation }: Readonly<{
+  configuration: ActiveOpenAiModelConfiguration
+  reformulation: Parameters<ResumeClaimWriter['reformulate']>[0]
+}>) {
+  const { claim, feedback, request: candidateRequest, ...writingInputs } = reformulation
+  const result = await writeResumeClaims({
+    configuration,
+    writingInputs,
+    revision: { candidateRequest, claim, feedback },
+  })
+  return result.ok && result.value.length === 1
+    ? { ok: true, value: result.value[0] ?? claim } as const
+    : resumeClaimWritingUnavailableResult
+}
+
 async function writeResumeClaims({
-  apiKey,
-  model,
-  reasoningEffort,
-  request,
+  configuration,
   revision,
   writingInputs,
 }: Readonly<{
-  apiKey: string
-  model: string
-  reasoningEffort: 'low' | 'medium'
-  request: typeof fetch
+  configuration: ActiveOpenAiModelConfiguration
   revision?: Readonly<{
     candidateRequest?: string
     claim: unknown
@@ -85,16 +78,20 @@ async function writeResumeClaims({
   writingInputs: ResumeClaimWritingInputs
 }>) {
   const response = await requestOpenAi({
-    apiKey,
+    ...configuration,
     developerText: writingInstructions,
-    model,
-    reasoningEffort,
-    request,
     responseFormat: resumeClaimResponseFormat,
     userValue: revision === undefined ? writingInputs : { ...writingInputs, revision },
   })
   if (!response.ok) return resumeClaimWritingUnavailableResult
-  const parsedClaims = proposedResumeClaimsSchema.safeParse(response.value)
+  return parseWrittenClaims({ value: response.value, writingInputs })
+}
+
+function parseWrittenClaims({ value, writingInputs }: Readonly<{
+  value: unknown
+  writingInputs: ResumeClaimWritingInputs
+}>) {
+  const parsedClaims = proposedResumeClaimsSchema.safeParse(value)
   if (!parsedClaims.success) return resumeClaimWritingUnavailableResult
   return hasOnlyResumeClaimInputReferences({
     claims: parsedClaims.data.claims,
@@ -105,31 +102,22 @@ async function writeResumeClaims({
 }
 
 async function validateResumeClaim({
-  apiKey,
-  claim,
-  model,
-  reasoningEffort,
-  request,
-  verifiedFacts,
+  configuration,
+  validationRequest,
 }: Readonly<{
-  apiKey: string
-  model: string
-  reasoningEffort: 'low' | 'medium'
-  request: typeof fetch
-}> & Parameters<ResumeClaimSemanticValidator['validate']>[0]) {
+  configuration: ActiveOpenAiModelConfiguration
+  validationRequest: Parameters<ResumeClaimSemanticValidator['validate']>[0]
+}>) {
   const response = await requestOpenAi({
-    apiKey,
+    ...configuration,
     developerText: validationInstructions,
-    model,
-    reasoningEffort,
-    request,
     responseFormat: resumeClaimValidationResponseFormat,
-    userValue: { claim, verifiedFacts },
+    userValue: validationRequest,
   })
   if (!response.ok) return resumeClaimValidationUnavailableResult
   const validation = semanticValidationSchema.safeParse(response.value)
   return validation.success
-    ? { ok: true, value: validation.data.supported } as const
+    ? { ok: true, value: validation.data } as const
     : resumeClaimValidationUnavailableResult
 }
 
@@ -151,30 +139,47 @@ async function requestOpenAi({
   userValue: unknown
 }>) {
   try {
-    const response = await request('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        reasoning: { effort: reasoningEffort },
-        store: false,
-        input: [
-          { role: 'developer', content: [{ type: 'input_text', text: developerText }] },
-          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify(userValue) }] },
-        ],
-        text: { format: responseFormat },
-      }),
-      signal: AbortSignal.timeout(resumeClaimTimeoutMilliseconds),
-    })
+    const response = await request('https://api.openai.com/v1/responses', createOpenAiRequest({
+      apiKey, developerText, model, reasoningEffort, responseFormat, userValue,
+    }))
     if (!response.ok) return unavailableOpenAiResult
-    const parsedResponse = openAiResponseSchema.safeParse(await response.json())
-    if (!parsedResponse.success) return unavailableOpenAiResult
-    const outputText = readOutputText({ output: parsedResponse.data.output })
-    if (outputText === undefined) return unavailableOpenAiResult
-    return { ok: true, value: JSON.parse(outputText) as unknown } as const
+    return parseOpenAiResponse(await response.json())
   } catch {
     return unavailableOpenAiResult
   }
+}
+
+function createOpenAiRequest({
+  apiKey, developerText, model, reasoningEffort, responseFormat, userValue,
+}: Omit<Parameters<typeof requestOpenAi>[0], 'request'>) {
+  return {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model, reasoning: { effort: reasoningEffort }, store: false,
+      input: createOpenAiInput({ developerText, userValue }),
+      text: { format: responseFormat },
+    }),
+    signal: AbortSignal.timeout(resumeClaimTimeoutMilliseconds),
+  } as const
+}
+
+function createOpenAiInput({ developerText, userValue }: Readonly<{
+  developerText: string
+  userValue: unknown
+}>) {
+  return [
+    { role: 'developer', content: [{ type: 'input_text', text: developerText }] },
+    { role: 'user', content: [{ type: 'input_text', text: JSON.stringify(userValue) }] },
+  ]
+}
+
+function parseOpenAiResponse(value: unknown) {
+  const parsedResponse = openAiResponseSchema.safeParse(value)
+  if (!parsedResponse.success) return unavailableOpenAiResult
+  const outputText = readOutputText({ output: parsedResponse.data.output })
+  if (outputText === undefined) return unavailableOpenAiResult
+  return { ok: true, value: JSON.parse(outputText) as unknown } as const
 }
 
 function readOutputText({ output }: Readonly<{ output: readonly unknown[] }>) {
@@ -203,6 +208,7 @@ const validationInstructions = [
   'Reject additions or strengthening of causality, scope, autonomy, seniority, duration, frequency, quantity, or outcome.',
   'Faithful compression, translation, voice changes, and omission are supported.',
   'Return supported false when any semantic fragment goes beyond its referenced facts.',
+  'For each failure, return its segmentIndex and the exact strengthened dimension as feedback.',
 ].join(' ')
 
 const segmentJsonSchema = {
@@ -252,15 +258,66 @@ const resumeClaimValidationResponseFormat = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['supported'],
-    properties: { supported: { type: 'boolean' } },
+    required: ['supported', 'feedback'],
+    properties: {
+      supported: { type: 'boolean' },
+      feedback: {
+        type: 'array',
+        maxItems: 20,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['code', 'segmentIndex'],
+          properties: {
+            code: {
+              type: 'string',
+              enum: [
+                'unsupported-meaning',
+                'strengthened-autonomy',
+                'strengthened-causality',
+                'strengthened-duration',
+                'strengthened-frequency',
+                'strengthened-outcome',
+                'strengthened-quantity',
+                'strengthened-scope',
+                'strengthened-seniority',
+              ],
+            },
+            segmentIndex: { type: 'integer', minimum: 0 },
+          },
+        },
+      },
+    },
   },
 } as const
 
 const openAiResponseSchema = z.object({ output: z.array(z.unknown()) })
 const openAiOutputItemSchema = z.object({ content: z.array(z.unknown()) })
 const openAiOutputTextSchema = z.object({ type: z.literal('output_text'), text: z.string() })
-const semanticValidationSchema = z.object({ supported: z.boolean() })
+const semanticValidationSchema = z.object({
+  supported: z.boolean(),
+  feedback: z.array(z.object({
+    code: z.enum([
+      'unsupported-meaning',
+      'strengthened-autonomy',
+      'strengthened-causality',
+      'strengthened-duration',
+      'strengthened-frequency',
+      'strengthened-outcome',
+      'strengthened-quantity',
+      'strengthened-scope',
+      'strengthened-seniority',
+    ]),
+    segmentIndex: z.number().int().min(0),
+  })).max(20),
+}).superRefine((validation, context) => {
+  if (!validation.supported && validation.feedback.length === 0) {
+    context.addIssue({ code: 'custom', path: ['feedback'], message: 'Feedback is required' })
+  }
+  if (validation.supported && validation.feedback.length > 0) {
+    context.addIssue({ code: 'custom', path: ['feedback'], message: 'Feedback must be empty' })
+  }
+})
 const resumeClaimTimeoutMilliseconds = 30_000
 const unavailableOpenAiResult = { ok: false } as const
 const resumeClaimWritingUnavailableResult = {

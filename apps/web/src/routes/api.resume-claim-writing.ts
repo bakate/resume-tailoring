@@ -23,13 +23,13 @@ async function writeResumeClaims({ request }: Readonly<{ request: Request }>) {
     model: environment.value.openAiWritingModel,
     reasoningEffort: environment.value.openAiWritingReasoningEffort,
   })
-  const result = await useWriter({ request: writingRequest.value, writer })
+  const result = await executeWritingRequest({ request: writingRequest.value, writer })
   return result.ok
     ? Response.json({ ok: true, value: { claims: result.value } }, { headers: privateHeaders })
     : createFailureResponse({ status: 502 })
 }
 
-function useWriter({
+function executeWritingRequest({
   request,
   writer,
 }: Readonly<{

@@ -103,27 +103,8 @@ export function createBrowserResumeClaimWriter({
   request = fetch,
 }: Readonly<{ request?: typeof fetch }> = {}): ResumeClaimWriter {
   return {
-    write: (writingInputs) => requestResumeClaimWriting({
-      request,
-      value: { operation: 'write', ...writingInputs },
-      writingInputs,
-    }).then((result) => result.ok
-      ? { ok: true, value: result.value.claims } as const
-      : result),
-    reformulate: ({ claim, feedback, request: candidateRequest, ...writingInputs }) =>
-      requestResumeClaimWriting({
-        request,
-        value: {
-          operation: 'reformulate',
-          ...writingInputs,
-          claim,
-          feedback,
-          ...(candidateRequest === undefined ? {} : { request: candidateRequest }),
-        },
-        writingInputs,
-      }).then((result) => result.ok && result.value.claims.length === 1
-        ? { ok: true, value: result.value.claims[0] ?? claim } as const
-        : resumeClaimWritingUnavailableResult),
+    write: (writingInputs) => writeBrowserResumeClaims({ request, writingInputs }),
+    reformulate: (reformulation) => reformulateBrowserResumeClaim({ request, reformulation }),
   }
 }
 
@@ -131,20 +112,45 @@ export function createBrowserResumeClaimSemanticValidator({
   request = fetch,
 }: Readonly<{ request?: typeof fetch }> = {}): ResumeClaimSemanticValidator {
   return {
-    validate: async (validationRequest) => {
-      try {
-        const response = await request('/api/resume-claim-validation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(validationRequest),
-          cache: 'no-store',
-        })
-        const result = resumeClaimValidationResultSchema.safeParse(await response.json())
-        return result.success ? result.data : resumeClaimValidationUnavailableResult
-      } catch {
-        return resumeClaimValidationUnavailableResult
-      }
-    },
+    validate: (validationRequest) => requestResumeClaimValidation({ request, validationRequest }),
+  }
+}
+
+async function writeBrowserResumeClaims({ request, writingInputs }: Readonly<{
+  request: typeof fetch
+  writingInputs: Parameters<ResumeClaimWriter['write']>[0]
+}>) {
+  const result = await requestResumeClaimWriting({
+    request, value: { operation: 'write', ...writingInputs }, writingInputs,
+  })
+  return result.ok ? { ok: true, value: result.value.claims } as const : result
+}
+
+async function reformulateBrowserResumeClaim({ request, reformulation }: Readonly<{
+  request: typeof fetch
+  reformulation: Parameters<ResumeClaimWriter['reformulate']>[0]
+}>) {
+  const { claim, feedback, request: candidateRequest, ...writingInputs } = reformulation
+  const value = {
+    operation: 'reformulate', ...writingInputs, claim, feedback,
+    ...(candidateRequest === undefined ? {} : { request: candidateRequest }),
+  }
+  const result = await requestResumeClaimWriting({ request, value, writingInputs })
+  return result.ok && result.value.claims.length === 1
+    ? { ok: true, value: result.value.claims[0] ?? claim } as const
+    : resumeClaimWritingUnavailableResult
+}
+
+async function requestResumeClaimValidation({ request, validationRequest }: Readonly<{
+  request: typeof fetch
+  validationRequest: Parameters<ResumeClaimSemanticValidator['validate']>[0]
+}>) {
+  try {
+    const response = await request('/api/resume-claim-validation', createJsonRequest(validationRequest))
+    const result = resumeClaimValidationResultSchema.safeParse(await response.json())
+    return result.success ? result.data : resumeClaimValidationUnavailableResult
+  } catch {
+    return resumeClaimValidationUnavailableResult
   }
 }
 
@@ -156,14 +162,9 @@ async function requestResumeClaimWriting({
   request: typeof fetch
   value: unknown
   writingInputs: Parameters<ResumeClaimWriter['write']>[0]
-}>) {
+  }>) {
   try {
-    const response = await request('/api/resume-claim-writing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(value),
-      cache: 'no-store',
-    })
+    const response = await request('/api/resume-claim-writing', createJsonRequest(value))
     const result = resumeClaimWritingResultSchema.safeParse(await response.json())
     if (!result.success || !result.data.ok) return resumeClaimWritingUnavailableResult
     return hasOnlyResumeClaimInputReferences({
@@ -173,6 +174,15 @@ async function requestResumeClaimWriting({
   } catch {
     return resumeClaimWritingUnavailableResult
   }
+}
+
+function createJsonRequest(value: unknown) {
+  return {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(value),
+    cache: 'no-store',
+  } as const
 }
 
 async function requestMatchEvidence({
