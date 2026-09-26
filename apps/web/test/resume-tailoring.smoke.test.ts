@@ -379,7 +379,7 @@ class ResumeTailoringBrowserTestSystem {
     this.#expectCompletedAction('resume-tailoring-viewed')
     await expect(this.#page.locator('html')).toHaveAttribute('lang', 'fr')
     await expect(
-      this.#page.getByRole('heading', { name: 'Adaptez votre CV sans rien inventer.' }),
+      this.#page.getByRole('heading', { name: 'Adapte ton CV sans rien inventer.' }),
     ).toBeVisible()
     await expect(this.#page.getByRole('button', { name: 'Français' })).toHaveAttribute(
       'aria-pressed',
@@ -396,7 +396,9 @@ class ResumeTailoringBrowserTestSystem {
     this.#expectCompletedAction('resume-tailoring-viewed')
     await this.expectResumeTailoringToBeInFrench()
     await expect(this.#page.getByText('Parcours ouvert')).toBeVisible()
-    await expect(this.#page.getByRole('button', { name: "Commencer l'adaptation" })).toBeDisabled()
+    await expect(
+      this.#page.getByRole('button', { name: 'Commencer à adapter mon CV' }),
+    ).toBeDisabled()
     expect(await this.#page.evaluate(() => localStorage.getItem('honest-resume-locale'))).toBe('fr')
   }
 
