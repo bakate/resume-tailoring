@@ -5,6 +5,9 @@ import {
 import type {
   CandidateSessionId,
   ResumeTailoringState,
+  SourceProfileFact,
+  SourceProfileFactContent,
+  SourceProfileFactId,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 import type {
@@ -13,23 +16,44 @@ import type {
   ResumeTailoringView,
   ResumeTailoringWorkflow,
 } from './resume-tailoring-workflow'
+import { sourceProfileProcessingNoticeVersion } from './resume-tailoring-workflow'
 import type {
   CandidateSessionClock,
   CandidateSessionIdentity,
   CandidateSessionPersistence,
   PrivacySafeTelemetry,
+  SourceDocumentReader,
+  SourceProfileFactIdentity,
+  SourceProfileExtractor,
 } from './resume-tailoring-workflow-ports'
+import {
+  correctSourceProfileFact,
+  createReviewingSourceProfile,
+  decideSourceProfileFacts,
+  resolveSourceProfileFactConflict,
+} from './source-profile'
 
 type ResumeTailoringDependencies = Readonly<{
   candidateSessionClock: CandidateSessionClock
   candidateSessionIdentity: CandidateSessionIdentity
   candidateSessionPersistence: CandidateSessionPersistence
+  sourceDocumentReader?: SourceDocumentReader
+  sourceProfileFactIdentity?: SourceProfileFactIdentity
+  sourceProfileExtractor?: SourceProfileExtractor
   telemetry: PrivacySafeTelemetry
 }>
 
 type ReadyResumeTailoringState = Extract<
   ResumeTailoringState,
   { readonly status: 'ready' }
+>
+type SourceProfileFactCommand = Exclude<ResumeTailoringCommand,
+  | { readonly type: 'open-workflow' }
+  | { readonly type: 'delete-session' }
+  | { readonly type: 'import-source-document' }
+  | { readonly type: 'update-source-content' }
+  | { readonly type: 'confirm-processing-notice' }
+  | { readonly type: 'extract-source-profile' }
 >
 
 export function createResumeTailoringWorkflow(
@@ -73,9 +97,186 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
   }
 
   #executeCommand(command: ResumeTailoringCommand) {
-    return command.type === 'open-workflow'
-      ? this.#openWorkflow()
-      : this.#deleteSession()
+    if (command.type === 'open-workflow') return this.#openWorkflow()
+    if (command.type === 'delete-session') return this.#deleteSession()
+    if (command.type === 'import-source-document') return this.#importSourceDocument(command)
+    if (command.type === 'update-source-content') {
+      return this.#updateSourceContent(command)
+    }
+    if (command.type === 'confirm-processing-notice') return this.#confirmProcessingNotice()
+    if (command.type === 'extract-source-profile') return this.#extractSourceProfile()
+    return this.#executeSourceProfileFactCommand(command)
+  }
+
+  #executeSourceProfileFactCommand(command: SourceProfileFactCommand) {
+    if (command.type === 'confirm-source-fact') {
+      return this.#decideSourceProfileFacts({ factIds: [command.factId], status: 'verified' })
+    }
+    if (command.type === 'confirm-source-facts') {
+      return this.#decideSourceProfileFacts({ factIds: command.factIds, status: 'verified' })
+    }
+    if (command.type === 'correct-source-fact') return this.#correctSourceProfileFact(command)
+    if (command.type === 'resolve-source-fact-conflict') {
+      return this.#resolveSourceProfileFactConflict(command)
+    }
+    return this.#decideSourceProfileFacts({ factIds: [command.factId], status: 'rejected' })
+  }
+
+  async #resolveSourceProfileFactConflict({
+    selectedFactId,
+  }: Extract<ResumeTailoringCommand, {
+    readonly type: 'resolve-source-fact-conflict'
+  }>): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasReviewingFacts(currentState)) return sourceProfileFactUnavailableResult
+    const transition = resolveSourceProfileFactConflict({
+      facts: currentState.value.sourceProfile.facts,
+      selectedFactId,
+    })
+    return this.#persistFactTransition({ currentState: currentState.value, transition })
+  }
+
+  async #correctSourceProfileFact(
+    command: Extract<ResumeTailoringCommand, { readonly type: 'correct-source-fact' }>,
+  ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasReviewingFacts(currentState)) return sourceProfileFactUnavailableResult
+    const identity = this.#dependencies.sourceProfileFactIdentity?.create()
+    if (identity === undefined || !identity.ok) return sourceProfileFactUnavailableResult
+    const transition = correctSourceProfileFact({
+      correctedValue: command.correctedValue,
+      factId: command.factId,
+      facts: currentState.value.sourceProfile.facts,
+      newFactId: identity.value,
+    })
+    return this.#persistFactTransition({ currentState: currentState.value, transition })
+  }
+
+  async #decideSourceProfileFacts({
+    factIds,
+    status,
+  }: Readonly<{
+    factIds: readonly SourceProfileFactId[]
+    status: 'verified' | 'rejected'
+  }>): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasReviewingFacts(currentState)) return sourceProfileFactUnavailableResult
+    const transition = decideSourceProfileFacts({
+      facts: currentState.value.sourceProfile.facts,
+      factIds,
+      status,
+    })
+    return this.#persistFactTransition({ currentState: currentState.value, transition })
+  }
+
+  #persistFactTransition({
+    currentState,
+    transition,
+  }: Readonly<{
+    currentState: ReadyResumeTailoringState & { readonly sourceProfile: NonNullable<ReadyResumeTailoringState['sourceProfile']> }
+    transition: ReturnType<typeof decideSourceProfileFacts>
+  }>) {
+    if (!transition.ok) {
+      return Promise.resolve(transition.error === 'conflict'
+        ? sourceProfileFactConflictResult
+        : sourceProfileFactUnavailableResult)
+    }
+    return this.#persistSourceProfile({
+      currentState,
+      sourceProfile: { ...currentState.sourceProfile, facts: transition.value },
+    })
+  }
+
+  async #extractSourceProfile(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasReviewingSourceProfile(currentState)) return unavailableResult
+    if (currentState.value.sourceProfile.processingNotice?.version
+      !== sourceProfileProcessingNoticeVersion) return processingNoticeRequiredResult
+    const extractor = this.#dependencies.sourceProfileExtractor
+    const sourceProfileFactIdentity = this.#dependencies.sourceProfileFactIdentity
+    if (extractor === undefined || sourceProfileFactIdentity === undefined) return unavailableResult
+
+    const extractedFacts = await extractor.extract({ professionalContent:
+      currentState.value.sourceProfile.outgoingContent })
+    if (!extractedFacts.ok) return extractedFacts
+    const facts = identifySourceProfileFacts({ factContents: extractedFacts.value,
+      sourceProfileFactIdentity })
+    if (facts === null) return unavailableResult
+    return this.#persistExtractedFacts({ currentState: currentState.value, facts })
+  }
+
+  #persistExtractedFacts({ currentState, facts }: Readonly<{
+    currentState: ReadyResumeTailoringState & { readonly sourceProfile: NonNullable<ReadyResumeTailoringState['sourceProfile']> }
+    facts: readonly SourceProfileFact[]
+  }>) {
+    return this.#persistSourceProfile({
+      currentState,
+      sourceProfile: {
+        ...currentState.sourceProfile,
+        status: 'reviewing-facts',
+        facts,
+      },
+    })
+  }
+
+  async #confirmProcessingNotice(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasReviewingSourceProfile(currentState)) return unavailableResult
+    return this.#persistSourceProfile({
+      currentState: currentState.value,
+      sourceProfile: {
+        ...currentState.value.sourceProfile,
+        processingNotice: {
+          version: sourceProfileProcessingNoticeVersion,
+          confirmedAt: this.#dependencies.candidateSessionClock.now(),
+        },
+      },
+    })
+  }
+
+  async #updateSourceContent(
+    { outgoingContent }: Extract<ResumeTailoringCommand, { readonly type: 'update-source-content' }>,
+  ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasReviewingSourceProfile(currentState)) return unavailableResult
+    return this.#persistSourceProfile({
+      currentState: currentState.value,
+      sourceProfile: {
+        ...currentState.value.sourceProfile,
+        outgoingContent,
+        processingNotice: null,
+      },
+    })
+  }
+
+  async #importSourceDocument(
+    { document }: Extract<ResumeTailoringCommand, { readonly type: 'import-source-document' }>,
+  ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!currentState.ok || currentState.value.status !== 'ready') return unavailableResult
+    if (currentState.value.sourceProfile !== undefined) return unavailableResult
+    const reader = this.#dependencies.sourceDocumentReader
+    if (reader === undefined) return unavailableResult
+
+    const documentText = await reader.read(document)
+    if (!documentText.ok) return documentText
+    return this.#persistImportedSourceDocument({ currentState: currentState.value, document, documentText: documentText.value })
+  }
+
+  async #persistImportedSourceDocument({ currentState, document, documentText }: Readonly<{
+    currentState: ReadyResumeTailoringState
+    document: Extract<ResumeTailoringCommand, { readonly type: 'import-source-document' }>['document']
+    documentText: string
+  }>) {
+    const sourceProfile = createReviewingSourceProfile({
+      documentName: document.name,
+      documentText,
+    })
+    const persistedState = await this.#dependencies.candidateSessionPersistence.update({
+      sessionId: currentState.sessionId,
+      state: { ...currentState, sourceProfile },
+    })
+    return persistedState.ok ? persistedState : unavailableResult
   }
 
   async #openWorkflow(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
@@ -102,6 +303,20 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     this.#scheduleExpiration(state)
     await this.#dependencies.telemetry.record('resume-tailoring-opened')
     return { ok: true, value: persistedState.value } as const
+  }
+
+  async #persistSourceProfile({
+    currentState,
+    sourceProfile,
+  }: Readonly<{
+    currentState: ReadyResumeTailoringState
+    sourceProfile: NonNullable<ReadyResumeTailoringState['sourceProfile']>
+  }>) {
+    const persistedState = await this.#dependencies.candidateSessionPersistence.update({
+      sessionId: currentState.sessionId,
+      state: { ...currentState, sourceProfile },
+    })
+    return persistedState.ok ? persistedState : unavailableResult
   }
 
   async #deleteSession(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
@@ -188,6 +403,48 @@ function ignoreResult(): undefined {
   return undefined
 }
 
+function identifySourceProfileFacts({
+  factContents,
+  sourceProfileFactIdentity,
+}: Readonly<{
+  factContents: readonly SourceProfileFactContent[]
+  sourceProfileFactIdentity: SourceProfileFactIdentity
+}>): readonly SourceProfileFact[] | null {
+  const facts = factContents.map((factContent) => {
+    const identity = sourceProfileFactIdentity.create()
+    return identity.ok
+      ? { ...factContent, id: identity.value, status: 'extracted' as const }
+      : null
+  })
+  return facts.includes(null) ? null : facts.filter((fact) => fact !== null)
+}
+
+function hasReviewingSourceProfile(
+  result: ResumeTailoringResult<ResumeTailoringView>,
+): result is Readonly<{
+  ok: true
+  value: ReadyResumeTailoringState & {
+    readonly sourceProfile: NonNullable<ReadyResumeTailoringState['sourceProfile']>
+  }
+}> {
+  return result.ok
+    && result.value.status === 'ready'
+    && result.value.sourceProfile?.status === 'reviewing-document'
+}
+
+function hasReviewingFacts(
+  result: ResumeTailoringResult<ResumeTailoringView>,
+): result is Readonly<{
+  ok: true
+  value: ReadyResumeTailoringState & {
+    readonly sourceProfile: NonNullable<ReadyResumeTailoringState['sourceProfile']>
+  }
+}> {
+  return result.ok
+    && result.value.status === 'ready'
+    && result.value.sourceProfile?.status === 'reviewing-facts'
+}
+
 const workflowAlreadyOpenResult = {
   ok: false,
   error: { type: 'workflow-already-open' },
@@ -196,4 +453,19 @@ const workflowAlreadyOpenResult = {
 const unavailableResult = {
   ok: false,
   error: { type: 'candidate-session-unavailable' },
+} as const satisfies ResumeTailoringResult<ResumeTailoringView>
+
+const processingNoticeRequiredResult = {
+  ok: false,
+  error: { type: 'processing-notice-required' },
+} as const satisfies ResumeTailoringResult<ResumeTailoringView>
+
+const sourceProfileFactUnavailableResult = {
+  ok: false,
+  error: { type: 'source-fact-unavailable' },
+} as const satisfies ResumeTailoringResult<ResumeTailoringView>
+
+const sourceProfileFactConflictResult = {
+  ok: false,
+  error: { type: 'source-fact-conflict' },
 } as const satisfies ResumeTailoringResult<ResumeTailoringView>

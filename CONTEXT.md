@@ -12,6 +12,12 @@ _Avoid_: User, applicant, profile owner
 The structured set of professional facts approved by the Candidate after document import and manual editing.
 _Avoid_: LinkedIn profile, raw profile, candidate data
 
+**Source Profile Review**:
+The transient, browser-local working state used to build a Source Profile. It contains the minimized Source Document content and immutable Source Profile Facts in extracted, verified, rejected, or superseded states.
+
+**Source Profile Fact**:
+An immutable professional proposition in the Source Profile Review. It becomes a Verified Fact only after explicit Candidate confirmation.
+
 **Source Document**:
 A text-based LinkedIn PDF or existing resume supplied by the Candidate as input for the Source Profile.
 _Avoid_: Profile URL, scraped profile, raw PDF

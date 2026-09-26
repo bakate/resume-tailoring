@@ -6,9 +6,12 @@ import {
 } from '../localization/localization'
 import type { Locale, Localization } from '../localization/localization'
 import { useCandidateSession } from './use-candidate-session'
-import type { CandidateSessionFailureMessageKey } from './use-candidate-session'
+import type {
+  CandidateSessionController,
+  CandidateSessionFailureMessageKey,
+} from './use-candidate-session'
+import { SourceProfileWorkspace } from './source-profile-workspace'
 
-type CandidateSessionController = ReturnType<typeof useCandidateSession>
 type LocalizationProps = Readonly<{ localization: Localization }>
 type CandidateSessionProps = Readonly<{
   candidateSession: CandidateSessionController
@@ -27,6 +30,10 @@ function LocalizedResumeTailoringScreen({ localization }: LocalizationProps) {
     <main className="app-shell">
       <SiteHeader localization={localization} />
       <WorkflowHero candidateSession={candidateSession} localization={localization} />
+      <SourceProfileWorkspace
+        candidateSession={candidateSession}
+        localization={localization}
+      />
       <ValueStrip localization={localization} />
     </main>
   )

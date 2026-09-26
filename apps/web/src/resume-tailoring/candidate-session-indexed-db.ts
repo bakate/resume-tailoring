@@ -4,6 +4,11 @@ import type {
   ResumeTailoringState,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 
+import {
+  sourceProfileReviewSchema,
+  storedCandidateSessionSchema,
+} from './source-profile-schemas'
+
 const databaseName = 'honest-resume'
 const databaseVersion = 1
 const candidateContentStoreName = 'candidate-content'
@@ -171,21 +176,16 @@ function isWritableSession({
 }
 
 function parseCandidateSession(value: unknown): ResumeTailoringState {
-  if (!isRecord(value) || value.status !== 'ready') return { status: 'not-started' }
-  if (typeof value.sessionId !== 'string' || !value.sessionId.startsWith('candidate-session-')) {
-    return { status: 'not-started' }
-  }
-  if (typeof value.expiresAt !== 'number') return { status: 'not-started' }
-
-  return {
+  const result = storedCandidateSessionSchema.safeParse(value)
+  if (!result.success) return { status: 'not-started' }
+  const { expiresAt, sessionId, sourceProfile: storedSourceProfile } = result.data
+  const readyState = {
     status: 'ready',
-    sessionId: value.sessionId as CandidateSessionId,
-    expiresAt: value.expiresAt,
-  }
-}
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === 'object' && value !== null
+    sessionId,
+    expiresAt,
+  } as const
+  const sourceProfile = sourceProfileReviewSchema.safeParse(storedSourceProfile)
+  return sourceProfile.success ? { ...readyState, sourceProfile: sourceProfile.data } : readyState
 }
 
 function openCandidateSessionDatabase(): Promise<IDBDatabase> {

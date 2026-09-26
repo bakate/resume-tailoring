@@ -10,33 +10,44 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiSourceProfileExtractionRouteImport } from './routes/api.source-profile-extraction'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSourceProfileExtractionRoute =
+  ApiSourceProfileExtractionRouteImport.update({
+    id: '/api/source-profile-extraction',
+    path: '/api/source-profile-extraction',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/api/source-profile-extraction'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/api/source-profile-extraction'
+  id: '__root__' | '/' | '/api/source-profile-extraction'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiSourceProfileExtractionRoute: typeof ApiSourceProfileExtractionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +59,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/source-profile-extraction': {
+      id: '/api/source-profile-extraction'
+      path: '/api/source-profile-extraction'
+      fullPath: '/api/source-profile-extraction'
+      preLoaderRoute: typeof ApiSourceProfileExtractionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiSourceProfileExtractionRoute: ApiSourceProfileExtractionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
