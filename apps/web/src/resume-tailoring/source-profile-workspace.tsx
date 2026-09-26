@@ -19,6 +19,7 @@ type WorkspaceProps = Readonly<{
 type SourceProfileReviewProps = WorkspaceProps & Readonly<{ sourceProfile: SourceProfileReview }>
 type FactActionProps = WorkspaceProps & Readonly<{ factId: SourceProfileFactId }>
 type ContentRevision = 'changed' | 'saved'
+type FactStatusFilter = SourceProfileFact['status'] | 'all'
 
 export function SourceProfileWorkspace({ candidateSession, localization }: WorkspaceProps) {
   if (candidateSession.view.status !== 'ready') return null
@@ -168,25 +169,90 @@ function ExtractFactsButton({ candidateSession, confirmationStatus, contentRevis
 }
 
 function SourceProfileFactsReview({ candidateSession, localization, sourceProfile }: SourceProfileReviewProps) {
-  const { translate } = localization
-  const confirmableFacts = sourceProfile.facts.filter(
+  const [statusFilter, setStatusFilter] = useState<FactStatusFilter>('all')
+  const [visibleCount, setVisibleCount] = useState(factPageSize)
+  const filteredFacts = statusFilter === 'all'
+    ? sourceProfile.facts
+    : sourceProfile.facts.filter((fact) => fact.status === statusFilter)
+  const visibleFacts = filteredFacts.slice(0, visibleCount)
+  const confirmableFacts = visibleFacts.filter(
     (fact) => fact.status === 'extracted'
       && !hasSourceProfileFactConflict({ fact, facts: sourceProfile.facts }),
   )
   return (
-    <div className="source-profile-card">
-      <h3>{translate('sourceProfile.factsTitle')}</h3>
+    <div className="source-profile-card facts-review-card">
+      <FactsReviewHeader {...{
+        facts: sourceProfile.facts, localization, setStatusFilter, setVisibleCount, statusFilter,
+      }} />
       <TransparentBatch {...{ candidateSession, confirmableFacts, localization }} />
-      <SourceProfileFactsList {...{ candidateSession, localization, sourceProfile }} />
+      <SourceProfileFactsList {...{
+        candidateSession, facts: visibleFacts, localization, sourceProfile,
+      }} />
+      <ShowMoreFacts {...{
+        filteredCount: filteredFacts.length, localization, setVisibleCount, visibleCount,
+      }} />
     </div>
   )
 }
 
-function SourceProfileFactsList({ candidateSession, localization, sourceProfile }: SourceProfileReviewProps) {
+type FactsReviewHeaderProps = Omit<SourceProfileReviewProps, 'candidateSession' | 'sourceProfile'>
+  & Readonly<{
+    facts: readonly SourceProfileFact[]
+    setStatusFilter: (status: FactStatusFilter) => void
+    setVisibleCount: (count: number) => void
+    statusFilter: FactStatusFilter
+  }>
+
+function FactsReviewHeader(props: FactsReviewHeaderProps) {
+  const { facts, localization } = props
+  const reviewedCount = facts.filter((fact) => fact.status !== 'extracted').length
+  return <div className="facts-review-header">
+    <div>
+      <h3>{localization.translate('sourceProfile.factsTitle')}</h3>
+      <p className="facts-review-progress">
+        {localization.translate('sourceProfile.reviewProgress')} {reviewedCount}/{facts.length}
+      </p>
+      <progress max={Math.max(facts.length, 1)} value={reviewedCount} />
+    </div>
+    <FactStatusFilters {...props} />
+  </div>
+}
+
+function FactStatusFilters(props: FactsReviewHeaderProps) {
+  const { facts, localization, setStatusFilter, setVisibleCount, statusFilter } = props
+  return <div aria-label={localization.translate('sourceProfile.filterLabel')}
+    className="fact-status-filters" role="group">
+    {factStatusFilters.map((filter) => <button aria-pressed={statusFilter === filter}
+      key={filter} onClick={() => { setStatusFilter(filter); setVisibleCount(factPageSize) }}
+      type="button">
+      {readFactFilterLabel({ filter, localization })} <span>{countFacts({ facts, filter })}</span>
+    </button>)}
+  </div>
+}
+
+function SourceProfileFactsList({ candidateSession, facts, localization, sourceProfile }:
+WorkspaceProps & Readonly<{ facts: readonly SourceProfileFact[]; sourceProfile: SourceProfileReview }>) {
+  if (facts.length === 0) return <p className="facts-empty-state">
+    {localization.translate('sourceProfile.filterEmpty')}
+  </p>
   return <ul className="source-fact-list">
-    {sourceProfile.facts.map((fact) => <SourceProfileFactCard
+    {facts.map((fact) => <SourceProfileFactCard
       {...{ candidateSession, fact, facts: sourceProfile.facts, localization }} key={fact.id} />)}
   </ul>
+}
+
+function ShowMoreFacts({ filteredCount, localization, setVisibleCount, visibleCount }: Readonly<{
+  filteredCount: number
+  localization: Localization
+  setVisibleCount: (count: number) => void
+  visibleCount: number
+}>) {
+  if (visibleCount >= filteredCount) return null
+  return <button className="show-more-facts" onClick={() => {
+    setVisibleCount(Math.min(visibleCount + factPageSize, filteredCount))
+  }} type="button">
+    {localization.translate('sourceProfile.showMore')} ({filteredCount - visibleCount})
+  </button>
 }
 
 function TransparentBatch({ candidateSession, confirmableFacts, localization }:
@@ -262,16 +328,38 @@ function CorrectionForm({ candidateSession, fact, localization }:
 WorkspaceProps & Readonly<{ fact: SourceProfileFact }>) {
   const [correctedValue, setCorrectedValue] = useState(fact.value)
   return (
-    <div className="correction-form">
-      <label htmlFor={`correction-${fact.id}`}>{localization.translate('sourceProfile.correctionLabel')}</label>
-      <input id={`correction-${fact.id}`} value={correctedValue}
-        onChange={(event) => { setCorrectedValue(event.currentTarget.value) }} />
-      <button disabled={correctedValue.trim().length === 0 || correctedValue === fact.value}
-        onClick={() => void candidateSession.correctSourceProfileFact({
-          factId: fact.id, correctedValue: correctedValue.trim(),
-        })} type="button">
-        {localization.translate('sourceProfile.correctFact')}
-      </button>
-    </div>
+    <details className="correction-disclosure">
+      <summary>{localization.translate('sourceProfile.correctionLabel')}</summary>
+      <div className="correction-form">
+        <label htmlFor={`correction-${fact.id}`}>{localization.translate('sourceProfile.correctionLabel')}</label>
+        <input id={`correction-${fact.id}`} value={correctedValue}
+          onChange={(event) => { setCorrectedValue(event.currentTarget.value) }} />
+        <button disabled={correctedValue.trim().length === 0 || correctedValue === fact.value}
+          onClick={() => void candidateSession.correctSourceProfileFact({
+            factId: fact.id, correctedValue: correctedValue.trim(),
+          })} type="button">
+          {localization.translate('sourceProfile.correctFact')}
+        </button>
+      </div>
+    </details>
   )
 }
+
+function countFacts({ facts, filter }: Readonly<{
+  facts: readonly SourceProfileFact[]
+  filter: FactStatusFilter
+}>) {
+  return filter === 'all' ? facts.length : facts.filter((fact) => fact.status === filter).length
+}
+
+function readFactFilterLabel({ filter, localization }: Readonly<{
+  filter: FactStatusFilter
+  localization: Localization
+}>) {
+  return filter === 'all'
+    ? localization.translate('sourceProfile.filterAll')
+    : localization.translate(`sourceProfile.status.${filter}`)
+}
+
+const factStatusFilters = ['all', 'extracted', 'verified', 'rejected', 'superseded'] as const
+const factPageSize = 20
