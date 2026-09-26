@@ -7,6 +7,7 @@ const englishCatalog = {
   'brand.tagline': 'A more honest way to get hired.',
   'locale.english': 'English',
   'locale.french': 'Français',
+  'locale.persistenceFailure': 'Your language preference could not be saved.',
   'locale.switcherLabel': 'Language',
   'hero.title': 'Tailor your resume without inventing a thing.',
   'hero.lede': 'Build a focused resume from facts you have reviewed and approved.',
@@ -47,6 +48,7 @@ const frenchCatalog = {
   'brand.tagline': 'Une manière plus honnête de décrocher un emploi.',
   'locale.english': 'Anglais',
   'locale.french': 'Français',
+  'locale.persistenceFailure': "Impossible d'enregistrer votre préférence de langue.",
   'locale.switcherLabel': 'Langue',
   'hero.title': 'Adaptez votre CV sans rien inventer.',
   'hero.lede': 'Créez un CV ciblé à partir de faits que vous avez vérifiés et approuvés.',
@@ -82,9 +84,16 @@ export type Locale = 'en' | 'fr'
 
 type Localization = Readonly<{
   locale: Locale
+  preferencePersistenceError: 'unavailable' | null
+  readiness: 'pending' | 'ready'
   selectLocale: (locale: Locale) => void
   translate: (key: TranslationKey) => string
 }>
+
+type LocaleState = Pick<Localization, 'locale' | 'preferencePersistenceError' | 'readiness'>
+type BrowserStorageResult<TValue> =
+  | Readonly<{ ok: true; value: TValue }>
+  | Readonly<{ ok: false; error: 'unavailable' }>
 
 const catalogs: Readonly<Record<Locale, Partial<TranslationCatalog>>> = {
   en: englishCatalog,
@@ -92,25 +101,25 @@ const catalogs: Readonly<Record<Locale, Partial<TranslationCatalog>>> = {
 }
 const defaultLocale: Locale = 'en'
 const localeStorageKey = 'honest-resume-locale'
-const defaultLocalization = {
+const pendingLocaleState = {
   locale: defaultLocale,
-  selectLocale: () => undefined,
-  translate: (key: TranslationKey) => englishCatalog[key],
-} as const satisfies Localization
-const LocalizationContext = createContext<Localization>(defaultLocalization)
+  preferencePersistenceError: null,
+  readiness: 'pending',
+} as const satisfies LocaleState
+const LocalizationContext = createContext<Localization | null>(null)
 
 export function LocalizationProvider({ children }: Readonly<{ children: ReactNode }>) {
-  const [locale, setLocale] = useState<Locale>(defaultLocale)
+  const [localeState, setLocaleState] = useState<LocaleState>(pendingLocaleState)
   useEffect(() => {
-    setLocale(readInitialLocale())
+    setLocaleState(readInitialLocale())
   }, [])
   return (
     <LocalizationContext.Provider value={{
-      locale,
+      ...localeState,
       selectLocale: (selectedLocale) => {
-        storeLocale({ selectedLocale, setLocale })
+        selectLocale({ selectedLocale, setLocaleState })
       },
-      translate: (key) => readTranslation({ locale, key }),
+      translate: (key) => readTranslation({ locale: localeState.locale, key }),
     }}>
       {children}
     </LocalizationContext.Provider>
@@ -118,51 +127,80 @@ export function LocalizationProvider({ children }: Readonly<{ children: ReactNod
 }
 
 export function useLocalization() {
-  return useContext(LocalizationContext)
+  const localization = useContext(LocalizationContext)
+  if (localization !== null) return localization
+  console.error('LocalizationProvider is required')
+  return unavailableLocalization
 }
 
 export const defaultDocumentTitle = englishCatalog['brand.name']
 
-function readInitialLocale(): Locale {
+function readInitialLocale(): LocaleState {
   const storedLocale = readStoredLocale()
-  if (storedLocale !== null) return storedLocale
-  return readSupportedLocale(navigator.languages)
+  if (storedLocale.ok && storedLocale.value !== null) {
+    return createReadyLocaleState({ locale: storedLocale.value, persistenceError: null })
+  }
+  return createReadyLocaleState({
+    locale: readSupportedLocale({ languages: navigator.languages }),
+    persistenceError: storedLocale.ok ? null : storedLocale.error,
+  })
 }
 
-function readStoredLocale(): Locale | null {
+function readStoredLocale(): BrowserStorageResult<Locale | null> {
   try {
     const storedLocale = localStorage.getItem(localeStorageKey)
-    return isLocale(storedLocale) ? storedLocale : null
+    return { ok: true, value: parseLocale({ value: storedLocale }) }
   } catch {
-    return null
+    return { ok: false, error: 'unavailable' }
   }
 }
 
-function readSupportedLocale(languages: readonly string[]): Locale {
+function readSupportedLocale({ languages }: Readonly<{ languages: readonly string[] }>): Locale {
   for (const language of languages) {
     const [languageCode] = language.toLowerCase().split('-')
-    if (isLocale(languageCode)) return languageCode
+    const locale = parseLocale({ value: languageCode })
+    if (locale !== null) return locale
   }
   return defaultLocale
 }
 
-function isLocale(value: string | null | undefined): value is Locale {
-  return value === 'en' || value === 'fr'
+function parseLocale({ value }: Readonly<{ value: string | null | undefined }>): Locale | null {
+  return value === 'en' || value === 'fr' ? value : null
+}
+
+function selectLocale({
+  selectedLocale,
+  setLocaleState,
+}: Readonly<{
+  selectedLocale: Locale
+  setLocaleState: (state: LocaleState) => void
+}>) {
+  const persistenceResult = storeLocale({ selectedLocale })
+  setLocaleState(createReadyLocaleState({
+    locale: selectedLocale,
+    persistenceError: persistenceResult.ok ? null : persistenceResult.error,
+  }))
 }
 
 function storeLocale({
   selectedLocale,
-  setLocale,
-}: Readonly<{
-  selectedLocale: Locale
-  setLocale: (locale: Locale) => void
-}>) {
+}: Readonly<{ selectedLocale: Locale }>): BrowserStorageResult<undefined> {
   try {
     localStorage.setItem(localeStorageKey, selectedLocale)
+    return { ok: true, value: undefined }
   } catch {
-    // The interface can still switch locale when browser storage is unavailable.
+    return { ok: false, error: 'unavailable' }
   }
-  setLocale(selectedLocale)
+}
+
+function createReadyLocaleState({
+  locale,
+  persistenceError,
+}: Readonly<{
+  locale: Locale
+  persistenceError: LocaleState['preferencePersistenceError']
+}>): LocaleState {
+  return { locale, preferencePersistenceError: persistenceError, readiness: 'ready' }
 }
 
 function readTranslation({ locale, key }: Readonly<{ locale: Locale; key: TranslationKey }>) {
@@ -174,3 +212,11 @@ function readTranslation({ locale, key }: Readonly<{ locale: Locale; key: Transl
   }
   return englishCatalog[key]
 }
+
+const unavailableLocalization = {
+  ...pendingLocaleState,
+  selectLocale: () => {
+    console.error('Locale selection is unavailable')
+  },
+  translate: (key: TranslationKey) => `[Localization unavailable: ${key}]`,
+} as const satisfies Localization

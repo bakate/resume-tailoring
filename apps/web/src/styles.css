@@ -91,6 +91,13 @@ h1,
   gap: 28px;
 }
 
+.locale-failure {
+  position: absolute;
+  top: 78px;
+  right: clamp(24px, 4.5vw, 72px);
+  color: #982f28;
+}
+
 .locale-switcher {
   display: flex;
   gap: 4px;

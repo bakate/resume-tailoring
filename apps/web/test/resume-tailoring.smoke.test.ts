@@ -5,6 +5,7 @@ import type { CandidateSessionPersistence } from '@resume-tailoring/application/
 declare global {
   interface Window {
     candidateSessionTestPersistence?: CandidateSessionPersistence
+    presentedDocumentLocales: string[]
     readInstalledPersistence: () => CandidateSessionPersistence
   }
 }
@@ -114,7 +115,7 @@ test('explains local expiry for Candidate content', async ({ page }) => {
 test('renders the Resume Tailoring interface in English', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
-  await system.givenBrowserPrefersLanguages(['en-US', 'fr-FR'])
+  await system.givenBrowserPrefersLanguages({ languages: ['en-US', 'fr-FR'] })
 
   await system.viewResumeTailoring()
 
@@ -124,17 +125,18 @@ test('renders the Resume Tailoring interface in English', async ({ page }) => {
 test('renders the Resume Tailoring interface in French', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
-  await system.givenBrowserPrefersLanguages(['fr-FR', 'en-US'])
+  await system.givenBrowserPrefersLanguages({ languages: ['fr-FR', 'en-US'] })
 
   await system.viewResumeTailoring()
 
   await system.expectResumeTailoringToBeInFrench()
+  await system.expectFrenchWasFirstPresentedLocale()
 })
 
 test('falls back to English for unsupported browser languages', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
-  await system.givenBrowserPrefersLanguages(['de-DE'])
+  await system.givenBrowserPrefersLanguages({ languages: ['de-DE'] })
 
   await system.viewResumeTailoring()
 
@@ -187,10 +189,23 @@ class ResumeTailoringBrowserTestSystem {
     await this.#page.getByText('Workflow opened').waitFor()
   }
 
-  async givenBrowserPrefersLanguages(languages: readonly string[]) {
+  async givenBrowserPrefersLanguages({ languages }: Readonly<{ languages: readonly string[] }>) {
     await this.#page.addInitScript((browserLanguages) => {
+      window.presentedDocumentLocales = []
       Object.defineProperty(navigator, 'languages', { get: () => browserLanguages })
-      Object.defineProperty(navigator, 'language', { get: () => browserLanguages[0] })
+      Object.defineProperty(navigator, 'language', { get: () => browserLanguages[0] ?? 'en-US' })
+      const recordPresentedLocale = () => {
+        const body = document.querySelector('body')
+        if (body === null || getComputedStyle(body).visibility === 'hidden') return
+        const presentedLocale = document.documentElement.lang
+        if (window.presentedDocumentLocales.includes(presentedLocale)) return
+        window.presentedDocumentLocales.push(presentedLocale)
+      }
+      new MutationObserver(recordPresentedLocale).observe(document, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+      })
     }, languages)
   }
 
@@ -370,6 +385,11 @@ class ResumeTailoringBrowserTestSystem {
       'aria-pressed',
       'true',
     )
+  }
+
+  async expectFrenchWasFirstPresentedLocale() {
+    this.#expectCompletedAction('resume-tailoring-viewed')
+    expect(await this.#page.evaluate(() => window.presentedDocumentLocales)).toEqual(['fr'])
   }
 
   async expectFrenchLocaleAndCandidateSessionToBeRetained() {

@@ -60,16 +60,18 @@ function NotFound() {
 }
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
-  const { locale } = useLocalization()
+  const { locale, readiness } = useLocalization()
   return (
     <html lang={locale}>
       <head>
         <HeadContent />
       </head>
-      <body>
+      <body style={readiness === 'pending' ? pendingLocaleStyle : undefined}>
         {children}
         <Scripts />
       </body>
     </html>
   )
 }
+
+const pendingLocaleStyle = { visibility: 'hidden' } as const

@@ -19,7 +19,7 @@ export function ResumeTailoringScreen() {
 }
 
 function SiteHeader() {
-  const { translate } = useLocalization()
+  const { preferencePersistenceError, translate } = useLocalization()
   return (
     <header className="site-header">
       <a className="brand" href="/" aria-label={translate('brand.homeLabel')}>
@@ -29,6 +29,11 @@ function SiteHeader() {
         <p>{translate('brand.tagline')}</p>
         <LocaleSwitcher />
       </div>
+      {preferencePersistenceError === null ? null : (
+        <p className="locale-failure" role="alert">
+          {translate('locale.persistenceFailure')}
+        </p>
+      )}
     </header>
   )
 }
@@ -53,17 +58,14 @@ function LocaleSwitcher() {
   )
 }
 
-function LocaleButton({
-  activeLocale,
-  label,
-  locale,
-  selectLocale,
-}: Readonly<{
+type LocaleButtonProps = Readonly<{
   activeLocale: Locale
   label: string
   locale: Locale
   selectLocale: (locale: Locale) => void
-}>) {
+}>
+
+function LocaleButton({ activeLocale, label, locale, selectLocale }: LocaleButtonProps) {
   return (
     <button
       aria-pressed={activeLocale === locale}
@@ -157,17 +159,13 @@ function WorkflowSummary({ candidateSession }: Readonly<{
 
 function WorkflowStatus({ view }: Readonly<{ view: ResumeTailoringView }>) {
   const { translate } = useLocalization()
-  const isReady = view.status === 'ready'
+  const statusCopy = workflowStatusCopy[view.status]
   return (
     <div className="workflow-status" aria-live="polite">
       <span className="status-mark" aria-hidden="true">✓</span>
       <div>
-        <strong>{translate(isReady ? 'workflow.opened' : 'workflow.ready')}</strong>
-        <p>
-          {translate(
-            isReady ? 'workflow.openedDescription' : 'workflow.readyDescription',
-          )}
-        </p>
+        <strong>{translate(statusCopy.title)}</strong>
+        <p>{translate(statusCopy.description)}</p>
       </div>
     </div>
   )
@@ -175,20 +173,7 @@ function WorkflowStatus({ view }: Readonly<{ view: ResumeTailoringView }>) {
 
 function WorkflowSteps() {
   const { translate } = useLocalization()
-  const workflowSteps = [
-    {
-      title: translate('workflow.sourceProfile'),
-      description: translate('workflow.sourceProfileDescription'),
-    },
-    {
-      title: translate('workflow.jobPosting'),
-      description: translate('workflow.jobPostingDescription'),
-    },
-    {
-      title: translate('workflow.tailoredResume'),
-      description: translate('workflow.tailoredResumeDescription'),
-    },
-  ] as const
+  const workflowSteps = createWorkflowSteps({ translate })
   return (
     <ol className="workflow-steps">
       {workflowSteps.map((step, stepIndex) => (
@@ -199,6 +184,28 @@ function WorkflowSteps() {
       ))}
     </ol>
   )
+}
+
+function createWorkflowSteps({ translate }: Readonly<{
+  translate: ReturnType<typeof useLocalization>['translate']
+}>) {
+  return [
+    createWorkflowStep({ translate, name: 'sourceProfile' }),
+    createWorkflowStep({ translate, name: 'jobPosting' }),
+    createWorkflowStep({ translate, name: 'tailoredResume' }),
+  ] as const
+}
+
+type WorkflowStepName = 'jobPosting' | 'sourceProfile' | 'tailoredResume'
+
+function createWorkflowStep({ translate, name }: Readonly<{
+  translate: ReturnType<typeof useLocalization>['translate']
+  name: WorkflowStepName
+}>) {
+  return {
+    title: translate(`workflow.${name}`),
+    description: translate(`workflow.${name}Description`),
+  }
 }
 
 function DeleteSessionButton({ candidateSession }: Readonly<{
@@ -247,3 +254,14 @@ function LockIcon() {
     </svg>
   )
 }
+
+const workflowStatusCopy = {
+  'not-started': {
+    title: 'workflow.ready',
+    description: 'workflow.readyDescription',
+  },
+  ready: {
+    title: 'workflow.opened',
+    description: 'workflow.openedDescription',
+  },
+} as const
