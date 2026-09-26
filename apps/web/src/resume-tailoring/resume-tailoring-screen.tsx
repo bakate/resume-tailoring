@@ -11,6 +11,7 @@ import type {
   CandidateSessionFailureMessageKey,
 } from './use-candidate-session'
 import { SourceProfileWorkspace } from './source-profile-workspace'
+import { JobPostingWorkspace } from './job-posting-workspace'
 
 type LocalizationProps = Readonly<{ localization: Localization }>
 type CandidateSessionProps = Readonly<{
@@ -31,6 +32,10 @@ function LocalizedResumeTailoringScreen({ localization }: LocalizationProps) {
       <SiteHeader localization={localization} />
       <WorkflowHero candidateSession={candidateSession} localization={localization} />
       <SourceProfileWorkspace
+        candidateSession={candidateSession}
+        localization={localization}
+      />
+      <JobPostingWorkspace
         candidateSession={candidateSession}
         localization={localization}
       />

@@ -4,6 +4,8 @@ import {
 } from '@resume-tailoring/domain/resume-tailoring-state'
 import type {
   CandidateSessionId,
+  JobPostingReview,
+  JobRequirement,
   ResumeTailoringState,
   SourceProfileFact,
   SourceProfileFactContent,
@@ -17,6 +19,9 @@ import type {
   ResumeTailoringWorkflow,
 } from './resume-tailoring-workflow'
 import { sourceProfileProcessingNoticeVersion } from './resume-tailoring-workflow'
+import { jobPostingProcessingNoticeVersion } from './resume-tailoring-workflow'
+import { jobPostingProcessingPolicy } from './resume-tailoring-workflow'
+import { hasCurrentJobPostingProcessingConsent } from './resume-tailoring-workflow'
 import type {
   CandidateSessionClock,
   CandidateSessionIdentity,
@@ -25,7 +30,15 @@ import type {
   SourceDocumentReader,
   SourceProfileFactIdentity,
   SourceProfileExtractor,
+  JobRequirementExtractor,
+  JobRequirementGroupIdentity,
+  JobRequirementIdentity,
 } from './resume-tailoring-workflow-ports'
+import {
+  createReviewingJobPosting,
+  identifyJobRequirements,
+  updateJobPosting,
+} from './job-requirement'
 import {
   correctSourceProfileFact,
   createReviewingSourceProfile,
@@ -37,6 +50,9 @@ type ResumeTailoringDependencies = Readonly<{
   candidateSessionClock: CandidateSessionClock
   candidateSessionIdentity: CandidateSessionIdentity
   candidateSessionPersistence: CandidateSessionPersistence
+  jobRequirementExtractor?: JobRequirementExtractor
+  jobRequirementGroupIdentity?: JobRequirementGroupIdentity
+  jobRequirementIdentity?: JobRequirementIdentity
   sourceDocumentReader?: SourceDocumentReader
   sourceProfileFactIdentity?: SourceProfileFactIdentity
   sourceProfileExtractor?: SourceProfileExtractor
@@ -54,6 +70,10 @@ type SourceProfileFactCommand = Exclude<ResumeTailoringCommand,
   | { readonly type: 'update-source-content' }
   | { readonly type: 'confirm-processing-notice' }
   | { readonly type: 'extract-source-profile' }
+  | { readonly type: 'review-job-posting' }
+  | { readonly type: 'update-job-posting-content' }
+  | { readonly type: 'confirm-job-posting-processing-notice' }
+  | { readonly type: 'extract-job-requirements' }
 >
 
 export function createResumeTailoringWorkflow(
@@ -105,7 +125,105 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     }
     if (command.type === 'confirm-processing-notice') return this.#confirmProcessingNotice()
     if (command.type === 'extract-source-profile') return this.#extractSourceProfile()
+    if (command.type === 'review-job-posting') return this.#reviewJobPosting(command)
+    if (command.type === 'update-job-posting-content') {
+      return this.#updateJobPostingContent(command)
+    }
+    if (command.type === 'confirm-job-posting-processing-notice') {
+      return this.#confirmJobPostingProcessingNotice()
+    }
+    if (command.type === 'extract-job-requirements') return this.#extractJobRequirements()
     return this.#executeSourceProfileFactCommand(command)
+  }
+
+  async #reviewJobPosting(
+    { content }: Extract<ResumeTailoringCommand, { readonly type: 'review-job-posting' }>,
+  ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasReadyState(currentState) || currentState.value.jobPosting !== undefined) {
+      return unavailableResult
+    }
+    return this.#persistJobPosting({
+      currentState: currentState.value,
+      jobPosting: createReviewingJobPosting({ content }),
+    })
+  }
+
+  async #updateJobPostingContent(
+    { outgoingContent }: Extract<ResumeTailoringCommand, {
+      readonly type: 'update-job-posting-content'
+    }>,
+  ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasJobPosting(currentState)) return unavailableResult
+    return this.#persistJobPosting({
+      currentState: currentState.value,
+      jobPosting: updateJobPosting({
+        jobPosting: currentState.value.jobPosting,
+        outgoingContent,
+      }),
+    })
+  }
+
+  async #confirmJobPostingProcessingNotice(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasReviewingJobPosting(currentState)) return unavailableResult
+    return this.#persistJobPosting({
+      currentState: currentState.value,
+      jobPosting: {
+        ...currentState.value.jobPosting,
+        processingNotice: {
+          ...jobPostingProcessingPolicy,
+          version: jobPostingProcessingNoticeVersion,
+          confirmedAt: this.#dependencies.candidateSessionClock.now(),
+        },
+      },
+    })
+  }
+
+  async #extractJobRequirements(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasReviewingJobPosting(currentState)) return unavailableResult
+    if (!hasCurrentJobPostingProcessingConsent({ jobPosting: currentState.value.jobPosting })) {
+      return processingNoticeRequiredResult
+    }
+    const extraction = await this.#requestJobRequirementExtraction({
+      jobPosting: currentState.value.jobPosting,
+    })
+    if (!extraction.ok) return extraction
+    return this.#persistExtractedJobRequirements({
+      currentState: currentState.value,
+      requirements: extraction.value,
+    })
+  }
+
+  async #requestJobRequirementExtraction({ jobPosting }: Readonly<{
+    jobPosting: JobPostingReview
+  }>) {
+    const extractor = this.#dependencies.jobRequirementExtractor
+    const groupIdentity = this.#dependencies.jobRequirementGroupIdentity
+    const requirementIdentity = this.#dependencies.jobRequirementIdentity
+    if (extractor === undefined || groupIdentity === undefined || requirementIdentity === undefined) {
+      return jobRequirementExtractionUnavailableResult
+    }
+    const extraction = await extractor.extract({ jobPostingContent: jobPosting.outgoingContent })
+    if (!extraction.ok) return extraction
+    const requirements = identifyJobRequirements({
+      contents: extraction.value, groupIdentity, requirementIdentity,
+    })
+    return requirements === null
+      ? jobRequirementExtractionUnavailableResult
+      : { ok: true, value: requirements } as const
+  }
+
+  #persistExtractedJobRequirements({ currentState, requirements }: Readonly<{
+    currentState: ReadyResumeTailoringState & { readonly jobPosting: JobPostingReview }
+    requirements: readonly JobRequirement[]
+  }>) {
+    return this.#persistJobPosting({
+      currentState,
+      jobPosting: { ...currentState.jobPosting, status: 'reviewing-requirements', requirements },
+    })
   }
 
   #executeSourceProfileFactCommand(command: SourceProfileFactCommand) {
@@ -319,6 +437,17 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     return persistedState.ok ? persistedState : unavailableResult
   }
 
+  async #persistJobPosting({ currentState, jobPosting }: Readonly<{
+    currentState: ReadyResumeTailoringState
+    jobPosting: JobPostingReview
+  }>) {
+    const persistedState = await this.#dependencies.candidateSessionPersistence.update({
+      sessionId: currentState.sessionId,
+      state: { ...currentState, jobPosting },
+    })
+    return persistedState.ok ? persistedState : unavailableResult
+  }
+
   async #deleteSession(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
     const currentState = await this.#readActiveState()
     if (!currentState.ok || currentState.value.status === 'not-started') return currentState
@@ -445,6 +574,30 @@ function hasReviewingFacts(
     && result.value.sourceProfile?.status === 'reviewing-facts'
 }
 
+function hasReadyState(
+  result: ResumeTailoringResult<ResumeTailoringView>,
+): result is Readonly<{ ok: true; value: ReadyResumeTailoringState }> {
+  return result.ok && result.value.status === 'ready'
+}
+
+function hasReviewingJobPosting(
+  result: ResumeTailoringResult<ResumeTailoringView>,
+): result is Readonly<{
+  ok: true
+  value: ReadyResumeTailoringState & { readonly jobPosting: JobPostingReview }
+}> {
+  return hasReadyState(result) && result.value.jobPosting?.status === 'reviewing-posting'
+}
+
+function hasJobPosting(
+  result: ResumeTailoringResult<ResumeTailoringView>,
+): result is Readonly<{
+  ok: true
+  value: ReadyResumeTailoringState & { readonly jobPosting: JobPostingReview }
+}> {
+  return hasReadyState(result) && result.value.jobPosting !== undefined
+}
+
 const workflowAlreadyOpenResult = {
   ok: false,
   error: { type: 'workflow-already-open' },
@@ -468,4 +621,9 @@ const sourceProfileFactUnavailableResult = {
 const sourceProfileFactConflictResult = {
   ok: false,
   error: { type: 'source-fact-conflict' },
+} as const satisfies ResumeTailoringResult<ResumeTailoringView>
+
+const jobRequirementExtractionUnavailableResult = {
+  ok: false,
+  error: { type: 'job-requirement-extraction-unavailable' },
 } as const satisfies ResumeTailoringResult<ResumeTailoringView>

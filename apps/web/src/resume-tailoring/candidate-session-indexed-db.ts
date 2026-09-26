@@ -8,6 +8,7 @@ import {
   sourceProfileReviewSchema,
   storedCandidateSessionSchema,
 } from './source-profile-schemas'
+import { jobPostingReviewSchema } from './job-requirement-schemas'
 
 const databaseName = 'honest-resume'
 const databaseVersion = 1
@@ -178,14 +179,29 @@ function isWritableSession({
 function parseCandidateSession(value: unknown): ResumeTailoringState {
   const result = storedCandidateSessionSchema.safeParse(value)
   if (!result.success) return { status: 'not-started' }
-  const { expiresAt, sessionId, sourceProfile: storedSourceProfile } = result.data
-  const readyState = {
-    status: 'ready',
-    sessionId,
-    expiresAt,
-  } as const
+  return restoreCandidateContent({
+    readyState: {
+      status: 'ready',
+      sessionId: result.data.sessionId,
+      expiresAt: result.data.expiresAt,
+    },
+    storedJobPosting: result.data.jobPosting,
+    storedSourceProfile: result.data.sourceProfile,
+  })
+}
+
+function restoreCandidateContent({ readyState, storedJobPosting, storedSourceProfile }: Readonly<{
+  readyState: ReadyResumeTailoringState
+  storedJobPosting: unknown
+  storedSourceProfile: unknown
+}>): ResumeTailoringState {
   const sourceProfile = sourceProfileReviewSchema.safeParse(storedSourceProfile)
-  return sourceProfile.success ? { ...readyState, sourceProfile: sourceProfile.data } : readyState
+  const jobPosting = jobPostingReviewSchema.safeParse(storedJobPosting)
+  return {
+    ...readyState,
+    ...(sourceProfile.success ? { sourceProfile: sourceProfile.data } : {}),
+    ...(jobPosting.success ? { jobPosting: jobPosting.data } : {}),
+  }
 }
 
 function openCandidateSessionDatabase(): Promise<IDBDatabase> {

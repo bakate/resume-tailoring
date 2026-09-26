@@ -32,7 +32,7 @@ const sourceProfileFactSchema = sourceProfileFactContentSchema.extend({
   supersedesFactId: sourceProfileFactIdSchema.optional(),
 })
 
-const sensitiveContentSchema = z.object({
+export const sensitiveContentSchema = z.object({
   id: z.templateLiteral(['sensitive-', z.string().min(1)]),
   kind: z.enum(sensitiveContentKinds),
   value: z.string(),
@@ -55,6 +55,7 @@ export const storedCandidateSessionSchema = z.object({
   sessionId: candidateSessionIdSchema,
   expiresAt: z.number(),
   sourceProfile: z.unknown().optional(),
+  jobPosting: z.unknown().optional(),
 })
 
 export const sourceProfileExtractionSuccessSchema = z.object({

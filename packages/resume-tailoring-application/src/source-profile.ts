@@ -4,14 +4,8 @@ import type {
   SourceProfileReview,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
+import { minimizeSensitiveContent } from './content-privacy'
 import { hasSourceProfileFactConflict } from './resume-tailoring-workflow'
-
-type SensitiveContentMatch = Readonly<{
-  end: number
-  kind: SourceProfileReview['detectedSensitiveContent'][number]['kind']
-  start: number
-  value: string
-}>
 
 type FactTransitionResult =
   | { readonly ok: true; readonly value: readonly SourceProfileFact[] }
@@ -36,14 +30,11 @@ export function createReviewingSourceProfile({
   documentName,
   documentText,
 }: Readonly<{ documentName: string; documentText: string }>): SourceProfileReview {
-  const sensitiveContentMatches = detectSensitiveContentMatches({ documentText })
+  const minimizedContent = minimizeSensitiveContent({ content: documentText })
   return {
     status: 'reviewing-document',
     documentName,
-    detectedSensitiveContent: sensitiveContentMatches.map((match, matchIndex) => (
-      toSensitiveContent({ match, matchIndex })
-    )),
-    outgoingContent: redactSensitiveContent({ documentText, sensitiveContentMatches }),
+    ...minimizedContent,
     processingNotice: null,
     facts: [],
   }
@@ -121,72 +112,6 @@ function isCompetingFact({
 function isClosedFact({ fact }: Readonly<{ fact: SourceProfileFact }>) {
   return fact.status === 'rejected' || fact.status === 'superseded'
 }
-
-function redactSensitiveContent({
-  documentText,
-  sensitiveContentMatches,
-}: Readonly<{
-  documentText: string
-  sensitiveContentMatches: readonly SensitiveContentMatch[]
-}>) {
-  const ranges = mergeSensitiveRanges({ sensitiveContentMatches })
-  const redactedParts = ranges.map((range, rangeIndex) => {
-    const previousEnd = ranges[rangeIndex - 1]?.end ?? 0
-    return documentText.slice(previousEnd, range.start)
-  })
-  return [...redactedParts, documentText.slice(ranges.at(-1)?.end ?? 0)].join('')
-}
-
-function mergeSensitiveRanges({
-  sensitiveContentMatches,
-}: Readonly<{ sensitiveContentMatches: readonly SensitiveContentMatch[] }>) {
-  return sensitiveContentMatches
-    .map(({ end, start }) => ({ end, start }))
-    .toSorted((firstRange, secondRange) => firstRange.start - secondRange.start)
-    .reduce<readonly Readonly<{ end: number; start: number }>[]>((ranges, range) => {
-      const previousRange = ranges.at(-1)
-      if (previousRange === undefined || range.start > previousRange.end) return [...ranges, range]
-      return [...ranges.slice(0, -1), { start: previousRange.start, end: Math.max(previousRange.end, range.end) }]
-    }, [])
-}
-
-function detectSensitiveContentMatches({ documentText }: Readonly<{ documentText: string }>) {
-  const matches = sensitiveContentPatterns.flatMap(({ kind, pattern }) => (
-    [...documentText.matchAll(pattern)].map((match) => ({
-      end: match.index + match[0].length,
-      kind,
-      start: match.index,
-      value: match[0],
-    }))
-  ))
-  return matches
-}
-
-function toSensitiveContent({
-  match,
-  matchIndex,
-}: Readonly<{ match: SensitiveContentMatch; matchIndex: number }>) {
-  return {
-    id: `sensitive-${String(matchIndex + 1)}` as const,
-    kind: match.kind,
-    value: match.value,
-  }
-}
-
-const sensitiveContentPatterns = [
-  { kind: 'email', pattern: /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/gu },
-  { kind: 'phone', pattern: /(?<![\d+])(?:\+33[ -]?(?:0[ -]?)?|0)[1-9](?:[ -]?\d{2}){4}(?!\d)/gu },
-  { kind: 'url', pattern: /(?:https?:\/\/|www\.)[^\s]+/giu },
-  { kind: 'address', pattern: /\b(?:address|adresse)\s*:?\s*.+$/gimu },
-  {
-    kind: 'date-of-birth',
-    pattern: /\b(?:date of birth|birth date|born|dob|date de naissance|né[e]?)\s*:?\s*.+$/gimu,
-  },
-  {
-    kind: 'personal-information',
-    pattern: /\b(?:nationality|nationalité|gender|genre|sex|sexe|marital status|situation familiale)\s*:?\s*.+$/gimu,
-  },
-] as const
 
 const unavailableTransition = { ok: false, error: 'unavailable' } as const
 const conflictTransition = { ok: false, error: 'conflict' } as const

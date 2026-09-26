@@ -3,6 +3,9 @@ import type {
   ResumeTailoringState,
   SourceProfileFactContent,
   SourceProfileFactId,
+  JobRequirementGroupId,
+  JobRequirementId,
+  JobRequirementContent,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export {
@@ -10,6 +13,8 @@ export {
   sourceProfileFactKinds,
   sourceProfileFactStatuses,
   sourceProfileReviewStatuses,
+  jobRequirementClassifications,
+  jobRequirementMaximumCount,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export type {
@@ -23,6 +28,12 @@ export type {
   SourceProfilePropositionKey,
   SourceProfileReview,
   SourceProfileReviewStatus,
+  JobPostingReview,
+  JobRequirement,
+  JobRequirementClassification,
+  JobRequirementContent,
+  JobRequirementGroupId,
+  JobRequirementId,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export type AdapterFailure = {
@@ -97,4 +108,28 @@ export type SourceProfileExtractor = {
 
 export type SourceProfileFactIdentity = {
   readonly create: () => AdapterResult<SourceProfileFactId>
+}
+
+export type JobRequirementExtractor = {
+  readonly extract: (request: Readonly<{
+    jobPostingContent: string
+  }>) => Promise<
+    | { readonly ok: true; readonly value: readonly JobRequirementContent[] }
+    | {
+        readonly ok: false
+        readonly error: {
+          readonly type:
+            | 'job-requirement-extraction-unavailable'
+            | 'job-requirement-transport-unavailable'
+        }
+      }
+  >
+}
+
+export type JobRequirementIdentity = {
+  readonly create: () => AdapterResult<JobRequirementId>
+}
+
+export type JobRequirementGroupIdentity = {
+  readonly create: () => AdapterResult<JobRequirementGroupId>
 }

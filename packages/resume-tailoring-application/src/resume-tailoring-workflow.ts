@@ -1,5 +1,6 @@
 import type {
   CandidateSessionId,
+  JobPostingReview,
   SourceProfileFact,
   SourceProfileFactId,
   SourceProfileReview,
@@ -12,6 +13,27 @@ export type SourceDocument = Readonly<{
 }>
 
 export const sourceProfileProcessingNoticeVersion = '2026-09-26'
+export const jobPostingProcessingNoticeVersion = '2026-09-26'
+export const jobPostingProcessingPolicy = {
+  provider: 'OpenAI',
+  retentionPolicy: 'standard-abuse-monitoring',
+  transmittedDataCategories: ['job-posting-content'],
+} as const
+
+export function hasCurrentJobPostingProcessingConsent({
+  jobPosting,
+}: Readonly<{ jobPosting: JobPostingReview }>) {
+  const notice = jobPosting.processingNotice
+  return notice?.version === jobPostingProcessingNoticeVersion
+    && notice.provider === jobPostingProcessingPolicy.provider
+    && notice.retentionPolicy === jobPostingProcessingPolicy.retentionPolicy
+    && notice.transmittedDataCategories.length
+      === jobPostingProcessingPolicy.transmittedDataCategories.length
+    && notice.transmittedDataCategories.every(
+      (category, categoryIndex) => category
+        === jobPostingProcessingPolicy.transmittedDataCategories[categoryIndex],
+    )
+}
 
 export type ResumeTailoringCommand =
   | { readonly type: 'open-workflow' }
@@ -29,6 +51,10 @@ export type ResumeTailoringCommand =
       readonly correctedValue: string
     }
   | { readonly type: 'resolve-source-fact-conflict'; readonly selectedFactId: SourceProfileFactId }
+  | { readonly type: 'review-job-posting'; readonly content: string }
+  | { readonly type: 'update-job-posting-content'; readonly outgoingContent: string }
+  | { readonly type: 'confirm-job-posting-processing-notice' }
+  | { readonly type: 'extract-job-requirements' }
 
 export type ResumeTailoringView =
   | { readonly status: 'not-started' }
@@ -37,6 +63,7 @@ export type ResumeTailoringView =
       readonly sessionId: CandidateSessionId
       readonly expiresAt: number
       readonly sourceProfile?: SourceProfileReview
+      readonly jobPosting?: JobPostingReview
     }
 
 export type ResumeTailoringFailure =
@@ -48,6 +75,8 @@ export type ResumeTailoringFailure =
   | { readonly type: 'source-profile-extraction-unavailable' }
   | { readonly type: 'source-fact-unavailable' }
   | { readonly type: 'source-fact-conflict' }
+  | { readonly type: 'job-requirement-extraction-unavailable' }
+  | { readonly type: 'job-requirement-transport-unavailable' }
 
 export type ResumeTailoringResult<TValue> =
   | { readonly ok: true; readonly value: TValue }
