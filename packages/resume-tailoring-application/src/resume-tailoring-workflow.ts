@@ -1,10 +1,16 @@
-export type ResumeTailoringCommand = {
-  readonly type: 'open-workflow'
-}
+import type { CandidateSessionId } from '@resume-tailoring/domain/resume-tailoring-state'
 
-export type ResumeTailoringView = {
-  readonly status: 'not-started' | 'ready'
-}
+export type ResumeTailoringCommand =
+  | { readonly type: 'open-workflow' }
+  | { readonly type: 'delete-session' }
+
+export type ResumeTailoringView =
+  | { readonly status: 'not-started' }
+  | {
+      readonly status: 'ready'
+      readonly sessionId: CandidateSessionId
+      readonly expiresAt: number
+    }
 
 export type ResumeTailoringFailure =
   | { readonly type: 'workflow-already-open' }
@@ -19,4 +25,7 @@ export type ResumeTailoringWorkflow = {
     command: ResumeTailoringCommand,
   ) => Promise<ResumeTailoringResult<ResumeTailoringView>>
   readonly readView: () => Promise<ResumeTailoringResult<ResumeTailoringView>>
+  readonly subscribe: (
+    listener: (result: ResumeTailoringResult<ResumeTailoringView>) => void,
+  ) => () => void
 }

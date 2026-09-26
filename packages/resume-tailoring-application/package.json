@@ -5,6 +5,7 @@
   "exports": {
     "./resume-tailoring-workflow": "./src/resume-tailoring-workflow.ts",
     "./resume-tailoring-workflow-composition": "./src/resume-tailoring-workflow-composition.ts",
+    "./resume-tailoring-workflow-ports": "./src/resume-tailoring-workflow-ports.ts",
     "./resume-tailoring-workflow-testing": "./src/resume-tailoring-workflow-testing.ts"
   },
   "scripts": {

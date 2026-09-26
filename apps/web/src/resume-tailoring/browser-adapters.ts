@@ -1,33 +1,44 @@
-import type { ResumeTailoringView } from '@resume-tailoring/application/resume-tailoring-workflow'
+import type {
+  CandidateSessionClock,
+  CandidateSessionIdentity,
+  PrivacySafeTelemetry,
+} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 
-type AdapterResult<TValue> =
-  | { readonly ok: true; readonly value: TValue }
-  | { readonly ok: false; readonly error: { readonly type: 'adapter-unavailable' } }
+export { createBrowserCandidateSessionPersistence } from './candidate-session-indexed-db'
 
-export function createBrowserCandidateSessionPersistence() {
-  let currentState: ResumeTailoringView = { status: 'not-started' }
-
+export function createBrowserCandidateSessionClock(): CandidateSessionClock {
   return {
-    read: (): Promise<AdapterResult<ResumeTailoringView>> =>
-      Promise.resolve({
-        ok: true,
-        value: currentState,
-      }),
-    write: (
-      state: ResumeTailoringView,
-    ): Promise<AdapterResult<ResumeTailoringView>> => {
-      currentState = state
-      return Promise.resolve({ ok: true, value: currentState })
+    now: () => Date.now(),
+    scheduleExpiration: ({ expiresAt, onExpire }) => {
+      const timeout = window.setTimeout(() => {
+        void onExpire()
+      }, Math.max(0, expiresAt - Date.now()))
+      return () => {
+        window.clearTimeout(timeout)
+      }
     },
   }
 }
 
-export function createPrivacySafeBrowserTelemetry() {
+export function createBrowserCandidateSessionIdentity(): CandidateSessionIdentity {
   return {
-    record: (): Promise<AdapterResult<undefined>> =>
-      Promise.resolve({
-        ok: true,
-        value: undefined,
-      }),
+    create: () => {
+      try {
+        return { ok: true, value: `candidate-session-${crypto.randomUUID()}` }
+      } catch {
+        return unavailableResult
+      }
+    },
   }
 }
+
+export function createPrivacySafeBrowserTelemetry(): PrivacySafeTelemetry {
+  return {
+    record: () => Promise.resolve({ ok: true, value: undefined }),
+  }
+}
+
+const unavailableResult = {
+  ok: false,
+  error: { type: 'adapter-unavailable' },
+} as const
