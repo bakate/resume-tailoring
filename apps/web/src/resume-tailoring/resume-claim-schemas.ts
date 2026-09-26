@@ -48,6 +48,7 @@ const resumeClaimWritingInputsSchema = z.object({
 const validationFeedbackSchema = z.object({
   code: z.enum([
     'invalid-fact-reference',
+    'inexact-fact-reference',
     'missing-segment-provenance',
     'unsupported-number-or-date',
     'unsupported-meaning',

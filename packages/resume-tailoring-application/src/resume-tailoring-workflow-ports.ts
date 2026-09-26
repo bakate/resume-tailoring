@@ -189,6 +189,7 @@ export type ProposedResumeClaim = Readonly<{
 export type ResumeClaimValidationFeedback = Readonly<{
   code:
     | 'invalid-fact-reference'
+    | 'inexact-fact-reference'
     | 'missing-segment-provenance'
     | 'unsupported-number-or-date'
     | 'unsupported-meaning'

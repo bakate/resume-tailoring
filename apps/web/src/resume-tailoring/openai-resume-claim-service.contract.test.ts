@@ -57,13 +57,19 @@ describe('OpenAI Resume Claim service contract', () => {
     expect(result).toEqual(resumeClaimWritingUnavailableResult)
   })
 
-  it('semantically validates one deterministic claim with the structured model', async () => {
+  it('semantically rejects inexact fact references with the structured model', async () => {
     const requests: Request[] = []
     const validator = createOpenAiResumeClaimSemanticValidator({
       apiKey: 'test-api-key',
       model: 'structured-model',
       reasoningEffort: 'low',
-      request: createRequestSpy({ requests, value: { supported: true, feedback: [] } }),
+      request: createRequestSpy({
+        requests,
+        value: {
+          supported: false,
+          feedback: [{ code: 'inexact-fact-reference', segmentIndex: 0 }],
+        },
+      }),
     })
 
     const result = await validator.validate({
@@ -71,7 +77,13 @@ describe('OpenAI Resume Claim service contract', () => {
       verifiedFacts: writingInputs.verifiedFacts,
     })
 
-    expect(result).toEqual({ ok: true, value: { supported: true, feedback: [] } })
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        supported: false,
+        feedback: [{ code: 'inexact-fact-reference', segmentIndex: 0 }],
+      },
+    })
     const requestBody = await readRequestBody({ requests })
     expect(requestBody).toMatchObject({
       model: 'structured-model',
@@ -81,6 +93,7 @@ describe('OpenAI Resume Claim service contract', () => {
         format: { type: 'json_schema', name: 'resume_claim_validation', strict: true },
       },
     })
+    expect(JSON.stringify(requestBody)).toMatch(/Every referenced fact must directly support/iu)
   })
 })
 

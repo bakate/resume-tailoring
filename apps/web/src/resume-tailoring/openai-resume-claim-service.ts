@@ -205,10 +205,11 @@ const writingInstructions = [
 
 const validationInstructions = [
   'Decide whether every Resume Claim segment is fully supported by its referenced Verified Facts.',
+  'Every referenced fact must directly support that segment; reject unrelated or redundant fact references as inexact-fact-reference.',
   'Reject additions or strengthening of causality, scope, autonomy, seniority, duration, frequency, quantity, or outcome.',
   'Faithful compression, translation, voice changes, and omission are supported.',
   'Return supported false when any semantic fragment goes beyond its referenced facts.',
-  'For each failure, return its segmentIndex and the exact strengthened dimension as feedback.',
+  'For each failure, return its segmentIndex and the exact failure code as feedback.',
 ].join(' ')
 
 const segmentJsonSchema = {
@@ -273,6 +274,7 @@ const resumeClaimValidationResponseFormat = {
               type: 'string',
               enum: [
                 'unsupported-meaning',
+                'inexact-fact-reference',
                 'strengthened-autonomy',
                 'strengthened-causality',
                 'strengthened-duration',
@@ -299,6 +301,7 @@ const semanticValidationSchema = z.object({
   feedback: z.array(z.object({
     code: z.enum([
       'unsupported-meaning',
+      'inexact-fact-reference',
       'strengthened-autonomy',
       'strengthened-causality',
       'strengthened-duration',
