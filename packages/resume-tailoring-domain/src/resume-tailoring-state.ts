@@ -72,6 +72,7 @@ export type SourceProfileReview = Readonly<{
 }>
 
 export const jobRequirementClassifications = ['required', 'preferred'] as const
+export const jobRequirementMaximumCount = 200
 
 export type JobRequirementClassification = typeof jobRequirementClassifications[number]
 

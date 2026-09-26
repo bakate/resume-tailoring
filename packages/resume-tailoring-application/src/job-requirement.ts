@@ -4,6 +4,7 @@ import type {
   JobRequirementContent,
   JobRequirementGroupId,
 } from '@resume-tailoring/domain/resume-tailoring-state'
+import { jobRequirementMaximumCount } from '@resume-tailoring/domain/resume-tailoring-state'
 
 import { minimizeSensitiveContent } from './content-privacy'
 import type {
@@ -43,6 +44,7 @@ export function identifyJobRequirements({
   groupIdentity: JobRequirementGroupIdentity
   requirementIdentity: JobRequirementIdentity
 }>): readonly JobRequirement[] | null {
+  if (contents.length > jobRequirementMaximumCount) return null
   const groupIds = identifyRequirementGroups({ contents, groupIdentity })
   if (groupIds === null) return null
 

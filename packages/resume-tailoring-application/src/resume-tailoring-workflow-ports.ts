@@ -14,6 +14,7 @@ export {
   sourceProfileFactStatuses,
   sourceProfileReviewStatuses,
   jobRequirementClassifications,
+  jobRequirementMaximumCount,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export type {

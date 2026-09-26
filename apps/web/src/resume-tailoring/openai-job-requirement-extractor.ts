@@ -3,6 +3,7 @@ import type {
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import {
   jobRequirementClassifications,
+  jobRequirementMaximumCount,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { z } from 'zod'
 
@@ -131,6 +132,7 @@ const jobRequirementResponseFormat = {
     properties: {
       requirements: {
         type: 'array',
+        maxItems: jobRequirementMaximumCount,
         items: {
           type: 'object',
           additionalProperties: false,

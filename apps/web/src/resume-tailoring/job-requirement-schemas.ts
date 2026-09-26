@@ -1,5 +1,6 @@
 import {
   jobRequirementClassifications,
+  jobRequirementMaximumCount,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import type {
   JobRequirementContent,
@@ -23,14 +24,15 @@ const jobRequirementContentSchema = z.object(jobRequirementContentShape).superRe
     context.addIssue({ code: 'custom', path: ['value'], message: 'Expected one atomic requirement' })
   }
 })
+const jobRequirementContentsSchema = z.array(jobRequirementContentSchema).max(jobRequirementMaximumCount)
 
 export const extractedJobRequirementsSchema = z.object({
-  requirements: z.array(jobRequirementContentSchema),
+  requirements: jobRequirementContentsSchema,
 })
 
 export const jobRequirementExtractionSuccessSchema = z.object({
   ok: z.literal(true),
-  value: z.array(jobRequirementContentSchema),
+  value: jobRequirementContentsSchema,
 })
 
 export const jobRequirementExtractionResultSchema = z.discriminatedUnion('ok', [
@@ -62,7 +64,7 @@ export const jobPostingReviewSchema = z.object({
     if (!isAtomicValue({ value: requirement.value })) {
       context.addIssue({ code: 'custom', path: ['value'], message: 'Expected one atomic requirement' })
     }
-  })),
+  })).max(jobRequirementMaximumCount),
 })
 
 export const jobRequirementExtractionMaximumCharacters = 100_000

@@ -38,6 +38,23 @@ describe('OpenAI Job Requirement extractor contract', () => {
     expect(result).toEqual(extractionUnavailableResult)
   })
 
+  it('rejects more than 200 requirements returned by the model', async () => {
+    const requirements = Array.from({ length: 201 }, (_unusedValue, requirementIndex) => ({
+      classification: 'required',
+      sourceExcerpt: jobPostingContent,
+      value: `Know technology ${String(requirementIndex)}`,
+    }))
+    const extractor = createOpenAiJobRequirementExtractor({
+      apiKey: 'test-api-key',
+      model: 'structured-model',
+      request: () => Promise.resolve(Response.json(createOpenAiResponse({ requirements }))),
+    })
+
+    const result = await extractor.extract({ jobPostingContent })
+
+    expect(result).toEqual(extractionUnavailableResult)
+  })
+
   it('maps an aborted upstream request to an unavailable extraction', async () => {
     const extractor = createOpenAiJobRequirementExtractor({
       apiKey: 'test-api-key',
@@ -115,7 +132,14 @@ const expectedRequestBody = {
     { role: 'developer' },
     { role: 'user', content: [{ type: 'input_text', text: jobPostingContent }] },
   ],
-  text: { format: { type: 'json_schema', name: 'job_requirements', strict: true } },
+  text: {
+    format: {
+      type: 'json_schema',
+      name: 'job_requirements',
+      strict: true,
+      schema: { properties: { requirements: { maxItems: 200 } } },
+    },
+  },
 } as const
 
 const extractionUnavailableResult = {

@@ -105,6 +105,19 @@ describe('Job Requirement workflow', () => {
     system.expectAtomicRequirementsToShareTheirSourceGroup()
   })
 
+  it('rejects extraction output beyond the supported requirement count', async () => {
+    const system = createSystemUnderTest({ jobPosting: confirmedJobPosting })
+
+    // Given
+    system.givenTheStructuredModelReturnsTooManyRequirements()
+
+    // Action
+    await system.extractJobRequirements()
+
+    // Then
+    await system.expectExcessiveRequirementsToBeRejected()
+  })
+
   it.each([
     'job-requirement-extraction-unavailable',
     'job-requirement-transport-unavailable',
@@ -177,6 +190,17 @@ class JobRequirementWorkflowTestSystem {
           value: 'Know React',
         },
       ],
+    }
+  }
+
+  givenTheStructuredModelReturnsTooManyRequirements() {
+    this.#extractionResult = {
+      ok: true,
+      value: Array.from({ length: 201 }, (_unusedValue, requirementIndex) => ({
+        classification: 'required',
+        sourceExcerpt: compoundSourceExcerpt,
+        value: `Know technology ${String(requirementIndex)}`,
+      })),
     }
   }
 
@@ -270,6 +294,14 @@ class JobRequirementWorkflowTestSystem {
     failureType: 'job-requirement-extraction-unavailable' | 'job-requirement-transport-unavailable'
   }>) {
     expect(this.#readActionResult()).toEqual({ ok: false, error: { type: failureType } })
+    expect(await this.#readPersistedJobPosting()).toEqual(confirmedJobPosting)
+  }
+
+  async expectExcessiveRequirementsToBeRejected() {
+    expect(this.#readActionResult()).toEqual({
+      ok: false,
+      error: { type: 'job-requirement-extraction-unavailable' },
+    })
     expect(await this.#readPersistedJobPosting()).toEqual(confirmedJobPosting)
   }
 

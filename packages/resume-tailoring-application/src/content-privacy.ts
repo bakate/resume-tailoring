@@ -9,6 +9,7 @@ type SensitiveContentMatch = Readonly<{
   start: number
   value: string
 }>
+type SensitiveRange = Readonly<{ end: number; start: number }>
 
 export function minimizeSensitiveContent({ content }: Readonly<{ content: string }>) {
   const matches = detectSensitiveContentMatches({ content })
@@ -38,19 +39,23 @@ function mergeSensitiveRanges({ matches }: Readonly<{
   return matches
     .map(({ end, start }) => ({ end, start }))
     .toSorted((firstRange, secondRange) => firstRange.start - secondRange.start)
-    .reduce<readonly Readonly<{ end: number; start: number }>[]>(mergeSensitiveRange, [])
+    .reduce<SensitiveRange[]>(mergeSensitiveRange, [])
 }
 
 function mergeSensitiveRange(
-  ranges: readonly Readonly<{ end: number; start: number }>[],
-  range: Readonly<{ end: number; start: number }>,
+  ranges: SensitiveRange[],
+  range: SensitiveRange,
 ) {
   const previousRange = ranges.at(-1)
-  if (previousRange === undefined || range.start > previousRange.end) return [...ranges, range]
-  return [...ranges.slice(0, -1), {
+  if (previousRange === undefined || range.start > previousRange.end) {
+    ranges.push(range)
+    return ranges
+  }
+  ranges[ranges.length - 1] = {
     start: previousRange.start,
     end: Math.max(previousRange.end, range.end),
-  }]
+  }
+  return ranges
 }
 
 function detectSensitiveContentMatches({ content }: Readonly<{ content: string }>) {
