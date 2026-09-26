@@ -92,5 +92,5 @@ function isAtomicValue({ value }: Readonly<{ value: string }>) {
     && value.length <= 500
     && value.trim() === value
     && !value.includes('\n')
-    && !/(?:;|\s(?:and|et)\s|\s&\s)/iu.test(value)
+    && !value.includes(';')
 }

@@ -19,7 +19,7 @@ describe('Source Profile boundary schemas', () => {
 
   it.each([
     ['a mismatched proposition kind', 'experience', 'proposition-skill-candidate-typescript', 'TypeScript'],
-    ['a compound value', 'skill', 'proposition-skill-candidate-typescript', 'TypeScript and React'],
+    ['multiple facts in one value', 'skill', 'proposition-skill-candidate-typescript', 'TypeScript\nReact'],
   ])('rejects %s', (_caseName, kind, propositionKey, value) => {
     const result = extractedSourceProfileFactContentSchema.safeParse({ kind, propositionKey, value })
 

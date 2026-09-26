@@ -33,6 +33,26 @@ describe('OpenAI Source Profile extractor contract', () => {
     })
   })
 
+  it('accepts an atomic fact containing a grammatical conjunction', async () => {
+    const value = 'Les outils et scripts créés ont réduit les tâches manuelles.'
+    const extractor = createOpenAiSourceProfileExtractor({
+      apiKey: 'test-api-key',
+      model: 'structured-model',
+      request: () => Promise.resolve(Response.json(createOpenAiResponse({ value }))),
+    })
+
+    const result = await extractor.extract({ professionalContent: value })
+
+    expect(result).toEqual({
+      ok: true,
+      value: [{
+        kind: 'skill',
+        propositionKey: 'proposition-skill-candidate-typescript',
+        value,
+      }],
+    })
+  })
+
   it('maps an aborted upstream request to an unavailable extraction', async () => {
     const extractor = createOpenAiSourceProfileExtractor({
       apiKey: 'test-api-key',
