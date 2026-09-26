@@ -53,16 +53,32 @@ function JobPostingReview({ candidateSession, jobPosting, localization }: Review
   useEffect(() => { setContent(jobPosting.outgoingContent) }, [jobPosting.outgoingContent])
   const revision = content === jobPosting.outgoingContent ? 'saved' : 'changed'
   return (
-    <div className="source-profile-card source-profile-review">
-      <JobPostingEditor {...{ content, localization, setContent }} />
-      <button className="secondary-action" disabled={revision === 'saved'}
-        onClick={() => void candidateSession.updateJobPostingContent({ outgoingContent: content })}
-        type="button">
-        {localization.translate('jobPosting.save')}
-      </button>
-      <JobPostingProcessingNotice {...{ candidateSession, jobPosting, localization, revision }} />
+    <div className="source-profile-grid">
+      <JobPostingSensitiveContentPanel {...{ jobPosting, localization }} />
+      <div className="source-profile-card source-profile-review">
+        <JobPostingEditor {...{ content, localization, setContent }} />
+        <button className="secondary-action" disabled={revision === 'saved'}
+          onClick={() => void candidateSession.updateJobPostingContent({ outgoingContent: content })}
+          type="button">{localization.translate('jobPosting.save')}</button>
+        <JobPostingProcessingNotice {...{ candidateSession, jobPosting, localization, revision }} />
+      </div>
     </div>
   )
+}
+
+function JobPostingSensitiveContentPanel({ jobPosting, localization }: Omit<
+ReviewProps, 'candidateSession'
+>) {
+  return <div className="source-profile-card">
+    <h3>{localization.translate('sourceProfile.detectedTitle')}</h3>
+    {jobPosting.detectedSensitiveContent.length === 0
+      ? <p>{localization.translate('sourceProfile.detectedNone')}</p>
+      : <ul className="sensitive-content-list">
+        {jobPosting.detectedSensitiveContent.map((content) => (
+          <li key={content.id}><strong>{content.kind}</strong><span>{content.value}</span></li>
+        ))}
+      </ul>}
+  </div>
 }
 
 function JobPostingEditor({ content, localization, setContent }: Readonly<{
@@ -83,14 +99,16 @@ function JobPostingProcessingNotice({
   localization,
   revision,
 }: ReviewProps & Readonly<{ revision: ContentRevision }>) {
-  const confirmed = hasCurrentJobPostingProcessingConsent({ jobPosting })
+  const confirmationStatus = hasCurrentJobPostingProcessingConsent({ jobPosting })
+    ? 'confirmed'
+    : 'pending'
   return (
     <div className="processing-notice">
       <h3>{localization.translate('jobPosting.noticeTitle')}</h3>
       <p>{localization.translate('jobPosting.noticeText')}</p>
       <small>{localization.translate('jobPosting.noticeVersion')} {jobPostingProcessingNoticeVersion}</small>
       <JobPostingNoticeActions {...{
-        candidateSession, confirmed, jobPosting, localization, revision,
+        candidateSession, confirmationStatus, jobPosting, localization, revision,
       }} />
     </div>
   )
@@ -98,25 +116,46 @@ function JobPostingProcessingNotice({
 
 function JobPostingNoticeActions({
   candidateSession,
-  confirmed,
+  confirmationStatus,
   jobPosting,
   localization,
   revision,
-}: ReviewProps & Readonly<{ confirmed: boolean; revision: ContentRevision }>) {
+}: NoticeActionProps) {
   return <>
-    {confirmed ? <p className="confirmed-note">{localization.translate('jobPosting.confirmed')}</p> : (
-      <button className="secondary-action"
-        disabled={revision === 'changed' || jobPosting.outgoingContent.trim().length === 0}
-        onClick={() => void candidateSession.confirmJobPostingProcessingNotice()} type="button">
-        {localization.translate('jobPosting.confirm')}
-      </button>
-    )}
-    <button className="primary-action compact-action"
-      disabled={!confirmed || revision === 'changed'}
-      onClick={() => void candidateSession.extractJobRequirements()} type="button">
-      {localization.translate('jobPosting.extract')}
-    </button>
+    <JobPostingNoticeConfirmation {...{
+      candidateSession, confirmationStatus, jobPosting, localization, revision,
+    }} />
+    <ExtractJobRequirementsButton {...{
+      candidateSession, confirmationStatus, localization, revision,
+    }} />
   </>
+}
+
+type NoticeActionProps = ReviewProps & Readonly<{
+  confirmationStatus: 'confirmed' | 'pending'
+  revision: ContentRevision
+}>
+
+function JobPostingNoticeConfirmation(props: NoticeActionProps) {
+  const { candidateSession, confirmationStatus, jobPosting, localization, revision } = props
+  if (confirmationStatus === 'confirmed') {
+    return <p className="confirmed-note">{localization.translate('jobPosting.confirmed')}</p>
+  }
+  return <button className="secondary-action"
+    disabled={revision === 'changed' || jobPosting.outgoingContent.trim().length === 0}
+    onClick={() => void candidateSession.confirmJobPostingProcessingNotice()} type="button">
+    {localization.translate('jobPosting.confirm')}
+  </button>
+}
+
+function ExtractJobRequirementsButton({
+  candidateSession, confirmationStatus, localization, revision,
+}: Omit<NoticeActionProps, 'jobPosting'>) {
+  return <button className="primary-action compact-action"
+    disabled={confirmationStatus === 'pending' || revision === 'changed'}
+    onClick={() => void candidateSession.extractJobRequirements()} type="button">
+    {localization.translate('jobPosting.extract')}
+  </button>
 }
 
 function JobRequirementReview({ jobPosting, localization }: ReviewProps) {

@@ -3,9 +3,9 @@ import type {
   JobRequirement,
   JobRequirementContent,
   JobRequirementGroupId,
-  JobRequirementGroupKey,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
+import { minimizeSensitiveContent } from './content-privacy'
 import type {
   JobRequirementGroupIdentity,
   JobRequirementIdentity,
@@ -14,11 +14,23 @@ import type {
 export function createReviewingJobPosting({ content }: Readonly<{
   content: string
 }>): JobPostingReview {
+  const minimizedContent = minimizeSensitiveContent({ content })
   return {
     status: 'reviewing-posting',
-    outgoingContent: content,
+    ...minimizedContent,
     processingNotice: null,
     requirements: [],
+  }
+}
+
+export function updateReviewingJobPosting({
+  jobPosting,
+  outgoingContent,
+}: Readonly<{ jobPosting: JobPostingReview; outgoingContent: string }>): JobPostingReview {
+  return {
+    ...jobPosting,
+    ...minimizeSensitiveContent({ content: outgoingContent }),
+    processingNotice: null,
   }
 }
 
@@ -36,7 +48,7 @@ export function identifyJobRequirements({
 
   const requirements = contents.map((content) => createJobRequirement({
     content,
-    groupId: groupIds.get(content.groupKey),
+    groupId: groupIds.get(content.sourceExcerpt),
     requirementIdentity,
   }))
   return requirements.includes(null) ? null : requirements.filter((requirement) => requirement !== null)
@@ -49,12 +61,12 @@ function identifyRequirementGroups({
   contents: readonly JobRequirementContent[]
   groupIdentity: JobRequirementGroupIdentity
 }>) {
-  const groupIds = new Map<JobRequirementGroupKey, JobRequirementGroupId>()
-  for (const { groupKey } of contents) {
-    if (groupIds.has(groupKey)) continue
+  const groupIds = new Map<string, JobRequirementGroupId>()
+  for (const { sourceExcerpt } of contents) {
+    if (groupIds.has(sourceExcerpt)) continue
     const identity = groupIdentity.create()
     if (!identity.ok) return null
-    groupIds.set(groupKey, identity.value)
+    groupIds.set(sourceExcerpt, identity.value)
   }
   return groupIds
 }

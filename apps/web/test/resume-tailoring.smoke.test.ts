@@ -281,23 +281,7 @@ class ResumeTailoringBrowserTestSystem {
       this.#jobPostingRequestContent = readJobPostingContent(route.request().postData())
       await route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify({
-          ok: true,
-          value: [
-            {
-              classification: 'required',
-              groupKey: 'requirement-group-engineering-stack',
-              sourceExcerpt: jobPostingExcerpt,
-              value: 'Know TypeScript',
-            },
-            {
-              classification: 'preferred',
-              groupKey: 'requirement-group-engineering-stack',
-              sourceExcerpt: jobPostingExcerpt,
-              value: 'Know React',
-            },
-          ],
-        }),
+        body: JSON.stringify(jobRequirementExtractionResponse),
       })
     })
   }
@@ -449,7 +433,7 @@ class ResumeTailoringBrowserTestSystem {
 
   async extractRequirementsFromMinimizedJobPosting() {
     await this.#page.getByLabel('Paste the Job Posting').fill(
-      `${jobPostingExcerpt}\nSalary: competitive`,
+      `${jobPostingExcerpt}\nContact jobs@example.com\nSalary: competitive`,
     )
     await this.#page.getByRole('button', { name: 'Review this Job Posting' }).click()
     const editor = this.#page.getByLabel('Exact Job Posting content sent for extraction')
@@ -575,6 +559,7 @@ class ResumeTailoringBrowserTestSystem {
   async expectAtomicJobRequirementsWithSourceProvenance() {
     this.#expectCompletedAction('job-requirements-extracted')
     expect(this.#jobPostingRequestContent).toBe(jobPostingExcerpt)
+    expect(this.#jobPostingRequestContent).not.toContain('jobs@example.com')
     await expect(this.#page.getByText('Know TypeScript', { exact: true })).toBeVisible()
     await expect(this.#page.getByText('Required', { exact: true })).toBeVisible()
     await expect(this.#page.getByText('Know React', { exact: true })).toBeVisible()
@@ -714,6 +699,21 @@ function readJobPostingContent(requestBody: string | null) {
 }
 
 const jobPostingExcerpt = 'You must know TypeScript and preferably React.'
+const jobRequirementExtractionResponse = {
+  ok: true,
+  value: [
+    {
+      classification: 'required',
+      sourceExcerpt: jobPostingExcerpt,
+      value: 'Know TypeScript',
+    },
+    {
+      classification: 'preferred',
+      sourceExcerpt: jobPostingExcerpt,
+      value: 'Know React',
+    },
+  ],
+} as const
 
 function createTextPdf(text: string) {
   const escapedText = text.replaceAll('\\', '\\\\').replaceAll('(', '\\(').replaceAll(')', '\\)')

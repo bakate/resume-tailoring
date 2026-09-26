@@ -6,7 +6,13 @@ import {
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { z } from 'zod'
 
-import { extractedJobRequirementsSchema } from './job-requirement-schemas'
+import {
+  atomicJobRequirementPattern,
+  extractedJobRequirementsSchema,
+  hasOnlyJobPostingSourceExcerpts,
+  jobRequirementSourceExcerptMaximumCharacters,
+  jobRequirementValueMaximumCharacters,
+} from './job-requirement-schemas'
 
 type OpenAiExtractorDependencies = Readonly<{
   apiKey: string
@@ -100,19 +106,16 @@ function parseRequirements({
 }: Readonly<{ jobPostingContent: string; value: unknown }>) {
   const result = extractedJobRequirementsSchema.safeParse(value)
   if (!result.success) return extractionUnavailableResult
-  const hasUnknownExcerpt = result.data.requirements.some(
-    ({ sourceExcerpt }) => !jobPostingContent.includes(sourceExcerpt),
-  )
-  return hasUnknownExcerpt
-    ? extractionUnavailableResult
-    : { ok: true, value: result.data.requirements } as const
+  if (!hasOnlyJobPostingSourceExcerpts({
+    jobPostingContent, requirements: result.data.requirements,
+  })) return extractionUnavailableResult
+  return { ok: true, value: result.data.requirements } as const
 }
 
 const extractionInstructions = [
   'Extract every explicit qualification or expectation from the Job Posting.',
   'Classify each one as required only when mandatory wording is explicit; otherwise use preferred.',
   'Split compound passages into indivisible requirements.',
-  'Requirements from the same source passage must share one requirement-group-<topic> key.',
   'Copy sourceExcerpt exactly from the Job Posting for every requirement.',
   'Never infer or add a requirement.',
 ].join(' ')
@@ -131,21 +134,19 @@ const jobRequirementResponseFormat = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['classification', 'groupKey', 'sourceExcerpt', 'value'],
+          required: ['classification', 'sourceExcerpt', 'value'],
           properties: {
             classification: { type: 'string', enum: jobRequirementClassifications },
-            groupKey: {
+            sourceExcerpt: {
               type: 'string',
-              pattern: '^requirement-group-[a-z0-9]+(?:-[a-z0-9]+)*$',
-              minLength: 19,
-              maxLength: 200,
+              minLength: 1,
+              maxLength: jobRequirementSourceExcerptMaximumCharacters,
             },
-            sourceExcerpt: { type: 'string', minLength: 1, maxLength: 2_000 },
             value: {
               type: 'string',
               minLength: 1,
-              maxLength: 500,
-              pattern: '^(?!.*(?:;|\\s(?:and|or|et|ou)\\s|\\s&\\s))[^\\n]+$',
+              maxLength: jobRequirementValueMaximumCharacters,
+              pattern: atomicJobRequirementPattern.source,
             },
           },
         },

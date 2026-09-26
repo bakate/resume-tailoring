@@ -37,6 +37,19 @@ describe('Job Requirement workflow', () => {
     system.expectExactJobPostingContentToBeReviewable()
   })
 
+  it('removes sensitive contact content locally before Job Posting processing', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    system.givenAJobPostingWithSensitiveContactContent()
+
+    // Action
+    await system.reviewSensitiveJobPosting()
+
+    // Then
+    system.expectSensitiveJobPostingContentToBeRemovedLocally()
+  })
+
   it('lets the Candidate minimize the Job Posting before processing', async () => {
     const system = createSystemUnderTest({ jobPosting: reviewingJobPosting })
 
@@ -141,6 +154,8 @@ class JobRequirementWorkflowTestSystem {
 
   givenAJobPosting() {}
 
+  givenAJobPostingWithSensitiveContactContent() {}
+
   givenTheJobPostingContainsAnUnwantedLine() {}
 
   givenTheCandidatePreviouslyConfirmedProcessing() {}
@@ -153,13 +168,11 @@ class JobRequirementWorkflowTestSystem {
       value: [
         {
           classification: 'required',
-          groupKey: 'requirement-group-engineering-stack',
           sourceExcerpt: compoundSourceExcerpt,
           value: 'Know TypeScript',
         },
         {
           classification: 'preferred',
-          groupKey: 'requirement-group-engineering-stack',
           sourceExcerpt: compoundSourceExcerpt,
           value: 'Know React',
         },
@@ -180,6 +193,13 @@ class JobRequirementWorkflowTestSystem {
     })
   }
 
+  async reviewSensitiveJobPosting() {
+    this.#actionResult = await this.#workflow.execute({
+      type: 'review-job-posting',
+      content: `${compoundSourceExcerpt}\nContact jobs@example.com`,
+    })
+  }
+
   async minimizeJobPosting() {
     this.#actionResult = await this.#workflow.execute({
       type: 'update-job-posting-content',
@@ -195,6 +215,14 @@ class JobRequirementWorkflowTestSystem {
     expect(this.#readJobPosting().outgoingContent).toBe(
       `${compoundSourceExcerpt}\nSalary: competitive`,
     )
+    expect(this.#modelRequests).toEqual([])
+  }
+
+  expectSensitiveJobPostingContentToBeRemovedLocally() {
+    expect(this.#readJobPosting()).toMatchObject({
+      detectedSensitiveContent: [{ kind: 'email', value: 'jobs@example.com' }],
+      outgoingContent: `${compoundSourceExcerpt}\nContact `,
+    })
     expect(this.#modelRequests).toEqual([])
   }
 
@@ -301,6 +329,7 @@ function createSequentialGroupIdentity() {
 
 const reviewingJobPosting = {
   status: 'reviewing-posting',
+  detectedSensitiveContent: [],
   outgoingContent: `${compoundSourceExcerpt}\nSalary: competitive`,
   processingNotice: null,
   requirements: [],

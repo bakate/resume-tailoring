@@ -32,7 +32,7 @@ const sourceProfileFactSchema = sourceProfileFactContentSchema.extend({
   supersedesFactId: sourceProfileFactIdSchema.optional(),
 })
 
-const sensitiveContentSchema = z.object({
+export const sensitiveContentSchema = z.object({
   id: z.templateLiteral(['sensitive-', z.string().min(1)]),
   kind: z.enum(sensitiveContentKinds),
   value: z.string(),

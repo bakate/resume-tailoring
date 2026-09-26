@@ -9,7 +9,10 @@ import type {
   JobRequirementIdentity,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 
-import { jobRequirementExtractionResultSchema } from './job-requirement-schemas'
+import {
+  hasOnlyJobPostingSourceExcerpts,
+  jobRequirementExtractionResultSchema,
+} from './job-requirement-schemas'
 import { sourceProfileExtractionSuccessSchema } from './source-profile-schemas'
 
 export { createBrowserCandidateSessionPersistence } from './candidate-session-indexed-db'
@@ -119,15 +122,24 @@ async function extractJobRequirements({
       body: JSON.stringify({ jobPostingContent }),
       cache: 'no-store',
     })
-    return parseJobRequirementExtractionResult({ value: await response.json() })
+    return parseJobRequirementExtractionResult({
+      jobPostingContent, value: await response.json(),
+    })
   } catch {
     return requirementTransportUnavailableResult
   }
 }
 
-function parseJobRequirementExtractionResult({ value }: Readonly<{ value: unknown }>) {
+function parseJobRequirementExtractionResult({
+  jobPostingContent,
+  value,
+}: Readonly<{ jobPostingContent: string; value: unknown }>) {
   const result = jobRequirementExtractionResultSchema.safeParse(value)
-  return result.success ? result.data : requirementTransportUnavailableResult
+  if (!result.success) return requirementTransportUnavailableResult
+  if (!result.data.ok) return result.data
+  return hasOnlyJobPostingSourceExcerpts({
+    jobPostingContent, requirements: result.data.value,
+  }) ? result.data : requirementTransportUnavailableResult
 }
 
 function parseExtractionResult({ value }: Readonly<{ value: unknown }>) {

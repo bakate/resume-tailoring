@@ -1,19 +1,24 @@
 import {
   jobRequirementClassifications,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type {
+  JobRequirementContent,
+} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { z } from 'zod'
+
+import { sensitiveContentSchema } from './source-profile-schemas'
+
+export const atomicJobRequirementPattern = /^(?!.*(?:[;,/|•]|\s(?:and|or|et|ou)\s|\s&\s))[^\n]+$/iu
+export const jobRequirementValueMaximumCharacters = 500
+export const jobRequirementSourceExcerptMaximumCharacters = 2_000
 
 const jobRequirementContentShape = {
   classification: z.enum(jobRequirementClassifications),
-  groupKey: z.templateLiteral(['requirement-group-', z.string().min(1)]),
-  sourceExcerpt: z.string().min(1).max(2_000),
-  value: z.string().min(1).max(500),
+  sourceExcerpt: z.string().min(1).max(jobRequirementSourceExcerptMaximumCharacters),
+  value: z.string().min(1).max(jobRequirementValueMaximumCharacters),
 } as const
 
 const jobRequirementContentSchema = z.object(jobRequirementContentShape).superRefine((requirement, context) => {
-  if (!isValidGroupKey({ value: requirement.groupKey })) {
-    context.addIssue({ code: 'custom', path: ['groupKey'], message: 'Invalid group key' })
-  }
   if (!isAtomicValue({ value: requirement.value })) {
     context.addIssue({ code: 'custom', path: ['value'], message: 'Expected one atomic requirement' })
   }
@@ -38,6 +43,7 @@ export const jobRequirementExtractionResultSchema = z.discriminatedUnion('ok', [
 
 export const jobPostingReviewSchema = z.object({
   status: z.enum(['reviewing-posting', 'reviewing-requirements']),
+  detectedSensitiveContent: z.array(sensitiveContentSchema),
   outgoingContent: z.string(),
   processingNotice: z.object({
     version: z.string(),
@@ -67,13 +73,17 @@ export const jobRequirementExtractionRequestSchema = z.object({
     .refine((value) => value.trim().length > 0),
 })
 
-function isValidGroupKey({ value }: Readonly<{ value: string }>) {
-  return value.length <= 200
-    && /^requirement-group-[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(value)
+export function hasOnlyJobPostingSourceExcerpts({
+  jobPostingContent,
+  requirements,
+}: Readonly<{
+  jobPostingContent: string
+  requirements: readonly JobRequirementContent[]
+}>) {
+  return requirements.every(({ sourceExcerpt }) => jobPostingContent.includes(sourceExcerpt))
 }
 
 function isAtomicValue({ value }: Readonly<{ value: string }>) {
   return value.trim() === value
-    && !value.includes('\n')
-    && !/(?:;|\s(?:and|or|et|ou)\s|\s&\s)/iu.test(value)
+    && atomicJobRequirementPattern.test(value)
 }

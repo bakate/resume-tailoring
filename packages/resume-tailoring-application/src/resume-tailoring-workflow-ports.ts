@@ -32,7 +32,6 @@ export type {
   JobRequirementClassification,
   JobRequirementContent,
   JobRequirementGroupId,
-  JobRequirementGroupKey,
   JobRequirementId,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 

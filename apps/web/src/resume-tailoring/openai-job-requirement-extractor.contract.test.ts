@@ -17,6 +17,8 @@ describe('OpenAI Job Requirement extractor contract', () => {
 
   it.each([
     ['a compound requirement', 'Know TypeScript and React', jobPostingContent],
+    ['a comma-separated requirement list', 'Know TypeScript, React', jobPostingContent],
+    ['a slash-separated requirement list', 'Know TypeScript/React', jobPostingContent],
     ['a fabricated source excerpt', 'Know TypeScript', 'TypeScript is mandatory.'],
   ])('rejects %s returned by the model', async (_caseName, value, sourceExcerpt) => {
     const extractor = createOpenAiJobRequirementExtractor({
@@ -25,7 +27,6 @@ describe('OpenAI Job Requirement extractor contract', () => {
       request: () => Promise.resolve(Response.json(createOpenAiResponse({
         requirements: [{
           classification: 'required',
-          groupKey: 'requirement-group-engineering-stack',
           sourceExcerpt,
           value,
         }],
@@ -76,7 +77,6 @@ function createOpenAiResponse({
 }: Readonly<{
   requirements?: readonly Readonly<{
     classification: string
-    groupKey: string
     sourceExcerpt: string
     value: string
   }>[]
@@ -97,13 +97,11 @@ const expectedExtractionResult = {
   value: [
     {
       classification: 'required',
-      groupKey: 'requirement-group-engineering-stack',
       sourceExcerpt: jobPostingContent,
       value: 'Know TypeScript',
     },
     {
       classification: 'preferred',
-      groupKey: 'requirement-group-engineering-stack',
       sourceExcerpt: jobPostingContent,
       value: 'Know React',
     },

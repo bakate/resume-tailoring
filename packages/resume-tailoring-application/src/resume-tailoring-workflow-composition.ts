@@ -37,6 +37,7 @@ import type {
 import {
   createReviewingJobPosting,
   identifyJobRequirements,
+  updateReviewingJobPosting,
 } from './job-requirement'
 import {
   correctSourceProfileFact,
@@ -157,11 +158,10 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (!hasReviewingJobPosting(currentState)) return unavailableResult
     return this.#persistJobPosting({
       currentState: currentState.value,
-      jobPosting: {
-        ...currentState.value.jobPosting,
+      jobPosting: updateReviewingJobPosting({
+        jobPosting: currentState.value.jobPosting,
         outgoingContent,
-        processingNotice: null,
-      },
+      }),
     })
   }
 
@@ -187,7 +187,9 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (!hasCurrentJobPostingProcessingConsent({ jobPosting: currentState.value.jobPosting })) {
       return processingNoticeRequiredResult
     }
-    const extraction = await this.#requestJobRequirementExtraction(currentState.value.jobPosting)
+    const extraction = await this.#requestJobRequirementExtraction({
+      jobPosting: currentState.value.jobPosting,
+    })
     if (!extraction.ok) return extraction
     return this.#persistExtractedJobRequirements({
       currentState: currentState.value,
@@ -195,7 +197,9 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     })
   }
 
-  async #requestJobRequirementExtraction(jobPosting: JobPostingReview) {
+  async #requestJobRequirementExtraction({ jobPosting }: Readonly<{
+    jobPosting: JobPostingReview
+  }>) {
     const extractor = this.#dependencies.jobRequirementExtractor
     const groupIdentity = this.#dependencies.jobRequirementGroupIdentity
     const requirementIdentity = this.#dependencies.jobRequirementIdentity

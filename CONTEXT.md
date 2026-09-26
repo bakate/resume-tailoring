@@ -34,6 +34,10 @@ _Avoid_: Inference, estimate, assumed seniority
 The Candidate-provided text describing one employment opportunity against which a Source Profile is evaluated.
 _Avoid_: Job offer URL, advert, listing
 
+**Job Posting Review**:
+The browser-local working state used to minimize one Job Posting, confirm its current processing notice, and review its extracted Job Requirements.
+_Avoid_: Stored job, server-side posting, listing review
+
 **Job Requirement**:
 An explicit qualification or expectation extracted from a Job Posting and classified as required or preferred.
 _Avoid_: Keyword, criterion
