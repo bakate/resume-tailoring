@@ -89,9 +89,9 @@ function MatchScoreSummary({ analysis, localization }: Readonly<{
 
 type EvidencePanelProps = Readonly<{
   analysis: MatchAnalysis
-  factById: ReadonlyMap<string, SourceProfileFact>
+  factById: ReadonlyMap<SourceProfileFact['id'], SourceProfileFact>
   localization: Localization
-  requirementById: ReadonlyMap<string, JobRequirement>
+  requirementById: ReadonlyMap<JobRequirement['id'], JobRequirement>
 }>
 
 function EvidencePanel(props: EvidencePanelProps) {

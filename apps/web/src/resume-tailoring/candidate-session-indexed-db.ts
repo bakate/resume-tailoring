@@ -3,7 +3,7 @@ import type {
   CandidateSessionPersistence,
   ResumeTailoringState,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
-import { createMatchAnalysis } from '@resume-tailoring/application/match-analysis'
+import { restoreMatchAnalysis as restoreStoredMatchAnalysis } from '@resume-tailoring/application/match-analysis'
 
 import {
   sourceProfileReviewSchema,
@@ -228,8 +228,8 @@ function restoreMatchAnalysis({ jobPosting, sourceProfile, storedMatchAnalysis }
     || sourceProfile?.status !== 'reviewing-facts') return null
   const storedAnalysis = storedMatchAnalysisSchema.safeParse(storedMatchAnalysis)
   if (!storedAnalysis.success) return null
-  return createMatchAnalysis({
-    proposedEvidence: storedAnalysis.data.evidence,
+  return restoreStoredMatchAnalysis({
+    evidence: storedAnalysis.data.evidence,
     requirements: jobPosting.requirements,
     verifiedFacts: sourceProfile.facts.filter((fact) => fact.status === 'verified'),
   })

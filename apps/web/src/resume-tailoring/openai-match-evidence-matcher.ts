@@ -1,7 +1,6 @@
 import type {
-  JobRequirement,
   MatchEvidenceMatcher,
-  SourceProfileFact,
+  MatchInputs,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { jobRequirementMaximumCount } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { z } from 'zod'
@@ -15,21 +14,22 @@ import {
 type OpenAiMatcherDependencies = Readonly<{
   apiKey: string
   model: string
+  reasoningEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
   request?: typeof fetch
 }>
 
-type MatchRequest = Readonly<{
-  requirements: readonly JobRequirement[]
-  verifiedFacts: readonly SourceProfileFact[]
-}>
+type MatchRequest = MatchInputs
 
 export function createOpenAiMatchEvidenceMatcher({
   apiKey,
   model,
+  reasoningEffort,
   request = fetch,
 }: OpenAiMatcherDependencies): MatchEvidenceMatcher {
   return {
-    match: (matchRequest) => requestMatchEvidence({ apiKey, matchRequest, model, request }),
+    match: (matchRequest) => requestMatchEvidence({
+      apiKey, matchRequest, model, reasoningEffort, request,
+    }),
   }
 }
 
@@ -37,18 +37,20 @@ async function requestMatchEvidence({
   apiKey,
   matchRequest,
   model,
+  reasoningEffort,
   request,
 }: Readonly<{
   apiKey: string
   matchRequest: MatchRequest
   model: string
+  reasoningEffort: OpenAiMatcherDependencies['reasoningEffort']
   request: typeof fetch
 }>) {
   try {
     const response = await request('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: createHeaders({ apiKey }),
-      body: JSON.stringify(createRequestBody({ matchRequest, model })),
+      body: JSON.stringify(createRequestBody({ matchRequest, model, reasoningEffort })),
       signal: AbortSignal.timeout(matchAnalysisTimeoutMilliseconds),
     })
     if (!response.ok) return matchAnalysisUnavailableResult
@@ -65,9 +67,15 @@ function createHeaders({ apiKey }: Readonly<{ apiKey: string }>) {
 function createRequestBody({
   matchRequest,
   model,
-}: Readonly<{ matchRequest: MatchRequest; model: string }>) {
+  reasoningEffort,
+}: Readonly<{
+  matchRequest: MatchRequest
+  model: string
+  reasoningEffort: OpenAiMatcherDependencies['reasoningEffort']
+}>) {
   return {
     model,
+    reasoning: { effort: reasoningEffort },
     store: false,
     input: [
       { role: 'developer', content: [{ type: 'input_text', text: matchingInstructions }] },
@@ -123,6 +131,7 @@ const matchingInstructions = [
   'Return evidence only when one or more Verified Facts explicitly prove a Job Requirement.',
   'Coverage is binary; omit every uncovered requirement.',
   'You may recognize controlled synonyms and translations with the same concrete meaning.',
+  'For each fact link, quote the exact requirementTerm and factTerm and classify their relationship.',
   'Do not treat a role, a transferable skill, or qualitative seniority as implicit proof.',
   'Never invent identifiers, qualifications, facts, or partial credit.',
 ].join(' ')
@@ -142,14 +151,24 @@ const matchEvidenceResponseFormat = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['requirementId', 'factIds'],
+          required: ['requirementId', 'factMatches'],
           properties: {
             requirementId: { type: 'string', pattern: '^job-requirement-.+$' },
-            factIds: {
+            factMatches: {
               type: 'array',
               minItems: 1,
               maxItems: sourceProfileFactMaximumCount,
-              items: { type: 'string', pattern: '^source-fact-.+$' },
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['factId', 'factTerm', 'relationship', 'requirementTerm'],
+                properties: {
+                  factId: { type: 'string', pattern: '^source-fact-.+$' },
+                  factTerm: { type: 'string', minLength: 2, maxLength: 100 },
+                  relationship: { type: 'string', enum: ['exact', 'controlled'] },
+                  requirementTerm: { type: 'string', minLength: 2, maxLength: 100 },
+                },
+              },
             },
           },
         },

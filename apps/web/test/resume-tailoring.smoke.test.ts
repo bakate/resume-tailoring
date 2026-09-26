@@ -298,7 +298,7 @@ class ResumeTailoringBrowserTestSystem {
           value: [{
             kind: 'experience',
               propositionKey: 'proposition-experience-acme-role',
-            value: 'Senior FullStack Developer at Acme',
+            value: 'Senior FullStack Developer using React at Acme',
           }],
         }),
       })
@@ -330,7 +330,12 @@ class ResumeTailoringBrowserTestSystem {
             ? []
             : [{
                 requirementId: preferredRequirement.id,
-                factIds: [verifiedFact.id],
+                factMatches: [{
+                  factId: verifiedFact.id,
+                  factTerm: 'React',
+                  relationship: 'exact',
+                  requirementTerm: 'React',
+                }],
               }],
         }),
       })
@@ -466,7 +471,7 @@ class ResumeTailoringBrowserTestSystem {
       name: 'resume.pdf',
       mimeType: 'application/pdf',
       buffer: createTextPdf(
-        'bakate@example.com +33 6 12 34 56 78 Senior FullStack Developer at Acme',
+        'bakate@example.com +33 6 12 34 56 78 Senior FullStack Developer using React at Acme',
       ),
     })
     await this.#page.getByLabel('Exact content that will be sent for extraction').waitFor()
@@ -610,17 +615,17 @@ class ResumeTailoringBrowserTestSystem {
 
   async expectVerifiedSourceProfileBuiltFromMinimizedContent() {
     this.#expectCompletedAction('source-profile-built')
-    expect(this.#extractionRequestContent).toContain('Senior FullStack Developer at Acme')
+    expect(this.#extractionRequestContent).toContain('Senior FullStack Developer using React at Acme')
     expect(this.#extractionRequestContent).not.toContain('bakate@example.com')
     expect(this.#extractionRequestContent).not.toContain('+33 6 12 34 56 78')
-    await expect(this.#page.getByText('Senior FullStack Developer at Acme')).toBeVisible()
+    await expect(this.#page.getByText('Senior FullStack Developer using React at Acme')).toBeVisible()
     await expect(this.#page.getByText('Verified', { exact: true })).toBeVisible()
   }
 
   async expectVerifiedSourceProfileToBeRestored() {
     this.#expectCompletedAction('source-profile-reloaded')
     await expect(this.#page.getByRole('heading', { name: 'Review extracted facts' })).toBeVisible()
-    await expect(this.#page.getByText('Senior FullStack Developer at Acme')).toBeVisible()
+    await expect(this.#page.getByText('Senior FullStack Developer using React at Acme')).toBeVisible()
     await expect(this.#page.getByText('Verified', { exact: true })).toBeVisible()
   }
 

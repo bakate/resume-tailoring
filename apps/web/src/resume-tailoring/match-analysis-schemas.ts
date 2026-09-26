@@ -1,6 +1,6 @@
 import type {
   JobRequirement,
-  MatchEvidence,
+  ProposedMatchEvidence,
   SourceProfileFact,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import {
@@ -14,20 +14,34 @@ const jobRequirementIdSchema = z.templateLiteral(['job-requirement-', z.string()
 const sourceProfileFactIdSchema = z.templateLiteral(['source-fact-', z.string().min(1)])
 export const sourceProfileFactMaximumCount = 500
 
-const matchEvidenceSchema = z.object({
+const proposedFactMatchSchema = z.object({
+  factId: sourceProfileFactIdSchema,
+  factTerm: z.string().min(2).max(100),
+  relationship: z.enum(['exact', 'controlled']),
+  requirementTerm: z.string().min(2).max(100),
+})
+
+const proposedMatchEvidenceSchema = z.object({
+  requirementId: jobRequirementIdSchema,
+  factMatches: z.array(proposedFactMatchSchema).min(1).max(sourceProfileFactMaximumCount),
+})
+
+export const extractedMatchEvidenceSchema = z.object({
+  evidence: z.array(proposedMatchEvidenceSchema).max(jobRequirementMaximumCount),
+})
+
+const storedMatchEvidenceSchema = z.object({
   requirementId: jobRequirementIdSchema,
   factIds: z.array(sourceProfileFactIdSchema).min(1).max(sourceProfileFactMaximumCount),
 })
 
-export const extractedMatchEvidenceSchema = z.object({
-  evidence: z.array(matchEvidenceSchema).max(jobRequirementMaximumCount),
+export const storedMatchAnalysisSchema = z.object({
+  evidence: z.array(storedMatchEvidenceSchema).max(jobRequirementMaximumCount),
 })
-
-export const storedMatchAnalysisSchema = extractedMatchEvidenceSchema
 
 export const matchAnalysisSuccessSchema = z.object({
   ok: z.literal(true),
-  value: z.array(matchEvidenceSchema).max(jobRequirementMaximumCount),
+  value: z.array(proposedMatchEvidenceSchema).max(jobRequirementMaximumCount),
 })
 
 export const matchAnalysisResultSchema = z.discriminatedUnion('ok', [
@@ -61,7 +75,7 @@ export function hasOnlyMatchInputReferences({
   requirements,
   verifiedFacts,
 }: Readonly<{
-  evidence: readonly MatchEvidence[]
+  evidence: readonly ProposedMatchEvidence[]
   requirements: readonly JobRequirement[]
   verifiedFacts: readonly SourceProfileFact[]
 }>) {
@@ -72,7 +86,7 @@ export function hasOnlyMatchInputReferences({
     if (referencedRequirementIds.has(item.requirementId)) return false
     referencedRequirementIds.add(item.requirementId)
     return requirementIds.has(item.requirementId)
-      && new Set(item.factIds).size === item.factIds.length
-      && item.factIds.every((factId) => verifiedFactIds.has(factId))
+      && new Set(item.factMatches.map(({ factId }) => factId)).size === item.factMatches.length
+      && item.factMatches.every(({ factId }) => verifiedFactIds.has(factId))
   })
 }

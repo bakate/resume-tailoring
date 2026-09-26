@@ -16,6 +16,7 @@ describe('server environment validation', () => {
       value: {
         openAiApiKey: 'secret-key',
         openAiStructuredModel: 'gpt-6-sol',
+        openAiStructuredReasoningEffort: 'low',
       },
     })
   })
@@ -30,6 +31,7 @@ describe('server environment validation', () => {
       value: {
         openAiApiKey: 'secret-key',
         openAiStructuredModel: 'gpt-6-luna',
+        openAiStructuredReasoningEffort: 'low',
       },
     })
   })
@@ -39,6 +41,7 @@ describe('server environment validation', () => {
     { OPENAI_API_KEY: '' },
     { OPENAI_API_KEY: '   ' },
     { OPENAI_API_KEY: 'secret-key', OPENAI_STRUCTURED_MODEL: '' },
+    { OPENAI_API_KEY: 'secret-key', OPENAI_STRUCTURED_REASONING_EFFORT: 'extreme' },
   ])('rejects invalid OpenAI configuration: %o', (environment) => {
     const result = validateServerEnvironment({ environment })
 

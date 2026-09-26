@@ -22,6 +22,7 @@ async function analyzeMatch({ request }: Readonly<{ request: Request }>) {
   const matcher = createOpenAiMatchEvidenceMatcher({
     apiKey: environmentResult.value.openAiApiKey,
     model: environmentResult.value.openAiStructuredModel,
+    reasoningEffort: environmentResult.value.openAiStructuredReasoningEffort,
   })
   const result = await matcher.match(matchRequest.value)
   return result.ok

@@ -6,7 +6,7 @@ import type {
   JobRequirementGroupId,
   JobRequirementId,
   JobRequirementContent,
-  MatchEvidence,
+  ProposedMatchEvidence,
   JobRequirement,
   SourceProfileFact,
 } from '@resume-tailoring/domain/resume-tailoring-state'
@@ -39,6 +39,8 @@ export type {
   JobRequirementId,
   MatchAnalysis,
   MatchEvidence,
+  ProposedFactMatch,
+  ProposedMatchEvidence,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export type AdapterFailure = {
@@ -140,11 +142,8 @@ export type JobRequirementGroupIdentity = {
 }
 
 export type MatchEvidenceMatcher = {
-  readonly match: (request: Readonly<{
-    requirements: readonly JobRequirement[]
-    verifiedFacts: readonly SourceProfileFact[]
-  }>) => Promise<
-    | { readonly ok: true; readonly value: readonly MatchEvidence[] }
+  readonly match: (request: MatchInputs) => Promise<
+    | { readonly ok: true; readonly value: readonly ProposedMatchEvidence[] }
     | {
         readonly ok: false
         readonly error: {
@@ -153,3 +152,8 @@ export type MatchEvidenceMatcher = {
       }
   >
 }
+
+export type MatchInputs = Readonly<{
+  requirements: readonly JobRequirement[]
+  verifiedFacts: readonly SourceProfileFact[]
+}>

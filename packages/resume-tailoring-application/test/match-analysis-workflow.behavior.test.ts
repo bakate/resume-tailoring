@@ -45,7 +45,7 @@ describe('Match Analysis workflow', () => {
     system.expectLowScoreWarningWithoutEligibilityDenial()
   })
 
-  it('denies generation only when no Verified Fact is relevant', async () => {
+  it('does not deny generation merely because no requirement is covered', async () => {
     const system = createSystemUnderTest()
 
     // Given
@@ -55,7 +55,20 @@ describe('Match Analysis workflow', () => {
     await system.analyzeMatch()
 
     // Then
-    system.expectGenerationDeniedForInsufficientRelevantMaterial()
+    system.expectVerifiedMaterialToRemainEligible()
+  })
+
+  it('denies generation when there is no Verified Fact to support a resume', async () => {
+    const system = createSystemUnderTest({ facts: [] })
+
+    // Given
+    system.givenNoRequirementIsCovered()
+
+    // Action
+    await system.analyzeMatch()
+
+    // Then
+    system.expectGenerationDeniedForInsufficientVerifiedMaterial()
   })
 
   it('rejects Match Evidence that references a fact which is not verified', async () => {
@@ -70,10 +83,25 @@ describe('Match Analysis workflow', () => {
     // Then
     system.expectFabricatedMatchEvidenceToBeRejected()
   })
+
+  it('rejects an uncontrolled implicit qualification proposed by the matcher', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    system.givenTheMatcherInfersLeadershipFromAProgrammingSkill()
+
+    // Action
+    await system.analyzeMatch()
+
+    // Then
+    system.expectFabricatedMatchEvidenceToBeRejected()
+  })
 })
 
-function createSystemUnderTest() {
-  return new MatchAnalysisWorkflowTestSystem()
+function createSystemUnderTest({ facts = verifiedFacts }: Readonly<{
+  facts?: readonly SourceProfileFact[]
+}> = {}) {
+  return new MatchAnalysisWorkflowTestSystem(facts)
 }
 
 class MatchAnalysisWorkflowTestSystem {
@@ -85,14 +113,14 @@ class MatchAnalysisWorkflowTestSystem {
     value: [],
   }
 
-  constructor() {
+  constructor(facts: readonly SourceProfileFact[]) {
     this.#workflow = createResumeTailoringWorkflow({
       candidateSessionClock: createControllableCandidateSessionClock({ now: 1_000 }),
       candidateSessionIdentity: {
         create: () => ({ ok: true, value: 'candidate-session-match-analysis' }),
       },
       candidateSessionPersistence: createInMemoryCandidateSessionPersistence({
-        initialState: candidateSessionState,
+        initialState: createCandidateSessionState({ facts }),
       }),
       matchEvidenceMatcher: {
         match: (request) => {
@@ -109,7 +137,12 @@ class MatchAnalysisWorkflowTestSystem {
       ok: true,
       value: [{
         requirementId: 'job-requirement-french',
-        factIds: ['source-fact-french'],
+        factMatches: [{
+          factId: 'source-fact-french',
+          factTerm: 'Français',
+          relationship: 'controlled',
+          requirementTerm: 'French',
+        }],
       }],
     }
   }
@@ -121,7 +154,27 @@ class MatchAnalysisWorkflowTestSystem {
       ok: true,
       value: [{
         requirementId: 'job-requirement-leadership',
-        factIds: ['source-fact-unverified-leadership'],
+        factMatches: [{
+          factId: 'source-fact-unverified-leadership',
+          factTerm: 'Led',
+          relationship: 'controlled',
+          requirementTerm: 'leadership',
+        }],
+      }],
+    }
+  }
+
+  givenTheMatcherInfersLeadershipFromAProgrammingSkill() {
+    this.#matcherResult = {
+      ok: true,
+      value: [{
+        requirementId: 'job-requirement-leadership',
+        factMatches: [{
+          factId: 'source-fact-typescript',
+          factTerm: 'TypeScript',
+          relationship: 'controlled',
+          requirementTerm: 'leadership',
+        }],
       }],
     }
   }
@@ -132,11 +185,21 @@ class MatchAnalysisWorkflowTestSystem {
       value: [
         {
           requirementId: 'job-requirement-typescript',
-          factIds: ['source-fact-typescript'],
+          factMatches: [{
+            factId: 'source-fact-typescript',
+            factTerm: 'TypeScript',
+            relationship: 'controlled',
+            requirementTerm: 'TS',
+          }],
         },
         {
           requirementId: 'job-requirement-french',
-          factIds: ['source-fact-french'],
+          factMatches: [{
+            factId: 'source-fact-french',
+            factTerm: 'Français',
+            relationship: 'controlled',
+            requirementTerm: 'French',
+          }],
         },
       ],
     }
@@ -182,12 +245,19 @@ class MatchAnalysisWorkflowTestSystem {
     })
   }
 
-  expectGenerationDeniedForInsufficientRelevantMaterial() {
+  expectVerifiedMaterialToRemainEligible() {
+    expect(this.#readMatchAnalysis()).toMatchObject({
+      evidence: [],
+      generationEligibility: 'eligible',
+      matchScore: 0,
+      warning: 'below-generation-threshold',
+    })
+  }
+
+  expectGenerationDeniedForInsufficientVerifiedMaterial() {
     expect(this.#readMatchAnalysis()).toMatchObject({
       evidence: [],
       generationEligibility: 'denied',
-      matchScore: 0,
-      warning: 'below-generation-threshold',
     })
   }
 
@@ -263,29 +333,33 @@ const requirements = [
   },
 ] as const satisfies readonly JobRequirement[]
 
-const candidateSessionState = {
-  status: 'ready',
-  sessionId: 'candidate-session-match-analysis',
-  expiresAt: 86_401_000,
-  sourceProfile: {
-    status: 'reviewing-facts',
-    documentName: 'resume.pdf',
-    detectedSensitiveContent: [],
-    outgoingContent: 'Professional content',
-    processingNotice: { version: '2026-09-26', confirmedAt: 1_000 },
-    facts: verifiedFacts,
-  },
-  jobPosting: {
-    status: 'reviewing-requirements',
-    detectedSensitiveContent: [],
-    outgoingContent: 'TypeScript and leadership are required. French is preferred.',
-    processingNotice: {
-      version: '2026-09-26',
-      confirmedAt: 1_000,
-      provider: 'OpenAI',
-      retentionPolicy: 'standard-abuse-monitoring',
-      transmittedDataCategories: ['job-posting-content'],
+function createCandidateSessionState({ facts }: Readonly<{
+  facts: readonly SourceProfileFact[]
+}>): ResumeTailoringState {
+  return {
+    status: 'ready',
+    sessionId: 'candidate-session-match-analysis',
+    expiresAt: 86_401_000,
+    sourceProfile: {
+      status: 'reviewing-facts',
+      documentName: 'resume.pdf',
+      detectedSensitiveContent: [],
+      outgoingContent: 'Professional content',
+      processingNotice: { version: '2026-09-26', confirmedAt: 1_000 },
+      facts,
     },
-    requirements,
-  },
-} as const satisfies ResumeTailoringState
+    jobPosting: {
+      status: 'reviewing-requirements',
+      detectedSensitiveContent: [],
+      outgoingContent: 'TypeScript and leadership are required. French is preferred.',
+      processingNotice: {
+        version: '2026-09-26',
+        confirmedAt: 1_000,
+        provider: 'OpenAI',
+        retentionPolicy: 'standard-abuse-monitoring',
+        transmittedDataCategories: ['job-posting-content'],
+      },
+      requirements,
+    },
+  }
+}

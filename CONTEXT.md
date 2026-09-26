@@ -50,8 +50,12 @@ _Avoid_: Keyword match, inferred match
 The percentage expressing how strongly the Source Profile's Verified Facts cover the requirements of a Job Posting.
 _Avoid_: Fit score, compatibility score
 
+**Match Analysis**:
+The evidence-backed result combining Match Evidence, the deterministic Match Score, Generation Eligibility, and the Gap Analysis for one Source Profile and Job Posting.
+_Avoid_: Model score, suitability decision
+
 **Generation Threshold**:
-The minimum Match Score required to produce a Tailored Resume. The threshold is 50%.
+The advisory Match Score threshold of 50%. Falling below it produces a warning and never decides Generation Eligibility.
 _Avoid_: Eligibility score, cutoff
 
 **Tailored Resume**:

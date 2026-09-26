@@ -92,6 +92,18 @@ export type MatchEvidence = Readonly<{
   factIds: readonly SourceProfileFactId[]
 }>
 
+export type ProposedFactMatch = Readonly<{
+  factId: SourceProfileFactId
+  factTerm: string
+  relationship: 'exact' | 'controlled'
+  requirementTerm: string
+}>
+
+export type ProposedMatchEvidence = Readonly<{
+  requirementId: JobRequirementId
+  factMatches: readonly ProposedFactMatch[]
+}>
+
 export type MatchAnalysis = Readonly<{
   evidence: readonly MatchEvidence[]
   gapAnalysis: Readonly<{

@@ -1,15 +1,20 @@
 import { z } from 'zod'
 
 const defaultOpenAiStructuredModel = 'gpt-6-luna'
+const defaultOpenAiStructuredReasoningEffort = 'low'
+const openAiReasoningEfforts = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const
 
 const serverEnvironmentSchema = z.object({
   OPENAI_API_KEY: z.string().trim().min(1),
   OPENAI_STRUCTURED_MODEL: z.string().trim().min(1).default(defaultOpenAiStructuredModel),
+  OPENAI_STRUCTURED_REASONING_EFFORT: z.enum(openAiReasoningEfforts)
+    .default(defaultOpenAiStructuredReasoningEffort),
 })
 
 export type ServerEnvironment = Readonly<{
   openAiApiKey: string
   openAiStructuredModel: string
+  openAiStructuredReasoningEffort: typeof openAiReasoningEfforts[number]
 }>
 
 export function validateServerEnvironment({
@@ -22,6 +27,7 @@ export function validateServerEnvironment({
     value: {
       openAiApiKey: result.data.OPENAI_API_KEY,
       openAiStructuredModel: result.data.OPENAI_STRUCTURED_MODEL,
+      openAiStructuredReasoningEffort: result.data.OPENAI_STRUCTURED_REASONING_EFFORT,
     },
   } as const
 }

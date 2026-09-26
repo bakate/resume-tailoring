@@ -12,6 +12,7 @@ describe('OpenAI Match Evidence matcher contract', () => {
     const matcher = createOpenAiMatchEvidenceMatcher({
       apiKey: 'test-api-key',
       model: 'structured-model',
+      reasoningEffort: 'low',
       request: (input, init) => {
         requests.push(new Request(input, init))
         return Promise.resolve(Response.json(createOpenAiResponse()))
@@ -25,6 +26,7 @@ describe('OpenAI Match Evidence matcher contract', () => {
     expect(requestBody).toMatchObject({
       model: 'structured-model',
       store: false,
+      reasoning: { effort: 'low' },
       input: [
         {
           role: 'developer',
@@ -50,10 +52,16 @@ describe('OpenAI Match Evidence matcher contract', () => {
     const matcher = createOpenAiMatchEvidenceMatcher({
       apiKey: 'test-api-key',
       model: 'structured-model',
+      reasoningEffort: 'low',
       request: () => Promise.resolve(Response.json(createOpenAiResponse({
         evidence: [{
           requirementId: 'job-requirement-invented',
-          factIds: ['source-fact-invented'],
+          factMatches: [{
+            factId: 'source-fact-invented',
+            factTerm: 'TypeScript',
+            relationship: 'exact',
+            requirementTerm: 'TypeScript',
+          }],
         }],
       }))),
     })
@@ -99,7 +107,12 @@ const requirements = [{
 
 const expectedEvidence = [{
   requirementId: 'job-requirement-typescript',
-  factIds: ['source-fact-typescript'],
+  factMatches: [{
+    factId: 'source-fact-typescript',
+    factTerm: 'TypeScript',
+    relationship: 'controlled',
+    requirementTerm: 'TS',
+  }],
 }] as const
 
 const matchAnalysisUnavailableResult = {
