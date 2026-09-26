@@ -75,7 +75,10 @@ ReviewProps, 'candidateSession'
       ? <p>{localization.translate('sourceProfile.detectedNone')}</p>
       : <ul className="sensitive-content-list">
         {jobPosting.detectedSensitiveContent.map((content) => (
-          <li key={content.id}><strong>{content.kind}</strong><span>{content.value}</span></li>
+          <li key={content.id}>
+            <strong>{localization.translate(`sourceProfile.sensitiveKind.${content.kind}`)}</strong>
+            <span>{content.value}</span>
+          </li>
         ))}
       </ul>}
   </div>

@@ -117,7 +117,10 @@ function SensitiveContentList({
   return (
     <ul className="sensitive-content-list">
       {sourceProfile.detectedSensitiveContent.map((content) => (
-        <li key={content.id}><strong>{content.kind}</strong><span>{content.value}</span></li>
+        <li key={content.id}>
+          <strong>{translate(`sourceProfile.sensitiveKind.${content.kind}`)}</strong>
+          <span>{content.value}</span>
+        </li>
       ))}
     </ul>
   )

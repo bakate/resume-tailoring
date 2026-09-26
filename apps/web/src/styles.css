@@ -439,7 +439,8 @@ h1 {
 }
 
 .sensitive-content-list span {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
   color: #982f28;
 }
 

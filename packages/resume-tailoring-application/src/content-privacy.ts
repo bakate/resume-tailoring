@@ -84,13 +84,16 @@ const sensitiveContentPatterns = [
   { kind: 'email', pattern: /[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/gu },
   { kind: 'phone', pattern: /(?<![\d+])(?:\+33[ -]?(?:0[ -]?)?|0)[1-9](?:[ -]?\d{2}){4}(?!\d)/gu },
   { kind: 'url', pattern: /(?:https?:\/\/|www\.)[^\s]+/giu },
-  { kind: 'address', pattern: /\b(?:address|adresse)\s*:?\s*.+$/gimu },
+  {
+    kind: 'address',
+    pattern: /(?<![\p{L}\p{N}_])(?:address|adresse)(?![\p{L}\p{N}_])\s*:?\s*.+$/gimu,
+  },
   {
     kind: 'date-of-birth',
-    pattern: /\b(?:date of birth|birth date|born|dob|date de naissance|né[e]?)\s*:?\s*.+$/gimu,
+    pattern: /(?<![\p{L}\p{N}_])(?:date of birth|birth date|born|dob|date de naissance|né[e]?)(?![\p{L}\p{N}_])\s*:?\s*.+$/gimu,
   },
   {
     kind: 'personal-information',
-    pattern: /\b(?:nationality|nationalité|gender|genre|sex|sexe|marital status|situation familiale)\s*:?\s*.+$/gimu,
+    pattern: /(?<![\p{L}\p{N}_])(?:nationality|nationalité|gender|genre|sex|sexe|marital status|situation familiale)(?![\p{L}\p{N}_])\s*:?\s*.+$/gimu,
   },
 ] as const

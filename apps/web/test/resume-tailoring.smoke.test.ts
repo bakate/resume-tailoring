@@ -188,6 +188,17 @@ test('a Candidate reviews classified atomic Job Requirements from minimized cont
   await system.expectAtomicJobRequirementsWithSourceProvenance()
 })
 
+test('localizes sensitive labels and preserves legitimate French words', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.switchResumeTailoringToFrench()
+
+  await system.reviewFrenchJobPostingWithPhoneNumber()
+
+  await system.expectFrenchSensitiveLabelAndIntactJobPosting()
+})
+
 test('rejects oversized professional content before model processing', async ({ page }) => {
   await page.goto('/')
 
@@ -229,6 +240,7 @@ type CompletedAction =
   | 'candidate-session-synchronized'
   | 'expiration-extension-attempted'
   | 'job-requirements-extracted'
+  | 'job-posting-reviewed'
   | 'resume-tailoring-opened'
   | 'resume-tailoring-viewed'
   | 'source-profile-built'
@@ -445,6 +457,17 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'job-requirements-extracted'
   }
 
+  async reviewFrenchJobPostingWithPhoneNumber() {
+    await this.#page.getByLabel("Colle l'Offre d'emploi").fill(
+      `${legitimateFrenchJobPosting}\nTéléphone : +33 6 12 34 56 78`,
+    )
+    await this.#page.getByRole('button', { name: "Vérifier cette Offre d'emploi" }).click()
+    await this.#page.getByLabel(
+      "Contenu exact de l'Offre d'emploi envoyé pour l'extraction",
+    ).waitFor()
+    this.#completedAction = 'job-posting-reviewed'
+  }
+
   async expectResumeTailoringSessionToBeStoredInIndexedDb() {
     this.#expectCompletedAction('resume-tailoring-opened')
     await expect(this.#page.getByText('Workflow opened')).toBeVisible()
@@ -567,6 +590,15 @@ class ResumeTailoringBrowserTestSystem {
     await expect(this.#page.getByText(jobPostingExcerpt).first()).toBeVisible()
   }
 
+  async expectFrenchSensitiveLabelAndIntactJobPosting() {
+    this.#expectCompletedAction('job-posting-reviewed')
+    await expect(this.#page.getByText('Numéro de téléphone', { exact: true })).toBeVisible()
+    await expect(this.#page.getByText('phone', { exact: true })).toHaveCount(0)
+    await expect(this.#page.getByLabel(
+      "Contenu exact de l'Offre d'emploi envoyé pour l'extraction",
+    )).toHaveValue(`${legitimateFrenchJobPosting}\nTéléphone : `)
+  }
+
   #readUnknownRoute() {
     expect(this.#unknownRoute).toBeDefined()
     return this.#unknownRoute ?? '/missing-test-route'
@@ -599,6 +631,8 @@ const inactiveSessionOutcome = {
   update: inactiveSessionResult,
   current: { ok: true, value: { status: 'not-started' } },
 } as const
+
+const legitimateFrenchJobPosting = "ASTORM bénéficie d'un référencement auprès de clients."
 
 async function seedCandidateSession({ page, expiresAt }: Readonly<{ page: Page; expiresAt: number }>) {
   await installCandidateSessionTestPersistence(page)

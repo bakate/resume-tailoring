@@ -22,6 +22,7 @@ const sessionStartedAt = Date.UTC(2026, 8, 26, 12)
 const sessionExpiresAt = Date.UTC(2026, 8, 27, 12)
 const sessionIdentifier = 'candidate-session-00000000-0000-4000-8000-000000000009' as const
 const compoundSourceExcerpt = 'You must know TypeScript and preferably React.'
+const legitimateFrenchJobPosting = "ASTORM bénéficie d'un référencement auprès de clients."
 
 describe('Job Requirement workflow', () => {
   it('lets the Candidate paste a Job Posting for exact review', async () => {
@@ -48,6 +49,19 @@ describe('Job Requirement workflow', () => {
 
     // Then
     system.expectSensitiveJobPostingContentToBeRemovedLocally()
+  })
+
+  it('preserves French words that only contain a sensitive keyword', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    system.givenAJobPostingWithALegitimateFrenchWord()
+
+    // Action
+    await system.reviewFrenchJobPosting()
+
+    // Then
+    system.expectLegitimateFrenchWordToRemain()
   })
 
   it('lets the Candidate minimize the Job Posting before processing', async () => {
@@ -169,6 +183,8 @@ class JobRequirementWorkflowTestSystem {
 
   givenAJobPostingWithSensitiveContactContent() {}
 
+  givenAJobPostingWithALegitimateFrenchWord() {}
+
   givenTheJobPostingContainsAnUnwantedLine() {}
 
   givenTheCandidatePreviouslyConfirmedProcessing() {}
@@ -224,6 +240,13 @@ class JobRequirementWorkflowTestSystem {
     })
   }
 
+  async reviewFrenchJobPosting() {
+    this.#actionResult = await this.#workflow.execute({
+      type: 'review-job-posting',
+      content: legitimateFrenchJobPosting,
+    })
+  }
+
   async minimizeJobPosting() {
     this.#actionResult = await this.#workflow.execute({
       type: 'update-job-posting-content',
@@ -248,6 +271,13 @@ class JobRequirementWorkflowTestSystem {
       outgoingContent: `${compoundSourceExcerpt}\nContact `,
     })
     expect(this.#modelRequests).toEqual([])
+  }
+
+  expectLegitimateFrenchWordToRemain() {
+    expect(this.#readJobPosting()).toMatchObject({
+      detectedSensitiveContent: [],
+      outgoingContent: legitimateFrenchJobPosting,
+    })
   }
 
   expectOnlyMinimizedJobPostingContentToRemain() {
