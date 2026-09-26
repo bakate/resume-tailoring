@@ -171,12 +171,26 @@ function provesRequirement({ fact, factMatch, requirement }: Readonly<{
   const requirementTerm = normalizeTerm({ value: factMatch.requirementTerm })
   if (nonEvidenceTerms.has(factTerm) || hasNegatedEvidence({ fact })) return false
   if (fact.kind === 'experience' && looksLikeRoleTitle({ value: fact.value })) return false
+  if (!representsCompleteRequirementConcept({ requirement, requirementTerm })) return false
   if (!satisfiesRequirementConstraints({ fact, factTerm: factMatch.factTerm,
     requirement, requirementTerm: factMatch.requirementTerm })) return false
   if (factTerm === requirementTerm) return true
   return controlledTermGroups.some((termGroup) => hasTermsFromGroup({
     factTerm, requirementTerm, termGroup,
   }))
+}
+
+function representsCompleteRequirementConcept({ requirement, requirementTerm }: Readonly<{
+  requirement: JobRequirement
+  requirementTerm: string
+}>) {
+  const requirementClause = readTermClause({
+    term: requirementTerm,
+    value: requirement.value,
+  })
+  return requirementClause !== null
+    && canonicalizeControlledTerm({ value: requirementClause })
+      === canonicalizeControlledTerm({ value: requirementTerm })
 }
 
 function hasTermsFromGroup({ factTerm, requirementTerm, termGroup }: Readonly<{
@@ -190,7 +204,13 @@ function hasTermsFromGroup({ factTerm, requirementTerm, termGroup }: Readonly<{
 
 function canonicalizeControlledTerm({ value }: Readonly<{ value: string }>) {
   return normalizeTerm({ value }).split(' ')
-    .filter((term) => !controlledContextTerms.has(term)).join(' ')
+    .filter((term) => !isConstraintContextTerm({ term })).join(' ')
+}
+
+function isConstraintContextTerm({ term }: Readonly<{ term: string }>) {
+  return controlledContextTerms.has(term)
+    || qualitativeRequirementTerms.includes(term as typeof qualitativeRequirementTerms[number])
+    || durationContextPattern.test(term)
 }
 
 function hasNegatedEvidence({ fact }: Readonly<{ fact: SourceProfileFact }>) {
@@ -206,24 +226,34 @@ function satisfiesRequirementConstraints({ fact, factTerm, requirement, requirem
   requirement: JobRequirement
   requirementTerm: string
 }>) {
+  const factClause = readTermClause({ term: factTerm, value: fact.value })
+  const requirementClause = readTermClause({ term: requirementTerm, value: requirement.value })
+  if (factClause === null || requirementClause === null) return false
   const hasQualifiers = qualitativeRequirementTerms.every((qualifier) =>
-    !containsTerm({ content: requirement.value, term: qualifier })
-    || containsTerm({ content: fact.value, term: qualifier }))
+    !containsTerm({ content: requirementClause, term: qualifier })
+    || containsTerm({ content: factClause, term: qualifier }))
   return hasQualifiers && satisfiesDurationConstraint({
-    fact, factTerm, requirement, requirementTerm,
+    factTerm, factValue: factClause, requirementTerm, requirementValue: requirementClause,
   })
 }
 
-function satisfiesDurationConstraint({ fact, factTerm, requirement, requirementTerm }: Readonly<{
-  fact: SourceProfileFact
+function satisfiesDurationConstraint({
+  factTerm, factValue, requirementTerm, requirementValue,
+}: Readonly<{
   factTerm: string
-  requirement: JobRequirement
+  factValue: string
   requirementTerm: string
+  requirementValue: string
 }>) {
-  const requiredMonths = readDurationInMonths({ term: requirementTerm, value: requirement.value })
+  const requiredMonths = readDurationInMonths({ term: requirementTerm, value: requirementValue })
   if (requiredMonths === null) return true
-  const factMonths = readDurationInMonths({ term: factTerm, value: fact.value })
+  const factMonths = readDurationInMonths({ term: factTerm, value: factValue })
   return factMonths !== null && factMonths >= requiredMonths
+}
+
+function readTermClause({ term, value }: Readonly<{ term: string; value: string }>) {
+  return value.split(clauseSeparatorPattern)
+    .find((clause) => containsTerm({ content: clause, term })) ?? null
 }
 
 function readDurationInMonths({ term, value }: Readonly<{ term: string; value: string }>) {
@@ -281,8 +311,10 @@ const nonEvidenceTerms = new Set([
 ])
 const negativeTerms = ['aucun', 'jamais', 'no', 'not', 'never', 'pas', 'sans', 'without'] as const
 const qualitativeRequirementTerms = [
-  'advanced', 'expert', 'lead', 'principal', 'senior', 'staff',
+  'advanced', 'expert', 'lead', 'principal', 'production', 'senior', 'staff',
 ] as const
+const clauseSeparatorPattern = /[,;\n]|\b(?:and|et)\b/iu
+const durationContextPattern = /^(?:\d+|ans?|months?|mois|years?|yrs?)$/u
 const durationPattern = /\b(\d+)\s*\+?\s*(years?|yrs?|ans?|months?|mois)\b/gu
 const roleTerms = ['developer', 'engineer', 'manager', 'architect', 'consultant'] as const
 const evidenceVerbs = [

@@ -163,7 +163,19 @@ const evaluationFixtures = [
     verifiedFacts: [createFact({
       id: 'source-fact-mixed-duration',
       kind: 'experience',
-      value: '5 years of Java, used TypeScript for 1 month',
+      value: '5 years of Java, used TypeScript',
+    })],
+    expectedCoverage: [],
+  },
+  {
+    name: 'binds qualitative seniority to the matching technology',
+    requirements: [createRequirement({
+      id: 'job-requirement-typescript-seniority', value: 'Senior TypeScript',
+    })],
+    verifiedFacts: [createFact({
+      id: 'source-fact-mixed-seniority',
+      kind: 'experience',
+      value: 'Senior Java developer, used TypeScript',
     })],
     expectedCoverage: [],
   },
