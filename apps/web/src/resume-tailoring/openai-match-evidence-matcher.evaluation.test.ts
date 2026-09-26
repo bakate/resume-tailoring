@@ -163,7 +163,7 @@ const evaluationFixtures = [
     verifiedFacts: [createFact({
       id: 'source-fact-mixed-duration',
       kind: 'experience',
-      value: '5 years of Java, used TypeScript',
+      value: '5 years of Java. Used TypeScript',
     })],
     expectedCoverage: [],
   },
@@ -175,7 +175,17 @@ const evaluationFixtures = [
     verifiedFacts: [createFact({
       id: 'source-fact-mixed-seniority',
       kind: 'experience',
-      value: 'Senior Java developer, used TypeScript',
+      value: 'Senior Java developer. Used TypeScript',
+    })],
+    expectedCoverage: [],
+  },
+  {
+    name: 'does not erase a required technology version',
+    requirements: [createRequirement({
+      id: 'job-requirement-react-version', value: 'Know React 18',
+    })],
+    verifiedFacts: [createFact({
+      id: 'source-fact-react-version', kind: 'experience', value: 'Used React 17',
     })],
     expectedCoverage: [],
   },

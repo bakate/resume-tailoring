@@ -203,14 +203,13 @@ function hasTermsFromGroup({ factTerm, requirementTerm, termGroup }: Readonly<{
 }
 
 function canonicalizeControlledTerm({ value }: Readonly<{ value: string }>) {
-  return normalizeTerm({ value }).split(' ')
+  return normalizeTerm({ value }).replaceAll(durationPattern, ' ').split(' ')
     .filter((term) => !isConstraintContextTerm({ term })).join(' ')
 }
 
 function isConstraintContextTerm({ term }: Readonly<{ term: string }>) {
   return controlledContextTerms.has(term)
     || qualitativeRequirementTerms.includes(term as typeof qualitativeRequirementTerms[number])
-    || durationContextPattern.test(term)
 }
 
 function hasNegatedEvidence({ fact }: Readonly<{ fact: SourceProfileFact }>) {
@@ -313,8 +312,7 @@ const negativeTerms = ['aucun', 'jamais', 'no', 'not', 'never', 'pas', 'sans', '
 const qualitativeRequirementTerms = [
   'advanced', 'expert', 'lead', 'principal', 'production', 'senior', 'staff',
 ] as const
-const clauseSeparatorPattern = /[,;\n]|\b(?:and|et)\b/iu
-const durationContextPattern = /^(?:\d+|ans?|months?|mois|years?|yrs?)$/u
+const clauseSeparatorPattern = /[,;\n]|[.!?](?:\s+|$)|\b(?:and|et)\b/iu
 const durationPattern = /\b(\d+)\s*\+?\s*(years?|yrs?|ans?|months?|mois)\b/gu
 const roleTerms = ['developer', 'engineer', 'manager', 'architect', 'consultant'] as const
 const evidenceVerbs = [

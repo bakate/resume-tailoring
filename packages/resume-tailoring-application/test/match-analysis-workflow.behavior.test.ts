@@ -165,7 +165,7 @@ describe('Match Analysis workflow', () => {
   it('binds a required duration to the matching skill', async () => {
     const system = createSystemUnderTest({
       facts: [createTypeScriptFact({
-        value: '5 years of Java, used TypeScript',
+        value: '5 years of Java. Used TypeScript',
       })],
       jobRequirements: [createTypeScriptRequirement({ value: '5 years of TypeScript' })],
     })
@@ -179,12 +179,24 @@ describe('Match Analysis workflow', () => {
   it('binds qualitative seniority to the matching skill', async () => {
     const system = createSystemUnderTest({
       facts: [createTypeScriptFact({
-        value: 'Senior Java developer, used TypeScript',
+        value: 'Senior Java developer. Used TypeScript',
       })],
       jobRequirements: [createTypeScriptRequirement({ value: 'Senior TypeScript' })],
     })
 
     system.givenTheMatcherMatchesTypeScript()
+    await system.analyzeMatch()
+
+    system.expectFabricatedMatchEvidenceToBeRejected()
+  })
+
+  it('does not erase a required technology version', async () => {
+    const system = createSystemUnderTest({
+      facts: [createReactFact({ value: 'Used React 17' })],
+      jobRequirements: [createReactRequirement({ value: 'Know React 18' })],
+    })
+
+    system.givenTheMatcherMatchesReact()
     await system.analyzeMatch()
 
     system.expectFabricatedMatchEvidenceToBeRejected()
