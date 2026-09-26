@@ -1,0 +1,382 @@
+:root {
+  color: #151820;
+  font-family: 'DM Sans', Arial, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #ffffff;
+}
+
+.not-found {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: clamp(24px, 7vw, 112px);
+}
+
+.not-found-brand {
+  margin: 0 0 38px;
+  color: #164f3d;
+  font-weight: 600;
+}
+
+.not-found h1 {
+  font-size: clamp(52px, 8vw, 104px);
+}
+
+.not-found > p:not(.not-found-brand) {
+  max-width: 580px;
+  margin: 28px 0;
+  color: #555b68;
+  font-size: 20px;
+  line-height: 1.5;
+}
+
+.not-found a {
+  color: #164f3d;
+  font-weight: 600;
+  text-underline-offset: 5px;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 0 clamp(24px, 4.5vw, 72px);
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 74px;
+  border-bottom: 1px solid #e3e4e2;
+}
+
+.brand,
+h1,
+.workflow-steps h3,
+.value-strip strong {
+  font-family: 'DM Serif Display', Georgia, serif;
+}
+
+.brand {
+  color: #151820;
+  font-size: 25px;
+  text-decoration: none;
+}
+
+.site-header p {
+  margin: 0;
+  color: #5d6270;
+  font-size: 15px;
+}
+
+.workflow-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(430px, 0.92fr);
+  min-height: 735px;
+  border-bottom: 1px solid #dfe1df;
+}
+
+.introduction {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 72px clamp(48px, 7vw, 116px) 72px 0;
+}
+
+h1 {
+  max-width: 650px;
+  margin: 0;
+  font-size: clamp(58px, 5.4vw, 84px);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 0.99;
+}
+
+.lede {
+  max-width: 570px;
+  margin: 42px 0 0;
+  color: #555b68;
+  font-size: clamp(20px, 1.8vw, 27px);
+  line-height: 1.45;
+}
+
+.primary-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  width: min(100%, 420px);
+  min-height: 72px;
+  margin-top: 52px;
+  border: 0;
+  border-radius: 3px;
+  background: #164f3d;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 600;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.primary-action:hover:not(:disabled) {
+  background: #0f3d2f;
+  transform: translateY(-1px);
+}
+
+.primary-action:focus-visible {
+  outline: 3px solid #94cdb8;
+  outline-offset: 4px;
+}
+
+.primary-action:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.primary-action svg {
+  width: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.privacy-note {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  max-width: 455px;
+  margin: 28px 0 0;
+  color: #656b77;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.privacy-note svg {
+  flex: 0 0 24px;
+  width: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.failure-message {
+  margin: 18px 0 0;
+  color: #982f28;
+}
+
+.workflow-summary {
+  padding: 84px 0 62px clamp(48px, 6vw, 92px);
+  border-left: 1px solid #e0e2df;
+}
+
+.workflow-summary h2 {
+  margin: 0 0 26px;
+  font-size: 31px;
+  letter-spacing: -0.025em;
+}
+
+.workflow-status {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  padding: 27px 30px;
+  background: #ecf7f1;
+}
+
+.status-mark {
+  display: grid;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 50%;
+  background: #164f3d;
+  color: #ffffff;
+  font-size: 22px;
+}
+
+.workflow-status strong {
+  color: #174b3b;
+  font-size: 20px;
+}
+
+.workflow-status p,
+.workflow-steps p,
+.value-strip p {
+  margin: 6px 0 0;
+  color: #666c79;
+  line-height: 1.45;
+}
+
+.workflow-steps {
+  margin: 42px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workflow-steps li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 34px;
+  min-height: 144px;
+}
+
+.workflow-steps li:not(:last-child)::after {
+  position: absolute;
+  top: 64px;
+  bottom: 12px;
+  left: 31px;
+  width: 1px;
+  background: #d7dad8;
+  content: '';
+}
+
+.step-number {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border: 1px solid #d4d7dc;
+  border-radius: 50%;
+  font-size: 18px;
+}
+
+.workflow-steps h3 {
+  margin: 9px 0 0;
+  font-size: 22px;
+  font-weight: 400;
+}
+
+.workflow-steps p {
+  max-width: 360px;
+  font-size: 15px;
+}
+
+.value-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  min-height: 126px;
+  padding: 28px 0;
+}
+
+.value-strip > div {
+  padding-right: 36px;
+}
+
+.value-strip > div + div {
+  padding-left: 50px;
+  border-left: 1px solid #dfe1df;
+}
+
+.value-strip strong {
+  font-size: 17px;
+  font-weight: 400;
+}
+
+.value-strip p {
+  font-size: 14px;
+}
+
+@media (max-width: 920px) {
+  .workflow-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .introduction {
+    padding-right: 0;
+  }
+
+  .workflow-summary {
+    padding: 58px 0;
+    border-top: 1px solid #e0e2df;
+    border-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .site-header p {
+    display: none;
+  }
+
+  .introduction {
+    padding: 58px 0;
+  }
+
+  h1 {
+    font-size: clamp(46px, 14vw, 64px);
+  }
+
+  .lede {
+    margin-top: 30px;
+    font-size: 19px;
+  }
+
+  .primary-action {
+    margin-top: 36px;
+  }
+
+  .workflow-summary {
+    padding-bottom: 42px;
+  }
+
+  .workflow-status {
+    gap: 16px;
+    padding: 22px 18px;
+  }
+
+  .workflow-steps li {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .step-number {
+    width: 52px;
+    height: 52px;
+  }
+
+  .workflow-steps li:not(:last-child)::after {
+    top: 52px;
+    left: 25px;
+  }
+
+  .value-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .value-strip > div {
+    padding: 22px 0;
+  }
+
+  .value-strip > div + div {
+    padding-left: 0;
+    border-top: 1px solid #dfe1df;
+    border-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primary-action {
+    transition: none;
+  }
+}

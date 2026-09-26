@@ -1,0 +1,17 @@
+{
+  "name": "@resume-tailoring/domain",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./resume-tailoring-state": "./src/resume-tailoring-state.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

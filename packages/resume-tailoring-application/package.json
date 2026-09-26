@@ -1,0 +1,22 @@
+{
+  "name": "@resume-tailoring/application",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./resume-tailoring-workflow": "./src/resume-tailoring-workflow.ts",
+    "./resume-tailoring-workflow-composition": "./src/resume-tailoring-workflow-composition.ts",
+    "./resume-tailoring-workflow-testing": "./src/resume-tailoring-workflow-testing.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@resume-tailoring/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

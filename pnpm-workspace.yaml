@@ -1,0 +1,31 @@
+packages:
+  - apps/*
+  - packages/*
+
+# -----------------------------------------------------------------------------
+# PNPM Catalog
+# -----------------------------------------------------------------------------
+# Keep external dependency versions in one place. Package manifests reference
+# these versions with "catalog:"; internal packages continue to use workspace:*.
+catalog:
+  "@eslint/js": 9.36.0
+  "@playwright/test": 1.63.0
+  "@tanstack/react-router": 1.170.39
+  "@tanstack/react-start": 1.168.58
+  "@types/react": 19.3.0
+  "@types/react-dom": 19.3.0
+  "@vitejs/plugin-react": 6.1.1
+  dependency-cruiser: 17.3.3
+  eslint: 9.36.0
+  globals: 16.4.0
+  nitro: 3.0.260903-beta
+  react: 19.3.0
+  react-dom: 19.3.0
+  turbo: 2.11.4
+  typescript: 5.9.2
+  typescript-eslint: 8.44.1
+  vite: 8.3.1
+  vitest: 3.2.4
+
+onlyBuiltDependencies:
+  - esbuild
