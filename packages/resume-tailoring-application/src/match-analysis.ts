@@ -3,40 +3,50 @@ import type {
   MatchAnalysis,
   MatchEvidence,
   JobRequirementId,
-  ProposedFactMatch,
-  ProposedMatchEvidence,
+  MatchScore,
   SourceProfileFact,
 } from '@resume-tailoring/domain/resume-tailoring-state'
+import type {
+  ProposedFactMatch,
+  ProposedMatchEvidence,
+} from './resume-tailoring-workflow-ports'
 
 export const generationThreshold = 50
 
 export function createMatchAnalysis({
   proposedEvidence,
+  relevantFactIds,
   requirements,
   verifiedFacts,
 }: Readonly<{
   proposedEvidence: readonly ProposedMatchEvidence[]
+  relevantFactIds: readonly SourceProfileFact['id'][]
   requirements: readonly JobRequirement[]
   verifiedFacts: readonly SourceProfileFact[]
 }>): MatchAnalysis | null {
   const evidence = validateMatchEvidence({ proposedEvidence, requirements, verifiedFacts })
-  if (evidence === null) return null
-  return createAnalysisFromEvidence({ evidence, requirements, verifiedFacts })
+  if (evidence === null
+    || !hasValidRelevantFacts({ evidence, relevantFactIds, verifiedFacts })) return null
+  return createAnalysisFromEvidence({ evidence, relevantFactIds, requirements })
 }
 
-export function restoreMatchAnalysis({ evidence, requirements, verifiedFacts }: Readonly<{
+export function restoreMatchAnalysis({
+  evidence, relevantFactIds, requirements, verifiedFacts,
+}: Readonly<{
   evidence: readonly MatchEvidence[]
+  relevantFactIds: readonly SourceProfileFact['id'][]
   requirements: readonly JobRequirement[]
   verifiedFacts: readonly SourceProfileFact[]
 }>): MatchAnalysis | null {
   if (!hasValidStoredEvidence({ evidence, requirements, verifiedFacts })) return null
-  return createAnalysisFromEvidence({ evidence, requirements, verifiedFacts })
+  if (!hasValidRelevantFacts({ evidence, relevantFactIds, verifiedFacts })) return null
+  return createAnalysisFromEvidence({ evidence, relevantFactIds, requirements })
 }
 
-function createAnalysisFromEvidence({ evidence, requirements, verifiedFacts }: Readonly<{
+function createAnalysisFromEvidence({ evidence, relevantFactIds, requirements }: Readonly<{
   evidence: readonly MatchEvidence[]
+  relevantFactIds: readonly SourceProfileFact['id'][]
   requirements: readonly JobRequirement[]
-  verifiedFacts: readonly SourceProfileFact[]
 }>): MatchAnalysis {
   const coveredRequirementIds = new Set(evidence.map(({ requirementId }) => requirementId))
   const matchScore = calculateMatchScore({ coveredRequirementIds, requirements })
@@ -48,10 +58,23 @@ function createAnalysisFromEvidence({ evidence, requirements, verifiedFacts }: R
         requirements,
       }),
     },
-    generationEligibility: verifiedFacts.length > 0 ? 'eligible' : 'denied',
+    generationEligibility: relevantFactIds.length > 0 ? 'eligible' : 'denied',
     matchScore,
+    relevantFactIds,
     warning: matchScore < generationThreshold ? 'below-generation-threshold' : null,
   }
+}
+
+function hasValidRelevantFacts({ evidence, relevantFactIds, verifiedFacts }: Readonly<{
+  evidence: readonly MatchEvidence[]
+  relevantFactIds: readonly SourceProfileFact['id'][]
+  verifiedFacts: readonly SourceProfileFact[]
+}>) {
+  const verifiedFactIds = new Set(verifiedFacts.map(({ id }) => id))
+  const relevantIds = new Set(relevantFactIds)
+  return relevantIds.size === relevantFactIds.length
+    && relevantFactIds.every((factId) => verifiedFactIds.has(factId))
+    && evidence.every(({ factIds }) => factIds.every((factId) => relevantIds.has(factId)))
 }
 
 function hasValidStoredEvidence({ evidence, requirements, verifiedFacts }: Readonly<{
@@ -146,9 +169,26 @@ function provesRequirement({ fact, factMatch, requirement }: Readonly<{
     || !containsTerm({ content: requirement.value, term: factMatch.requirementTerm })) return false
   const factTerm = normalizeTerm({ value: factMatch.factTerm })
   const requirementTerm = normalizeTerm({ value: factMatch.requirementTerm })
+  if (nonEvidenceTerms.has(factTerm) || hasNegatedTerm({ fact, factTerm })) return false
+  if (fact.kind === 'experience' && looksLikeRoleTitle({ value: fact.value })) return false
   if (factMatch.relationship === 'exact') return factTerm === requirementTerm
   return controlledTermGroups.some((termGroup) => termGroup.has(factTerm)
     && termGroup.has(requirementTerm))
+}
+
+function hasNegatedTerm({ fact, factTerm }: Readonly<{
+  fact: SourceProfileFact
+  factTerm: string
+}>) {
+  const normalizedFact = normalizeTerm({ value: fact.value })
+  return negativeTerms.some((negativeTerm) => normalizedFact.includes(`${negativeTerm} ${factTerm}`))
+}
+
+function looksLikeRoleTitle({ value }: Readonly<{ value: string }>) {
+  const normalizedValue = normalizeTerm({ value })
+  const hasRoleWord = roleTerms.some((roleTerm) => normalizedValue.includes(roleTerm))
+  const hasEvidenceVerb = evidenceVerbs.some((verb) => normalizedValue.includes(verb))
+  return hasRoleWord && !hasEvidenceVerb
 }
 
 function containsTerm({ content, term }: Readonly<{ content: string; term: string }>) {
@@ -171,6 +211,16 @@ const controlledTermGroups = [
   ['bilingual', 'bilingue'],
 ].map((terms) => new Set(terms))
 
+const nonEvidenceTerms = new Set([
+  'advanced', 'expert', 'junior', 'lead', 'mid level', 'senior',
+])
+const negativeTerms = ['no', 'not', 'never used', 'without'] as const
+const roleTerms = ['developer', 'engineer', 'manager', 'architect', 'consultant'] as const
+const evidenceVerbs = [
+  'built', 'created', 'delivered', 'designed', 'developed', 'implemented', 'used', 'using',
+  'worked with',
+] as const
+
 function calculateMatchScore({
   coveredRequirementIds,
   requirements,
@@ -179,11 +229,11 @@ function calculateMatchScore({
   requirements: readonly JobRequirement[]
 }>) {
   const totalWeight = requirements.reduce(sumRequirementWeight, 0)
-  if (totalWeight === 0) return 0
+  if (totalWeight === 0) return 0 as MatchScore
   const coveredWeight = requirements
     .filter(({ id }) => coveredRequirementIds.has(id))
     .reduce(sumRequirementWeight, 0)
-  return Math.round((coveredWeight / totalWeight) * 100)
+  return Math.round((coveredWeight / totalWeight) * 100) as MatchScore
 }
 
 function sumRequirementWeight(total: number, requirement: JobRequirement) {

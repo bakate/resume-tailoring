@@ -117,7 +117,7 @@ function parseMatchAnalysisResult({
   const result = matchAnalysisResultSchema.safeParse(value)
   if (!result.success) return matchAnalysisTransportUnavailableResult
   if (!result.data.ok) return result.data
-  return hasOnlyMatchInputReferences({ ...matchRequest, evidence: result.data.value })
+  return hasOnlyMatchInputReferences({ ...matchRequest, analysis: result.data.value })
     ? result.data
     : matchAnalysisTransportUnavailableResult
 }

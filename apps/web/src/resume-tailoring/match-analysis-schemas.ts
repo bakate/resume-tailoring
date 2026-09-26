@@ -1,6 +1,6 @@
 import type {
   JobRequirement,
-  ProposedMatchEvidence,
+  ProposedMatchAnalysis,
   SourceProfileFact,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import {
@@ -28,6 +28,7 @@ const proposedMatchEvidenceSchema = z.object({
 
 export const extractedMatchEvidenceSchema = z.object({
   evidence: z.array(proposedMatchEvidenceSchema).max(jobRequirementMaximumCount),
+  relevantFactIds: z.array(sourceProfileFactIdSchema).max(sourceProfileFactMaximumCount),
 })
 
 const storedMatchEvidenceSchema = z.object({
@@ -37,11 +38,12 @@ const storedMatchEvidenceSchema = z.object({
 
 export const storedMatchAnalysisSchema = z.object({
   evidence: z.array(storedMatchEvidenceSchema).max(jobRequirementMaximumCount),
+  relevantFactIds: z.array(sourceProfileFactIdSchema).max(sourceProfileFactMaximumCount),
 })
 
 export const matchAnalysisSuccessSchema = z.object({
   ok: z.literal(true),
-  value: z.array(proposedMatchEvidenceSchema).max(jobRequirementMaximumCount),
+  value: extractedMatchEvidenceSchema,
 })
 
 export const matchAnalysisResultSchema = z.discriminatedUnion('ok', [
@@ -71,22 +73,25 @@ export const matchAnalysisRequestSchema = z.object({
 })
 
 export function hasOnlyMatchInputReferences({
-  evidence,
+  analysis,
   requirements,
   verifiedFacts,
 }: Readonly<{
-  evidence: readonly ProposedMatchEvidence[]
+  analysis: ProposedMatchAnalysis
   requirements: readonly JobRequirement[]
   verifiedFacts: readonly SourceProfileFact[]
 }>) {
   const requirementIds = new Set(requirements.map(({ id }) => id))
   const verifiedFactIds = new Set(verifiedFacts.map(({ id }) => id))
-  const referencedRequirementIds = new Set<string>()
-  return evidence.every((item) => {
+  const referencedRequirementIds = new Set<JobRequirement['id']>()
+  const relevantFactIds = new Set(analysis.relevantFactIds)
+  if (relevantFactIds.size !== analysis.relevantFactIds.length
+    || analysis.relevantFactIds.some((factId) => !verifiedFactIds.has(factId))) return false
+  return analysis.evidence.every((item) => {
     if (referencedRequirementIds.has(item.requirementId)) return false
     referencedRequirementIds.add(item.requirementId)
     return requirementIds.has(item.requirementId)
       && new Set(item.factMatches.map(({ factId }) => factId)).size === item.factMatches.length
-      && item.factMatches.every(({ factId }) => verifiedFactIds.has(factId))
+      && item.factMatches.every(({ factId }) => relevantFactIds.has(factId))
   })
 }

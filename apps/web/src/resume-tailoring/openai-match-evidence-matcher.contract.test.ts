@@ -9,19 +9,21 @@ import { createOpenAiMatchEvidenceMatcher } from './openai-match-evidence-matche
 describe('OpenAI Match Evidence matcher contract', () => {
   it('uses a stateless strict request limited to Job Requirements and Verified Facts', async () => {
     const requests: Request[] = []
+    const signals: (AbortSignal | null)[] = []
     const matcher = createOpenAiMatchEvidenceMatcher({
       apiKey: 'test-api-key',
       model: 'structured-model',
       reasoningEffort: 'low',
       request: (input, init) => {
         requests.push(new Request(input, init))
+        signals.push(init?.signal ?? null)
         return Promise.resolve(Response.json(createOpenAiResponse()))
       },
     })
 
     const result = await matcher.match({ requirements, verifiedFacts })
 
-    expect(result).toEqual({ ok: true, value: expectedEvidence })
+    expect(result).toEqual({ ok: true, value: expectedAnalysis })
     const requestBody = await readRequestBody(requests)
     expect(requestBody).toMatchObject({
       model: 'structured-model',
@@ -46,6 +48,7 @@ describe('OpenAI Match Evidence matcher contract', () => {
     expect(JSON.stringify(requestBody)).toMatch(
       /role, a transferable skill, or qualitative seniority as implicit proof/iu,
     )
+    expect(signals).toEqual([expect.any(AbortSignal)])
   })
 
   it('rejects evidence that references input identifiers not supplied to the model', async () => {
@@ -53,7 +56,7 @@ describe('OpenAI Match Evidence matcher contract', () => {
       apiKey: 'test-api-key',
       model: 'structured-model',
       reasoningEffort: 'low',
-      request: () => Promise.resolve(Response.json(createOpenAiResponse({
+      request: () => Promise.resolve(Response.json(createOpenAiResponse({ analysis: {
         evidence: [{
           requirementId: 'job-requirement-invented',
           factMatches: [{
@@ -63,7 +66,8 @@ describe('OpenAI Match Evidence matcher contract', () => {
             requirementTerm: 'TypeScript',
           }],
         }],
-      }))),
+        relevantFactIds: ['source-fact-invented'],
+      } }))),
     })
 
     const result = await matcher.match({ requirements, verifiedFacts })
@@ -79,12 +83,12 @@ async function readRequestBody(requests: readonly Request[]) {
 }
 
 function createOpenAiResponse({
-  evidence = expectedEvidence,
-}: Readonly<{ evidence?: readonly unknown[] }> = {}) {
+  analysis = expectedAnalysis,
+}: Readonly<{ analysis?: unknown }> = {}) {
   return {
     output: [{
       type: 'message',
-      content: [{ type: 'output_text', text: JSON.stringify({ evidence }) }],
+      content: [{ type: 'output_text', text: JSON.stringify(analysis) }],
     }],
   }
 }
@@ -105,15 +109,18 @@ const requirements = [{
   value: 'Know TS',
 }] as const satisfies readonly JobRequirement[]
 
-const expectedEvidence = [{
-  requirementId: 'job-requirement-typescript',
-  factMatches: [{
-    factId: 'source-fact-typescript',
-    factTerm: 'TypeScript',
-    relationship: 'controlled',
-    requirementTerm: 'TS',
+const expectedAnalysis = {
+  evidence: [{
+    requirementId: 'job-requirement-typescript',
+    factMatches: [{
+      factId: 'source-fact-typescript',
+      factTerm: 'TypeScript',
+      relationship: 'controlled',
+      requirementTerm: 'TS',
+    }],
   }],
-}] as const
+  relevantFactIds: ['source-fact-typescript'],
+} as const
 
 const matchAnalysisUnavailableResult = {
   ok: false,

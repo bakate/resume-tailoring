@@ -155,7 +155,8 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     })
     if (!matchResult.ok) return matchResult
     const matchAnalysis = createMatchAnalysis({
-      proposedEvidence: matchResult.value,
+      proposedEvidence: matchResult.value.evidence,
+      relevantFactIds: matchResult.value.relevantFactIds,
       requirements: currentState.value.jobPosting.requirements,
       verifiedFacts,
     })

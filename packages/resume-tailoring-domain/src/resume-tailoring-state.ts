@@ -92,17 +92,8 @@ export type MatchEvidence = Readonly<{
   factIds: readonly SourceProfileFactId[]
 }>
 
-export type ProposedFactMatch = Readonly<{
-  factId: SourceProfileFactId
-  factTerm: string
-  relationship: 'exact' | 'controlled'
-  requirementTerm: string
-}>
-
-export type ProposedMatchEvidence = Readonly<{
-  requirementId: JobRequirementId
-  factMatches: readonly ProposedFactMatch[]
-}>
+declare const matchScoreBrand: unique symbol
+export type MatchScore = number & Readonly<{ [matchScoreBrand]: true }>
 
 export type MatchAnalysis = Readonly<{
   evidence: readonly MatchEvidence[]
@@ -110,7 +101,8 @@ export type MatchAnalysis = Readonly<{
     uncoveredRequiredRequirementIds: readonly JobRequirementId[]
   }>
   generationEligibility: 'eligible' | 'denied'
-  matchScore: number
+  matchScore: MatchScore
+  relevantFactIds: readonly SourceProfileFactId[]
   warning: 'below-generation-threshold' | null
 }>
 

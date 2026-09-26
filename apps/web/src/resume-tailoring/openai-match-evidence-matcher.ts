@@ -121,10 +121,10 @@ function parseMatchEvidence({
 }: Readonly<{ matchRequest: MatchRequest; value: unknown }>) {
   const result = extractedMatchEvidenceSchema.safeParse(value)
   if (!result.success) return matchAnalysisUnavailableResult
-  if (!hasOnlyMatchInputReferences({ ...matchRequest, evidence: result.data.evidence })) {
+  if (!hasOnlyMatchInputReferences({ ...matchRequest, analysis: result.data })) {
     return matchAnalysisUnavailableResult
   }
-  return { ok: true, value: result.data.evidence } as const
+  return { ok: true, value: result.data } as const
 }
 
 const matchingInstructions = [
@@ -132,6 +132,8 @@ const matchingInstructions = [
   'Coverage is binary; omit every uncovered requirement.',
   'You may recognize controlled synonyms and translations with the same concrete meaning.',
   'For each fact link, quote the exact requirementTerm and factTerm and classify their relationship.',
+  'Return relevantFactIds only for Verified Facts relevant enough to support an honest Tailored Resume.',
+  'Return no relevantFactIds when the verified material cannot support an honest Tailored Resume.',
   'Do not treat a role, a transferable skill, or qualitative seniority as implicit proof.',
   'Never invent identifiers, qualifications, facts, or partial credit.',
 ].join(' ')
@@ -143,7 +145,7 @@ const matchEvidenceResponseFormat = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['evidence'],
+    required: ['evidence', 'relevantFactIds'],
     properties: {
       evidence: {
         type: 'array',
@@ -172,6 +174,11 @@ const matchEvidenceResponseFormat = {
             },
           },
         },
+      },
+      relevantFactIds: {
+        type: 'array',
+        maxItems: sourceProfileFactMaximumCount,
+        items: { type: 'string', pattern: '^source-fact-.+$' },
       },
     },
   },

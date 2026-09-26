@@ -1,14 +1,12 @@
 import { z } from 'zod'
 
 const defaultOpenAiStructuredModel = 'gpt-6-luna'
-const defaultOpenAiStructuredReasoningEffort = 'low'
 const openAiReasoningEfforts = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'] as const
 
 const serverEnvironmentSchema = z.object({
   OPENAI_API_KEY: z.string().trim().min(1),
   OPENAI_STRUCTURED_MODEL: z.string().trim().min(1).default(defaultOpenAiStructuredModel),
-  OPENAI_STRUCTURED_REASONING_EFFORT: z.enum(openAiReasoningEfforts)
-    .default(defaultOpenAiStructuredReasoningEffort),
+  OPENAI_STRUCTURED_REASONING_EFFORT: z.enum(openAiReasoningEfforts),
 })
 
 export type ServerEnvironment = Readonly<{

@@ -230,6 +230,7 @@ function restoreMatchAnalysis({ jobPosting, sourceProfile, storedMatchAnalysis }
   if (!storedAnalysis.success) return null
   return restoreStoredMatchAnalysis({
     evidence: storedAnalysis.data.evidence,
+    relevantFactIds: storedAnalysis.data.relevantFactIds,
     requirements: jobPosting.requirements,
     verifiedFacts: sourceProfile.facts.filter((fact) => fact.status === 'verified'),
   })

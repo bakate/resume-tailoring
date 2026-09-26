@@ -326,9 +326,10 @@ class ResumeTailoringBrowserTestSystem {
         contentType: 'application/json',
         body: JSON.stringify({
           ok: true,
-          value: preferredRequirement === undefined || verifiedFact === undefined
-            ? []
-            : [{
+          value: {
+            evidence: preferredRequirement === undefined || verifiedFact === undefined
+              ? []
+              : [{
                 requirementId: preferredRequirement.id,
                 factMatches: [{
                   factId: verifiedFact.id,
@@ -337,6 +338,8 @@ class ResumeTailoringBrowserTestSystem {
                   requirementTerm: 'React',
                 }],
               }],
+            relevantFactIds: verifiedFact === undefined ? [] : [verifiedFact.id],
+          },
         }),
       })
     })

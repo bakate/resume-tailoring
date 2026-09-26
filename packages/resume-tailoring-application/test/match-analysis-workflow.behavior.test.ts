@@ -49,7 +49,7 @@ describe('Match Analysis workflow', () => {
     const system = createSystemUnderTest()
 
     // Given
-    system.givenNoRequirementIsCovered()
+    system.givenRelevantVerifiedMaterialWithoutCoverage()
 
     // Action
     await system.analyzeMatch()
@@ -96,6 +96,19 @@ describe('Match Analysis workflow', () => {
     // Then
     system.expectFabricatedMatchEvidenceToBeRejected()
   })
+
+  it('rejects a technology inferred only from a role title', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    system.givenTheMatcherUsesARoleTitleAsSkillProof()
+
+    // Action
+    await system.analyzeMatch()
+
+    // Then
+    system.expectFabricatedMatchEvidenceToBeRejected()
+  })
 })
 
 function createSystemUnderTest({ facts = verifiedFacts }: Readonly<{
@@ -110,7 +123,7 @@ class MatchAnalysisWorkflowTestSystem {
   #actionResult: ResumeTailoringResult<ResumeTailoringView> | undefined
   #matcherResult: Awaited<ReturnType<MatchEvidenceMatcher['match']>> = {
     ok: true,
-    value: [],
+    value: { evidence: [], relevantFactIds: [] },
   }
 
   constructor(facts: readonly SourceProfileFact[]) {
@@ -135,64 +148,8 @@ class MatchAnalysisWorkflowTestSystem {
   givenOnlyAPreferredRequirementIsCovered() {
     this.#matcherResult = {
       ok: true,
-      value: [{
-        requirementId: 'job-requirement-french',
-        factMatches: [{
-          factId: 'source-fact-french',
-          factTerm: 'Français',
-          relationship: 'controlled',
-          requirementTerm: 'French',
-        }],
-      }],
-    }
-  }
-
-  givenNoRequirementIsCovered() {}
-
-  givenTheMatcherReferencesAnUnverifiedFact() {
-    this.#matcherResult = {
-      ok: true,
-      value: [{
-        requirementId: 'job-requirement-leadership',
-        factMatches: [{
-          factId: 'source-fact-unverified-leadership',
-          factTerm: 'Led',
-          relationship: 'controlled',
-          requirementTerm: 'leadership',
-        }],
-      }],
-    }
-  }
-
-  givenTheMatcherInfersLeadershipFromAProgrammingSkill() {
-    this.#matcherResult = {
-      ok: true,
-      value: [{
-        requirementId: 'job-requirement-leadership',
-        factMatches: [{
-          factId: 'source-fact-typescript',
-          factTerm: 'TypeScript',
-          relationship: 'controlled',
-          requirementTerm: 'leadership',
-        }],
-      }],
-    }
-  }
-
-  givenControlledSynonymsAndTranslationsEstablishCoverage() {
-    this.#matcherResult = {
-      ok: true,
-      value: [
-        {
-          requirementId: 'job-requirement-typescript',
-          factMatches: [{
-            factId: 'source-fact-typescript',
-            factTerm: 'TypeScript',
-            relationship: 'controlled',
-            requirementTerm: 'TS',
-          }],
-        },
-        {
+      value: {
+        evidence: [{
           requirementId: 'job-requirement-french',
           factMatches: [{
             factId: 'source-fact-french',
@@ -200,8 +157,98 @@ class MatchAnalysisWorkflowTestSystem {
             relationship: 'controlled',
             requirementTerm: 'French',
           }],
-        },
-      ],
+        }],
+        relevantFactIds: ['source-fact-french'],
+      },
+    }
+  }
+
+  givenNoRequirementIsCovered() {}
+
+  givenRelevantVerifiedMaterialWithoutCoverage() {
+    this.#matcherResult = {
+      ok: true,
+      value: { evidence: [], relevantFactIds: ['source-fact-typescript'] },
+    }
+  }
+
+  givenTheMatcherReferencesAnUnverifiedFact() {
+    this.#matcherResult = {
+      ok: true,
+      value: {
+        evidence: [{
+          requirementId: 'job-requirement-leadership',
+          factMatches: [{
+            factId: 'source-fact-unverified-leadership',
+            factTerm: 'Led',
+            relationship: 'controlled',
+            requirementTerm: 'leadership',
+          }],
+        }],
+        relevantFactIds: ['source-fact-unverified-leadership'],
+      },
+    }
+  }
+
+  givenTheMatcherInfersLeadershipFromAProgrammingSkill() {
+    this.#matcherResult = {
+      ok: true,
+      value: {
+        evidence: [{
+          requirementId: 'job-requirement-leadership',
+          factMatches: [{
+            factId: 'source-fact-typescript',
+            factTerm: 'TypeScript',
+            relationship: 'controlled',
+            requirementTerm: 'leadership',
+          }],
+        }],
+        relevantFactIds: ['source-fact-typescript'],
+      },
+    }
+  }
+
+  givenTheMatcherUsesARoleTitleAsSkillProof() {
+    this.#matcherResult = {
+      ok: true,
+      value: {
+        evidence: [{
+          requirementId: 'job-requirement-typescript',
+          factMatches: [{
+            factId: 'source-fact-role-title',
+            factTerm: 'TypeScript',
+            relationship: 'controlled',
+            requirementTerm: 'TS',
+          }],
+        }],
+        relevantFactIds: ['source-fact-role-title'],
+      },
+    }
+  }
+
+  givenControlledSynonymsAndTranslationsEstablishCoverage() {
+    this.#matcherResult = {
+      ok: true,
+      value: {
+        evidence: [{
+          requirementId: 'job-requirement-typescript',
+          factMatches: [{
+            factId: 'source-fact-typescript',
+            factTerm: 'TypeScript',
+            relationship: 'controlled',
+            requirementTerm: 'TS',
+          }],
+        }, {
+          requirementId: 'job-requirement-french',
+          factMatches: [{
+            factId: 'source-fact-french',
+            factTerm: 'Français',
+            relationship: 'controlled',
+            requirementTerm: 'French',
+          }],
+        }],
+        relevantFactIds: ['source-fact-typescript', 'source-fact-french'],
+      },
     }
   }
 
@@ -229,6 +276,7 @@ class MatchAnalysisWorkflowTestSystem {
       },
       generationEligibility: 'eligible',
       matchScore: 60,
+      relevantFactIds: ['source-fact-typescript', 'source-fact-french'],
       warning: null,
     })
     expect(this.#matchRequests).toEqual([{
@@ -306,6 +354,13 @@ const verifiedFacts = [
     propositionKey: 'proposition-experience-leadership',
     status: 'extracted',
     value: 'Led a team',
+  },
+  {
+    id: 'source-fact-role-title',
+    kind: 'experience',
+    propositionKey: 'proposition-experience-role-title',
+    status: 'verified',
+    value: 'Senior TypeScript Developer at Acme',
   },
 ] as const satisfies readonly SourceProfileFact[]
 
