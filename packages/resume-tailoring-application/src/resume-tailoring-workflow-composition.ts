@@ -219,31 +219,28 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (!hasTailoredResume(currentState) || command.request.trim().length === 0) {
       return resumeClaimUnavailableResult
     }
-    const claimIndex = currentState.value.tailoredResume.claims
-      .findIndex((claim) => claim.id === command.claimId)
-    const claim = currentState.value.tailoredResume.claims[claimIndex]
-    const generation = createResumeClaimGenerationFrom(this.#dependencies)
-    if (claim === undefined || generation === null) return resumeClaimUnavailableResult
-    const inputs = createReformulationInputs({
-      claim,
-      inputs: createResumeClaimWritingInputs({ state: currentState.value }),
+    const operation = prepareResumeClaimReformulation({
+      command, dependencies: this.#dependencies, state: currentState.value,
     })
-    const validation = await generation.reformulate({
-      claim,
-      inputs,
-      request: command.request,
+    if (operation === null) return resumeClaimUnavailableResult
+    const validation = await operation.generation.reformulate({
+      claim: operation.claim, inputs: operation.inputs, request: command.request,
     })
     if (!validation.ok) return validation
-    const claims = [...currentState.value.tailoredResume.claims]
-    if (validation.claim === null) claims.splice(claimIndex, 1)
-    else claims[claimIndex] = validation.claim
-    return this.#persistTailoredResume({
-      currentState: currentState.value,
-      claims,
-      exclusions: validation.claim === null
-        ? [...currentState.value.tailoredResume.exclusions, unsupportedClaimExclusion]
-        : currentState.value.tailoredResume.exclusions,
+    return this.#persistReformulatedResumeClaim({ command, state: currentState.value, validation })
+  }
+
+  #persistReformulatedResumeClaim({ command, state, validation }: Readonly<{
+    command: Extract<ResumeTailoringCommand, { readonly type: 'reformulate-resume-claim' }>
+    state: ResumeClaimReadyState & { readonly tailoredResume: TailoredResume }
+    validation: Readonly<{ claim: ResumeClaim | null }>
+  }>) {
+    const tailoredResume = replaceResumeClaim({
+      claim: validation.claim,
+      claimId: command.claimId,
+      tailoredResume: state.tailoredResume,
     })
+    return this.#persistTailoredResume({ currentState: state, ...tailoredResume })
   }
 
   async #persistTailoredResume({
@@ -848,6 +845,40 @@ function createReformulationInputs({
     }),
     verifiedFacts: inputs.verifiedFacts
       .filter(({ id }) => supportingFactIds.has(id)),
+  }
+}
+
+function prepareResumeClaimReformulation({ command, dependencies, state }: Readonly<{
+  command: Extract<ResumeTailoringCommand, { readonly type: 'reformulate-resume-claim' }>
+  dependencies: ResumeTailoringDependencies
+  state: ResumeClaimReadyState & { readonly tailoredResume: TailoredResume }
+}>) {
+  const claim = state.tailoredResume.claims.find(({ id }) => id === command.claimId)
+  const generation = createResumeClaimGenerationFrom(dependencies)
+  if (claim === undefined || generation === null) return null
+  return {
+    claim,
+    generation,
+    inputs: createReformulationInputs({
+      claim, inputs: createResumeClaimWritingInputs({ state }),
+    }),
+  }
+}
+
+function replaceResumeClaim({ claim, claimId, tailoredResume }: Readonly<{
+  claim: ResumeClaim | null
+  claimId: ResumeClaim['id']
+  tailoredResume: TailoredResume
+}>): TailoredResume {
+  const claims = claim === null
+    ? tailoredResume.claims.filter(({ id }) => id !== claimId)
+    : tailoredResume.claims.map((existingClaim) =>
+        existingClaim.id === claimId ? claim : existingClaim)
+  return {
+    claims,
+    exclusions: claim === null
+      ? [...tailoredResume.exclusions, unsupportedClaimExclusion]
+      : tailoredResume.exclusions,
   }
 }
 

@@ -89,7 +89,8 @@ function supportsNumericExpression({
 }: Readonly<{ candidate: NumericExpression; expression: NumericExpression }>) {
   return candidate.amount === expression.amount
     && (expression.prefix.length === 0 || candidate.prefix === expression.prefix)
-    && (expression.suffix.length === 0 || candidate.suffix === expression.suffix)
+    && (expression.suffix.length === 0
+      || normalizeNumericSuffix(candidate.suffix) === normalizeNumericSuffix(expression.suffix))
 }
 
 function readNumericExpressions({ value }: Readonly<{ value: string }>): NumericExpression[] {
@@ -102,8 +103,39 @@ function readNumericExpressions({ value }: Readonly<{ value: string }>): Numeric
 }
 
 function readDateTokens({ value }: Readonly<{ value: string }>) {
-  return value.toLocaleLowerCase('en-US').match(dateTokenPattern) ?? []
+  return (value.toLocaleLowerCase('en-US').match(dateTokenPattern) ?? [])
+    .map(normalizeDateToken)
+}
+
+function normalizeNumericSuffix(suffix: string) {
+  return numericSuffixTranslations[suffix] ?? suffix
+}
+
+function normalizeDateToken(token: string) {
+  const normalizedToken = token.normalize('NFD').replaceAll(/\p{Diacritic}/gu, '')
+  return monthTranslations.find(({ pattern }) => pattern.test(normalizedToken))?.month
+    ?? normalizedToken
 }
 
 const numericExpressionPattern = /(?<prefix>[-+$€£])?\s*(?<amount>\d+(?:[.,]\d+)?)\s*(?<suffix>%|years?|ans?|months?|mois|days?|jours?|hours?|heures?|usd|eur|gbp|k|m|millions?)?/giu
 const dateTokenPattern = /\b(?:jan(?:uary|vier)?|feb(?:ruary)?|f[eé]v(?:rier)?|mar(?:ch|s)?|apr(?:il)?|avr(?:il)?|may|mai|jun(?:e)?|juin|jul(?:y)?|juil(?:let)?|aug(?:ust)?|ao[uû]t|sep(?:tember|tembre)?|oct(?:ober|obre)?|nov(?:ember|embre)?|dec(?:ember)?|d[eé]c(?:embre)?)\b/giu
+const numericSuffixTranslations: Readonly<Record<string, string>> = {
+  year: 'year', years: 'year', an: 'year', ans: 'year',
+  month: 'month', months: 'month', mois: 'month',
+  day: 'day', days: 'day', jour: 'day', jours: 'day',
+  hour: 'hour', hours: 'hour', heure: 'hour', heures: 'hour',
+}
+const monthTranslations = [
+  { month: 'january', pattern: /^jan(?:uary|vier)?$/u },
+  { month: 'february', pattern: /^(?:feb(?:ruary)?|fev(?:rier)?)$/u },
+  { month: 'march', pattern: /^mar(?:ch|s)?$/u },
+  { month: 'april', pattern: /^(?:apr(?:il)?|avr(?:il)?)$/u },
+  { month: 'may', pattern: /^(?:may|mai)$/u },
+  { month: 'june', pattern: /^(?:jun(?:e)?|juin)$/u },
+  { month: 'july', pattern: /^(?:jul(?:y)?|juil(?:let)?)$/u },
+  { month: 'august', pattern: /^(?:aug(?:ust)?|aout)$/u },
+  { month: 'september', pattern: /^sep(?:tember|tembre)?$/u },
+  { month: 'october', pattern: /^oct(?:ober|obre)?$/u },
+  { month: 'november', pattern: /^nov(?:ember|embre)?$/u },
+  { month: 'december', pattern: /^(?:dec(?:ember)?|dec(?:embre)?)$/u },
+] as const

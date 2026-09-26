@@ -38,6 +38,15 @@ describe('Resume Claim workflow', () => {
     system.expectOnlyTheRegeneratedClaimToReachSemanticValidation()
   })
 
+  it('accepts faithful French translations of dates and durations', async () => {
+    const system = createSystemUnderTest()
+
+    system.givenAFaithfulFrenchTranslation()
+    await system.generateTailoredResume()
+
+    system.expectTheTranslatedClaimToBeKept()
+  })
+
   it('removes a claim that fails validation twice and informs the Candidate', async () => {
     const system = createSystemUnderTest()
 
@@ -140,12 +149,26 @@ class ResumeClaimWorkflowTestSystem {
     this.#generatedClaims = [{
       segments: [{ factIds: ['source-fact-experience'], text: 'Built APIs for $2022' }],
     }]
-    this.#reformulatedClaims = [defaultProposedClaim]
+    this.#reformulatedClaims = [{
+      segments: [{
+        factIds: ['source-fact-experience'],
+        text: 'Built APIs at Acme from 2022 to 2024',
+      }],
+    }]
   }
 
   givenAClaimThatRemainsSemanticallyUnsupported() {
     this.#semanticResults = [false, false]
     this.#reformulatedClaims = [defaultProposedClaim]
+  }
+
+  givenAFaithfulFrenchTranslation() {
+    this.#generatedClaims = [{
+      segments: [{
+        factIds: ['source-fact-experience'],
+        text: 'Développement API depuis janvier 2022 pendant 2 ans',
+      }],
+    }]
   }
 
   givenAConciseSupportedReformulation() {
@@ -191,8 +214,14 @@ class ResumeClaimWorkflowTestSystem {
   }
 
   expectOnlyTheRegeneratedClaimToReachSemanticValidation() {
+    expect(this.#reformulationFactIds).toEqual([['source-fact-experience']])
     expect(this.#semanticValidationRequests).toHaveLength(1)
     expect(this.#readTailoredResume().claims).toHaveLength(1)
+  }
+
+  expectTheTranslatedClaimToBeKept() {
+    expect(this.#readTailoredResume().claims[0]?.segments[0]?.text)
+      .toBe('Développement API depuis janvier 2022 pendant 2 ans')
   }
 
   expectTheUnsupportedClaimToBeExcluded() {
@@ -299,7 +328,7 @@ const verifiedFacts = [
     kind: 'experience',
     propositionKey: 'proposition-experience-acme',
     status: 'verified',
-    value: 'Built APIs at Acme from 2022 to 2024',
+    value: 'Built APIs at Acme from January 2022 for 2 years until 2024',
   },
   {
     id: 'source-fact-typescript',

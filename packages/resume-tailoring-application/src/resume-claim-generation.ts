@@ -131,16 +131,32 @@ async function validateClaimWithOneRetry({
 }>): Promise<ClaimResult> {
   const firstValidation = await validateClaim({ claimId, dependencies, inputs, proposal })
   if (!firstValidation.ok || firstValidation.claim !== null) return firstValidation
+  const retryInputs = restrictInputsToProposal({ inputs, proposal })
   const rewrite = await dependencies.writer.reformulate({
-    ...inputs, claim: proposal, feedback: firstValidation.feedback,
+    ...retryInputs, claim: proposal, feedback: firstValidation.feedback,
   })
   if (!rewrite.ok) return rewrite
   const secondValidation = await validateClaim({
-    claimId, dependencies, inputs, proposal: rewrite.value,
+    claimId, dependencies, inputs: retryInputs, proposal: rewrite.value,
   })
   return secondValidation.ok && secondValidation.claim === null
     ? { ok: true, claim: null }
     : secondValidation
+}
+
+function restrictInputsToProposal({ inputs, proposal }: Readonly<{
+  inputs: ResumeClaimWritingInputs
+  proposal: ProposedResumeClaim
+}>) {
+  const supportingFactIds = new Set(proposal.segments.flatMap(({ factIds }) => factIds))
+  return {
+    ...inputs,
+    evidence: inputs.evidence.flatMap((item) => {
+      const factIds = item.factIds.filter((factId) => supportingFactIds.has(factId))
+      return factIds.length === 0 ? [] : [{ ...item, factIds }]
+    }),
+    verifiedFacts: inputs.verifiedFacts.filter(({ id }) => supportingFactIds.has(id)),
+  }
 }
 
 async function validateClaim({
