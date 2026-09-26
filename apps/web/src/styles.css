@@ -325,6 +325,96 @@ h1 {
   font-weight: 600;
 }
 
+.workflow-hero-active {
+  min-height: 0;
+}
+
+.workflow-hero-active .introduction {
+  padding-top: 42px;
+  padding-bottom: 42px;
+}
+
+.workflow-hero-active h1 {
+  font-size: clamp(42px, 4vw, 60px);
+}
+
+.workflow-hero-active .lede {
+  margin-top: 20px;
+  font-size: 18px;
+}
+
+.workflow-hero-active .primary-action,
+.workflow-hero-active .privacy-note {
+  display: none;
+}
+
+.workflow-hero-active .workflow-summary {
+  padding-top: 36px;
+  padding-bottom: 32px;
+}
+
+.workflow-hero-active .workflow-summary h2 {
+  margin-bottom: 16px;
+  font-size: 26px;
+}
+
+.workflow-hero-active .workflow-status {
+  gap: 14px;
+  padding: 16px 18px;
+}
+
+.workflow-hero-active .status-mark {
+  flex-basis: 34px;
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+}
+
+.workflow-hero-active .workflow-status strong {
+  font-size: 16px;
+}
+
+.workflow-hero-active .workflow-status p {
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+.workflow-hero-active .workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.workflow-hero-active .workflow-steps li {
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+}
+
+.workflow-hero-active .workflow-steps li::after,
+.workflow-hero-active .workflow-steps p {
+  display: none;
+}
+
+.workflow-hero-active .step-number {
+  width: 34px;
+  height: 34px;
+  font-size: 13px;
+}
+
+.workflow-hero-active .workflow-steps h3 {
+  margin-top: 5px;
+  font-family: 'DM Sans', Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.workflow-hero-active .delete-session-action {
+  margin-top: 18px;
+  font-size: 13px;
+}
+
 .source-profile-workspace,
 .job-posting-workspace,
 .match-analysis-workspace {

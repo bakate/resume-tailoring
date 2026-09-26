@@ -111,8 +111,11 @@ function LocaleButton({ activeLocale, label, locale, selectLocale }: LocaleButto
 }
 
 function WorkflowHero({ candidateSession, localization }: CandidateSessionProps) {
+  const heroClassName = candidateSession.view.status === 'ready'
+    ? 'workflow-hero workflow-hero-active'
+    : 'workflow-hero'
   return (
-    <section className="workflow-hero" aria-labelledby="page-title">
+    <section className={heroClassName} aria-labelledby="page-title">
       <Introduction candidateSession={candidateSession} localization={localization} />
       <WorkflowSummary candidateSession={candidateSession} localization={localization} />
     </section>
