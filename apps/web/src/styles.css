@@ -273,6 +273,21 @@ h1 {
   font-size: 15px;
 }
 
+.delete-session-action {
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: #982f28;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.delete-session-action:focus-visible {
+  outline: 3px solid #e2aaa6;
+  outline-offset: 4px;
+}
+
 .value-strip {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

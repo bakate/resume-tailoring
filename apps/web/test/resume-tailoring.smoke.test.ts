@@ -1,14 +1,94 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import type { CandidateSessionPersistence } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 
-test('a Candidate can open the Resume Tailoring workflow', async ({ page }) => {
+declare global {
+  interface Window {
+    candidateSessionTestPersistence?: CandidateSessionPersistence
+    readInstalledPersistence: () => CandidateSessionPersistence
+  }
+}
+
+test('a Candidate can start a private Resume Tailoring session', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
   system.givenResumeTailoringIsAvailable()
 
-  await system.openResumeTailoring()
+  await system.startResumeTailoringSession()
 
-  await system.expectResumeTailoringToBeReady()
+  await system.expectResumeTailoringSessionToBeStoredInIndexedDb()
+})
+
+test('a Candidate can restore an unexpired session after reload', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+
+  await system.reloadResumeTailoringSession()
+
+  await system.expectResumeTailoringSessionToBeReady()
+})
+
+test('deleting a Candidate session invalidates every open tab', async ({ page }) => {
+  const secondPage = await page.context().newPage()
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActiveInBothTabs({ secondPage })
+
+  await system.deleteResumeTailoringSessionInSecondTab({ secondPage })
+
+  await system.expectResumeTailoringSessionDeletedInBothTabs({ secondPage })
+})
+
+test('expiration invalidates Candidate content in every open tab', async ({ page }) => {
+  const secondPage = await page.context().newPage()
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionWillExpireInBothTabs({ secondPage })
+
+  await system.expireResumeTailoringSessionInBothTabs({ secondPage })
+
+  await system.expectResumeTailoringSessionDeletedInBothTabs({ secondPage })
+})
+
+test('startup removes already expired Candidate content', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionAlreadyExpired()
+
+  await system.reloadExpiredCandidateSession()
+
+  await system.expectResumeTailoringSessionToBeNotStarted()
+})
+
+test('a late response cannot recreate a deleted Candidate session', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionWasDeleted()
+
+  await system.applyLateCandidateSessionResponse()
+
+  system.expectLateResponseToBeDiscarded()
+})
+
+test('a late response cannot recreate an expired Candidate session', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionWasExpired()
+
+  await system.applyLateCandidateSessionResponse()
+
+  system.expectLateResponseToBeDiscarded()
+})
+
+test('a response cannot extend the absolute Candidate session expiration', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsStored()
+
+  await system.extendCandidateSessionExpirationFromResponse()
+
+  system.expectSessionExpirationExtensionToBeRejected()
 })
 
 test('a Candidate can recover from an unknown page', async ({ page }) => {
@@ -32,66 +112,296 @@ test('explains local expiry for Candidate content', async ({ page }) => {
 })
 
 function createSystemUnderTest({ page }: Readonly<{ page: Page }>) {
-  let unknownRoute: string | undefined
-  let completedAction:
-    | 'resume-tailoring-opened'
-    | 'resume-tailoring-viewed'
-    | 'unknown-page-opened'
-    | undefined
+  return new ResumeTailoringBrowserTestSystem(page)
+}
+
+type CompletedAction =
+  | 'candidate-session-expired'
+  | 'candidate-session-reloaded'
+  | 'candidate-session-response-applied'
+  | 'candidate-session-synchronized'
+  | 'expiration-extension-attempted'
+  | 'resume-tailoring-opened'
+  | 'resume-tailoring-viewed'
+  | 'unknown-page-opened'
+
+class ResumeTailoringBrowserTestSystem {
+  readonly #page: Page
+  #completedAction: CompletedAction | undefined
+  #lateResponseOutcome: unknown
+  #unknownRoute: string | undefined
+
+  constructor(page: Page) {
+    this.#page = page
+  }
+
+  givenResumeTailoringIsAvailable() {}
+
+  givenUnknownRoute(route: string) {
+    this.#unknownRoute = route
+  }
+
+  async givenCandidateSessionIsActive() {
+    await this.#page.goto('/')
+    await this.#page.getByRole('button', { name: 'Start tailoring' }).click()
+    await this.#page.getByText('Workflow opened').waitFor()
+  }
+
+  async givenCandidateSessionIsStored() {
+    await this.#page.goto('/')
+    await seedCandidateSession({
+      page: this.#page,
+      expiresAt: lateResponseSession.expiresAt,
+    })
+  }
+
+  async givenCandidateSessionIsActiveInBothTabs({ secondPage }: Readonly<{ secondPage: Page }>) {
+    await Promise.all([this.#page.goto('/'), secondPage.goto('/')])
+    await this.#page.getByRole('button', { name: 'Start tailoring' }).click()
+    await secondPage.getByText('Workflow opened').waitFor()
+  }
+
+  async givenCandidateSessionWillExpireInBothTabs({ secondPage }: Readonly<{ secondPage: Page }>) {
+    await Promise.all([this.#page.goto('/'), secondPage.goto('/')])
+    await seedCandidateSession({ page: this.#page, expiresAt: Date.now() + 1_500 })
+    await Promise.all([this.#page.reload(), secondPage.reload()])
+    await Promise.all([
+      this.#page.getByText('Workflow opened').waitFor(),
+      secondPage.getByText('Workflow opened').waitFor(),
+    ])
+  }
+
+  async givenCandidateSessionAlreadyExpired() {
+    await this.#page.goto('/')
+    await seedCandidateSession({ page: this.#page, expiresAt: Date.now() - 1 })
+  }
+
+  async givenCandidateSessionWasDeleted() {
+    await this.#page.goto('/')
+    await seedCandidateSession({ page: this.#page, expiresAt: lateResponseSession.expiresAt })
+    await eraseCandidateSession(this.#page)
+  }
+
+  async givenCandidateSessionWasExpired() {
+    await this.#page.goto('/')
+    await seedCandidateSession({ page: this.#page, expiresAt: Date.now() - 1 })
+    await this.#page.reload()
+    await this.#page.getByText('Ready to begin').waitFor()
+  }
+
+  async startResumeTailoringSession() {
+    await this.#page.goto('/')
+    await this.#page.getByRole('button', { name: 'Start tailoring' }).click()
+    this.#completedAction = 'resume-tailoring-opened'
+  }
+
+  async reloadResumeTailoringSession() {
+    await this.#page.reload()
+    this.#completedAction = 'candidate-session-reloaded'
+  }
+
+  async deleteResumeTailoringSessionInSecondTab({ secondPage }: Readonly<{ secondPage: Page }>) {
+    await secondPage.getByRole('button', { name: 'Delete private session' }).click()
+    this.#completedAction = 'candidate-session-synchronized'
+  }
+
+  async expireResumeTailoringSessionInBothTabs({ secondPage }: Readonly<{ secondPage: Page }>) {
+    await Promise.all([
+      waitForStartTailoringToBeEnabled(this.#page),
+      waitForStartTailoringToBeEnabled(secondPage),
+    ])
+    this.#completedAction = 'candidate-session-expired'
+  }
+
+  async reloadExpiredCandidateSession() {
+    await this.#page.reload()
+    this.#completedAction = 'candidate-session-reloaded'
+  }
+
+  async applyLateCandidateSessionResponse() {
+    this.#lateResponseOutcome = await updateCandidateSession(this.#page, lateResponseSession)
+    this.#completedAction = 'candidate-session-response-applied'
+  }
+
+  async extendCandidateSessionExpirationFromResponse() {
+    this.#lateResponseOutcome = await extendCandidateSessionExpiration(this.#page)
+    this.#completedAction = 'expiration-extension-attempted'
+  }
+
+  async openUnknownPage() {
+    await this.#page.goto(this.#readUnknownRoute())
+    this.#completedAction = 'unknown-page-opened'
+  }
+
+  async viewResumeTailoring() {
+    await this.#page.goto('/')
+    this.#completedAction = 'resume-tailoring-viewed'
+  }
+
+  async expectResumeTailoringSessionToBeStoredInIndexedDb() {
+    this.#expectCompletedAction('resume-tailoring-opened')
+    await expect(this.#page.getByText('Workflow opened')).toBeVisible()
+    const storage = await readBrowserStorage(this.#page)
+    expect(storage.localStorageLength).toBe(0)
+    expect(storage.sessionId).toMatch(/^candidate-session-/)
+    expect(storage.remainingLifetime).toBeGreaterThan(24 * 60 * 60 * 1_000 - 10_000)
+  }
+
+  async expectResumeTailoringSessionToBeReady() {
+    this.#expectCompletedAction('candidate-session-reloaded')
+    await expect(this.#page.getByText('Workflow opened')).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Start tailoring' })).toBeDisabled()
+  }
+
+  async expectResumeTailoringSessionDeletedInBothTabs({ secondPage }: Readonly<{ secondPage: Page }>) {
+    this.#expectCandidateSessionInvalidationAction()
+    await expect(this.#page.getByText('Ready to begin')).toBeVisible()
+    await expect(secondPage.getByText('Ready to begin')).toBeVisible()
+  }
+
+  async expectResumeTailoringSessionToBeNotStarted() {
+    this.#expectCompletedAction('candidate-session-reloaded')
+    await expect(this.#page.getByText('Ready to begin')).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Start tailoring' })).toBeEnabled()
+  }
+
+  expectLateResponseToBeDiscarded() {
+    this.#expectCompletedAction('candidate-session-response-applied')
+    expect(this.#lateResponseOutcome).toEqual(inactiveSessionOutcome)
+  }
+
+  expectSessionExpirationExtensionToBeRejected() {
+    this.#expectCompletedAction('expiration-extension-attempted')
+    expect(this.#lateResponseOutcome).toEqual({
+      update: inactiveSessionResult,
+      currentExpiresAt: lateResponseSession.expiresAt,
+    })
+  }
+
+  async expectPageNotFoundWithWorkflowLink() {
+    this.#expectCompletedAction('unknown-page-opened')
+    await expect(this.#page).toHaveTitle('Honest Resume')
+    await expect(this.#page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
+    await expect(this.#page.getByRole('link', { name: 'Return to the workflow' })).toHaveAttribute(
+      'href',
+      '/',
+    )
+  }
+
+  async expectCandidateContentRetentionExplained() {
+    this.#expectCompletedAction('resume-tailoring-viewed')
+    await expect(this.#page.getByText(/expires locally after 24 hours/)).toBeVisible()
+    await expect(this.#page.getByText(/Downloaded files remain on your device/)).toBeVisible()
+  }
+
+  #readUnknownRoute() {
+    if (this.#unknownRoute === undefined) throw new Error('Record an unknown route before opening it')
+    return this.#unknownRoute
+  }
+
+  #expectCompletedAction(expectedAction: CompletedAction) {
+    if (this.#completedAction !== expectedAction) {
+      throw new Error(`Run ${expectedAction} before reading its outcome`)
+    }
+  }
+
+  #expectCandidateSessionInvalidationAction() {
+    if (
+      this.#completedAction !== 'candidate-session-expired'
+      && this.#completedAction !== 'candidate-session-synchronized'
+    ) {
+      throw new Error('Delete or expire the Candidate session before reading its outcome')
+    }
+  }
+}
+
+const lateResponseSession = {
+  status: 'ready',
+  sessionId: 'candidate-session-late-response',
+  expiresAt: Date.now() + 60_000,
+} as const
+
+const inactiveSessionResult = {
+  ok: false,
+  error: { type: 'candidate-session-inactive' },
+} as const
+
+const inactiveSessionOutcome = {
+  update: inactiveSessionResult,
+  current: { ok: true, value: { status: 'not-started' } },
+} as const
+
+async function seedCandidateSession({ page, expiresAt }: Readonly<{ page: Page; expiresAt: number }>) {
+  await installCandidateSessionTestPersistence(page)
+  await page.evaluate(async ({ expirationTimestamp, sessionId }) => {
+    const persistence = window.readInstalledPersistence()
+    await persistence.create({ status: 'ready', sessionId, expiresAt: expirationTimestamp })
+  }, { expirationTimestamp: expiresAt, sessionId: lateResponseSession.sessionId })
+}
+
+async function eraseCandidateSession(page: Page) {
+  await installCandidateSessionTestPersistence(page)
+  await page.evaluate(async (sessionId) => {
+    await window.readInstalledPersistence().erase({ sessionId })
+  }, lateResponseSession.sessionId)
+}
+
+async function updateCandidateSession(page: Page, state: typeof lateResponseSession) {
+  await installCandidateSessionTestPersistence(page)
+  return page.evaluate(async (session) => {
+    const persistence = window.readInstalledPersistence()
+    const update = await persistence.update({ sessionId: session.sessionId, state: session })
+    return { update, current: await persistence.read() }
+  }, state)
+}
+
+async function extendCandidateSessionExpiration(page: Page) {
+  await installCandidateSessionTestPersistence(page)
+  return page.evaluate(async (session) => {
+    const persistence = window.readInstalledPersistence()
+    const update = await persistence.update({
+      sessionId: session.sessionId,
+      state: { ...session, expiresAt: session.expiresAt + 60_000 },
+    })
+    const current = await persistence.read()
+    return {
+      update,
+      currentExpiresAt: current.ok && current.value.status === 'ready'
+        ? current.value.expiresAt
+        : null,
+    }
+  }, lateResponseSession)
+}
+
+async function readBrowserStorage(page: Page) {
+  await installCandidateSessionTestPersistence(page)
+  const storedState = await page.evaluate(async () => window.readInstalledPersistence().read())
+  if (!storedState.ok || storedState.value.status !== 'ready') {
+    throw new Error('Expected an active Candidate session in IndexedDB')
+  }
 
   return {
-    givenResumeTailoringIsAvailable() {},
-    givenUnknownRoute(route: string) {
-      unknownRoute = route
-    },
-    async openResumeTailoring() {
-      await page.goto('/')
-      await page.getByRole('button', { name: 'Start tailoring' }).click()
-      completedAction = 'resume-tailoring-opened'
-    },
-    async openUnknownPage() {
-      await page.goto(readUnknownRoute())
-      completedAction = 'unknown-page-opened'
-    },
-    async viewResumeTailoring() {
-      await page.goto('/')
-      completedAction = 'resume-tailoring-viewed'
-    },
-    async expectResumeTailoringToBeReady() {
-      expectCompletedAction('resume-tailoring-opened')
-      await expect(page.getByText('Workflow opened')).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Start tailoring' })).toBeDisabled()
-    },
-    async expectPageNotFoundWithWorkflowLink() {
-      expectCompletedAction('unknown-page-opened')
-      await expect(page).toHaveTitle('Honest Resume')
-      await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
-      await expect(page.getByRole('link', { name: 'Return to the workflow' })).toHaveAttribute(
-        'href',
-        '/',
-      )
-    },
-    async expectCandidateContentRetentionExplained() {
-      expectCompletedAction('resume-tailoring-viewed')
-      await expect(
-        page.getByText(
-          'Candidate content you add stays in this browser and expires locally after 24 hours.',
-        ),
-      ).toBeVisible()
-    },
+    localStorageLength: await page.evaluate(() => localStorage.length),
+    remainingLifetime: storedState.value.expiresAt - Date.now(),
+    sessionId: storedState.value.sessionId,
   }
+}
 
-  function readUnknownRoute() {
-    if (unknownRoute === undefined) {
-      throw new Error('Record an unknown route before opening it')
-    }
+async function installCandidateSessionTestPersistence(page: Page) {
+  await page.addScriptTag({
+    type: 'module',
+    content: `
+      import { createBrowserCandidateSessionPersistence } from '/src/resume-tailoring/browser-adapters.ts'
+      window.candidateSessionTestPersistence = createBrowserCandidateSessionPersistence()
+      window.readInstalledPersistence = () => window.candidateSessionTestPersistence
+    `,
+  })
+  await page.waitForFunction(() => window.candidateSessionTestPersistence !== undefined)
+}
 
-    return unknownRoute
-  }
-
-  function expectCompletedAction(expectedAction: typeof completedAction) {
-    if (completedAction !== expectedAction) {
-      throw new Error(`Run ${expectedAction ?? 'the expected action'} before reading its outcome`)
-    }
-  }
+async function waitForStartTailoringToBeEnabled(page: Page) {
+  await page.waitForFunction(() => {
+    const button = document.querySelector<HTMLButtonElement>('.primary-action')
+    return button?.disabled === false
+  })
 }

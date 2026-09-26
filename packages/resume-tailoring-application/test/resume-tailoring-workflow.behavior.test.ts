@@ -3,53 +3,114 @@ import { describe, expect, it } from 'vitest'
 import type {
   ResumeTailoringResult,
   ResumeTailoringView,
+  ResumeTailoringWorkflow,
 } from '@resume-tailoring/application/resume-tailoring-workflow'
 import { createResumeTailoringWorkflow } from '@resume-tailoring/application/resume-tailoring-workflow-composition'
+import type { CandidateSessionPersistence } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import {
+  createControllableCandidateSessionClock,
   createInMemoryCandidateSessionPersistence,
   createTelemetrySpy,
 } from '@resume-tailoring/application/resume-tailoring-workflow-testing'
 
+const sessionStartedAt = Date.UTC(2026, 8, 26, 12)
+const sessionExpiresAt = Date.UTC(2026, 8, 27, 12)
+const sessionIdentifier = 'candidate-session-00000000-0000-4000-8000-000000000007' as const
+
 describe('Resume Tailoring workflow', () => {
-  it('opens the initial workflow for a Candidate', async () => {
+  it('starts an expiring private Candidate session', async () => {
     const system = createSystemUnderTest({ initialStatus: 'not-started' })
 
     // Given
     await system.expectResumeTailoringToBeNotStarted()
 
     // Action
-    await system.openResumeTailoring()
+    await system.startResumeTailoringSession()
 
     // Then
-    system.expectResumeTailoringToBeReady()
+    system.expectResumeTailoringSessionToBeReady()
     system.expectWorkflowOpeningToBeRecorded()
   })
 
-  it('rejects opening a workflow that is already open', async () => {
+  it('restores an unexpired Candidate session', async () => {
     const system = createSystemUnderTest({ initialStatus: 'ready' })
 
     // Given
-    await system.expectStoredResumeTailoringToBeReady()
+    system.givenResumeTailoringIsReloaded()
 
     // Action
-    await system.openResumeTailoring()
+    await system.restoreResumeTailoringSession()
 
     // Then
-    system.expectResumeTailoringOpeningToBeRejected()
+    system.expectRestoredResumeTailoringSessionToBeReady()
   })
 
-  it('opens the workflow only once when requests overlap', async () => {
+  it('expires the Candidate session at its absolute expiration timestamp', async () => {
+    const system = createSystemUnderTest({ initialStatus: 'ready' })
+
+    // Given
+    system.givenSessionExpirationIsDue()
+
+    // Action
+    await system.expireResumeTailoringSession()
+
+    // Then
+    system.expectResumeTailoringSessionToBeDeleted()
+    system.expectSessionExpirationToBeRecorded()
+  })
+
+  it('cleans up an expired Candidate session during startup', async () => {
+    const system = createSystemUnderTest({ initialStatus: 'ready' })
+
+    // Given
+    system.givenResumeTailoringIsReloadedAfterExpiration()
+
+    // Action
+    await system.restoreResumeTailoringSession()
+
+    // Then
+    system.expectResumeTailoringSessionToBeDeleted()
+  })
+
+  it('deletes the Candidate session immediately', async () => {
+    const system = createSystemUnderTest({ initialStatus: 'ready' })
+
+    // Given
+    await system.expectStoredResumeTailoringSessionToBeReady()
+
+    // Action
+    await system.deleteResumeTailoringSession()
+
+    // Then
+    system.expectResumeTailoringSessionToBeDeleted()
+    system.expectSessionDeletionToBeRecorded()
+  })
+
+  it('rejects starting a Candidate session that is already active', async () => {
+    const system = createSystemUnderTest({ initialStatus: 'ready' })
+
+    // Given
+    await system.expectStoredResumeTailoringSessionToBeReady()
+
+    // Action
+    await system.startResumeTailoringSession()
+
+    // Then
+    system.expectResumeTailoringSessionOpeningToBeRejected()
+  })
+
+  it('starts the Candidate session only once when requests overlap', async () => {
     const system = createSystemUnderTest({ initialStatus: 'not-started' })
 
     // Given
     await system.expectResumeTailoringToBeNotStarted()
 
     // Action
-    await system.openResumeTailoringConcurrently()
+    await system.startResumeTailoringSessionConcurrently()
 
     // Then
-    system.expectOneResumeTailoringOpeningToSucceed()
-    system.expectOneResumeTailoringOpeningToBeRejected()
+    system.expectOneResumeTailoringSessionToStart()
+    system.expectOneResumeTailoringSessionOpeningToBeRejected()
     system.expectWorkflowOpeningToBeRecorded()
   })
 })
@@ -57,85 +118,151 @@ describe('Resume Tailoring workflow', () => {
 function createSystemUnderTest({
   initialStatus,
 }: Readonly<{ initialStatus: ResumeTailoringView['status'] }>) {
-  const candidateSessionPersistence = createInMemoryCandidateSessionPersistence({
-    initialState: { status: initialStatus },
-  })
-  const telemetry = createTelemetrySpy()
-  const workflow = createResumeTailoringWorkflow({
-    candidateSessionPersistence,
-    telemetry,
-  })
-  let openingResult: ResumeTailoringResult<ResumeTailoringView> | undefined
-  let concurrentOpeningResults: readonly ResumeTailoringResult<ResumeTailoringView>[] | undefined
+  return new ResumeTailoringWorkflowTestSystem(initialStatus)
+}
 
-  return {
-    async openResumeTailoring() {
-      openingResult = await workflow.execute({ type: 'open-workflow' })
-    },
-    async openResumeTailoringConcurrently() {
-      concurrentOpeningResults = await Promise.all([
-        workflow.execute({ type: 'open-workflow' }),
-        workflow.execute({ type: 'open-workflow' }),
-      ])
-    },
-    async expectResumeTailoringToBeNotStarted() {
-      const result = await workflow.readView()
-      expect(result).toEqual({
-        ok: true,
-        value: { status: 'not-started' },
-      })
-    },
-    expectResumeTailoringToBeReady() {
-      expect(readOpeningResult()).toEqual({
-        ok: true,
-        value: { status: 'ready' },
-      })
-    },
-    async expectStoredResumeTailoringToBeReady() {
-      const result = await workflow.readView()
-      expect(result).toEqual({
-        ok: true,
-        value: { status: 'ready' },
-      })
-    },
-    expectResumeTailoringOpeningToBeRejected() {
-      expect(readOpeningResult()).toEqual({
-        ok: false,
-        error: { type: 'workflow-already-open' },
-      })
-    },
-    expectOneResumeTailoringOpeningToSucceed() {
-      expect(readConcurrentOpeningResults()).toContainEqual({
-        ok: true,
-        value: { status: 'ready' },
-      })
-    },
-    expectOneResumeTailoringOpeningToBeRejected() {
-      expect(readConcurrentOpeningResults()).toContainEqual({
-        ok: false,
-        error: { type: 'workflow-already-open' },
-      })
-    },
-    expectWorkflowOpeningToBeRecorded() {
-      expect(telemetry.recordedEvents()).toEqual(['resume-tailoring-opened'])
-    },
+class ResumeTailoringWorkflowTestSystem {
+  readonly #candidateSessionClock
+  readonly #candidateSessionPersistence: CandidateSessionPersistence
+  readonly #telemetry = createTelemetrySpy()
+  #workflow: ResumeTailoringWorkflow
+  #actionResult: ResumeTailoringResult<ResumeTailoringView> | undefined
+  #concurrentResults: readonly ResumeTailoringResult<ResumeTailoringView>[] | undefined
+
+  constructor(initialStatus: ResumeTailoringView['status']) {
+    this.#candidateSessionClock = createControllableCandidateSessionClock({
+      now: sessionStartedAt,
+    })
+    this.#candidateSessionPersistence = createInMemoryCandidateSessionPersistence({
+      initialState: createInitialState(initialStatus),
+    })
+    this.#workflow = this.#createWorkflow()
   }
 
-  function readOpeningResult() {
-    expect(openingResult, 'Open the Resume Tailoring workflow before reading its outcome').toBeDefined()
-
-    if (openingResult === undefined) {
-      throw new Error('Open the Resume Tailoring workflow before reading its outcome')
-    }
-
-    return openingResult
+  givenResumeTailoringIsReloaded() {
+    this.#workflow = this.#createWorkflow()
   }
 
-  function readConcurrentOpeningResults() {
-    if (concurrentOpeningResults === undefined) {
-      throw new Error('Open the Resume Tailoring workflow concurrently before reading its outcomes')
-    }
+  givenSessionExpirationIsDue() {
+    this.#candidateSessionClock.advanceTo({ timestamp: sessionExpiresAt })
+  }
 
-    return concurrentOpeningResults
+  givenResumeTailoringIsReloadedAfterExpiration() {
+    this.#candidateSessionClock.advanceTo({ timestamp: sessionExpiresAt })
+    this.#workflow = this.#createWorkflow()
+  }
+
+  async startResumeTailoringSession() {
+    this.#actionResult = await this.#workflow.execute({ type: 'open-workflow' })
+  }
+
+  async restoreResumeTailoringSession() {
+    this.#actionResult = await this.#workflow.readView()
+  }
+
+  async expireResumeTailoringSession() {
+    await this.#candidateSessionClock.runDueExpirations()
+    this.#actionResult = await this.#workflow.readView()
+  }
+
+  async deleteResumeTailoringSession() {
+    this.#actionResult = await this.#workflow.execute({ type: 'delete-session' })
+  }
+
+  async startResumeTailoringSessionConcurrently() {
+    this.#concurrentResults = await Promise.all([
+      this.#workflow.execute({ type: 'open-workflow' }),
+      this.#workflow.execute({ type: 'open-workflow' }),
+    ])
+  }
+
+  async expectResumeTailoringToBeNotStarted() {
+    expect(await this.#workflow.readView()).toEqual(notStartedResult)
+  }
+
+  async expectStoredResumeTailoringSessionToBeReady() {
+    expect(await this.#workflow.readView()).toEqual(readyResult)
+  }
+
+  expectResumeTailoringSessionToBeReady() {
+    expect(this.#readActionResult()).toEqual(readyResult)
+  }
+
+  expectRestoredResumeTailoringSessionToBeReady() {
+    expect(this.#readActionResult()).toEqual(readyResult)
+  }
+
+  expectResumeTailoringSessionToBeDeleted() {
+    expect(this.#readActionResult()).toEqual(notStartedResult)
+  }
+
+  expectResumeTailoringSessionOpeningToBeRejected() {
+    expect(this.#readActionResult()).toEqual(workflowAlreadyOpenResult)
+  }
+
+  expectOneResumeTailoringSessionToStart() {
+    expect(this.#readConcurrentResults()).toContainEqual(readyResult)
+  }
+
+  expectOneResumeTailoringSessionOpeningToBeRejected() {
+    expect(this.#readConcurrentResults()).toContainEqual(workflowAlreadyOpenResult)
+  }
+
+  expectWorkflowOpeningToBeRecorded() {
+    expect(this.#telemetry.recordedEvents()).toEqual(['resume-tailoring-opened'])
+  }
+
+  expectSessionExpirationToBeRecorded() {
+    expect(this.#telemetry.recordedEvents()).toEqual(['candidate-session-expired'])
+  }
+
+  expectSessionDeletionToBeRecorded() {
+    expect(this.#telemetry.recordedEvents()).toEqual(['candidate-session-deleted'])
+  }
+
+  #createWorkflow() {
+    return createResumeTailoringWorkflow({
+      candidateSessionClock: this.#candidateSessionClock,
+      candidateSessionIdentity: {
+        create: () => ({ ok: true, value: sessionIdentifier }),
+      },
+      candidateSessionPersistence: this.#candidateSessionPersistence,
+      telemetry: this.#telemetry,
+    })
+  }
+
+  #readActionResult() {
+    if (this.#actionResult === undefined) {
+      throw new Error('Complete a Resume Tailoring session action before reading its outcome')
+    }
+    return this.#actionResult
+  }
+
+  #readConcurrentResults() {
+    if (this.#concurrentResults === undefined) {
+      throw new Error('Start the Candidate session concurrently before reading its outcomes')
+    }
+    return this.#concurrentResults
   }
 }
+
+function createInitialState(initialStatus: ResumeTailoringView['status']) {
+  return initialStatus === 'ready'
+    ? { status: 'ready', sessionId: sessionIdentifier, expiresAt: sessionExpiresAt } as const
+    : { status: 'not-started' } as const
+}
+
+const readyResult = {
+  ok: true,
+  value: { status: 'ready', sessionId: sessionIdentifier, expiresAt: sessionExpiresAt },
+} as const
+
+const notStartedResult = {
+  ok: true,
+  value: { status: 'not-started' },
+} as const
+
+const workflowAlreadyOpenResult = {
+  ok: false,
+  error: { type: 'workflow-already-open' },
+} as const
