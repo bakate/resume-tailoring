@@ -1,21 +1,9 @@
 import type { ResumeTailoringView } from '@resume-tailoring/application/resume-tailoring-workflow'
 
+import { useLocalization } from '../localization/localization'
+import type { Locale } from '../localization/localization'
 import { useCandidateSession } from './use-candidate-session'
-
-const workflowSteps = [
-  {
-    title: 'Source Profile',
-    description: 'Use your existing resume or career details as the source of truth.',
-  },
-  {
-    title: 'Job Posting',
-    description: 'Add the Job Posting you are targeting so we can identify what to highlight.',
-  },
-  {
-    title: 'Tailored Resume',
-    description: 'Review a focused resume based only on your approved facts.',
-  },
-] as const
+import type { CandidateSessionFailureMessageKey } from './use-candidate-session'
 
 type CandidateSessionController = ReturnType<typeof useCandidateSession>
 
@@ -31,13 +19,61 @@ export function ResumeTailoringScreen() {
 }
 
 function SiteHeader() {
+  const { translate } = useLocalization()
   return (
     <header className="site-header">
-      <a className="brand" href="/" aria-label="Honest Resume home">
-        Honest Resume
+      <a className="brand" href="/" aria-label={translate('brand.homeLabel')}>
+        {translate('brand.name')}
       </a>
-      <p>A more honest way to get hired.</p>
+      <div className="header-tools">
+        <p>{translate('brand.tagline')}</p>
+        <LocaleSwitcher />
+      </div>
     </header>
+  )
+}
+
+function LocaleSwitcher() {
+  const { locale, selectLocale, translate } = useLocalization()
+  return (
+    <nav className="locale-switcher" aria-label={translate('locale.switcherLabel')}>
+      <LocaleButton
+        activeLocale={locale}
+        label={translate('locale.english')}
+        locale="en"
+        selectLocale={selectLocale}
+      />
+      <LocaleButton
+        activeLocale={locale}
+        label={translate('locale.french')}
+        locale="fr"
+        selectLocale={selectLocale}
+      />
+    </nav>
+  )
+}
+
+function LocaleButton({
+  activeLocale,
+  label,
+  locale,
+  selectLocale,
+}: Readonly<{
+  activeLocale: Locale
+  label: string
+  locale: Locale
+  selectLocale: (locale: Locale) => void
+}>) {
+  return (
+    <button
+      aria-pressed={activeLocale === locale}
+      onClick={() => {
+        selectLocale(locale)
+      }}
+      type="button"
+    >
+      {label}
+    </button>
   )
 }
 
@@ -55,13 +91,14 @@ function WorkflowHero({ candidateSession }: Readonly<{
 function Introduction({ candidateSession }: Readonly<{
   candidateSession: CandidateSessionController
 }>) {
+  const { translate } = useLocalization()
   return (
     <div className="introduction">
-      <h1 id="page-title">Tailor your resume without inventing a thing.</h1>
-      <p className="lede">Build a focused resume from facts you have reviewed and approved.</p>
+      <h1 id="page-title">{translate('hero.title')}</h1>
+      <p className="lede">{translate('hero.lede')}</p>
       <StartSessionButton candidateSession={candidateSession} />
       <PrivacyNote />
-      <FailureMessage message={candidateSession.failureMessage} />
+      <FailureMessage messageKey={candidateSession.failureMessageKey} />
     </div>
   )
 }
@@ -69,6 +106,7 @@ function Introduction({ candidateSession }: Readonly<{
 function StartSessionButton({ candidateSession }: Readonly<{
   candidateSession: CandidateSessionController
 }>) {
+  const { translate } = useLocalization()
   return (
     <button
       className="primary-action"
@@ -76,28 +114,29 @@ function StartSessionButton({ candidateSession }: Readonly<{
       onClick={() => void candidateSession.start()}
       type="button"
     >
-      <span>Start tailoring</span>
+      <span>{translate('session.start')}</span>
       <ArrowIcon />
     </button>
   )
 }
 
 function PrivacyNote() {
+  const { translate } = useLocalization()
   return (
     <p className="privacy-note">
       <LockIcon />
-      <span>
-        Candidate content you add stays in this browser and expires locally after 24 hours.{' '}
-        Downloaded files remain on your device and are outside this automatic expiration.
-      </span>
+      <span>{translate('privacy.retention')}</span>
     </p>
   )
 }
 
-function FailureMessage({ message }: Readonly<{ message: string | null }>) {
-  return message === null ? null : (
+function FailureMessage({
+  messageKey,
+}: Readonly<{ messageKey: CandidateSessionFailureMessageKey | null }>) {
+  const { translate } = useLocalization()
+  return messageKey === null ? null : (
     <p className="failure-message" role="alert">
-      {message}
+      {translate(messageKey)}
     </p>
   )
 }
@@ -105,9 +144,10 @@ function FailureMessage({ message }: Readonly<{ message: string | null }>) {
 function WorkflowSummary({ candidateSession }: Readonly<{
   candidateSession: CandidateSessionController
 }>) {
+  const { translate } = useLocalization()
   return (
     <div className="workflow-summary">
-      <h2>Your workflow</h2>
+      <h2>{translate('workflow.title')}</h2>
       <WorkflowStatus view={candidateSession.view} />
       <WorkflowSteps />
       <DeleteSessionButton candidateSession={candidateSession} />
@@ -116,16 +156,17 @@ function WorkflowSummary({ candidateSession }: Readonly<{
 }
 
 function WorkflowStatus({ view }: Readonly<{ view: ResumeTailoringView }>) {
+  const { translate } = useLocalization()
   const isReady = view.status === 'ready'
   return (
     <div className="workflow-status" aria-live="polite">
       <span className="status-mark" aria-hidden="true">✓</span>
       <div>
-        <strong>{isReady ? 'Workflow opened' : 'Ready to begin'}</strong>
+        <strong>{translate(isReady ? 'workflow.opened' : 'workflow.ready')}</strong>
         <p>
-          {isReady
-            ? 'Your Source Profile is the next step.'
-            : 'Click “Start tailoring” to begin your workflow.'}
+          {translate(
+            isReady ? 'workflow.openedDescription' : 'workflow.readyDescription',
+          )}
         </p>
       </div>
     </div>
@@ -133,6 +174,21 @@ function WorkflowStatus({ view }: Readonly<{ view: ResumeTailoringView }>) {
 }
 
 function WorkflowSteps() {
+  const { translate } = useLocalization()
+  const workflowSteps = [
+    {
+      title: translate('workflow.sourceProfile'),
+      description: translate('workflow.sourceProfileDescription'),
+    },
+    {
+      title: translate('workflow.jobPosting'),
+      description: translate('workflow.jobPostingDescription'),
+    },
+    {
+      title: translate('workflow.tailoredResume'),
+      description: translate('workflow.tailoredResumeDescription'),
+    },
+  ] as const
   return (
     <ol className="workflow-steps">
       {workflowSteps.map((step, stepIndex) => (
@@ -148,6 +204,7 @@ function WorkflowSteps() {
 function DeleteSessionButton({ candidateSession }: Readonly<{
   candidateSession: CandidateSessionController
 }>) {
+  const { translate } = useLocalization()
   if (candidateSession.view.status !== 'ready') return null
   return (
     <button
@@ -155,17 +212,21 @@ function DeleteSessionButton({ candidateSession }: Readonly<{
       onClick={() => void candidateSession.delete()}
       type="button"
     >
-      Delete private session
+      {translate('session.delete')}
     </button>
   )
 }
 
 function ValueStrip() {
+  const { translate } = useLocalization()
   return (
     <footer className="value-strip">
-      <ValueStatement title="You stay in control" text="Only use information you have reviewed and approved." />
-      <ValueStatement title="A more focused story" text="Show the most relevant version of your experience." />
-      <ValueStatement title="Built for real opportunities" text="Tailor with confidence, apply with integrity." />
+      <ValueStatement title={translate('value.controlTitle')} text={translate('value.controlText')} />
+      <ValueStatement title={translate('value.focusTitle')} text={translate('value.focusText')} />
+      <ValueStatement
+        title={translate('value.opportunitiesTitle')}
+        text={translate('value.opportunitiesText')}
+      />
     </footer>
   )
 }

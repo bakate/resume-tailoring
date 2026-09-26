@@ -16,10 +16,15 @@ import {
 } from './browser-adapters'
 
 type CandidateSessionState = Readonly<{
-  failureMessage: string | null
+  failureMessageKey: CandidateSessionFailureMessageKey | null
   isHydrated: boolean
   view: ResumeTailoringView
 }>
+
+export type CandidateSessionFailureMessageKey =
+  | 'session.deleteFailure'
+  | 'session.loadFailure'
+  | 'session.openFailure'
 
 type CandidateSessionStateSetter = Dispatch<SetStateAction<CandidateSessionState>>
 
@@ -49,7 +54,7 @@ function connectCandidateSession({
 }: Readonly<{ workflow: ResumeTailoringWorkflow; setState: CandidateSessionStateSetter }>) {
   setState((state) => ({ ...state, isHydrated: true }))
   const updateState = (result: ResumeTailoringResult<ResumeTailoringView>) => {
-    applyResult({ result, setState, failureMessage: 'Your private session could not be loaded.' })
+    applyResult({ result, setState, failureMessageKey: 'session.loadFailure' })
   }
   const unsubscribe = workflow.subscribe(updateState)
   void workflow.readView().then(updateState)
@@ -65,30 +70,30 @@ async function executeCommand({
   setState: CandidateSessionStateSetter
   command: ResumeTailoringCommand
 }>) {
-  const failureMessage = command.type === 'open-workflow'
-    ? 'The workflow could not be opened. Try again.'
-    : 'Your private session could not be deleted. Try again.'
-  applyResult({ result: await workflow.execute(command), setState, failureMessage })
+  const failureMessageKey = command.type === 'open-workflow'
+    ? 'session.openFailure'
+    : 'session.deleteFailure'
+  applyResult({ result: await workflow.execute(command), setState, failureMessageKey })
 }
 
 function applyResult({
   result,
   setState,
-  failureMessage,
+  failureMessageKey,
 }: Readonly<{
   result: ResumeTailoringResult<ResumeTailoringView>
   setState: CandidateSessionStateSetter
-  failureMessage: string
+  failureMessageKey: CandidateSessionFailureMessageKey
 }>) {
   if (!result.ok) {
-    setState((state) => ({ ...state, failureMessage }))
+    setState((state) => ({ ...state, failureMessageKey }))
     return
   }
-  setState((state) => ({ ...state, failureMessage: null, view: result.value }))
+  setState((state) => ({ ...state, failureMessageKey: null, view: result.value }))
 }
 
 const initialCandidateSessionState = {
-  failureMessage: null,
+  failureMessageKey: null,
   isHydrated: false,
   view: { status: 'not-started' },
 } as const satisfies CandidateSessionState
