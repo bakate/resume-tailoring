@@ -13,6 +13,7 @@ import {
   defaultDocumentTitle,
   useLocalization,
 } from '../localization/localization'
+import type { Locale, Localization } from '../localization/localization'
 import '../styles.css'
 
 export const Route = createRootRoute({
@@ -73,8 +74,8 @@ function NotFound() {
 
 function RootDocument({ children, locale, readiness }: Readonly<{
   children: ReactNode
-  locale: 'en' | 'fr'
-  readiness: 'pending' | 'ready'
+  locale: Locale
+  readiness: Localization['readiness']
 }>) {
   return (
     <html lang={locale}>
