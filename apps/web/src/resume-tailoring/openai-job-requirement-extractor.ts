@@ -8,7 +8,6 @@ import {
 import { z } from 'zod'
 
 import {
-  atomicJobRequirementPattern,
   extractedJobRequirementsSchema,
   hasOnlyJobPostingSourceExcerpts,
   jobRequirementSourceExcerptMaximumCharacters,
@@ -148,7 +147,6 @@ const jobRequirementResponseFormat = {
               type: 'string',
               minLength: 1,
               maxLength: jobRequirementValueMaximumCharacters,
-              pattern: atomicJobRequirementPattern.source,
             },
           },
         },

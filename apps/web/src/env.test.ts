@@ -22,11 +22,10 @@ describe('server environment validation', () => {
     })
   })
 
-  it('uses the default structured model', () => {
+  it('uses the evaluated structured defaults', () => {
     const result = validateServerEnvironment({
       environment: {
         OPENAI_API_KEY: 'secret-key',
-        OPENAI_STRUCTURED_REASONING_EFFORT: 'low',
       },
     })
 
@@ -44,7 +43,6 @@ describe('server environment validation', () => {
     {},
     { OPENAI_API_KEY: '' },
     { OPENAI_API_KEY: '   ' },
-    { OPENAI_API_KEY: 'secret-key' },
     { OPENAI_API_KEY: 'secret-key', OPENAI_STRUCTURED_MODEL: '' },
     { OPENAI_API_KEY: 'secret-key', OPENAI_STRUCTURED_REASONING_EFFORT: 'extreme' },
   ])('rejects invalid OpenAI configuration: %o', (environment) => {

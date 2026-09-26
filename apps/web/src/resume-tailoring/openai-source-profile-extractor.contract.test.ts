@@ -10,7 +10,9 @@ describe('OpenAI Source Profile extractor contract', () => {
     })
 
     expect(result).toEqual(expectedExtractionResult)
-    expect(await readRequestBody(requests)).toMatchObject(expectedRequestBody)
+    const requestBody = await readRequestBody(requests)
+    expect(requestBody).toMatchObject(expectedRequestBody)
+    expect(JSON.stringify(requestBody)).not.toContain('?!')
     expect(signals).toEqual([expect.any(AbortSignal)])
   })
 
