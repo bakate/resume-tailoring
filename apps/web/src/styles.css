@@ -85,6 +85,48 @@ h1,
   font-size: 15px;
 }
 
+.header-tools {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.locale-failure {
+  position: absolute;
+  top: 78px;
+  right: clamp(24px, 4.5vw, 72px);
+  color: #982f28;
+}
+
+.locale-switcher {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #d4d7dc;
+  border-radius: 999px;
+}
+
+.locale-switcher button {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #555b68;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.locale-switcher button[aria-pressed='true'] {
+  background: #164f3d;
+  color: #ffffff;
+}
+
+.locale-switcher button:focus-visible {
+  outline: 3px solid #94cdb8;
+  outline-offset: 3px;
+}
+
 .workflow-hero {
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(430px, 0.92fr);
@@ -330,7 +372,7 @@ h1 {
 }
 
 @media (max-width: 640px) {
-  .site-header p {
+  .header-tools > p {
     display: none;
   }
 

@@ -5,6 +5,7 @@ import type { CandidateSessionPersistence } from '@resume-tailoring/application/
 declare global {
   interface Window {
     candidateSessionTestPersistence?: CandidateSessionPersistence
+    presentedDocumentLocales: string[]
     readInstalledPersistence: () => CandidateSessionPersistence
   }
 }
@@ -111,6 +112,47 @@ test('explains local expiry for Candidate content', async ({ page }) => {
   await system.expectCandidateContentRetentionExplained()
 })
 
+test('renders the Resume Tailoring interface in English', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenBrowserPrefersLanguages({ languages: ['en-US', 'fr-FR'] })
+
+  await system.viewResumeTailoring()
+
+  await system.expectResumeTailoringToBeInEnglish()
+})
+
+test('renders the Resume Tailoring interface in French', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenBrowserPrefersLanguages({ languages: ['fr-FR', 'en-US'] })
+
+  await system.viewResumeTailoring()
+
+  await system.expectResumeTailoringToBeInFrench()
+  await system.expectFrenchWasFirstPresentedLocale()
+})
+
+test('falls back to English for unsupported browser languages', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenBrowserPrefersLanguages({ languages: ['de-DE'] })
+
+  await system.viewResumeTailoring()
+
+  await system.expectResumeTailoringToBeInEnglish()
+})
+
+test('a Candidate can switch locale without losing an active session', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+
+  await system.switchResumeTailoringToFrench()
+
+  await system.expectFrenchLocaleAndCandidateSessionToBeRetained()
+})
+
 function createSystemUnderTest({ page }: Readonly<{ page: Page }>) {
   return new ResumeTailoringBrowserTestSystem(page)
 }
@@ -145,6 +187,26 @@ class ResumeTailoringBrowserTestSystem {
     await this.#page.goto('/')
     await this.#page.getByRole('button', { name: 'Start tailoring' }).click()
     await this.#page.getByText('Workflow opened').waitFor()
+  }
+
+  async givenBrowserPrefersLanguages({ languages }: Readonly<{ languages: readonly string[] }>) {
+    await this.#page.addInitScript((browserLanguages) => {
+      window.presentedDocumentLocales = []
+      Object.defineProperty(navigator, 'languages', { get: () => browserLanguages })
+      Object.defineProperty(navigator, 'language', { get: () => browserLanguages[0] ?? 'en-US' })
+      const recordPresentedLocale = () => {
+        const body = document.querySelector('body')
+        if (body === null || getComputedStyle(body).visibility === 'hidden') return
+        const presentedLocale = document.documentElement.lang
+        if (window.presentedDocumentLocales.includes(presentedLocale)) return
+        window.presentedDocumentLocales.push(presentedLocale)
+      }
+      new MutationObserver(recordPresentedLocale).observe(document, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+      })
+    }, languages)
   }
 
   async givenCandidateSessionIsStored() {
@@ -238,6 +300,13 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'resume-tailoring-viewed'
   }
 
+  async switchResumeTailoringToFrench() {
+    await this.#page.getByRole('button', { name: 'Français' }).click()
+    await this.#page.locator('html[lang="fr"]').waitFor()
+    await this.#page.reload()
+    this.#completedAction = 'resume-tailoring-viewed'
+  }
+
   async expectResumeTailoringSessionToBeStoredInIndexedDb() {
     this.#expectCompletedAction('resume-tailoring-opened')
     await expect(this.#page.getByText('Workflow opened')).toBeVisible()
@@ -292,6 +361,45 @@ class ResumeTailoringBrowserTestSystem {
     this.#expectCompletedAction('resume-tailoring-viewed')
     await expect(this.#page.getByText(/expires locally after 24 hours/)).toBeVisible()
     await expect(this.#page.getByText(/Downloaded files remain on your device/)).toBeVisible()
+  }
+
+  async expectResumeTailoringToBeInEnglish() {
+    this.#expectCompletedAction('resume-tailoring-viewed')
+    await expect(this.#page.locator('html')).toHaveAttribute('lang', 'en')
+    await expect(
+      this.#page.getByRole('heading', { name: 'Tailor your resume without inventing a thing.' }),
+    ).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'English' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  }
+
+  async expectResumeTailoringToBeInFrench() {
+    this.#expectCompletedAction('resume-tailoring-viewed')
+    await expect(this.#page.locator('html')).toHaveAttribute('lang', 'fr')
+    await expect(
+      this.#page.getByRole('heading', { name: 'Adapte ton CV sans rien inventer.' }),
+    ).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Français' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  }
+
+  async expectFrenchWasFirstPresentedLocale() {
+    this.#expectCompletedAction('resume-tailoring-viewed')
+    expect(await this.#page.evaluate(() => window.presentedDocumentLocales)).toEqual(['fr'])
+  }
+
+  async expectFrenchLocaleAndCandidateSessionToBeRetained() {
+    this.#expectCompletedAction('resume-tailoring-viewed')
+    await this.expectResumeTailoringToBeInFrench()
+    await expect(this.#page.getByText('Parcours ouvert')).toBeVisible()
+    await expect(
+      this.#page.getByRole('button', { name: 'Commencer à adapter mon CV' }),
+    ).toBeDisabled()
+    expect(await this.#page.evaluate(() => localStorage.getItem('honest-resume-locale'))).toBe('fr')
   }
 
   #readUnknownRoute() {

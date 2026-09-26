@@ -1,74 +1,125 @@
 import type { ResumeTailoringView } from '@resume-tailoring/application/resume-tailoring-workflow'
 
+import {
+  LocalizationFailure,
+  useLocalization,
+} from '../localization/localization'
+import type { Locale, Localization } from '../localization/localization'
 import { useCandidateSession } from './use-candidate-session'
-
-const workflowSteps = [
-  {
-    title: 'Source Profile',
-    description: 'Use your existing resume or career details as the source of truth.',
-  },
-  {
-    title: 'Job Posting',
-    description: 'Add the Job Posting you are targeting so we can identify what to highlight.',
-  },
-  {
-    title: 'Tailored Resume',
-    description: 'Review a focused resume based only on your approved facts.',
-  },
-] as const
+import type { CandidateSessionFailureMessageKey } from './use-candidate-session'
 
 type CandidateSessionController = ReturnType<typeof useCandidateSession>
+type LocalizationProps = Readonly<{ localization: Localization }>
+type CandidateSessionProps = Readonly<{
+  candidateSession: CandidateSessionController
+  localization: Localization
+}>
 
 export function ResumeTailoringScreen() {
+  const localizationResult = useLocalization()
+  if (!localizationResult.ok) return <LocalizationFailure />
+  return <LocalizedResumeTailoringScreen localization={localizationResult.value} />
+}
+
+function LocalizedResumeTailoringScreen({ localization }: LocalizationProps) {
   const candidateSession = useCandidateSession()
   return (
     <main className="app-shell">
-      <SiteHeader />
-      <WorkflowHero candidateSession={candidateSession} />
-      <ValueStrip />
+      <SiteHeader localization={localization} />
+      <WorkflowHero candidateSession={candidateSession} localization={localization} />
+      <ValueStrip localization={localization} />
     </main>
   )
 }
 
-function SiteHeader() {
+function SiteHeader({ localization }: LocalizationProps) {
+  const { preferencePersistenceError, translate } = localization
   return (
     <header className="site-header">
-      <a className="brand" href="/" aria-label="Honest Resume home">
-        Honest Resume
+      <a className="brand" href="/" aria-label={translate('brand.homeLabel')}>
+        {translate('brand.name')}
       </a>
-      <p>A more honest way to get hired.</p>
+      <div className="header-tools">
+        <p>{translate('brand.tagline')}</p>
+        <LocaleSwitcher localization={localization} />
+      </div>
+      {preferencePersistenceError === null ? null : (
+        <p className="locale-failure" role="alert">
+          {translate('locale.persistenceFailure')}
+        </p>
+      )}
     </header>
   )
 }
 
-function WorkflowHero({ candidateSession }: Readonly<{
-  candidateSession: CandidateSessionController
-}>) {
+function LocaleSwitcher({ localization }: LocalizationProps) {
+  const { locale, selectLocale, translate } = localization
+  return (
+    <nav className="locale-switcher" aria-label={translate('locale.switcherLabel')}>
+      <LocaleButton
+        activeLocale={locale}
+        label={translate('locale.english')}
+        locale="en"
+        selectLocale={selectLocale}
+      />
+      <LocaleButton
+        activeLocale={locale}
+        label={translate('locale.french')}
+        locale="fr"
+        selectLocale={selectLocale}
+      />
+    </nav>
+  )
+}
+
+type LocaleButtonProps = Readonly<{
+  activeLocale: Locale
+  label: string
+  locale: Locale
+  selectLocale: (locale: Locale) => void
+}>
+
+function LocaleButton({ activeLocale, label, locale, selectLocale }: LocaleButtonProps) {
+  return (
+    <button
+      aria-pressed={activeLocale === locale}
+      onClick={() => {
+        selectLocale(locale)
+      }}
+      type="button"
+    >
+      {label}
+    </button>
+  )
+}
+
+function WorkflowHero({ candidateSession, localization }: CandidateSessionProps) {
   return (
     <section className="workflow-hero" aria-labelledby="page-title">
-      <Introduction candidateSession={candidateSession} />
-      <WorkflowSummary candidateSession={candidateSession} />
+      <Introduction candidateSession={candidateSession} localization={localization} />
+      <WorkflowSummary candidateSession={candidateSession} localization={localization} />
     </section>
   )
 }
 
-function Introduction({ candidateSession }: Readonly<{
-  candidateSession: CandidateSessionController
-}>) {
+function Introduction({ candidateSession, localization }: CandidateSessionProps) {
+  const { translate } = localization
   return (
     <div className="introduction">
-      <h1 id="page-title">Tailor your resume without inventing a thing.</h1>
-      <p className="lede">Build a focused resume from facts you have reviewed and approved.</p>
-      <StartSessionButton candidateSession={candidateSession} />
-      <PrivacyNote />
-      <FailureMessage message={candidateSession.failureMessage} />
+      <h1 id="page-title">{translate('hero.title')}</h1>
+      <p className="lede">{translate('hero.lede')}</p>
+      <StartSessionButton candidateSession={candidateSession} localization={localization} />
+      <PrivacyNote localization={localization} />
+      <FailureMessage
+        localization={localization}
+        messageKey={candidateSession.failureMessageKey}
+      />
     </div>
   )
 }
 
-function StartSessionButton({ candidateSession }: Readonly<{
-  candidateSession: CandidateSessionController
-}>) {
+function StartSessionButton({ candidateSession, localization }: CandidateSessionProps) {
+  const { translate } = localization
   return (
     <button
       className="primary-action"
@@ -76,63 +127,69 @@ function StartSessionButton({ candidateSession }: Readonly<{
       onClick={() => void candidateSession.start()}
       type="button"
     >
-      <span>Start tailoring</span>
+      <span>{translate('session.start')}</span>
       <ArrowIcon />
     </button>
   )
 }
 
-function PrivacyNote() {
+function PrivacyNote({ localization }: LocalizationProps) {
+  const { translate } = localization
   return (
     <p className="privacy-note">
       <LockIcon />
-      <span>
-        Candidate content you add stays in this browser and expires locally after 24 hours.{' '}
-        Downloaded files remain on your device and are outside this automatic expiration.
-      </span>
+      <span>{translate('privacy.retention')}</span>
     </p>
   )
 }
 
-function FailureMessage({ message }: Readonly<{ message: string | null }>) {
-  return message === null ? null : (
-    <p className="failure-message" role="alert">
-      {message}
-    </p>
-  )
-}
-
-function WorkflowSummary({ candidateSession }: Readonly<{
-  candidateSession: CandidateSessionController
+function FailureMessage({
+  localization,
+  messageKey,
+}: Readonly<{
+  localization: Localization
+  messageKey: CandidateSessionFailureMessageKey | null
 }>) {
+  const { translate } = localization
+  return messageKey === null ? null : (
+    <p className="failure-message" role="alert">
+      {translate(messageKey)}
+    </p>
+  )
+}
+
+function WorkflowSummary({ candidateSession, localization }: CandidateSessionProps) {
+  const { translate } = localization
   return (
     <div className="workflow-summary">
-      <h2>Your workflow</h2>
-      <WorkflowStatus view={candidateSession.view} />
-      <WorkflowSteps />
-      <DeleteSessionButton candidateSession={candidateSession} />
+      <h2>{translate('workflow.title')}</h2>
+      <WorkflowStatus localization={localization} view={candidateSession.view} />
+      <WorkflowSteps localization={localization} />
+      <DeleteSessionButton candidateSession={candidateSession} localization={localization} />
     </div>
   )
 }
 
-function WorkflowStatus({ view }: Readonly<{ view: ResumeTailoringView }>) {
-  const isReady = view.status === 'ready'
+function WorkflowStatus({ localization, view }: Readonly<{
+  localization: Localization
+  view: ResumeTailoringView
+}>) {
+  const { translate } = localization
+  const statusCopy = workflowStatusCopy[view.status]
   return (
     <div className="workflow-status" aria-live="polite">
       <span className="status-mark" aria-hidden="true">✓</span>
       <div>
-        <strong>{isReady ? 'Workflow opened' : 'Ready to begin'}</strong>
-        <p>
-          {isReady
-            ? 'Your Source Profile is the next step.'
-            : 'Click “Start tailoring” to begin your workflow.'}
-        </p>
+        <strong>{translate(statusCopy.title)}</strong>
+        <p>{translate(statusCopy.description)}</p>
       </div>
     </div>
   )
 }
 
-function WorkflowSteps() {
+function WorkflowSteps({ localization }: LocalizationProps) {
+  const { translate } = localization
+  const workflowSteps = createWorkflowSteps({ translate })
   return (
     <ol className="workflow-steps">
       {workflowSteps.map((step, stepIndex) => (
@@ -145,9 +202,30 @@ function WorkflowSteps() {
   )
 }
 
-function DeleteSessionButton({ candidateSession }: Readonly<{
-  candidateSession: CandidateSessionController
+function createWorkflowSteps({ translate }: Readonly<{
+  translate: Localization['translate']
 }>) {
+  return [
+    createWorkflowStep({ translate, name: 'sourceProfile' }),
+    createWorkflowStep({ translate, name: 'jobPosting' }),
+    createWorkflowStep({ translate, name: 'tailoredResume' }),
+  ] as const
+}
+
+type WorkflowStepName = 'jobPosting' | 'sourceProfile' | 'tailoredResume'
+
+function createWorkflowStep({ translate, name }: Readonly<{
+  translate: Localization['translate']
+  name: WorkflowStepName
+}>) {
+  return {
+    title: translate(`workflow.${name}`),
+    description: translate(`workflow.${name}Description`),
+  }
+}
+
+function DeleteSessionButton({ candidateSession, localization }: CandidateSessionProps) {
+  const { translate } = localization
   if (candidateSession.view.status !== 'ready') return null
   return (
     <button
@@ -155,17 +233,21 @@ function DeleteSessionButton({ candidateSession }: Readonly<{
       onClick={() => void candidateSession.delete()}
       type="button"
     >
-      Delete private session
+      {translate('session.delete')}
     </button>
   )
 }
 
-function ValueStrip() {
+function ValueStrip({ localization }: LocalizationProps) {
+  const { translate } = localization
   return (
     <footer className="value-strip">
-      <ValueStatement title="You stay in control" text="Only use information you have reviewed and approved." />
-      <ValueStatement title="A more focused story" text="Show the most relevant version of your experience." />
-      <ValueStatement title="Built for real opportunities" text="Tailor with confidence, apply with integrity." />
+      <ValueStatement title={translate('value.controlTitle')} text={translate('value.controlText')} />
+      <ValueStatement title={translate('value.focusTitle')} text={translate('value.focusText')} />
+      <ValueStatement
+        title={translate('value.opportunitiesTitle')}
+        text={translate('value.opportunitiesText')}
+      />
     </footer>
   )
 }
@@ -186,3 +268,14 @@ function LockIcon() {
     </svg>
   )
 }
+
+const workflowStatusCopy = {
+  'not-started': {
+    title: 'workflow.ready',
+    description: 'workflow.readyDescription',
+  },
+  ready: {
+    title: 'workflow.opened',
+    description: 'workflow.openedDescription',
+  },
+} as const

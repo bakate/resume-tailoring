@@ -7,13 +7,20 @@ import {
 } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
+import {
+  LocalizationFailure,
+  LocalizationProvider,
+  defaultDocumentTitle,
+  useLocalization,
+} from '../localization/localization'
+import type { Locale, Localization } from '../localization/localization'
 import '../styles.css'
 
 export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
-      { title: 'Honest Resume' },
+      { title: defaultDocumentTitle },
       {
         name: 'viewport',
         content: 'width=device-width, initial-scale=1',
@@ -34,33 +41,61 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   return (
-    <RootDocument>
+    <LocalizationProvider>
+      <LocalizedRoot />
+    </LocalizationProvider>
+  )
+}
+
+function LocalizedRoot() {
+  const localizationResult = useLocalization()
+  if (!localizationResult.ok) return <LocalizationUnavailableDocument />
+  const { locale, readiness } = localizationResult.value
+  return (
+    <RootDocument locale={locale} readiness={readiness}>
       <Outlet />
     </RootDocument>
   )
 }
 
 function NotFound() {
+  const localizationResult = useLocalization()
+  if (!localizationResult.ok) return <LocalizationFailure />
+  const { translate } = localizationResult.value
   return (
     <main className="not-found">
-      <p className="not-found-brand">Honest Resume</p>
-      <h1>Page not found</h1>
-      <p>The page you requested does not belong to this Resume Tailoring workflow.</p>
-      <Link to="/">Return to the workflow</Link>
+      <p className="not-found-brand">{translate('brand.name')}</p>
+      <h1>{translate('notFound.title')}</h1>
+      <p>{translate('notFound.description')}</p>
+      <Link to="/">{translate('notFound.return')}</Link>
     </main>
   )
 }
 
-function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
+function RootDocument({ children, locale, readiness }: Readonly<{
+  children: ReactNode
+  locale: Locale
+  readiness: Localization['readiness']
+}>) {
   return (
-    <html lang="en">
+    <html lang={locale}>
       <head>
         <HeadContent />
       </head>
-      <body>
+      <body style={readiness === 'pending' ? pendingLocaleStyle : undefined}>
         {children}
         <Scripts />
       </body>
     </html>
   )
 }
+
+function LocalizationUnavailableDocument() {
+  return (
+    <RootDocument locale="en" readiness="ready">
+      <LocalizationFailure />
+    </RootDocument>
+  )
+}
+
+const pendingLocaleStyle = { visibility: 'hidden' } as const
