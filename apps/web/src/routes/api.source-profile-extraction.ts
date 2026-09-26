@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 import type { ZodError } from 'zod'
 
+import { validateServerEnvironment } from '../env'
 import { createOpenAiSourceProfileExtractor } from '../resume-tailoring/openai-source-profile-extractor'
 import { sourceProfileExtractionRequestSchema } from '../resume-tailoring/source-profile-schemas'
 
@@ -19,12 +20,12 @@ async function extractSourceProfile({ request }: Readonly<{ request: Request }>)
   if (!professionalContentResult.ok) {
     return createFailureResponse({ status: professionalContentResult.status })
   }
-  const apiKey = process.env.OPENAI_API_KEY
-  if (apiKey === undefined || apiKey.length === 0) return createFailureResponse({ status: 503 })
+  const environmentResult = validateServerEnvironment({ environment: process.env })
+  if (!environmentResult.ok) return createFailureResponse({ status: 503 })
 
   const extractor = createOpenAiSourceProfileExtractor({
-    apiKey,
-    model: process.env.OPENAI_STRUCTURED_MODEL ?? 'gpt-6-luna',
+    apiKey: environmentResult.value.openAiApiKey,
+    model: environmentResult.value.openAiStructuredModel,
   })
   const result = await extractor.extract({ professionalContent: professionalContentResult.value })
   return result.ok

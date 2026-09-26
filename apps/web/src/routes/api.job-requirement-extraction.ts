@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 import type { ZodError } from 'zod'
 
+import { validateServerEnvironment } from '../env'
 import {
   jobRequirementExtractionRequestSchema,
 } from '../resume-tailoring/job-requirement-schemas'
@@ -21,12 +22,12 @@ export const Route = createFileRoute('/api/job-requirement-extraction')({
 async function extractJobRequirements({ request }: Readonly<{ request: Request }>) {
   const contentResult = await readJobPostingContent({ request })
   if (!contentResult.ok) return createFailureResponse({ status: contentResult.status })
-  const apiKey = process.env.OPENAI_API_KEY
-  if (apiKey === undefined || apiKey.length === 0) return createFailureResponse({ status: 503 })
+  const environmentResult = validateServerEnvironment({ environment: process.env })
+  if (!environmentResult.ok) return createFailureResponse({ status: 503 })
 
   const extractor = createOpenAiJobRequirementExtractor({
-    apiKey,
-    model: process.env.OPENAI_STRUCTURED_MODEL ?? 'gpt-6-luna',
+    apiKey: environmentResult.value.openAiApiKey,
+    model: environmentResult.value.openAiStructuredModel,
   })
   const result = await extractor.extract({ jobPostingContent: contentResult.value })
   return result.ok
