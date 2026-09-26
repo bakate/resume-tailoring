@@ -6,7 +6,8 @@
     "build": "vite build",
     "dev": "vite dev",
     "start": "node .output/server/index.mjs",
-    "test": "vitest run --passWithNoTests --exclude test/**",
+    "test": "vitest run --passWithNoTests --exclude test/** --exclude **/*.evaluation.test.ts",
+    "test:evaluation": "vitest run --maxWorkers=1 src/resume-tailoring/openai-match-evidence-matcher.evaluation.test.ts",
     "test:e2e": "playwright test",
     "typecheck": "tsc -p tsconfig.json"
   },

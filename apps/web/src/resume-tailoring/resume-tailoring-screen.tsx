@@ -12,6 +12,7 @@ import type {
 } from './use-candidate-session'
 import { SourceProfileWorkspace } from './source-profile-workspace'
 import { JobPostingWorkspace } from './job-posting-workspace'
+import { MatchAnalysisWorkspace } from './match-analysis-workspace'
 
 type LocalizationProps = Readonly<{ localization: Localization }>
 type CandidateSessionProps = Readonly<{
@@ -36,6 +37,10 @@ function LocalizedResumeTailoringScreen({ localization }: LocalizationProps) {
         localization={localization}
       />
       <JobPostingWorkspace
+        candidateSession={candidateSession}
+        localization={localization}
+      />
+      <MatchAnalysisWorkspace
         candidateSession={candidateSession}
         localization={localization}
       />
@@ -106,8 +111,11 @@ function LocaleButton({ activeLocale, label, locale, selectLocale }: LocaleButto
 }
 
 function WorkflowHero({ candidateSession, localization }: CandidateSessionProps) {
+  const heroClassName = candidateSession.view.status === 'ready'
+    ? 'workflow-hero workflow-hero-active'
+    : 'workflow-hero'
   return (
-    <section className="workflow-hero" aria-labelledby="page-title">
+    <section className={heroClassName} aria-labelledby="page-title">
       <Introduction candidateSession={candidateSession} localization={localization} />
       <WorkflowSummary candidateSession={candidateSession} localization={localization} />
     </section>

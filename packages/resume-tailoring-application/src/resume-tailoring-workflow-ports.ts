@@ -6,6 +6,8 @@ import type {
   JobRequirementGroupId,
   JobRequirementId,
   JobRequirementContent,
+  JobRequirement,
+  SourceProfileFact,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export {
@@ -34,6 +36,9 @@ export type {
   JobRequirementContent,
   JobRequirementGroupId,
   JobRequirementId,
+  MatchAnalysis,
+  MatchEvidence,
+  MatchScore,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export type AdapterFailure = {
@@ -133,3 +138,37 @@ export type JobRequirementIdentity = {
 export type JobRequirementGroupIdentity = {
   readonly create: () => AdapterResult<JobRequirementGroupId>
 }
+
+export type MatchEvidenceMatcher = {
+  readonly match: (request: MatchInputs) => Promise<
+    | { readonly ok: true; readonly value: ProposedMatchAnalysis }
+    | {
+        readonly ok: false
+        readonly error: {
+          readonly type: 'match-analysis-unavailable' | 'match-analysis-transport-unavailable'
+        }
+      }
+  >
+}
+
+export type ProposedFactMatch = Readonly<{
+  factId: SourceProfileFactId
+  factTerm: string
+  relationship: 'exact' | 'controlled'
+  requirementTerm: string
+}>
+
+export type ProposedMatchEvidence = Readonly<{
+  requirementId: JobRequirementId
+  factMatches: readonly ProposedFactMatch[]
+}>
+
+export type ProposedMatchAnalysis = Readonly<{
+  evidence: readonly ProposedMatchEvidence[]
+  relevantFactIds: readonly SourceProfileFactId[]
+}>
+
+export type MatchInputs = Readonly<{
+  requirements: readonly Pick<JobRequirement, 'classification' | 'id' | 'value'>[]
+  verifiedFacts: readonly Pick<SourceProfileFact, 'id' | 'kind' | 'value'>[]
+}>

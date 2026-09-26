@@ -136,7 +136,6 @@ const sourceProfileResponseFormat = {
               description: 'One atomic claim without a conjunction joining separate claims.',
               minLength: 1,
               maxLength: 500,
-              pattern: '^(?!.*(?:;|\\s(?:and|et)\\s|\\s&\\s))[^\\n]+$',
             },
           },
         },

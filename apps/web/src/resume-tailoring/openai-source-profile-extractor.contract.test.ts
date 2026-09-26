@@ -10,7 +10,9 @@ describe('OpenAI Source Profile extractor contract', () => {
     })
 
     expect(result).toEqual(expectedExtractionResult)
-    expect(await readRequestBody(requests)).toMatchObject(expectedRequestBody)
+    const requestBody = await readRequestBody(requests)
+    expect(requestBody).toMatchObject(expectedRequestBody)
+    expect(JSON.stringify(requestBody)).not.toContain('?!')
     expect(signals).toEqual([expect.any(AbortSignal)])
   })
 
@@ -28,6 +30,26 @@ describe('OpenAI Source Profile extractor contract', () => {
     expect(result).toEqual({
       ok: false,
       error: { type: 'source-profile-extraction-unavailable' },
+    })
+  })
+
+  it('accepts an atomic fact containing a grammatical conjunction', async () => {
+    const value = 'Les outils et scripts créés ont réduit les tâches manuelles.'
+    const extractor = createOpenAiSourceProfileExtractor({
+      apiKey: 'test-api-key',
+      model: 'structured-model',
+      request: () => Promise.resolve(Response.json(createOpenAiResponse({ value }))),
+    })
+
+    const result = await extractor.extract({ professionalContent: value })
+
+    expect(result).toEqual({
+      ok: true,
+      value: [{
+        kind: 'skill',
+        propositionKey: 'proposition-skill-candidate-typescript',
+        value,
+      }],
     })
   })
 

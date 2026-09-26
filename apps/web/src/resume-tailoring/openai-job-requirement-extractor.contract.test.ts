@@ -11,14 +11,15 @@ describe('OpenAI Job Requirement extractor contract', () => {
     const result = await extractor.extract({ jobPostingContent })
 
     expect(result).toEqual(expectedExtractionResult)
-    expect(await readRequestBody(requests)).toMatchObject(expectedRequestBody)
+    const requestBody = await readRequestBody(requests)
+    expect(requestBody).toMatchObject(expectedRequestBody)
+    expect(JSON.stringify(requestBody)).not.toContain('?!')
     expect(signals).toEqual([expect.any(AbortSignal)])
   })
 
   it.each([
-    ['a compound requirement', 'Know TypeScript and React', jobPostingContent],
-    ['a comma-separated requirement list', 'Know TypeScript, React', jobPostingContent],
-    ['a slash-separated requirement list', 'Know TypeScript/React', jobPostingContent],
+    ['multiple lines in one requirement', 'Know TypeScript\nKnow React', jobPostingContent],
+    ['semicolon-separated requirements', 'Know TypeScript; Know React', jobPostingContent],
     ['a fabricated source excerpt', 'Know TypeScript', 'TypeScript is mandatory.'],
   ])('rejects %s returned by the model', async (_caseName, value, sourceExcerpt) => {
     const extractor = createOpenAiJobRequirementExtractor({
@@ -36,6 +37,32 @@ describe('OpenAI Job Requirement extractor contract', () => {
     const result = await extractor.extract({ jobPostingContent })
 
     expect(result).toEqual(extractionUnavailableResult)
+  })
+
+  it('accepts atomic requirements containing aliases and grammatical conjunctions', async () => {
+    const sourceExcerpt = 'Build robust and reusable libraries with JavaScript / Vanilla JS.'
+    const extractor = createOpenAiJobRequirementExtractor({
+      apiKey: 'test-api-key',
+      model: 'structured-model',
+      request: () => Promise.resolve(Response.json(createOpenAiResponse({
+        requirements: [{
+          classification: 'required',
+          sourceExcerpt,
+          value: 'Build robust and reusable libraries with JavaScript / Vanilla JS.',
+        }],
+      }))),
+    })
+
+    const result = await extractor.extract({ jobPostingContent: sourceExcerpt })
+
+    expect(result).toEqual({
+      ok: true,
+      value: [{
+        classification: 'required',
+        sourceExcerpt,
+        value: 'Build robust and reusable libraries with JavaScript / Vanilla JS.',
+      }],
+    })
   })
 
   it('rejects more than 200 requirements returned by the model', async () => {

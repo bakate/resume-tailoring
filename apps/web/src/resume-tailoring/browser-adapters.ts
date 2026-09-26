@@ -7,6 +7,7 @@ import type {
   JobRequirementExtractor,
   JobRequirementGroupIdentity,
   JobRequirementIdentity,
+  MatchEvidenceMatcher,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 
 import {
@@ -14,6 +15,10 @@ import {
   jobRequirementExtractionResultSchema,
 } from './job-requirement-schemas'
 import { sourceProfileExtractionSuccessSchema } from './source-profile-schemas'
+import {
+  hasOnlyMatchInputReferences,
+  matchAnalysisResultSchema,
+} from './match-analysis-schemas'
 
 export { createBrowserCandidateSessionPersistence } from './candidate-session-indexed-db'
 export { createBrowserSourceDocumentReader } from './source-document-pdf'
@@ -72,6 +77,49 @@ export function createBrowserJobRequirementGroupIdentity(): JobRequirementGroupI
   return {
     create: () => createBrowserIdentity({ prefix: 'job-requirement-group-' }),
   }
+}
+
+export function createBrowserMatchEvidenceMatcher({
+  request = fetch,
+}: Readonly<{ request?: typeof fetch }> = {}): MatchEvidenceMatcher {
+  return {
+    match: (matchRequest) => requestMatchEvidence({ matchRequest, request }),
+  }
+}
+
+async function requestMatchEvidence({
+  matchRequest,
+  request,
+}: Readonly<{
+  matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
+  request: typeof fetch
+}>) {
+  try {
+    const response = await request('/api/match-analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(matchRequest),
+      cache: 'no-store',
+    })
+    return parseMatchAnalysisResult({ matchRequest, value: await response.json() })
+  } catch {
+    return matchAnalysisTransportUnavailableResult
+  }
+}
+
+function parseMatchAnalysisResult({
+  matchRequest,
+  value,
+}: Readonly<{
+  matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
+  value: unknown
+}>) {
+  const result = matchAnalysisResultSchema.safeParse(value)
+  if (!result.success) return matchAnalysisTransportUnavailableResult
+  if (!result.data.ok) return result.data
+  return hasOnlyMatchInputReferences({ ...matchRequest, analysis: result.data.value })
+    ? result.data
+    : matchAnalysisTransportUnavailableResult
 }
 
 function createBrowserIdentity<TPrefix extends string>({ prefix }: Readonly<{
@@ -160,4 +208,9 @@ const extractionUnavailableResult = {
 const requirementTransportUnavailableResult = {
   ok: false,
   error: { type: 'job-requirement-transport-unavailable' },
+} as const
+
+const matchAnalysisTransportUnavailableResult = {
+  ok: false,
+  error: { type: 'match-analysis-transport-unavailable' },
 } as const

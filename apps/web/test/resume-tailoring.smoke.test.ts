@@ -3,6 +3,7 @@ import type { Page } from '@playwright/test'
 import type { CandidateSessionPersistence } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 
 import { jobRequirementExtractionMaximumCharacters } from '../src/resume-tailoring/job-requirement-schemas'
+import { matchAnalysisRequestSchema } from '../src/resume-tailoring/match-analysis-schemas'
 import { sourceProfileExtractionMaximumCharacters } from '../src/resume-tailoring/source-profile-schemas'
 
 declare global {
@@ -188,6 +189,21 @@ test('a Candidate reviews classified atomic Job Requirements from minimized cont
   await system.expectAtomicJobRequirementsWithSourceProvenance()
 })
 
+test('a Candidate sees an evidence-backed Match Score and Gap Analysis', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+  await system.givenJobRequirementExtractionIsAvailable()
+  await system.givenMatchAnalysisIsAvailable()
+  await system.buildVerifiedSourceProfile()
+  await system.extractRequirementsFromMinimizedJobPosting()
+
+  await system.analyzeMatch()
+
+  await system.expectEvidenceBackedMatchScoreAndGapAnalysis()
+})
+
 test('localizes sensitive labels and preserves legitimate French words', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
@@ -241,6 +257,7 @@ type CompletedAction =
   | 'expiration-extension-attempted'
   | 'job-requirements-extracted'
   | 'job-posting-reviewed'
+  | 'match-analyzed'
   | 'resume-tailoring-opened'
   | 'resume-tailoring-viewed'
   | 'source-profile-built'
@@ -281,7 +298,7 @@ class ResumeTailoringBrowserTestSystem {
           value: [{
             kind: 'experience',
               propositionKey: 'proposition-experience-acme-role',
-            value: 'Senior FullStack Developer at Acme',
+            value: 'Senior FullStack Developer using React at Acme',
           }],
         }),
       })
@@ -294,6 +311,36 @@ class ResumeTailoringBrowserTestSystem {
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify(jobRequirementExtractionResponse),
+      })
+    })
+  }
+
+  async givenMatchAnalysisIsAvailable() {
+    await this.#page.route('**/api/match-analysis', async (route) => {
+      const matchRequest = readMatchRequest(route.request().postData())
+      const preferredRequirement = matchRequest?.requirements.find(
+        (requirement) => requirement.classification === 'preferred',
+      )
+      const [verifiedFact] = matchRequest?.verifiedFacts ?? []
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          value: {
+            evidence: preferredRequirement === undefined || verifiedFact === undefined
+              ? []
+              : [{
+                requirementId: preferredRequirement.id,
+                factMatches: [{
+                  factId: verifiedFact.id,
+                  factTerm: 'React',
+                  relationship: 'exact',
+                  requirementTerm: 'React',
+                }],
+              }],
+            relevantFactIds: verifiedFact === undefined ? [] : [verifiedFact.id],
+          },
+        }),
       })
     })
   }
@@ -427,7 +474,7 @@ class ResumeTailoringBrowserTestSystem {
       name: 'resume.pdf',
       mimeType: 'application/pdf',
       buffer: createTextPdf(
-        'bakate@example.com +33 6 12 34 56 78 Senior FullStack Developer at Acme',
+        'bakate@example.com +33 6 12 34 56 78 Senior FullStack Developer using React at Acme',
       ),
     })
     await this.#page.getByLabel('Exact content that will be sent for extraction').waitFor()
@@ -466,6 +513,12 @@ class ResumeTailoringBrowserTestSystem {
       "Contenu exact de l'Offre d'emploi envoyé pour l'extraction",
     ).waitFor()
     this.#completedAction = 'job-posting-reviewed'
+  }
+
+  async analyzeMatch() {
+    await this.#page.getByRole('button', { name: 'Analyze the match' }).click()
+    await this.#page.getByText('33%', { exact: true }).waitFor()
+    this.#completedAction = 'match-analyzed'
   }
 
   async expectResumeTailoringSessionToBeStoredInIndexedDb() {
@@ -565,17 +618,17 @@ class ResumeTailoringBrowserTestSystem {
 
   async expectVerifiedSourceProfileBuiltFromMinimizedContent() {
     this.#expectCompletedAction('source-profile-built')
-    expect(this.#extractionRequestContent).toContain('Senior FullStack Developer at Acme')
+    expect(this.#extractionRequestContent).toContain('Senior FullStack Developer using React at Acme')
     expect(this.#extractionRequestContent).not.toContain('bakate@example.com')
     expect(this.#extractionRequestContent).not.toContain('+33 6 12 34 56 78')
-    await expect(this.#page.getByText('Senior FullStack Developer at Acme')).toBeVisible()
+    await expect(this.#page.getByText('Senior FullStack Developer using React at Acme')).toBeVisible()
     await expect(this.#page.getByText('Verified', { exact: true })).toBeVisible()
   }
 
   async expectVerifiedSourceProfileToBeRestored() {
     this.#expectCompletedAction('source-profile-reloaded')
     await expect(this.#page.getByRole('heading', { name: 'Review extracted facts' })).toBeVisible()
-    await expect(this.#page.getByText('Senior FullStack Developer at Acme')).toBeVisible()
+    await expect(this.#page.getByText('Senior FullStack Developer using React at Acme')).toBeVisible()
     await expect(this.#page.getByText('Verified', { exact: true })).toBeVisible()
   }
 
@@ -588,6 +641,20 @@ class ResumeTailoringBrowserTestSystem {
     await expect(this.#page.getByText('Know React', { exact: true })).toBeVisible()
     await expect(this.#page.getByText('Preferred', { exact: true })).toBeVisible()
     await expect(this.#page.getByText(jobPostingExcerpt).first()).toBeVisible()
+  }
+
+  async expectEvidenceBackedMatchScoreAndGapAnalysis() {
+    this.#expectCompletedAction('match-analyzed')
+    await expect(this.#page.getByText('33%', { exact: true })).toBeVisible()
+    await expect(this.#page.getByText(/below 50%/)).toBeVisible()
+    await expect(this.#page.getByRole('heading', {
+      name: 'Covered Job Requirements and Match Evidence',
+    })).toBeVisible()
+    await expect(this.#page.getByText('Know React', { exact: true }).last()).toBeVisible()
+    await expect(this.#page.getByRole('heading', {
+      name: 'Uncovered required Job Requirements',
+    })).toBeVisible()
+    await expect(this.#page.getByText('Know TypeScript', { exact: true }).last()).toBeVisible()
   }
 
   async expectFrenchSensitiveLabelAndIntactJobPosting() {
@@ -730,6 +797,13 @@ function readJobPostingContent(requestBody: string | null) {
   return isRecord(value) && typeof value.jobPostingContent === 'string'
     ? value.jobPostingContent
     : undefined
+}
+
+function readMatchRequest(requestBody: string | null) {
+  if (requestBody === null) return undefined
+  const value = JSON.parse(requestBody) as unknown
+  const result = matchAnalysisRequestSchema.safeParse(value)
+  return result.success ? result.data : undefined
 }
 
 const jobPostingExcerpt = 'You must know TypeScript and preferably React.'

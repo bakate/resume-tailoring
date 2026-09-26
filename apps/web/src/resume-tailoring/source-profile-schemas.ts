@@ -56,6 +56,7 @@ export const storedCandidateSessionSchema = z.object({
   expiresAt: z.number(),
   sourceProfile: z.unknown().optional(),
   jobPosting: z.unknown().optional(),
+  matchAnalysis: z.unknown().optional(),
 })
 
 export const sourceProfileExtractionSuccessSchema = z.object({
@@ -91,5 +92,5 @@ function isAtomicValue({ value }: Readonly<{ value: string }>) {
     && value.length <= 500
     && value.trim() === value
     && !value.includes('\n')
-    && !/(?:;|\s(?:and|et)\s|\s&\s)/iu.test(value)
+    && !value.includes(';')
 }

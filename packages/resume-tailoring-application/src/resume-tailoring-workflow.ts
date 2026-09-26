@@ -1,6 +1,7 @@
 import type {
   CandidateSessionId,
   JobPostingReview,
+  MatchAnalysis,
   SourceProfileFact,
   SourceProfileFactId,
   SourceProfileReview,
@@ -55,6 +56,7 @@ export type ResumeTailoringCommand =
   | { readonly type: 'update-job-posting-content'; readonly outgoingContent: string }
   | { readonly type: 'confirm-job-posting-processing-notice' }
   | { readonly type: 'extract-job-requirements' }
+  | { readonly type: 'analyze-match' }
 
 export type ResumeTailoringView =
   | { readonly status: 'not-started' }
@@ -64,6 +66,7 @@ export type ResumeTailoringView =
       readonly expiresAt: number
       readonly sourceProfile?: SourceProfileReview
       readonly jobPosting?: JobPostingReview
+      readonly matchAnalysis?: MatchAnalysis
     }
 
 export type ResumeTailoringFailure =
@@ -77,6 +80,8 @@ export type ResumeTailoringFailure =
   | { readonly type: 'source-fact-conflict' }
   | { readonly type: 'job-requirement-extraction-unavailable' }
   | { readonly type: 'job-requirement-transport-unavailable' }
+  | { readonly type: 'match-analysis-unavailable' }
+  | { readonly type: 'match-analysis-transport-unavailable' }
 
 export type ResumeTailoringResult<TValue> =
   | { readonly ok: true; readonly value: TValue }

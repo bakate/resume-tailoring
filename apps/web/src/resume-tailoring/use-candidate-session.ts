@@ -16,6 +16,7 @@ import {
   createBrowserJobRequirementExtractor,
   createBrowserJobRequirementGroupIdentity,
   createBrowserJobRequirementIdentity,
+  createBrowserMatchEvidenceMatcher,
   createBrowserSourceDocumentReader,
   createBrowserSourceProfileFactIdentity,
   createBrowserSourceProfileExtractor,
@@ -39,6 +40,8 @@ export type CandidateSessionFailureMessageKey =
   | 'jobPosting.extractionFailure'
   | 'jobPosting.failure'
   | 'jobPosting.transportFailure'
+  | 'matchAnalysis.failure'
+  | 'matchAnalysis.transportFailure'
 
 type CandidateSessionStateSetter = Dispatch<SetStateAction<CandidateSessionState>>
 type CandidateSessionActionDependencies = Readonly<{
@@ -61,6 +64,7 @@ export function useCandidateSession() {
     ...createSourceDocumentActions({ workflow, setState }),
     ...createSourceProfileFactActions({ workflow, setState }),
     ...createJobPostingActions({ workflow, setState }),
+    ...createMatchAnalysisActions({ workflow, setState }),
   }
 }
 
@@ -120,6 +124,16 @@ function createJobPostingActions({ workflow, setState }: CandidateSessionActionD
   }
 }
 
+function createMatchAnalysisActions({ workflow, setState }: CandidateSessionActionDependencies) {
+  return {
+    analyzeMatch: () => executeCommand({
+      workflow,
+      setState,
+      command: { type: 'analyze-match' },
+    }),
+  }
+}
+
 export type CandidateSessionController = ReturnType<typeof useCandidateSession>
 
 function createBrowserResumeTailoringWorkflow() {
@@ -130,6 +144,7 @@ function createBrowserResumeTailoringWorkflow() {
     jobRequirementExtractor: createBrowserJobRequirementExtractor(),
     jobRequirementGroupIdentity: createBrowserJobRequirementGroupIdentity(),
     jobRequirementIdentity: createBrowserJobRequirementIdentity(),
+    matchEvidenceMatcher: createBrowserMatchEvidenceMatcher(),
     sourceDocumentReader: createBrowserSourceDocumentReader(),
     sourceProfileFactIdentity: createBrowserSourceProfileFactIdentity(),
     sourceProfileExtractor: createBrowserSourceProfileExtractor(),
@@ -183,6 +198,7 @@ function readFailureMessageKey(command: ResumeTailoringCommand): CandidateSessio
   if (command.type === 'open-workflow') return 'session.openFailure'
   if (command.type === 'delete-session') return 'session.deleteFailure'
   if (isJobPostingCommand(command)) return 'jobPosting.failure'
+  if (command.type === 'analyze-match') return 'matchAnalysis.failure'
   return 'sourceProfile.failure'
 }
 
@@ -232,6 +248,10 @@ function readTypedFailureMessageKey({
   if (result.error.type === 'job-requirement-transport-unavailable') {
     return 'jobPosting.transportFailure'
   }
+  if (result.error.type === 'match-analysis-transport-unavailable') {
+    return 'matchAnalysis.transportFailure'
+  }
+  if (result.error.type === 'match-analysis-unavailable') return 'matchAnalysis.failure'
   return fallback
 }
 
