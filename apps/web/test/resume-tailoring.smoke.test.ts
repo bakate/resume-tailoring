@@ -5,6 +5,7 @@ import type { CandidateSessionPersistence } from '@resume-tailoring/application/
 import { jobRequirementExtractionMaximumCharacters } from '../src/resume-tailoring/job-requirement-schemas'
 import { matchAnalysisRequestSchema } from '../src/resume-tailoring/match-analysis-schemas'
 import { sourceProfileExtractionMaximumCharacters } from '../src/resume-tailoring/source-profile-schemas'
+import { resumeClaimWritingRequestSchema } from '../src/resume-tailoring/resume-claim-schemas'
 
 declare global {
   interface Window {
@@ -204,6 +205,23 @@ test('a Candidate sees an evidence-backed Match Score and Gap Analysis', async (
   await system.expectEvidenceBackedMatchScoreAndGapAnalysis()
 })
 
+test('a Candidate curates validated provenance-backed Resume Claims', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+  await system.givenJobRequirementExtractionIsAvailable()
+  await system.givenMatchAnalysisIsAvailable()
+  await system.givenResumeClaimServicesAreAvailable()
+  await system.buildVerifiedSourceProfile()
+  await system.extractRequirementsFromMinimizedJobPosting()
+  await system.analyzeMatch()
+
+  await system.generateAndCurateResumeClaims()
+
+  await system.expectResumeClaimsToRemainControlledAndValidated()
+})
+
 test('localizes sensitive labels and preserves legitimate French words', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
@@ -260,6 +278,7 @@ type CompletedAction =
   | 'match-analyzed'
   | 'resume-tailoring-opened'
   | 'resume-tailoring-viewed'
+  | 'resume-claims-curated'
   | 'source-profile-built'
   | 'source-profile-reloaded'
   | 'unknown-page-opened'
@@ -341,6 +360,38 @@ class ResumeTailoringBrowserTestSystem {
             relevantFactIds: verifiedFact === undefined ? [] : [verifiedFact.id],
           },
         }),
+      })
+    })
+  }
+
+  async givenResumeClaimServicesAreAvailable() {
+    await this.#page.route('**/api/resume-claim-writing', async (route) => {
+      const writingRequest = resumeClaimWritingRequestSchema.safeParse(
+        JSON.parse(route.request().postData() ?? 'null') as unknown,
+      )
+      const [verifiedFact] = writingRequest.success ? writingRequest.data.verifiedFacts : []
+      const reformulated = writingRequest.success
+        && writingRequest.data.operation === 'reformulate'
+        && writingRequest.data.request !== undefined
+      const claimTexts = reformulated
+        ? ['Delivered React applications at Acme']
+        : ['Built React applications at Acme', 'Worked as a FullStack Developer at Acme']
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          value: {
+            claims: verifiedFact === undefined ? [] : claimTexts.map((text) => ({
+              segments: [{ text, factIds: [verifiedFact.id] }],
+            })),
+          },
+        }),
+      })
+    })
+    await this.#page.route('**/api/resume-claim-validation', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, value: true }),
       })
     })
   }
@@ -521,6 +572,17 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'match-analyzed'
   }
 
+  async generateAndCurateResumeClaims() {
+    await this.#page.getByRole('button', { name: 'Generate Resume Claims' }).click()
+    await this.#page.getByText('Built React applications at Acme', { exact: true }).waitFor()
+    const reformulationInput = this.#page.getByLabel('Request a wording change').first()
+    await reformulationInput.fill('Use a stronger verb without changing meaning')
+    await this.#page.getByRole('button', { name: 'Request reformulation' }).first().click()
+    await this.#page.getByText('Delivered React applications at Acme', { exact: true }).waitFor()
+    await this.#page.getByRole('button', { name: 'Remove claim' }).last().click()
+    this.#completedAction = 'resume-claims-curated'
+  }
+
   async expectResumeTailoringSessionToBeStoredInIndexedDb() {
     this.#expectCompletedAction('resume-tailoring-opened')
     await expect(this.#page.getByText('Workflow opened')).toBeVisible()
@@ -533,7 +595,7 @@ class ResumeTailoringBrowserTestSystem {
   async expectResumeTailoringSessionToBeReady() {
     this.#expectCompletedAction('candidate-session-reloaded')
     await expect(this.#page.getByText('Workflow opened')).toBeVisible()
-    await expect(this.#page.getByRole('button', { name: 'Start tailoring' })).toBeDisabled()
+    await expect(this.#page.getByRole('button', { name: 'Delete private session' })).toBeVisible()
   }
 
   async expectResumeTailoringSessionDeletedInBothTabs({ secondPage }: Readonly<{ secondPage: Page }>) {
@@ -611,8 +673,8 @@ class ResumeTailoringBrowserTestSystem {
     await this.expectResumeTailoringToBeInFrench()
     await expect(this.#page.getByText('Parcours ouvert')).toBeVisible()
     await expect(
-      this.#page.getByRole('button', { name: 'Commencer à adapter mon CV' }),
-    ).toBeDisabled()
+      this.#page.getByRole('button', { name: 'Supprimer ma session privée' }),
+    ).toBeVisible()
     expect(await this.#page.evaluate(() => localStorage.getItem('honest-resume-locale'))).toBe('fr')
   }
 
@@ -655,6 +717,19 @@ class ResumeTailoringBrowserTestSystem {
       name: 'Uncovered required Job Requirements',
     })).toBeVisible()
     await expect(this.#page.getByText('Know TypeScript', { exact: true }).last()).toBeVisible()
+  }
+
+  async expectResumeClaimsToRemainControlledAndValidated() {
+    this.#expectCompletedAction('resume-claims-curated')
+    await expect(this.#page.getByText(
+      'Delivered React applications at Acme',
+      { exact: true },
+    )).toBeVisible()
+    await expect(this.#page.getByText(
+      'Worked as a FullStack Developer at Acme',
+      { exact: true },
+    )).toHaveCount(0)
+    await expect(this.#page.getByText(/Claims cannot be edited directly/)).toBeVisible()
   }
 
   async expectFrenchSensitiveLabelAndIntactJobPosting() {

@@ -7,10 +7,13 @@ import type {
   JobPostingReview,
   JobRequirement,
   MatchAnalysis,
+  ResumeClaim,
+  ResumeClaimId,
   ResumeTailoringState,
   SourceProfileFact,
   SourceProfileFactContent,
   SourceProfileFactId,
+  TailoredResume,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 import type {
@@ -35,7 +38,14 @@ import type {
   JobRequirementGroupIdentity,
   JobRequirementIdentity,
   MatchEvidenceMatcher,
+  ProposedResumeClaim,
+  ResumeClaimIdentity,
+  ResumeClaimSemanticValidator,
+  ResumeClaimValidationFeedback,
+  ResumeClaimWriter,
+  ResumeClaimWritingInputs,
 } from './resume-tailoring-workflow-ports'
+import { toProposedResumeClaim, validateProposedResumeClaim } from './resume-claims'
 import { createMatchAnalysis } from './match-analysis'
 import {
   createReviewingJobPosting,
@@ -57,6 +67,9 @@ type ResumeTailoringDependencies = Readonly<{
   jobRequirementGroupIdentity?: JobRequirementGroupIdentity
   jobRequirementIdentity?: JobRequirementIdentity
   matchEvidenceMatcher?: MatchEvidenceMatcher
+  resumeClaimIdentity?: ResumeClaimIdentity
+  resumeClaimSemanticValidator?: ResumeClaimSemanticValidator
+  resumeClaimWriter?: ResumeClaimWriter
   sourceDocumentReader?: SourceDocumentReader
   sourceProfileFactIdentity?: SourceProfileFactIdentity
   sourceProfileExtractor?: SourceProfileExtractor
@@ -79,6 +92,10 @@ type SourceProfileFactCommand = Exclude<ResumeTailoringCommand,
   | { readonly type: 'confirm-job-posting-processing-notice' }
   | { readonly type: 'extract-job-requirements' }
   | { readonly type: 'analyze-match' }
+  | { readonly type: 'generate-resume-claims' }
+  | { readonly type: 'remove-resume-claim' }
+  | { readonly type: 'reorder-resume-claims' }
+  | { readonly type: 'reformulate-resume-claim' }
 >
 
 export function createResumeTailoringWorkflow(
@@ -139,7 +156,210 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     }
     if (command.type === 'extract-job-requirements') return this.#extractJobRequirements()
     if (command.type === 'analyze-match') return this.#analyzeMatch()
+    if (command.type === 'generate-resume-claims') return this.#generateResumeClaims()
+    if (command.type === 'remove-resume-claim') return this.#removeResumeClaim(command)
+    if (command.type === 'reorder-resume-claims') return this.#reorderResumeClaims(command)
+    if (command.type === 'reformulate-resume-claim') {
+      return this.#reformulateResumeClaim(command)
+    }
     return this.#executeSourceProfileFactCommand(command)
+  }
+
+  async #generateResumeClaims(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasResumeClaimInputs(currentState)) return resumeClaimUnavailableResult
+    const writer = this.#dependencies.resumeClaimWriter
+    if (writer === undefined) return resumeClaimWritingUnavailableResult
+    const inputs = createResumeClaimWritingInputs({ state: currentState.value })
+    const writingResult = await writer.write(inputs)
+    if (!writingResult.ok) return writingResult
+    const validation = await this.#validateGeneratedClaims({
+      inputs,
+      proposals: writingResult.value,
+    })
+    if (!validation.ok) return validation.error
+    return this.#persistTailoredResume({
+      currentState: currentState.value,
+      claims: validation.claims,
+      exclusions: validation.exclusions,
+    })
+  }
+
+  async #validateGeneratedClaims({
+    inputs,
+    proposals,
+  }: Readonly<{
+    inputs: ResumeClaimWritingInputs
+    proposals: readonly ProposedResumeClaim[]
+  }>) {
+    const claims: ResumeClaim[] = []
+    const exclusions: { readonly reason: 'unsupported-after-regeneration' }[] = []
+    for (const proposal of proposals) {
+      const identity = this.#dependencies.resumeClaimIdentity?.create()
+      if (identity === undefined || !identity.ok) {
+        return { ok: false, error: resumeClaimUnavailableResult } as const
+      }
+      const validation = await this.#validateClaimWithOneRetry({
+        claimId: identity.value,
+        inputs,
+        proposal,
+      })
+      if (!validation.ok) return validation
+      if (validation.claim === null) exclusions.push(unsupportedClaimExclusion)
+      else claims.push(validation.claim)
+    }
+    return { ok: true, claims, exclusions } as const
+  }
+
+  async #validateClaimWithOneRetry({
+    claimId,
+    inputs,
+    proposal,
+  }: Readonly<{
+    claimId: ResumeClaimId
+    inputs: ResumeClaimWritingInputs
+    proposal: ProposedResumeClaim
+  }>) {
+    const firstValidation = await this.#validateClaim({ claimId, inputs, proposal })
+    if (!firstValidation.ok) return firstValidation
+    if (firstValidation.claim !== null) return firstValidation
+    const writer = this.#dependencies.resumeClaimWriter
+    if (writer === undefined) return { ok: false, error: resumeClaimWritingUnavailableResult } as const
+    const rewrite = await writer.reformulate({
+      ...inputs,
+      claim: proposal,
+      feedback: firstValidation.feedback,
+    })
+    if (!rewrite.ok) return { ok: false, error: rewrite } as const
+    const secondValidation = await this.#validateClaim({
+      claimId,
+      inputs,
+      proposal: rewrite.value,
+    })
+    if (!secondValidation.ok) return secondValidation
+    return secondValidation.claim === null
+      ? { ok: true, claim: null, feedback: secondValidation.feedback } as const
+      : secondValidation
+  }
+
+  async #validateClaim({
+    claimId,
+    inputs,
+    proposal,
+  }: Readonly<{
+    claimId: ResumeClaimId
+    inputs: ResumeClaimWritingInputs
+    proposal: ProposedResumeClaim
+  }>) {
+    const deterministicValidation = validateProposedResumeClaim({
+      claimId,
+      proposal,
+      verifiedFacts: inputs.verifiedFacts,
+    })
+    if (!deterministicValidation.ok) {
+      return { ok: true, claim: null, feedback: deterministicValidation.feedback } as const
+    }
+    const validator = this.#dependencies.resumeClaimSemanticValidator
+    if (validator === undefined) {
+      return { ok: false, error: resumeClaimValidationUnavailableResult } as const
+    }
+    const semanticValidation = await validator.validate({
+      claim: deterministicValidation.value,
+      verifiedFacts: inputs.verifiedFacts,
+    })
+    if (!semanticValidation.ok) return { ok: false, error: semanticValidation } as const
+    return semanticValidation.value
+      ? { ok: true, claim: deterministicValidation.value, feedback: [] } as const
+      : { ok: true, claim: null, feedback: unsupportedMeaningFeedback } as const
+  }
+
+  async #removeResumeClaim(
+    { claimId }: Extract<ResumeTailoringCommand, { readonly type: 'remove-resume-claim' }>,
+  ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasTailoredResume(currentState)) return resumeClaimUnavailableResult
+    const claims = currentState.value.tailoredResume.claims
+      .filter((claim) => claim.id !== claimId)
+    if (claims.length === currentState.value.tailoredResume.claims.length) {
+      return resumeClaimUnavailableResult
+    }
+    return this.#persistTailoredResume({
+      currentState: currentState.value,
+      claims,
+      exclusions: currentState.value.tailoredResume.exclusions,
+    })
+  }
+
+  async #reorderResumeClaims(
+    { claimIds }: Extract<ResumeTailoringCommand, { readonly type: 'reorder-resume-claims' }>,
+  ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasTailoredResume(currentState)) return resumeClaimUnavailableResult
+    const claimById = new Map(currentState.value.tailoredResume.claims
+      .map((claim) => [claim.id, claim]))
+    if (new Set(claimIds).size !== claimById.size
+      || claimIds.some((claimId) => !claimById.has(claimId))) return resumeClaimUnavailableResult
+    const claims = claimIds.map((claimId) => claimById.get(claimId))
+    if (claims.some((claim) => claim === undefined)) return resumeClaimUnavailableResult
+    return this.#persistTailoredResume({
+      currentState: currentState.value,
+      claims: claims.filter((claim) => claim !== undefined),
+      exclusions: currentState.value.tailoredResume.exclusions,
+    })
+  }
+
+  async #reformulateResumeClaim(
+    command: Extract<ResumeTailoringCommand, { readonly type: 'reformulate-resume-claim' }>,
+  ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasTailoredResume(currentState) || command.request.trim().length === 0) {
+      return resumeClaimUnavailableResult
+    }
+    const claimIndex = currentState.value.tailoredResume.claims
+      .findIndex((claim) => claim.id === command.claimId)
+    const claim = currentState.value.tailoredResume.claims[claimIndex]
+    const writer = this.#dependencies.resumeClaimWriter
+    if (claim === undefined || writer === undefined) return resumeClaimUnavailableResult
+    const inputs = createResumeClaimWritingInputs({ state: currentState.value })
+    const rewrite = await writer.reformulate({
+      ...inputs,
+      claim: toProposedResumeClaim({ claim }),
+      feedback: [],
+      request: command.request,
+    })
+    if (!rewrite.ok) return rewrite
+    const validation = await this.#validateClaimWithOneRetry({
+      claimId: claim.id,
+      inputs,
+      proposal: rewrite.value,
+    })
+    if (!validation.ok) return validation.error
+    const claims = [...currentState.value.tailoredResume.claims]
+    if (validation.claim === null) claims.splice(claimIndex, 1)
+    else claims[claimIndex] = validation.claim
+    return this.#persistTailoredResume({
+      currentState: currentState.value,
+      claims,
+      exclusions: validation.claim === null
+        ? [...currentState.value.tailoredResume.exclusions, unsupportedClaimExclusion]
+        : currentState.value.tailoredResume.exclusions,
+    })
+  }
+
+  async #persistTailoredResume({
+    claims,
+    currentState,
+    exclusions,
+  }: Readonly<{
+    claims: readonly ResumeClaim[]
+    currentState: ReadyResumeTailoringState
+    exclusions: TailoredResume['exclusions']
+  }>) {
+    const persistedState = await this.#dependencies.candidateSessionPersistence.update({
+      sessionId: currentState.sessionId,
+      state: { ...currentState, tailoredResume: { claims, exclusions } },
+    })
+    return persistedState.ok ? persistedState : unavailableResult
   }
 
   async #analyzeMatch(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
@@ -174,7 +394,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
   }>) {
     const persistedState = await this.#dependencies.candidateSessionPersistence.update({
       sessionId: currentState.sessionId,
-      state: { ...currentState, matchAnalysis },
+      state: { ...currentState, matchAnalysis, tailoredResume: undefined },
     })
     return persistedState.ok ? persistedState : unavailableResult
   }
@@ -475,7 +695,12 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
   }>) {
     const persistedState = await this.#dependencies.candidateSessionPersistence.update({
       sessionId: currentState.sessionId,
-      state: { ...currentState, sourceProfile },
+      state: {
+        ...currentState,
+        sourceProfile,
+        matchAnalysis: undefined,
+        tailoredResume: undefined,
+      },
     })
     return persistedState.ok ? persistedState : unavailableResult
   }
@@ -486,7 +711,12 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
   }>) {
     const persistedState = await this.#dependencies.candidateSessionPersistence.update({
       sessionId: currentState.sessionId,
-      state: { ...currentState, jobPosting, matchAnalysis: undefined },
+      state: {
+        ...currentState,
+        jobPosting,
+        matchAnalysis: undefined,
+        tailoredResume: undefined,
+      },
     })
     return persistedState.ok ? persistedState : unavailableResult
   }
@@ -655,6 +885,53 @@ function hasMatchInputs(
     && result.value.sourceProfile?.status === 'reviewing-facts'
 }
 
+type ResumeClaimReadyState = ReadyResumeTailoringState & {
+  readonly jobPosting: JobPostingReview & { readonly status: 'reviewing-requirements' }
+  readonly matchAnalysis: MatchAnalysis
+  readonly sourceProfile: NonNullable<ReadyResumeTailoringState['sourceProfile']>
+}
+
+function hasResumeClaimInputs(
+  result: ResumeTailoringResult<ResumeTailoringView>,
+): result is Readonly<{ ok: true; value: ResumeClaimReadyState }> {
+  if (!hasMatchInputs(result) || result.value.matchAnalysis === undefined) return false
+  const relevantFactIds = new Set(result.value.matchAnalysis.relevantFactIds)
+  const hasSubstantiveFact = result.value.sourceProfile.facts.some((fact) =>
+    fact.status === 'verified'
+    && relevantFactIds.has(fact.id)
+    && (fact.kind === 'experience' || fact.kind === 'education' || fact.kind === 'project'))
+  return result.value.matchAnalysis.generationEligibility === 'eligible'
+    && result.value.matchAnalysis.evidence.length > 0
+    && hasSubstantiveFact
+    && hasCurrentMatchProcessingConsent({ state: result.value })
+}
+
+function hasTailoredResume(
+  result: ResumeTailoringResult<ResumeTailoringView>,
+): result is Readonly<{
+  ok: true
+  value: ResumeClaimReadyState & { readonly tailoredResume: TailoredResume }
+}> {
+  return hasResumeClaimInputs(result) && result.value.tailoredResume !== undefined
+}
+
+function createResumeClaimWritingInputs({
+  state,
+}: Readonly<{ state: ResumeClaimReadyState }>): ResumeClaimWritingInputs {
+  const relevantFactIds = new Set(state.matchAnalysis.relevantFactIds)
+  const coveredRequirementIds = new Set(state.matchAnalysis.evidence
+    .map(({ requirementId }) => requirementId))
+  return {
+    evidence: state.matchAnalysis.evidence,
+    requirements: state.jobPosting.requirements
+      .filter(({ id }) => coveredRequirementIds.has(id))
+      .map(({ classification, id, value }) => ({ classification, id, value })),
+    verifiedFacts: state.sourceProfile.facts
+      .filter((fact) => fact.status === 'verified' && relevantFactIds.has(fact.id))
+      .map(({ id, kind, value }) => ({ id, kind, value })),
+  }
+}
+
 function hasCurrentMatchProcessingConsent({ state }: Readonly<{
   state: ReadyResumeTailoringState & {
     readonly jobPosting: JobPostingReview & { readonly status: 'reviewing-requirements' }
@@ -699,3 +976,26 @@ const matchAnalysisUnavailableResult = {
   ok: false,
   error: { type: 'match-analysis-unavailable' },
 } as const satisfies ResumeTailoringResult<ResumeTailoringView>
+
+const resumeClaimWritingUnavailableResult = {
+  ok: false,
+  error: { type: 'resume-claim-writing-unavailable' },
+} as const satisfies ResumeTailoringResult<ResumeTailoringView>
+
+const resumeClaimValidationUnavailableResult = {
+  ok: false,
+  error: { type: 'resume-claim-validation-unavailable' },
+} as const satisfies ResumeTailoringResult<ResumeTailoringView>
+
+const resumeClaimUnavailableResult = {
+  ok: false,
+  error: { type: 'resume-claim-unavailable' },
+} as const satisfies ResumeTailoringResult<ResumeTailoringView>
+
+const unsupportedClaimExclusion = {
+  reason: 'unsupported-after-regeneration',
+} as const
+
+const unsupportedMeaningFeedback = [{
+  code: 'unsupported-meaning',
+}] as const satisfies readonly ResumeClaimValidationFeedback[]
