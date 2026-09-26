@@ -10,8 +10,10 @@ import type { ReactNode } from 'react'
 import {
   LocalizationProvider,
   defaultDocumentTitle,
+  localizationUnavailableMessage,
   useLocalization,
 } from '../localization/localization'
+import type { Localization } from '../localization/localization'
 import '../styles.css'
 
 export const Route = createRootRoute({
@@ -40,15 +42,25 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <LocalizationProvider>
-      <RootDocument>
-        <Outlet />
-      </RootDocument>
+      <LocalizedRoot />
     </LocalizationProvider>
   )
 }
 
+function LocalizedRoot() {
+  const localizationResult = useLocalization()
+  if (!localizationResult.ok) return <LocalizationUnavailableDocument />
+  return (
+    <RootDocument localization={localizationResult.value}>
+      <Outlet />
+    </RootDocument>
+  )
+}
+
 function NotFound() {
-  const { translate } = useLocalization()
+  const localizationResult = useLocalization()
+  if (!localizationResult.ok) return <LocalizationFailure />
+  const { translate } = localizationResult.value
   return (
     <main className="not-found">
       <p className="not-found-brand">{translate('brand.name')}</p>
@@ -59,8 +71,11 @@ function NotFound() {
   )
 }
 
-function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
-  const { locale, readiness } = useLocalization()
+function RootDocument({ children, localization }: Readonly<{
+  children: ReactNode
+  localization: Localization
+}>) {
+  const { locale, readiness } = localization
   return (
     <html lang={locale}>
       <head>
@@ -72,6 +87,21 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
       </body>
     </html>
   )
+}
+
+function LocalizationUnavailableDocument() {
+  const localization = {
+    locale: 'en',
+    preferencePersistenceError: null,
+    readiness: 'ready',
+    selectLocale: () => undefined,
+    translate: () => localizationUnavailableMessage,
+  } as const satisfies Localization
+  return <RootDocument localization={localization}><LocalizationFailure /></RootDocument>
+}
+
+function LocalizationFailure() {
+  return <p role="alert">{localizationUnavailableMessage}</p>
 }
 
 const pendingLocaleStyle = { visibility: 'hidden' } as const

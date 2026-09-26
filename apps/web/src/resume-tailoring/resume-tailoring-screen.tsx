@@ -1,25 +1,39 @@
 import type { ResumeTailoringView } from '@resume-tailoring/application/resume-tailoring-workflow'
 
-import { useLocalization } from '../localization/localization'
-import type { Locale } from '../localization/localization'
+import {
+  localizationUnavailableMessage,
+  useLocalization,
+} from '../localization/localization'
+import type { Locale, Localization } from '../localization/localization'
 import { useCandidateSession } from './use-candidate-session'
 import type { CandidateSessionFailureMessageKey } from './use-candidate-session'
 
 type CandidateSessionController = ReturnType<typeof useCandidateSession>
+type LocalizationProps = Readonly<{ localization: Localization }>
+type CandidateSessionProps = Readonly<{
+  candidateSession: CandidateSessionController
+  localization: Localization
+}>
 
 export function ResumeTailoringScreen() {
+  const localizationResult = useLocalization()
+  if (!localizationResult.ok) return <LocalizationFailure />
+  return <LocalizedResumeTailoringScreen localization={localizationResult.value} />
+}
+
+function LocalizedResumeTailoringScreen({ localization }: LocalizationProps) {
   const candidateSession = useCandidateSession()
   return (
     <main className="app-shell">
-      <SiteHeader />
-      <WorkflowHero candidateSession={candidateSession} />
-      <ValueStrip />
+      <SiteHeader localization={localization} />
+      <WorkflowHero candidateSession={candidateSession} localization={localization} />
+      <ValueStrip localization={localization} />
     </main>
   )
 }
 
-function SiteHeader() {
-  const { preferencePersistenceError, translate } = useLocalization()
+function SiteHeader({ localization }: LocalizationProps) {
+  const { preferencePersistenceError, translate } = localization
   return (
     <header className="site-header">
       <a className="brand" href="/" aria-label={translate('brand.homeLabel')}>
@@ -27,7 +41,7 @@ function SiteHeader() {
       </a>
       <div className="header-tools">
         <p>{translate('brand.tagline')}</p>
-        <LocaleSwitcher />
+        <LocaleSwitcher localization={localization} />
       </div>
       {preferencePersistenceError === null ? null : (
         <p className="locale-failure" role="alert">
@@ -38,8 +52,8 @@ function SiteHeader() {
   )
 }
 
-function LocaleSwitcher() {
-  const { locale, selectLocale, translate } = useLocalization()
+function LocaleSwitcher({ localization }: LocalizationProps) {
+  const { locale, selectLocale, translate } = localization
   return (
     <nav className="locale-switcher" aria-label={translate('locale.switcherLabel')}>
       <LocaleButton
@@ -79,36 +93,33 @@ function LocaleButton({ activeLocale, label, locale, selectLocale }: LocaleButto
   )
 }
 
-function WorkflowHero({ candidateSession }: Readonly<{
-  candidateSession: CandidateSessionController
-}>) {
+function WorkflowHero({ candidateSession, localization }: CandidateSessionProps) {
   return (
     <section className="workflow-hero" aria-labelledby="page-title">
-      <Introduction candidateSession={candidateSession} />
-      <WorkflowSummary candidateSession={candidateSession} />
+      <Introduction candidateSession={candidateSession} localization={localization} />
+      <WorkflowSummary candidateSession={candidateSession} localization={localization} />
     </section>
   )
 }
 
-function Introduction({ candidateSession }: Readonly<{
-  candidateSession: CandidateSessionController
-}>) {
-  const { translate } = useLocalization()
+function Introduction({ candidateSession, localization }: CandidateSessionProps) {
+  const { translate } = localization
   return (
     <div className="introduction">
       <h1 id="page-title">{translate('hero.title')}</h1>
       <p className="lede">{translate('hero.lede')}</p>
-      <StartSessionButton candidateSession={candidateSession} />
-      <PrivacyNote />
-      <FailureMessage messageKey={candidateSession.failureMessageKey} />
+      <StartSessionButton candidateSession={candidateSession} localization={localization} />
+      <PrivacyNote localization={localization} />
+      <FailureMessage
+        localization={localization}
+        messageKey={candidateSession.failureMessageKey}
+      />
     </div>
   )
 }
 
-function StartSessionButton({ candidateSession }: Readonly<{
-  candidateSession: CandidateSessionController
-}>) {
-  const { translate } = useLocalization()
+function StartSessionButton({ candidateSession, localization }: CandidateSessionProps) {
+  const { translate } = localization
   return (
     <button
       className="primary-action"
@@ -122,8 +133,8 @@ function StartSessionButton({ candidateSession }: Readonly<{
   )
 }
 
-function PrivacyNote() {
-  const { translate } = useLocalization()
+function PrivacyNote({ localization }: LocalizationProps) {
+  const { translate } = localization
   return (
     <p className="privacy-note">
       <LockIcon />
@@ -133,9 +144,13 @@ function PrivacyNote() {
 }
 
 function FailureMessage({
+  localization,
   messageKey,
-}: Readonly<{ messageKey: CandidateSessionFailureMessageKey | null }>) {
-  const { translate } = useLocalization()
+}: Readonly<{
+  localization: Localization
+  messageKey: CandidateSessionFailureMessageKey | null
+}>) {
+  const { translate } = localization
   return messageKey === null ? null : (
     <p className="failure-message" role="alert">
       {translate(messageKey)}
@@ -143,22 +158,23 @@ function FailureMessage({
   )
 }
 
-function WorkflowSummary({ candidateSession }: Readonly<{
-  candidateSession: CandidateSessionController
-}>) {
-  const { translate } = useLocalization()
+function WorkflowSummary({ candidateSession, localization }: CandidateSessionProps) {
+  const { translate } = localization
   return (
     <div className="workflow-summary">
       <h2>{translate('workflow.title')}</h2>
-      <WorkflowStatus view={candidateSession.view} />
-      <WorkflowSteps />
-      <DeleteSessionButton candidateSession={candidateSession} />
+      <WorkflowStatus localization={localization} view={candidateSession.view} />
+      <WorkflowSteps localization={localization} />
+      <DeleteSessionButton candidateSession={candidateSession} localization={localization} />
     </div>
   )
 }
 
-function WorkflowStatus({ view }: Readonly<{ view: ResumeTailoringView }>) {
-  const { translate } = useLocalization()
+function WorkflowStatus({ localization, view }: Readonly<{
+  localization: Localization
+  view: ResumeTailoringView
+}>) {
+  const { translate } = localization
   const statusCopy = workflowStatusCopy[view.status]
   return (
     <div className="workflow-status" aria-live="polite">
@@ -171,8 +187,8 @@ function WorkflowStatus({ view }: Readonly<{ view: ResumeTailoringView }>) {
   )
 }
 
-function WorkflowSteps() {
-  const { translate } = useLocalization()
+function WorkflowSteps({ localization }: LocalizationProps) {
+  const { translate } = localization
   const workflowSteps = createWorkflowSteps({ translate })
   return (
     <ol className="workflow-steps">
@@ -187,7 +203,7 @@ function WorkflowSteps() {
 }
 
 function createWorkflowSteps({ translate }: Readonly<{
-  translate: ReturnType<typeof useLocalization>['translate']
+  translate: Localization['translate']
 }>) {
   return [
     createWorkflowStep({ translate, name: 'sourceProfile' }),
@@ -199,7 +215,7 @@ function createWorkflowSteps({ translate }: Readonly<{
 type WorkflowStepName = 'jobPosting' | 'sourceProfile' | 'tailoredResume'
 
 function createWorkflowStep({ translate, name }: Readonly<{
-  translate: ReturnType<typeof useLocalization>['translate']
+  translate: Localization['translate']
   name: WorkflowStepName
 }>) {
   return {
@@ -208,10 +224,8 @@ function createWorkflowStep({ translate, name }: Readonly<{
   }
 }
 
-function DeleteSessionButton({ candidateSession }: Readonly<{
-  candidateSession: CandidateSessionController
-}>) {
-  const { translate } = useLocalization()
+function DeleteSessionButton({ candidateSession, localization }: CandidateSessionProps) {
+  const { translate } = localization
   if (candidateSession.view.status !== 'ready') return null
   return (
     <button
@@ -224,8 +238,8 @@ function DeleteSessionButton({ candidateSession }: Readonly<{
   )
 }
 
-function ValueStrip() {
-  const { translate } = useLocalization()
+function ValueStrip({ localization }: LocalizationProps) {
+  const { translate } = localization
   return (
     <footer className="value-strip">
       <ValueStatement title={translate('value.controlTitle')} text={translate('value.controlText')} />
@@ -253,6 +267,10 @@ function LockIcon() {
       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
     </svg>
   )
+}
+
+function LocalizationFailure() {
+  return <p role="alert">{localizationUnavailableMessage}</p>
 }
 
 const workflowStatusCopy = {

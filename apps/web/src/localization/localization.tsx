@@ -8,6 +8,7 @@ const englishCatalog = {
   'locale.english': 'English',
   'locale.french': 'Français',
   'locale.persistenceFailure': 'Your language preference could not be saved.',
+  'locale.unavailable': 'The interface language is unavailable.',
   'locale.switcherLabel': 'Language',
   'hero.title': 'Tailor your resume without inventing a thing.',
   'hero.lede': 'Build a focused resume from facts you have reviewed and approved.',
@@ -49,6 +50,7 @@ const frenchCatalog = {
   'locale.english': 'Anglais',
   'locale.french': 'Français',
   'locale.persistenceFailure': "Impossible d'enregistrer votre préférence de langue.",
+  'locale.unavailable': "La langue de l'interface est indisponible.",
   'locale.switcherLabel': 'Langue',
   'hero.title': 'Adaptez votre CV sans rien inventer.',
   'hero.lede': 'Créez un CV ciblé à partir de faits que vous avez vérifiés et approuvés.',
@@ -82,13 +84,17 @@ const frenchCatalog = {
 
 export type Locale = 'en' | 'fr'
 
-type Localization = Readonly<{
+export type Localization = Readonly<{
   locale: Locale
   preferencePersistenceError: 'unavailable' | null
   readiness: 'pending' | 'ready'
   selectLocale: (locale: Locale) => void
   translate: (key: TranslationKey) => string
 }>
+
+export type LocalizationResult =
+  | Readonly<{ ok: true; value: Localization }>
+  | Readonly<{ ok: false; error: 'provider-missing' }>
 
 type LocaleState = Pick<Localization, 'locale' | 'preferencePersistenceError' | 'readiness'>
 type BrowserStorageResult<TValue> =
@@ -128,12 +134,12 @@ export function LocalizationProvider({ children }: Readonly<{ children: ReactNod
 
 export function useLocalization() {
   const localization = useContext(LocalizationContext)
-  if (localization !== null) return localization
-  console.error('LocalizationProvider is required')
-  return unavailableLocalization
+  if (localization === null) return missingProviderResult
+  return { ok: true, value: localization } as const
 }
 
 export const defaultDocumentTitle = englishCatalog['brand.name']
+export const localizationUnavailableMessage = englishCatalog['locale.unavailable']
 
 function readInitialLocale(): LocaleState {
   const storedLocale = readStoredLocale()
@@ -213,10 +219,7 @@ function readTranslation({ locale, key }: Readonly<{ locale: Locale; key: Transl
   return englishCatalog[key]
 }
 
-const unavailableLocalization = {
-  ...pendingLocaleState,
-  selectLocale: () => {
-    console.error('Locale selection is unavailable')
-  },
-  translate: (key: TranslationKey) => `[Localization unavailable: ${key}]`,
-} as const satisfies Localization
+const missingProviderResult = {
+  ok: false,
+  error: 'provider-missing',
+} as const satisfies LocalizationResult
