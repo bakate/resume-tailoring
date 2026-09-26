@@ -171,7 +171,8 @@ function provesRequirement({ fact, factMatch, requirement }: Readonly<{
   const requirementTerm = normalizeTerm({ value: factMatch.requirementTerm })
   if (nonEvidenceTerms.has(factTerm) || hasNegatedEvidence({ fact })) return false
   if (fact.kind === 'experience' && looksLikeRoleTitle({ value: fact.value })) return false
-  if (!satisfiesRequirementConstraints({ fact, requirement })) return false
+  if (!satisfiesRequirementConstraints({ fact, factTerm: factMatch.factTerm,
+    requirement, requirementTerm: factMatch.requirementTerm })) return false
   if (factTerm === requirementTerm) return true
   return controlledTermGroups.some((termGroup) => hasTermsFromGroup({
     factTerm, requirementTerm, termGroup,
@@ -183,8 +184,13 @@ function hasTermsFromGroup({ factTerm, requirementTerm, termGroup }: Readonly<{
   requirementTerm: string
   termGroup: ReadonlySet<string>
 }>) {
-  return [...termGroup].some((term) => containsTerm({ content: factTerm, term }))
-    && [...termGroup].some((term) => containsTerm({ content: requirementTerm, term }))
+  return termGroup.has(canonicalizeControlledTerm({ value: factTerm }))
+    && termGroup.has(canonicalizeControlledTerm({ value: requirementTerm }))
+}
+
+function canonicalizeControlledTerm({ value }: Readonly<{ value: string }>) {
+  return normalizeTerm({ value }).split(' ')
+    .filter((term) => !controlledContextTerms.has(term)).join(' ')
 }
 
 function hasNegatedEvidence({ fact }: Readonly<{ fact: SourceProfileFact }>) {
@@ -194,32 +200,49 @@ function hasNegatedEvidence({ fact }: Readonly<{ fact: SourceProfileFact }>) {
   }))
 }
 
-function satisfiesRequirementConstraints({ fact, requirement }: Readonly<{
+function satisfiesRequirementConstraints({ fact, factTerm, requirement, requirementTerm }: Readonly<{
   fact: SourceProfileFact
+  factTerm: string
   requirement: JobRequirement
+  requirementTerm: string
 }>) {
   const hasQualifiers = qualitativeRequirementTerms.every((qualifier) =>
     !containsTerm({ content: requirement.value, term: qualifier })
     || containsTerm({ content: fact.value, term: qualifier }))
-  return hasQualifiers && satisfiesDurationConstraint({ fact, requirement })
+  return hasQualifiers && satisfiesDurationConstraint({
+    fact, factTerm, requirement, requirementTerm,
+  })
 }
 
-function satisfiesDurationConstraint({ fact, requirement }: Readonly<{
+function satisfiesDurationConstraint({ fact, factTerm, requirement, requirementTerm }: Readonly<{
   fact: SourceProfileFact
+  factTerm: string
   requirement: JobRequirement
+  requirementTerm: string
 }>) {
-  const requiredMonths = readDurationInMonths({ value: requirement.value })
+  const requiredMonths = readDurationInMonths({ term: requirementTerm, value: requirement.value })
   if (requiredMonths === null) return true
-  const factMonths = readDurationInMonths({ value: fact.value })
+  const factMonths = readDurationInMonths({ term: factTerm, value: fact.value })
   return factMonths !== null && factMonths >= requiredMonths
 }
 
-function readDurationInMonths({ value }: Readonly<{ value: string }>) {
-  const match = durationPattern.exec(normalizeTerm({ value }))
-  if (match === null) return null
-  const amount = Number(match[1])
-  return match[2]?.startsWith('year') || match[2]?.startsWith('yr')
-    || match[2]?.startsWith('an') ? amount * 12 : amount
+function readDurationInMonths({ term, value }: Readonly<{ term: string; value: string }>) {
+  const normalizedValue = normalizeTerm({ value })
+  const termIndex = normalizedValue.indexOf(normalizeTerm({ value: term }))
+  if (termIndex < 0) return null
+  return readDurations({ value: normalizedValue }).toSorted((left, right) =>
+    Math.abs(left.index - termIndex) - Math.abs(right.index - termIndex))[0]?.months ?? null
+}
+
+function readDurations({ value }: Readonly<{ value: string }>) {
+  return [...value.matchAll(durationPattern)].flatMap((match) => {
+    const amount = match[1] === undefined ? Number.NaN : Number(match[1])
+    const unit = match[2]
+    if (!Number.isFinite(amount) || unit === undefined) return []
+    const months = unit.startsWith('year') || unit.startsWith('yr')
+      || unit.startsWith('an') ? amount * 12 : amount
+    return [{ index: match.index, months }]
+  })
 }
 
 function looksLikeRoleTitle({ value }: Readonly<{ value: string }>) {
@@ -248,6 +271,10 @@ const controlledTermGroups = [
   ['english', 'anglais'],
   ['bilingual', 'bilingue'],
 ].map((terms) => new Set(terms))
+const controlledContextTerms = new Set([
+  'courant', 'courante', 'experience', 'fluent', 'in', 'know', 'knowledge', 'language',
+  'maitrise', 'of', 'proficiency', 'speak', 'spoken', 'used', 'using', 'with',
+])
 
 const nonEvidenceTerms = new Set([
   'advanced', 'expert', 'junior', 'lead', 'mid level', 'senior',
@@ -256,7 +283,7 @@ const negativeTerms = ['aucun', 'jamais', 'no', 'not', 'never', 'pas', 'sans', '
 const qualitativeRequirementTerms = [
   'advanced', 'expert', 'lead', 'principal', 'senior', 'staff',
 ] as const
-const durationPattern = /\b(\d+)\s*\+?\s*(years?|yrs?|ans?|months?|mois)\b/u
+const durationPattern = /\b(\d+)\s*\+?\s*(years?|yrs?|ans?|months?|mois)\b/gu
 const roleTerms = ['developer', 'engineer', 'manager', 'architect', 'consultant'] as const
 const evidenceVerbs = [
   'built', 'created', 'delivered', 'designed', 'developed', 'implemented', 'used', 'using',

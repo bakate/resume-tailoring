@@ -145,6 +145,28 @@ const evaluationFixtures = [
     })],
     expectedCoverage: [],
   },
+  {
+    name: 'does not treat React as proof of React Native',
+    requirements: [createRequirement({
+      id: 'job-requirement-react-native', value: 'Know React Native',
+    })],
+    verifiedFacts: [createFact({
+      id: 'source-fact-react', kind: 'experience', value: 'Used React',
+    })],
+    expectedCoverage: [],
+  },
+  {
+    name: 'binds experience duration to the matching technology',
+    requirements: [createRequirement({
+      id: 'job-requirement-typescript-duration', value: '5 years of TypeScript',
+    })],
+    verifiedFacts: [createFact({
+      id: 'source-fact-mixed-duration',
+      kind: 'experience',
+      value: '5 years of Java, used TypeScript for 1 month',
+    })],
+    expectedCoverage: [],
+  },
 ] as const satisfies readonly EvaluationFixture[]
 
 function createRequirement({ id, value }: Readonly<{

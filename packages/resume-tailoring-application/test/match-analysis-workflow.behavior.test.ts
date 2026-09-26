@@ -149,6 +149,32 @@ describe('Match Analysis workflow', () => {
 
     system.expectCurrentProcessingConsentToBeRequired()
   })
+
+  it('does not treat React as proof of React Native', async () => {
+    const system = createSystemUnderTest({
+      facts: [createReactFact({ value: 'Used React' })],
+      jobRequirements: [createReactRequirement({ value: 'Know React Native' })],
+    })
+
+    system.givenTheMatcherMatchesReact()
+    await system.analyzeMatch()
+
+    system.expectFabricatedMatchEvidenceToBeRejected()
+  })
+
+  it('binds a required duration to the matching skill', async () => {
+    const system = createSystemUnderTest({
+      facts: [createTypeScriptFact({
+        value: '5 years of Java, used TypeScript for 1 month',
+      })],
+      jobRequirements: [createTypeScriptRequirement({ value: '5 years of TypeScript' })],
+    })
+
+    system.givenTheMatcherMatchesTypeScript()
+    await system.analyzeMatch()
+
+    system.expectFabricatedMatchEvidenceToBeRejected()
+  })
 })
 
 function createSystemUnderTest({
@@ -297,6 +323,24 @@ class MatchAnalysisWorkflowTestSystem {
           }],
         }],
         relevantFactIds: ['source-fact-typescript'],
+      },
+    }
+  }
+
+  givenTheMatcherMatchesReact() {
+    this.#matcherResult = {
+      ok: true,
+      value: {
+        evidence: [{
+          requirementId: 'job-requirement-react',
+          factMatches: [{
+            factId: 'source-fact-react',
+            factTerm: 'React',
+            relationship: 'controlled',
+            requirementTerm: 'React Native',
+          }],
+        }],
+        relevantFactIds: ['source-fact-react'],
       },
     }
   }
@@ -525,6 +569,26 @@ function createTypeScriptFact({ value }: Readonly<{ value: string }>): SourcePro
 function createTypeScriptRequirement({ value }: Readonly<{ value: string }>): JobRequirement {
   return {
     id: 'job-requirement-typescript',
+    groupId: 'job-requirement-group-technical',
+    classification: 'required',
+    sourceExcerpt: value,
+    value,
+  }
+}
+
+function createReactFact({ value }: Readonly<{ value: string }>): SourceProfileFact {
+  return {
+    id: 'source-fact-react',
+    kind: 'experience',
+    propositionKey: 'proposition-experience-react',
+    status: 'verified',
+    value,
+  }
+}
+
+function createReactRequirement({ value }: Readonly<{ value: string }>): JobRequirement {
+  return {
+    id: 'job-requirement-react',
     groupId: 'job-requirement-group-technical',
     classification: 'required',
     sourceExcerpt: value,
