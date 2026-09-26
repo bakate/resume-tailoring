@@ -4,6 +4,7 @@ import type {
   ResumeTailoringView,
   ResumeTailoringWorkflow,
 } from '@resume-tailoring/application/resume-tailoring-workflow'
+import type { SourceProfileFactId } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { createResumeTailoringWorkflow } from '@resume-tailoring/application/resume-tailoring-workflow-composition'
 import { useEffect, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -12,6 +13,9 @@ import {
   createBrowserCandidateSessionClock,
   createBrowserCandidateSessionIdentity,
   createBrowserCandidateSessionPersistence,
+  createBrowserSourceDocumentReader,
+  createBrowserSourceProfileFactIdentity,
+  createBrowserSourceProfileExtractor,
   createPrivacySafeBrowserTelemetry,
 } from './browser-adapters'
 
@@ -25,8 +29,21 @@ export type CandidateSessionFailureMessageKey =
   | 'session.deleteFailure'
   | 'session.loadFailure'
   | 'session.openFailure'
+  | 'sourceProfile.extractionFailure'
+  | 'sourceProfile.failure'
+  | 'sourceProfile.unreadableFailure'
+  | 'sourceProfile.unsupportedFailure'
 
 type CandidateSessionStateSetter = Dispatch<SetStateAction<CandidateSessionState>>
+type CandidateSessionActionDependencies = Readonly<{
+  setState: CandidateSessionStateSetter
+  workflow: ResumeTailoringWorkflow
+}>
+type FactIdentifier = Readonly<{ factId: SourceProfileFactId }>
+type FactIdentifiers = Readonly<{ factIds: readonly SourceProfileFactId[] }>
+type FactCorrection = FactIdentifier & Readonly<{ correctedValue: string }>
+type ConflictResolution = Readonly<{ selectedFactId: SourceProfileFactId }>
+type SourceDocumentImport = CandidateSessionActionDependencies & Readonly<{ file: File }>
 
 export function useCandidateSession() {
   const [workflow] = useState(createBrowserResumeTailoringWorkflow)
@@ -34,18 +51,80 @@ export function useCandidateSession() {
   useEffect(() => connectCandidateSession({ workflow, setState }), [workflow])
   return {
     ...state,
+    ...createCandidateSessionActions({ workflow, setState }),
+    ...createSourceDocumentActions({ workflow, setState }),
+    ...createSourceProfileFactActions({ workflow, setState }),
+  }
+}
+
+function createCandidateSessionActions({ workflow, setState }: CandidateSessionActionDependencies) {
+  return {
     start: () => executeCommand({ workflow, setState, command: { type: 'open-workflow' } }),
     delete: () => executeCommand({ workflow, setState, command: { type: 'delete-session' } }),
   }
 }
+
+function createSourceDocumentActions({ workflow, setState }: CandidateSessionActionDependencies) {
+  const execute = (command: ResumeTailoringCommand) => executeCommand({ workflow, setState, command })
+  return {
+    importSourceDocument: ({ file }: Readonly<{ file: File }>) => importSourceDocument({
+      file, workflow, setState,
+    }),
+    updateSourceContent: ({ outgoingContent }: Readonly<{ outgoingContent: string }>) => execute({
+      type: 'update-source-content', outgoingContent,
+    }),
+    confirmProcessingNotice: () => execute({ type: 'confirm-processing-notice' }),
+    extractSourceProfile: () => execute({ type: 'extract-source-profile' }),
+  }
+}
+
+function createSourceProfileFactActions({ workflow, setState }: CandidateSessionActionDependencies) {
+  const execute = (command: ResumeTailoringCommand) => executeCommand({ workflow, setState, command })
+  return {
+    confirmSourceProfileFact: ({ factId }: FactIdentifier) => execute({
+      type: 'confirm-source-fact', factId,
+    }),
+    confirmSourceProfileFacts: ({ factIds }: FactIdentifiers) => execute({
+      type: 'confirm-source-facts', factIds,
+    }),
+    rejectSourceProfileFact: ({ factId }: FactIdentifier) => execute({ type: 'reject-source-fact', factId }),
+    correctSourceProfileFact: ({ factId, correctedValue }: FactCorrection) => execute({
+      type: 'correct-source-fact', factId, correctedValue,
+    }),
+    resolveSourceProfileFactConflict: ({ selectedFactId }: ConflictResolution) => execute({
+      type: 'resolve-source-fact-conflict', selectedFactId,
+    }),
+  }
+}
+
+export type CandidateSessionController = ReturnType<typeof useCandidateSession>
 
 function createBrowserResumeTailoringWorkflow() {
   return createResumeTailoringWorkflow({
     candidateSessionClock: createBrowserCandidateSessionClock(),
     candidateSessionIdentity: createBrowserCandidateSessionIdentity(),
     candidateSessionPersistence: createBrowserCandidateSessionPersistence(),
+    sourceDocumentReader: createBrowserSourceDocumentReader(),
+    sourceProfileFactIdentity: createBrowserSourceProfileFactIdentity(),
+    sourceProfileExtractor: createBrowserSourceProfileExtractor(),
     telemetry: createPrivacySafeBrowserTelemetry(),
   })
+}
+
+async function importSourceDocument({ file, workflow, setState }: SourceDocumentImport) {
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    await executeCommand({
+      workflow,
+      setState,
+      command: {
+        type: 'import-source-document',
+        document: { bytes, mediaType: file.type, name: file.name },
+      },
+    })
+  } catch {
+    setState((state) => ({ ...state, failureMessageKey: 'sourceProfile.failure' }))
+  }
 }
 
 function connectCandidateSession({
@@ -70,10 +149,14 @@ async function executeCommand({
   setState: CandidateSessionStateSetter
   command: ResumeTailoringCommand
 }>) {
-  const failureMessageKey = command.type === 'open-workflow'
-    ? 'session.openFailure'
-    : 'session.deleteFailure'
+  const failureMessageKey = readFailureMessageKey(command)
   applyResult({ result: await workflow.execute(command), setState, failureMessageKey })
+}
+
+function readFailureMessageKey(command: ResumeTailoringCommand): CandidateSessionFailureMessageKey {
+  if (command.type === 'open-workflow') return 'session.openFailure'
+  if (command.type === 'delete-session') return 'session.deleteFailure'
+  return 'sourceProfile.failure'
 }
 
 function applyResult({
@@ -86,10 +169,30 @@ function applyResult({
   failureMessageKey: CandidateSessionFailureMessageKey
 }>) {
   if (!result.ok) {
-    setState((state) => ({ ...state, failureMessageKey }))
+    setState((state) => ({
+      ...state,
+      failureMessageKey: readTypedFailureMessageKey({ result, fallback: failureMessageKey }),
+    }))
     return
   }
   setState((state) => ({ ...state, failureMessageKey: null, view: result.value }))
+}
+
+function readTypedFailureMessageKey({
+  fallback,
+  result,
+}: Readonly<{
+  fallback: CandidateSessionFailureMessageKey
+  result: Extract<ResumeTailoringResult<ResumeTailoringView>, { readonly ok: false }>
+}>): CandidateSessionFailureMessageKey {
+  if (result.error.type === 'unsupported-source-document') {
+    return 'sourceProfile.unsupportedFailure'
+  }
+  if (result.error.type === 'unreadable-source-document') return 'sourceProfile.unreadableFailure'
+  if (result.error.type === 'source-profile-extraction-unavailable') {
+    return 'sourceProfile.extractionFailure'
+  }
+  return fallback
 }
 
 const initialCandidateSessionState = {

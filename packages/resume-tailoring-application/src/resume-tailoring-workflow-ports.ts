@@ -1,11 +1,28 @@
 import type {
   CandidateSessionId,
   ResumeTailoringState,
+  SourceProfileFactContent,
+  SourceProfileFactId,
+} from '@resume-tailoring/domain/resume-tailoring-state'
+
+export {
+  sensitiveContentKinds,
+  sourceProfileFactKinds,
+  sourceProfileFactStatuses,
+  sourceProfileReviewStatuses,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export type {
   CandidateSessionId,
   ResumeTailoringState,
+  SourceProfileFact,
+  SourceProfileFactContent,
+  SourceProfileFactId,
+  SourceProfileFactKind,
+  SourceProfileFactStatus,
+  SourceProfilePropositionKey,
+  SourceProfileReview,
+  SourceProfileReviewStatus,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export type AdapterFailure = {
@@ -50,4 +67,34 @@ export type PrivacySafeTelemetry = {
       | 'candidate-session-deleted'
       | 'candidate-session-expired',
   ) => Promise<AdapterResult<undefined>>
+}
+
+export type SourceDocumentReader = {
+  readonly read: (document: Readonly<{
+    bytes: Uint8Array
+    mediaType: string
+    name: string
+  }>) => Promise<
+    | { readonly ok: true; readonly value: string }
+    | {
+        readonly ok: false
+        readonly error: { readonly type: 'unsupported-source-document' | 'unreadable-source-document' }
+      }
+  >
+}
+
+export type SourceProfileExtractor = {
+  readonly extract: (request: Readonly<{
+    professionalContent: string
+  }>) => Promise<
+    | {
+        readonly ok: true
+        readonly value: readonly SourceProfileFactContent[]
+      }
+    | { readonly ok: false; readonly error: { readonly type: 'source-profile-extraction-unavailable' } }
+  >
+}
+
+export type SourceProfileFactIdentity = {
+  readonly create: () => AdapterResult<SourceProfileFactId>
 }

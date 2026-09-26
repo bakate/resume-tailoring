@@ -5,8 +5,8 @@ packages:
 # -----------------------------------------------------------------------------
 # PNPM Catalog
 # -----------------------------------------------------------------------------
-# Keep external dependency versions in one place. Package manifests reference
-# these versions with "catalog:"; internal packages continue to use workspace:*.
+# Keep shared external dependency versions in one place when multiple packages
+# must stay aligned. Package-specific dependencies keep their version locally.
 catalog:
   "@eslint/js": 9.36.0
   "@playwright/test": 1.63.0

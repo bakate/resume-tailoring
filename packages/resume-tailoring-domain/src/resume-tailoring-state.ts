@@ -1,4 +1,73 @@
 export type CandidateSessionId = `candidate-session-${string}`
+export type SourceProfileFactId = `source-fact-${string}`
+export type SourceProfilePropositionKey = `proposition-${string}`
+
+export const sensitiveContentKinds = [
+  'email',
+  'phone',
+  'url',
+  'address',
+  'date-of-birth',
+  'personal-information',
+] as const
+
+export type SensitiveContentKind = typeof sensitiveContentKinds[number]
+
+export type SensitiveContent = Readonly<{
+  id: `sensitive-${string}`
+  kind: SensitiveContentKind
+  value: string
+}>
+
+export const sourceProfileFactKinds = [
+  'experience',
+  'skill',
+  'education',
+  'language',
+  'project',
+] as const
+
+export type SourceProfileFactKind = typeof sourceProfileFactKinds[number]
+
+export const sourceProfileFactStatuses = [
+  'extracted',
+  'verified',
+  'rejected',
+  'superseded',
+] as const
+
+export type SourceProfileFactStatus = typeof sourceProfileFactStatuses[number]
+
+export const sourceProfileReviewStatuses = [
+  'reviewing-document',
+  'reviewing-facts',
+] as const
+
+export type SourceProfileReviewStatus = typeof sourceProfileReviewStatuses[number]
+
+export type SourceProfileFactContent = Readonly<{
+  kind: SourceProfileFactKind
+  propositionKey: SourceProfilePropositionKey
+  value: string
+}>
+
+export type SourceProfileFact = SourceProfileFactContent & Readonly<{
+  id: SourceProfileFactId
+  status: SourceProfileFactStatus
+  supersedesFactId?: SourceProfileFactId
+}>
+
+export type SourceProfileReview = Readonly<{
+  status: SourceProfileReviewStatus
+  documentName: string
+  detectedSensitiveContent: readonly SensitiveContent[]
+  outgoingContent: string
+  processingNotice: Readonly<{
+    version: string
+    confirmedAt: number
+  }> | null
+  facts: readonly SourceProfileFact[]
+}>
 
 export type ResumeTailoringState =
   | { readonly status: 'not-started' }
@@ -6,6 +75,7 @@ export type ResumeTailoringState =
       readonly status: 'ready'
       readonly sessionId: CandidateSessionId
       readonly expiresAt: number
+      readonly sourceProfile?: SourceProfileReview
     }
 
 export type DomainResult<TValue, TError> =

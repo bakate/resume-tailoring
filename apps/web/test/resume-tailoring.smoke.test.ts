@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { CandidateSessionPersistence } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 
+import { sourceProfileExtractionMaximumCharacters } from '../src/resume-tailoring/source-profile-schemas'
+
 declare global {
   interface Window {
     candidateSessionTestPersistence?: CandidateSessionPersistence
@@ -153,6 +155,42 @@ test('a Candidate can switch locale without losing an active session', async ({ 
   await system.expectFrenchLocaleAndCandidateSessionToBeRetained()
 })
 
+test('a Candidate builds a Verified Source Profile from minimized PDF content', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+
+  await system.buildVerifiedSourceProfile()
+
+  await system.expectVerifiedSourceProfileBuiltFromMinimizedContent()
+})
+
+test('a Candidate restores the Verified Source Profile after reload', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenVerifiedSourceProfile()
+
+  await system.reloadVerifiedSourceProfile()
+
+  await system.expectVerifiedSourceProfileToBeRestored()
+})
+
+test('rejects oversized professional content before model processing', async ({ page }) => {
+  await page.goto('/')
+
+  const responseStatus = await page.evaluate(async (maximumCharacters) => {
+    const response = await fetch('/api/source-profile-extraction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ professionalContent: 'x'.repeat(maximumCharacters + 1) }),
+    })
+    return response.status
+  }, sourceProfileExtractionMaximumCharacters)
+
+  expect(responseStatus).toBe(413)
+})
+
 function createSystemUnderTest({ page }: Readonly<{ page: Page }>) {
   return new ResumeTailoringBrowserTestSystem(page)
 }
@@ -165,12 +203,15 @@ type CompletedAction =
   | 'expiration-extension-attempted'
   | 'resume-tailoring-opened'
   | 'resume-tailoring-viewed'
+  | 'source-profile-built'
+  | 'source-profile-reloaded'
   | 'unknown-page-opened'
 
 class ResumeTailoringBrowserTestSystem {
   readonly #page: Page
   #completedAction: CompletedAction | undefined
   #lateResponseOutcome: unknown
+  #extractionRequestContent: string | undefined
   #unknownRoute: string | undefined
 
   constructor(page: Page) {
@@ -187,6 +228,29 @@ class ResumeTailoringBrowserTestSystem {
     await this.#page.goto('/')
     await this.#page.getByRole('button', { name: 'Start tailoring' }).click()
     await this.#page.getByText('Workflow opened').waitFor()
+  }
+
+  async givenStructuredExtractionIsAvailable() {
+    await this.#page.route('**/api/source-profile-extraction', async (route) => {
+      this.#extractionRequestContent = readProfessionalContent(route.request().postData())
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          value: [{
+            kind: 'experience',
+              propositionKey: 'proposition-experience-acme-role',
+            value: 'Senior FullStack Developer at Acme',
+          }],
+        }),
+      })
+    })
+  }
+
+  async givenVerifiedSourceProfile() {
+    await this.givenCandidateSessionIsActive()
+    await this.givenStructuredExtractionIsAvailable()
+    await this.buildVerifiedSourceProfile()
   }
 
   async givenBrowserPrefersLanguages({ languages }: Readonly<{ languages: readonly string[] }>) {
@@ -307,6 +371,27 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'resume-tailoring-viewed'
   }
 
+  async buildVerifiedSourceProfile() {
+    await this.#page.getByLabel('Choose a PDF Source Document').setInputFiles({
+      name: 'resume.pdf',
+      mimeType: 'application/pdf',
+      buffer: createTextPdf(
+        'bakate@example.com +33 6 12 34 56 78 Senior FullStack Developer at Acme',
+      ),
+    })
+    await this.#page.getByLabel('Exact content that will be sent for extraction').waitFor()
+    await this.#page.getByRole('button', { name: 'Confirm this processing notice' }).click()
+    await this.#page.getByRole('button', { name: 'Extract professional facts' }).click()
+    await this.#page.getByRole('button', { name: 'Confirm fact' }).click()
+    await this.#page.getByText('Verified', { exact: true }).waitFor()
+    this.#completedAction = 'source-profile-built'
+  }
+
+  async reloadVerifiedSourceProfile() {
+    await this.#page.reload()
+    this.#completedAction = 'source-profile-reloaded'
+  }
+
   async expectResumeTailoringSessionToBeStoredInIndexedDb() {
     this.#expectCompletedAction('resume-tailoring-opened')
     await expect(this.#page.getByText('Workflow opened')).toBeVisible()
@@ -402,24 +487,36 @@ class ResumeTailoringBrowserTestSystem {
     expect(await this.#page.evaluate(() => localStorage.getItem('honest-resume-locale'))).toBe('fr')
   }
 
+  async expectVerifiedSourceProfileBuiltFromMinimizedContent() {
+    this.#expectCompletedAction('source-profile-built')
+    expect(this.#extractionRequestContent).toContain('Senior FullStack Developer at Acme')
+    expect(this.#extractionRequestContent).not.toContain('bakate@example.com')
+    expect(this.#extractionRequestContent).not.toContain('+33 6 12 34 56 78')
+    await expect(this.#page.getByText('Senior FullStack Developer at Acme')).toBeVisible()
+    await expect(this.#page.getByText('Verified', { exact: true })).toBeVisible()
+  }
+
+  async expectVerifiedSourceProfileToBeRestored() {
+    this.#expectCompletedAction('source-profile-reloaded')
+    await expect(this.#page.getByRole('heading', { name: 'Review extracted facts' })).toBeVisible()
+    await expect(this.#page.getByText('Senior FullStack Developer at Acme')).toBeVisible()
+    await expect(this.#page.getByText('Verified', { exact: true })).toBeVisible()
+  }
+
   #readUnknownRoute() {
-    if (this.#unknownRoute === undefined) throw new Error('Record an unknown route before opening it')
-    return this.#unknownRoute
+    expect(this.#unknownRoute).toBeDefined()
+    return this.#unknownRoute ?? '/missing-test-route'
   }
 
   #expectCompletedAction(expectedAction: CompletedAction) {
-    if (this.#completedAction !== expectedAction) {
-      throw new Error(`Run ${expectedAction} before reading its outcome`)
-    }
+    expect(this.#completedAction).toBe(expectedAction)
   }
 
   #expectCandidateSessionInvalidationAction() {
-    if (
+    expect(
       this.#completedAction !== 'candidate-session-expired'
-      && this.#completedAction !== 'candidate-session-synchronized'
-    ) {
-      throw new Error('Delete or expire the Candidate session before reading its outcome')
-    }
+      && this.#completedAction !== 'candidate-session-synchronized',
+    ).toBe(false)
   }
 }
 
@@ -484,9 +581,10 @@ async function extendCandidateSessionExpiration(page: Page) {
 async function readBrowserStorage(page: Page) {
   await installCandidateSessionTestPersistence(page)
   const storedState = await page.evaluate(async () => window.readInstalledPersistence().read())
-  if (!storedState.ok || storedState.value.status !== 'ready') {
-    throw new Error('Expected an active Candidate session in IndexedDB')
-  }
+  expect(storedState.ok).toBe(true)
+  if (!storedState.ok) return unavailableBrowserStorage
+  expect(storedState.value.status).toBe('ready')
+  if (storedState.value.status !== 'ready') return unavailableBrowserStorage
 
   return {
     localStorageLength: await page.evaluate(() => localStorage.length),
@@ -494,6 +592,12 @@ async function readBrowserStorage(page: Page) {
     sessionId: storedState.value.sessionId,
   }
 }
+
+const unavailableBrowserStorage = {
+  localStorageLength: -1,
+  remainingLifetime: -1,
+  sessionId: 'candidate-session-unavailable',
+} as const
 
 async function installCandidateSessionTestPersistence(page: Page) {
   await page.addScriptTag({
@@ -512,4 +616,44 @@ async function waitForStartTailoringToBeEnabled(page: Page) {
     const button = document.querySelector<HTMLButtonElement>('.primary-action')
     return button?.disabled === false
   })
+}
+
+function readProfessionalContent(requestBody: string | null) {
+  if (requestBody === null) return undefined
+  const value = JSON.parse(requestBody) as unknown
+  return isRecord(value) && typeof value.professionalContent === 'string'
+    ? value.professionalContent
+    : undefined
+}
+
+function createTextPdf(text: string) {
+  const escapedText = text.replaceAll('\\', '\\\\').replaceAll('(', '\\(').replaceAll(')', '\\)')
+  const content = `BT /F1 12 Tf 72 720 Td (${escapedText}) Tj ET`
+  const document = appendPdfObjects({ objects: createPdfObjects({ content }) })
+  const crossReferenceOffset = Buffer.byteLength(document.pdf, 'ascii')
+  const entries = document.offsets
+    .map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('')
+  const trailer = `xref\n0 6\n0000000000 65535 f \n${entries}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${String(crossReferenceOffset)}\n%%EOF`
+  return Buffer.from(`${document.pdf}${trailer}`, 'ascii')
+}
+
+function createPdfObjects({ content }: Readonly<{ content: string }>) {
+  return [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${String(content.length)} >>\nstream\n${content}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ]
+}
+
+function appendPdfObjects({ objects }: Readonly<{ objects: readonly string[] }>) {
+  return objects.reduce((document, object, objectIndex) => ({
+    offsets: [...document.offsets, Buffer.byteLength(document.pdf, 'ascii')],
+    pdf: `${document.pdf}${String(objectIndex + 1)} 0 obj\n${object}\nendobj\n`,
+  }), { offsets: [] as readonly number[], pdf: '%PDF-1.4\n' })
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null
 }
