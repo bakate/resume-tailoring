@@ -9,7 +9,6 @@ import { z } from 'zod'
 
 import { sensitiveContentSchema } from './source-profile-schemas'
 
-export const atomicJobRequirementPattern = /^(?!.*(?:[;,/|•]|\s(?:and|or|et|ou)\s|\s&\s))[^\n]+$/iu
 export const jobRequirementValueMaximumCharacters = 500
 export const jobRequirementSourceExcerptMaximumCharacters = 2_000
 
@@ -87,5 +86,6 @@ export function hasOnlyJobPostingSourceExcerpts({
 
 function isAtomicValue({ value }: Readonly<{ value: string }>) {
   return value.trim() === value
-    && atomicJobRequirementPattern.test(value)
+    && !value.includes('\n')
+    && !value.includes(';')
 }
