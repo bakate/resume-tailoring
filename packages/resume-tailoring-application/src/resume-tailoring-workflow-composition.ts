@@ -145,13 +145,17 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
   async #analyzeMatch(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
     const currentState = await this.#readActiveState()
     if (!hasMatchInputs(currentState)) return matchAnalysisUnavailableResult
+    if (!hasCurrentMatchProcessingConsent({ state: currentState.value })) {
+      return processingNoticeRequiredResult
+    }
     const matcher = this.#dependencies.matchEvidenceMatcher
     if (matcher === undefined) return matchAnalysisUnavailableResult
     const verifiedFacts = currentState.value.sourceProfile.facts
       .filter((fact) => fact.status === 'verified')
     const matchResult = await matcher.match({
-      requirements: currentState.value.jobPosting.requirements,
-      verifiedFacts,
+      requirements: currentState.value.jobPosting.requirements.map(({ classification, id, value }) =>
+        ({ classification, id, value })),
+      verifiedFacts: verifiedFacts.map(({ id, kind, value }) => ({ id, kind, value })),
     })
     if (!matchResult.ok) return matchResult
     const matchAnalysis = createMatchAnalysis({
@@ -649,6 +653,16 @@ function hasMatchInputs(
   return hasReadyState(result)
     && result.value.jobPosting?.status === 'reviewing-requirements'
     && result.value.sourceProfile?.status === 'reviewing-facts'
+}
+
+function hasCurrentMatchProcessingConsent({ state }: Readonly<{
+  state: ReadyResumeTailoringState & {
+    readonly jobPosting: JobPostingReview & { readonly status: 'reviewing-requirements' }
+    readonly sourceProfile: NonNullable<ReadyResumeTailoringState['sourceProfile']>
+  }
+}>) {
+  return state.sourceProfile.processingNotice?.version === sourceProfileProcessingNoticeVersion
+    && hasCurrentJobPostingProcessingConsent({ jobPosting: state.jobPosting })
 }
 
 const workflowAlreadyOpenResult = {

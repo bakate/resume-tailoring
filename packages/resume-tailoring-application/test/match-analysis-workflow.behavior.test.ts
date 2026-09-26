@@ -109,12 +109,62 @@ describe('Match Analysis workflow', () => {
     // Then
     system.expectFabricatedMatchEvidenceToBeRejected()
   })
+
+  it('rejects a partial term match that does not satisfy a required duration', async () => {
+    const system = createSystemUnderTest({
+      facts: [createTypeScriptFact({ value: 'Used TypeScript on one project' })],
+      jobRequirements: [createTypeScriptRequirement({ value: '5 years of TypeScript' })],
+    })
+
+    system.givenTheMatcherMatchesTypeScript()
+    await system.analyzeMatch()
+
+    system.expectFabricatedMatchEvidenceToBeRejected()
+  })
+
+  it('rejects a fact containing a negated skill claim', async () => {
+    const system = createSystemUnderTest({
+      facts: [createTypeScriptFact({ value: 'No production experience with TypeScript' })],
+      jobRequirements: [createTypeScriptRequirement({ value: 'Know TypeScript' })],
+    })
+
+    system.givenTheMatcherMatchesTypeScript()
+    await system.analyzeMatch()
+
+    system.expectFabricatedMatchEvidenceToBeRejected()
+  })
+
+  it('does not send match inputs after a processing notice becomes stale', async () => {
+    const system = createSystemUnderTest({ sourceNoticeVersion: 'obsolete' })
+
+    await system.analyzeMatch()
+
+    system.expectCurrentProcessingConsentToBeRequired()
+  })
+
+  it('does not send match inputs after the Job Posting consent becomes stale', async () => {
+    const system = createSystemUnderTest({ jobNoticeVersion: 'obsolete' })
+
+    await system.analyzeMatch()
+
+    system.expectCurrentProcessingConsentToBeRequired()
+  })
 })
 
-function createSystemUnderTest({ facts = verifiedFacts }: Readonly<{
+function createSystemUnderTest({
+  facts = verifiedFacts,
+  jobRequirements = requirements,
+  jobNoticeVersion = '2026-09-26',
+  sourceNoticeVersion = '2026-09-26',
+}: Readonly<{
   facts?: readonly SourceProfileFact[]
+  jobRequirements?: readonly JobRequirement[]
+  jobNoticeVersion?: string
+  sourceNoticeVersion?: string
 }> = {}) {
-  return new MatchAnalysisWorkflowTestSystem(facts)
+  return new MatchAnalysisWorkflowTestSystem({
+    facts, jobNoticeVersion, jobRequirements, sourceNoticeVersion,
+  })
 }
 
 class MatchAnalysisWorkflowTestSystem {
@@ -126,14 +176,21 @@ class MatchAnalysisWorkflowTestSystem {
     value: { evidence: [], relevantFactIds: [] },
   }
 
-  constructor(facts: readonly SourceProfileFact[]) {
+  constructor({ facts, jobNoticeVersion, jobRequirements, sourceNoticeVersion }: Readonly<{
+    facts: readonly SourceProfileFact[]
+    jobNoticeVersion: string
+    jobRequirements: readonly JobRequirement[]
+    sourceNoticeVersion: string
+  }>) {
     this.#workflow = createResumeTailoringWorkflow({
       candidateSessionClock: createControllableCandidateSessionClock({ now: 1_000 }),
       candidateSessionIdentity: {
         create: () => ({ ok: true, value: 'candidate-session-match-analysis' }),
       },
       candidateSessionPersistence: createInMemoryCandidateSessionPersistence({
-        initialState: createCandidateSessionState({ facts }),
+        initialState: createCandidateSessionState({
+          facts, jobNoticeVersion, jobRequirements, sourceNoticeVersion,
+        }),
       }),
       matchEvidenceMatcher: {
         match: (request) => {
@@ -226,6 +283,24 @@ class MatchAnalysisWorkflowTestSystem {
     }
   }
 
+  givenTheMatcherMatchesTypeScript() {
+    this.#matcherResult = {
+      ok: true,
+      value: {
+        evidence: [{
+          requirementId: 'job-requirement-typescript',
+          factMatches: [{
+            factId: 'source-fact-typescript',
+            factTerm: 'TypeScript',
+            relationship: 'exact',
+            requirementTerm: 'TypeScript',
+          }],
+        }],
+        relevantFactIds: ['source-fact-typescript'],
+      },
+    }
+  }
+
   givenControlledSynonymsAndTranslationsEstablishCoverage() {
     this.#matcherResult = {
       ok: true,
@@ -280,8 +355,10 @@ class MatchAnalysisWorkflowTestSystem {
       warning: null,
     })
     expect(this.#matchRequests).toEqual([{
-      requirements,
-      verifiedFacts: verifiedFacts.filter((fact) => fact.status === 'verified'),
+      requirements: requirements.map(({ classification, id, value }) =>
+        ({ classification, id, value })),
+      verifiedFacts: verifiedFacts.filter((fact) => fact.status === 'verified')
+        .map(({ id, kind, value }) => ({ id, kind, value })),
     }])
   }
 
@@ -314,6 +391,14 @@ class MatchAnalysisWorkflowTestSystem {
       ok: false,
       error: { type: 'match-analysis-unavailable' },
     })
+  }
+
+  expectCurrentProcessingConsentToBeRequired() {
+    expect(this.#readActionResult()).toEqual({
+      ok: false,
+      error: { type: 'processing-notice-required' },
+    })
+    expect(this.#matchRequests).toEqual([])
   }
 
   #readActionResult() {
@@ -388,8 +473,16 @@ const requirements = [
   },
 ] as const satisfies readonly JobRequirement[]
 
-function createCandidateSessionState({ facts }: Readonly<{
+function createCandidateSessionState({
+  facts,
+  jobNoticeVersion,
+  jobRequirements,
+  sourceNoticeVersion,
+}: Readonly<{
   facts: readonly SourceProfileFact[]
+  jobNoticeVersion: string
+  jobRequirements: readonly JobRequirement[]
+  sourceNoticeVersion: string
 }>): ResumeTailoringState {
   return {
     status: 'ready',
@@ -400,7 +493,7 @@ function createCandidateSessionState({ facts }: Readonly<{
       documentName: 'resume.pdf',
       detectedSensitiveContent: [],
       outgoingContent: 'Professional content',
-      processingNotice: { version: '2026-09-26', confirmedAt: 1_000 },
+      processingNotice: { version: sourceNoticeVersion, confirmedAt: 1_000 },
       facts,
     },
     jobPosting: {
@@ -408,13 +501,33 @@ function createCandidateSessionState({ facts }: Readonly<{
       detectedSensitiveContent: [],
       outgoingContent: 'TypeScript and leadership are required. French is preferred.',
       processingNotice: {
-        version: '2026-09-26',
+        version: jobNoticeVersion,
         confirmedAt: 1_000,
         provider: 'OpenAI',
         retentionPolicy: 'standard-abuse-monitoring',
         transmittedDataCategories: ['job-posting-content'],
       },
-      requirements,
+      requirements: jobRequirements,
     },
+  }
+}
+
+function createTypeScriptFact({ value }: Readonly<{ value: string }>): SourceProfileFact {
+  return {
+    id: 'source-fact-typescript',
+    kind: 'experience',
+    propositionKey: 'proposition-experience-typescript',
+    status: 'verified',
+    value,
+  }
+}
+
+function createTypeScriptRequirement({ value }: Readonly<{ value: string }>): JobRequirement {
+  return {
+    id: 'job-requirement-typescript',
+    groupId: 'job-requirement-group-technical',
+    classification: 'required',
+    sourceExcerpt: value,
+    value,
   }
 }

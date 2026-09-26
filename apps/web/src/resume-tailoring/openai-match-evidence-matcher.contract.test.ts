@@ -1,7 +1,4 @@
-import type {
-  JobRequirement,
-  SourceProfileFact,
-} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type { MatchInputs } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { describe, expect, it } from 'vitest'
 
 import { createOpenAiMatchEvidenceMatcher } from './openai-match-evidence-matcher'
@@ -96,18 +93,14 @@ function createOpenAiResponse({
 const verifiedFacts = [{
   id: 'source-fact-typescript',
   kind: 'skill',
-  propositionKey: 'proposition-skill-typescript',
-  status: 'verified',
   value: 'TypeScript',
-}] as const satisfies readonly SourceProfileFact[]
+}] as const satisfies MatchInputs['verifiedFacts']
 
 const requirements = [{
   id: 'job-requirement-typescript',
-  groupId: 'job-requirement-group-technical',
   classification: 'required',
-  sourceExcerpt: 'TS is required.',
   value: 'Know TS',
-}] as const satisfies readonly JobRequirement[]
+}] as const satisfies MatchInputs['requirements']
 
 const expectedAnalysis = {
   evidence: [{

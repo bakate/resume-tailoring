@@ -169,19 +169,57 @@ function provesRequirement({ fact, factMatch, requirement }: Readonly<{
     || !containsTerm({ content: requirement.value, term: factMatch.requirementTerm })) return false
   const factTerm = normalizeTerm({ value: factMatch.factTerm })
   const requirementTerm = normalizeTerm({ value: factMatch.requirementTerm })
-  if (nonEvidenceTerms.has(factTerm) || hasNegatedTerm({ fact, factTerm })) return false
+  if (nonEvidenceTerms.has(factTerm) || hasNegatedEvidence({ fact })) return false
   if (fact.kind === 'experience' && looksLikeRoleTitle({ value: fact.value })) return false
-  if (factMatch.relationship === 'exact') return factTerm === requirementTerm
-  return controlledTermGroups.some((termGroup) => termGroup.has(factTerm)
-    && termGroup.has(requirementTerm))
+  if (!satisfiesRequirementConstraints({ fact, requirement })) return false
+  if (factTerm === requirementTerm) return true
+  return controlledTermGroups.some((termGroup) => hasTermsFromGroup({
+    factTerm, requirementTerm, termGroup,
+  }))
 }
 
-function hasNegatedTerm({ fact, factTerm }: Readonly<{
-  fact: SourceProfileFact
+function hasTermsFromGroup({ factTerm, requirementTerm, termGroup }: Readonly<{
   factTerm: string
+  requirementTerm: string
+  termGroup: ReadonlySet<string>
 }>) {
-  const normalizedFact = normalizeTerm({ value: fact.value })
-  return negativeTerms.some((negativeTerm) => normalizedFact.includes(`${negativeTerm} ${factTerm}`))
+  return [...termGroup].some((term) => containsTerm({ content: factTerm, term }))
+    && [...termGroup].some((term) => containsTerm({ content: requirementTerm, term }))
+}
+
+function hasNegatedEvidence({ fact }: Readonly<{ fact: SourceProfileFact }>) {
+  return negativeTerms.some((negativeTerm) => containsTerm({
+    content: fact.value,
+    term: negativeTerm,
+  }))
+}
+
+function satisfiesRequirementConstraints({ fact, requirement }: Readonly<{
+  fact: SourceProfileFact
+  requirement: JobRequirement
+}>) {
+  const hasQualifiers = qualitativeRequirementTerms.every((qualifier) =>
+    !containsTerm({ content: requirement.value, term: qualifier })
+    || containsTerm({ content: fact.value, term: qualifier }))
+  return hasQualifiers && satisfiesDurationConstraint({ fact, requirement })
+}
+
+function satisfiesDurationConstraint({ fact, requirement }: Readonly<{
+  fact: SourceProfileFact
+  requirement: JobRequirement
+}>) {
+  const requiredMonths = readDurationInMonths({ value: requirement.value })
+  if (requiredMonths === null) return true
+  const factMonths = readDurationInMonths({ value: fact.value })
+  return factMonths !== null && factMonths >= requiredMonths
+}
+
+function readDurationInMonths({ value }: Readonly<{ value: string }>) {
+  const match = durationPattern.exec(normalizeTerm({ value }))
+  if (match === null) return null
+  const amount = Number(match[1])
+  return match[2]?.startsWith('year') || match[2]?.startsWith('yr')
+    || match[2]?.startsWith('an') ? amount * 12 : amount
 }
 
 function looksLikeRoleTitle({ value }: Readonly<{ value: string }>) {
@@ -214,7 +252,11 @@ const controlledTermGroups = [
 const nonEvidenceTerms = new Set([
   'advanced', 'expert', 'junior', 'lead', 'mid level', 'senior',
 ])
-const negativeTerms = ['no', 'not', 'never used', 'without'] as const
+const negativeTerms = ['aucun', 'jamais', 'no', 'not', 'never', 'pas', 'sans', 'without'] as const
+const qualitativeRequirementTerms = [
+  'advanced', 'expert', 'lead', 'principal', 'senior', 'staff',
+] as const
+const durationPattern = /\b(\d+)\s*\+?\s*(years?|yrs?|ans?|months?|mois)\b/u
 const roleTerms = ['developer', 'engineer', 'manager', 'architect', 'consultant'] as const
 const evidenceVerbs = [
   'built', 'created', 'delivered', 'designed', 'developed', 'implemented', 'used', 'using',

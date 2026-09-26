@@ -1,7 +1,7 @@
 import type {
-  JobRequirement,
+  JobRequirementId,
+  MatchInputs,
   ProposedMatchAnalysis,
-  SourceProfileFact,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import {
   jobRequirementClassifications,
@@ -57,17 +57,12 @@ export const matchAnalysisResultSchema = z.discriminatedUnion('ok', [
 export const matchAnalysisRequestSchema = z.object({
   requirements: z.array(z.object({
     id: jobRequirementIdSchema,
-    groupId: z.templateLiteral(['job-requirement-group-', z.string().min(1)]),
     classification: z.enum(jobRequirementClassifications),
-    sourceExcerpt: z.string().min(1).max(2_000),
     value: z.string().min(1).max(500),
   })).max(jobRequirementMaximumCount),
   verifiedFacts: z.array(z.object({
     id: sourceProfileFactIdSchema,
     kind: z.enum(sourceProfileFactKinds),
-    propositionKey: z.templateLiteral(['proposition-', z.string().min(1)]),
-    status: z.literal('verified'),
-    supersedesFactId: sourceProfileFactIdSchema.optional(),
     value: z.string().min(1).max(500),
   })).max(sourceProfileFactMaximumCount),
 })
@@ -78,12 +73,12 @@ export function hasOnlyMatchInputReferences({
   verifiedFacts,
 }: Readonly<{
   analysis: ProposedMatchAnalysis
-  requirements: readonly JobRequirement[]
-  verifiedFacts: readonly SourceProfileFact[]
+  requirements: MatchInputs['requirements']
+  verifiedFacts: MatchInputs['verifiedFacts']
 }>) {
   const requirementIds = new Set(requirements.map(({ id }) => id))
   const verifiedFactIds = new Set(verifiedFacts.map(({ id }) => id))
-  const referencedRequirementIds = new Set<JobRequirement['id']>()
+  const referencedRequirementIds = new Set<JobRequirementId>()
   const relevantFactIds = new Set(analysis.relevantFactIds)
   if (relevantFactIds.size !== analysis.relevantFactIds.length
     || analysis.relevantFactIds.some((factId) => !verifiedFactIds.has(factId))) return false

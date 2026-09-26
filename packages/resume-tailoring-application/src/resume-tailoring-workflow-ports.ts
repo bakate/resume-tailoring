@@ -169,6 +169,6 @@ export type ProposedMatchAnalysis = Readonly<{
 }>
 
 export type MatchInputs = Readonly<{
-  requirements: readonly JobRequirement[]
-  verifiedFacts: readonly SourceProfileFact[]
+  requirements: readonly Pick<JobRequirement, 'classification' | 'id' | 'value'>[]
+  verifiedFacts: readonly Pick<SourceProfileFact, 'id' | 'kind' | 'value'>[]
 }>

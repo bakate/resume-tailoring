@@ -132,6 +132,7 @@ const matchingInstructions = [
   'Coverage is binary; omit every uncovered requirement.',
   'You may recognize controlled synonyms and translations with the same concrete meaning.',
   'For each fact link, quote the exact requirementTerm and factTerm and classify their relationship.',
+  'Use exact only when the normalized quoted terms are identical; otherwise use controlled.',
   'Return relevantFactIds only for Verified Facts relevant enough to support an honest Tailored Resume.',
   'Return no relevantFactIds when the verified material cannot support an honest Tailored Resume.',
   'Do not treat a role, a transferable skill, or qualitative seniority as implicit proof.',
