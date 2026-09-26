@@ -6,6 +6,9 @@ import type {
   JobRequirementGroupId,
   JobRequirementId,
   JobRequirementContent,
+  MatchEvidence,
+  JobRequirement,
+  SourceProfileFact,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export {
@@ -34,6 +37,8 @@ export type {
   JobRequirementContent,
   JobRequirementGroupId,
   JobRequirementId,
+  MatchAnalysis,
+  MatchEvidence,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export type AdapterFailure = {
@@ -132,4 +137,19 @@ export type JobRequirementIdentity = {
 
 export type JobRequirementGroupIdentity = {
   readonly create: () => AdapterResult<JobRequirementGroupId>
+}
+
+export type MatchEvidenceMatcher = {
+  readonly match: (request: Readonly<{
+    requirements: readonly JobRequirement[]
+    verifiedFacts: readonly SourceProfileFact[]
+  }>) => Promise<
+    | { readonly ok: true; readonly value: readonly MatchEvidence[] }
+    | {
+        readonly ok: false
+        readonly error: {
+          readonly type: 'match-analysis-unavailable' | 'match-analysis-transport-unavailable'
+        }
+      }
+  >
 }

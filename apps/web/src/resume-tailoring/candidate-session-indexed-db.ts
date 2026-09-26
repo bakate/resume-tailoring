@@ -3,12 +3,14 @@ import type {
   CandidateSessionPersistence,
   ResumeTailoringState,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import { createMatchAnalysis } from '@resume-tailoring/application/match-analysis'
 
 import {
   sourceProfileReviewSchema,
   storedCandidateSessionSchema,
 } from './source-profile-schemas'
 import { jobPostingReviewSchema } from './job-requirement-schemas'
+import { storedMatchAnalysisSchema } from './match-analysis-schemas'
 
 const databaseName = 'honest-resume'
 const databaseVersion = 1
@@ -186,22 +188,51 @@ function parseCandidateSession(value: unknown): ResumeTailoringState {
       expiresAt: result.data.expiresAt,
     },
     storedJobPosting: result.data.jobPosting,
+    storedMatchAnalysis: result.data.matchAnalysis,
     storedSourceProfile: result.data.sourceProfile,
   })
 }
 
-function restoreCandidateContent({ readyState, storedJobPosting, storedSourceProfile }: Readonly<{
+function restoreCandidateContent({
+  readyState,
+  storedJobPosting,
+  storedMatchAnalysis,
+  storedSourceProfile,
+}: Readonly<{
   readyState: ReadyResumeTailoringState
   storedJobPosting: unknown
+  storedMatchAnalysis: unknown
   storedSourceProfile: unknown
 }>): ResumeTailoringState {
   const sourceProfile = sourceProfileReviewSchema.safeParse(storedSourceProfile)
   const jobPosting = jobPostingReviewSchema.safeParse(storedJobPosting)
+  const matchAnalysis = restoreMatchAnalysis({
+    jobPosting: jobPosting.success ? jobPosting.data : undefined,
+    sourceProfile: sourceProfile.success ? sourceProfile.data : undefined,
+    storedMatchAnalysis,
+  })
   return {
     ...readyState,
     ...(sourceProfile.success ? { sourceProfile: sourceProfile.data } : {}),
     ...(jobPosting.success ? { jobPosting: jobPosting.data } : {}),
+    ...(matchAnalysis === null ? {} : { matchAnalysis }),
   }
+}
+
+function restoreMatchAnalysis({ jobPosting, sourceProfile, storedMatchAnalysis }: Readonly<{
+  jobPosting: ReturnType<typeof jobPostingReviewSchema.parse> | undefined
+  sourceProfile: ReturnType<typeof sourceProfileReviewSchema.parse> | undefined
+  storedMatchAnalysis: unknown
+}>) {
+  if (jobPosting?.status !== 'reviewing-requirements'
+    || sourceProfile?.status !== 'reviewing-facts') return null
+  const storedAnalysis = storedMatchAnalysisSchema.safeParse(storedMatchAnalysis)
+  if (!storedAnalysis.success) return null
+  return createMatchAnalysis({
+    proposedEvidence: storedAnalysis.data.evidence,
+    requirements: jobPosting.requirements,
+    verifiedFacts: sourceProfile.facts.filter((fact) => fact.status === 'verified'),
+  })
 }
 
 function openCandidateSessionDatabase(): Promise<IDBDatabase> {

@@ -56,6 +56,7 @@ export const storedCandidateSessionSchema = z.object({
   expiresAt: z.number(),
   sourceProfile: z.unknown().optional(),
   jobPosting: z.unknown().optional(),
+  matchAnalysis: z.unknown().optional(),
 })
 
 export const sourceProfileExtractionSuccessSchema = z.object({

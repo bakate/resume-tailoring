@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiJobRequirementExtractionRouteImport } from './routes/api.job-requirement-extraction'
+import { Route as ApiMatchAnalysisRouteImport } from './routes/api.match-analysis'
 import { Route as ApiSourceProfileExtractionRouteImport } from './routes/api.source-profile-extraction'
 
 const IndexRoute = IndexRouteImport.update({
@@ -24,6 +25,11 @@ const ApiJobRequirementExtractionRoute =
     path: '/api/job-requirement-extraction',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiMatchAnalysisRoute = ApiMatchAnalysisRouteImport.update({
+  id: '/api/match-analysis',
+  path: '/api/match-analysis',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSourceProfileExtractionRoute =
   ApiSourceProfileExtractionRouteImport.update({
     id: '/api/source-profile-extraction',
@@ -34,35 +40,47 @@ const ApiSourceProfileExtractionRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
+  '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
+  '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
+  '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/api/job-requirement-extraction' | '/api/source-profile-extraction'
+    | '/'
+    | '/api/job-requirement-extraction'
+    | '/api/match-analysis'
+    | '/api/source-profile-extraction'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/job-requirement-extraction' | '/api/source-profile-extraction'
+  to:
+    | '/'
+    | '/api/job-requirement-extraction'
+    | '/api/match-analysis'
+    | '/api/source-profile-extraction'
   id:
     | '__root__'
     | '/'
     | '/api/job-requirement-extraction'
+    | '/api/match-analysis'
     | '/api/source-profile-extraction'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiJobRequirementExtractionRoute: typeof ApiJobRequirementExtractionRoute
+  ApiMatchAnalysisRoute: typeof ApiMatchAnalysisRoute
   ApiSourceProfileExtractionRoute: typeof ApiSourceProfileExtractionRoute
 }
 
@@ -82,6 +100,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiJobRequirementExtractionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/match-analysis': {
+      id: '/api/match-analysis'
+      path: '/api/match-analysis'
+      fullPath: '/api/match-analysis'
+      preLoaderRoute: typeof ApiMatchAnalysisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/source-profile-extraction': {
       id: '/api/source-profile-extraction'
       path: '/api/source-profile-extraction'
@@ -95,6 +120,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiJobRequirementExtractionRoute: ApiJobRequirementExtractionRoute,
+  ApiMatchAnalysisRoute: ApiMatchAnalysisRoute,
   ApiSourceProfileExtractionRoute: ApiSourceProfileExtractionRoute,
 }
 export const routeTree = rootRouteImport

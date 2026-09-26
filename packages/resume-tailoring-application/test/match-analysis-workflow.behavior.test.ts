@@ -1,0 +1,291 @@
+import { describe, expect, it } from 'vitest'
+
+import type {
+  JobRequirement,
+  MatchEvidenceMatcher,
+  ResumeTailoringState,
+  SourceProfileFact,
+} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type {
+  ResumeTailoringResult,
+  ResumeTailoringView,
+  ResumeTailoringWorkflow,
+} from '@resume-tailoring/application/resume-tailoring-workflow'
+import { createResumeTailoringWorkflow } from '@resume-tailoring/application/resume-tailoring-workflow-composition'
+import {
+  createControllableCandidateSessionClock,
+  createInMemoryCandidateSessionPersistence,
+  createTelemetrySpy,
+} from '@resume-tailoring/application/resume-tailoring-workflow-testing'
+
+describe('Match Analysis workflow', () => {
+  it('shows evidence-backed binary coverage and calculates the weighted Match Score', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    system.givenControlledSynonymsAndTranslationsEstablishCoverage()
+
+    // Action
+    await system.analyzeMatch()
+
+    // Then
+    system.expectEvidenceBackedMatchAnalysis()
+  })
+
+  it('warns below 50 percent without denying an evidence-backed Tailored Resume', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    system.givenOnlyAPreferredRequirementIsCovered()
+
+    // Action
+    await system.analyzeMatch()
+
+    // Then
+    system.expectLowScoreWarningWithoutEligibilityDenial()
+  })
+
+  it('denies generation only when no Verified Fact is relevant', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    system.givenNoRequirementIsCovered()
+
+    // Action
+    await system.analyzeMatch()
+
+    // Then
+    system.expectGenerationDeniedForInsufficientRelevantMaterial()
+  })
+
+  it('rejects Match Evidence that references a fact which is not verified', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    system.givenTheMatcherReferencesAnUnverifiedFact()
+
+    // Action
+    await system.analyzeMatch()
+
+    // Then
+    system.expectFabricatedMatchEvidenceToBeRejected()
+  })
+})
+
+function createSystemUnderTest() {
+  return new MatchAnalysisWorkflowTestSystem()
+}
+
+class MatchAnalysisWorkflowTestSystem {
+  readonly #matchRequests: Parameters<MatchEvidenceMatcher['match']>[0][] = []
+  readonly #workflow: ResumeTailoringWorkflow
+  #actionResult: ResumeTailoringResult<ResumeTailoringView> | undefined
+  #matcherResult: Awaited<ReturnType<MatchEvidenceMatcher['match']>> = {
+    ok: true,
+    value: [],
+  }
+
+  constructor() {
+    this.#workflow = createResumeTailoringWorkflow({
+      candidateSessionClock: createControllableCandidateSessionClock({ now: 1_000 }),
+      candidateSessionIdentity: {
+        create: () => ({ ok: true, value: 'candidate-session-match-analysis' }),
+      },
+      candidateSessionPersistence: createInMemoryCandidateSessionPersistence({
+        initialState: candidateSessionState,
+      }),
+      matchEvidenceMatcher: {
+        match: (request) => {
+          this.#matchRequests.push(request)
+          return Promise.resolve(this.#matcherResult)
+        },
+      },
+      telemetry: createTelemetrySpy(),
+    })
+  }
+
+  givenOnlyAPreferredRequirementIsCovered() {
+    this.#matcherResult = {
+      ok: true,
+      value: [{
+        requirementId: 'job-requirement-french',
+        factIds: ['source-fact-french'],
+      }],
+    }
+  }
+
+  givenNoRequirementIsCovered() {}
+
+  givenTheMatcherReferencesAnUnverifiedFact() {
+    this.#matcherResult = {
+      ok: true,
+      value: [{
+        requirementId: 'job-requirement-leadership',
+        factIds: ['source-fact-unverified-leadership'],
+      }],
+    }
+  }
+
+  givenControlledSynonymsAndTranslationsEstablishCoverage() {
+    this.#matcherResult = {
+      ok: true,
+      value: [
+        {
+          requirementId: 'job-requirement-typescript',
+          factIds: ['source-fact-typescript'],
+        },
+        {
+          requirementId: 'job-requirement-french',
+          factIds: ['source-fact-french'],
+        },
+      ],
+    }
+  }
+
+  async analyzeMatch() {
+    this.#actionResult = await this.#workflow.execute({ type: 'analyze-match' })
+  }
+
+  expectEvidenceBackedMatchAnalysis() {
+    const result = this.#readActionResult()
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.value.status !== 'ready') return
+    expect(result.value.matchAnalysis).toEqual({
+      evidence: [
+        {
+          requirementId: 'job-requirement-typescript',
+          factIds: ['source-fact-typescript'],
+        },
+        {
+          requirementId: 'job-requirement-french',
+          factIds: ['source-fact-french'],
+        },
+      ],
+      gapAnalysis: {
+        uncoveredRequiredRequirementIds: ['job-requirement-leadership'],
+      },
+      generationEligibility: 'eligible',
+      matchScore: 60,
+      warning: null,
+    })
+    expect(this.#matchRequests).toEqual([{
+      requirements,
+      verifiedFacts: verifiedFacts.filter((fact) => fact.status === 'verified'),
+    }])
+  }
+
+  expectLowScoreWarningWithoutEligibilityDenial() {
+    expect(this.#readMatchAnalysis()).toMatchObject({
+      generationEligibility: 'eligible',
+      matchScore: 20,
+      warning: 'below-generation-threshold',
+    })
+  }
+
+  expectGenerationDeniedForInsufficientRelevantMaterial() {
+    expect(this.#readMatchAnalysis()).toMatchObject({
+      evidence: [],
+      generationEligibility: 'denied',
+      matchScore: 0,
+      warning: 'below-generation-threshold',
+    })
+  }
+
+  expectFabricatedMatchEvidenceToBeRejected() {
+    expect(this.#readActionResult()).toEqual({
+      ok: false,
+      error: { type: 'match-analysis-unavailable' },
+    })
+  }
+
+  #readActionResult() {
+    expect(this.#actionResult).toBeDefined()
+    return this.#actionResult ?? {
+      ok: false,
+      error: { type: 'candidate-session-unavailable' },
+    } as const
+  }
+
+  #readMatchAnalysis() {
+    const result = this.#readActionResult()
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.value.status !== 'ready') return undefined
+    expect(result.value.matchAnalysis).toBeDefined()
+    return result.value.matchAnalysis
+  }
+}
+
+const verifiedFacts = [
+  {
+    id: 'source-fact-typescript',
+    kind: 'skill',
+    propositionKey: 'proposition-skill-typescript',
+    status: 'verified',
+    value: 'TypeScript',
+  },
+  {
+    id: 'source-fact-french',
+    kind: 'language',
+    propositionKey: 'proposition-language-french',
+    status: 'verified',
+    value: 'Français courant',
+  },
+  {
+    id: 'source-fact-unverified-leadership',
+    kind: 'experience',
+    propositionKey: 'proposition-experience-leadership',
+    status: 'extracted',
+    value: 'Led a team',
+  },
+] as const satisfies readonly SourceProfileFact[]
+
+const requirements = [
+  {
+    id: 'job-requirement-typescript',
+    groupId: 'job-requirement-group-technical',
+    classification: 'required',
+    sourceExcerpt: 'TypeScript and leadership are required.',
+    value: 'Know TS',
+  },
+  {
+    id: 'job-requirement-leadership',
+    groupId: 'job-requirement-group-technical',
+    classification: 'required',
+    sourceExcerpt: 'TypeScript and leadership are required.',
+    value: 'Demonstrate leadership',
+  },
+  {
+    id: 'job-requirement-french',
+    groupId: 'job-requirement-group-language',
+    classification: 'preferred',
+    sourceExcerpt: 'French is preferred.',
+    value: 'Speak French',
+  },
+] as const satisfies readonly JobRequirement[]
+
+const candidateSessionState = {
+  status: 'ready',
+  sessionId: 'candidate-session-match-analysis',
+  expiresAt: 86_401_000,
+  sourceProfile: {
+    status: 'reviewing-facts',
+    documentName: 'resume.pdf',
+    detectedSensitiveContent: [],
+    outgoingContent: 'Professional content',
+    processingNotice: { version: '2026-09-26', confirmedAt: 1_000 },
+    facts: verifiedFacts,
+  },
+  jobPosting: {
+    status: 'reviewing-requirements',
+    detectedSensitiveContent: [],
+    outgoingContent: 'TypeScript and leadership are required. French is preferred.',
+    processingNotice: {
+      version: '2026-09-26',
+      confirmedAt: 1_000,
+      provider: 'OpenAI',
+      retentionPolicy: 'standard-abuse-monitoring',
+      transmittedDataCategories: ['job-posting-content'],
+    },
+    requirements,
+  },
+} as const satisfies ResumeTailoringState

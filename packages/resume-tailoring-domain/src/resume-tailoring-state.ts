@@ -87,6 +87,21 @@ export type JobRequirement = JobRequirementContent & Readonly<{
   groupId: JobRequirementGroupId
 }>
 
+export type MatchEvidence = Readonly<{
+  requirementId: JobRequirementId
+  factIds: readonly SourceProfileFactId[]
+}>
+
+export type MatchAnalysis = Readonly<{
+  evidence: readonly MatchEvidence[]
+  gapAnalysis: Readonly<{
+    uncoveredRequiredRequirementIds: readonly JobRequirementId[]
+  }>
+  generationEligibility: 'eligible' | 'denied'
+  matchScore: number
+  warning: 'below-generation-threshold' | null
+}>
+
 export type JobPostingReview = Readonly<{
   status: 'reviewing-posting' | 'reviewing-requirements'
   detectedSensitiveContent: readonly SensitiveContent[]
@@ -109,6 +124,7 @@ export type ResumeTailoringState =
       readonly expiresAt: number
       readonly sourceProfile?: SourceProfileReview
       readonly jobPosting?: JobPostingReview
+      readonly matchAnalysis?: MatchAnalysis
     }
 
 export type DomainResult<TValue, TError> =

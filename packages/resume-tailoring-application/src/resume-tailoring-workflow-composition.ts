@@ -6,6 +6,7 @@ import type {
   CandidateSessionId,
   JobPostingReview,
   JobRequirement,
+  MatchAnalysis,
   ResumeTailoringState,
   SourceProfileFact,
   SourceProfileFactContent,
@@ -33,7 +34,9 @@ import type {
   JobRequirementExtractor,
   JobRequirementGroupIdentity,
   JobRequirementIdentity,
+  MatchEvidenceMatcher,
 } from './resume-tailoring-workflow-ports'
+import { createMatchAnalysis } from './match-analysis'
 import {
   createReviewingJobPosting,
   identifyJobRequirements,
@@ -53,6 +56,7 @@ type ResumeTailoringDependencies = Readonly<{
   jobRequirementExtractor?: JobRequirementExtractor
   jobRequirementGroupIdentity?: JobRequirementGroupIdentity
   jobRequirementIdentity?: JobRequirementIdentity
+  matchEvidenceMatcher?: MatchEvidenceMatcher
   sourceDocumentReader?: SourceDocumentReader
   sourceProfileFactIdentity?: SourceProfileFactIdentity
   sourceProfileExtractor?: SourceProfileExtractor
@@ -74,6 +78,7 @@ type SourceProfileFactCommand = Exclude<ResumeTailoringCommand,
   | { readonly type: 'update-job-posting-content' }
   | { readonly type: 'confirm-job-posting-processing-notice' }
   | { readonly type: 'extract-job-requirements' }
+  | { readonly type: 'analyze-match' }
 >
 
 export function createResumeTailoringWorkflow(
@@ -133,7 +138,40 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
       return this.#confirmJobPostingProcessingNotice()
     }
     if (command.type === 'extract-job-requirements') return this.#extractJobRequirements()
+    if (command.type === 'analyze-match') return this.#analyzeMatch()
     return this.#executeSourceProfileFactCommand(command)
+  }
+
+  async #analyzeMatch(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasMatchInputs(currentState)) return matchAnalysisUnavailableResult
+    const matcher = this.#dependencies.matchEvidenceMatcher
+    if (matcher === undefined) return matchAnalysisUnavailableResult
+    const verifiedFacts = currentState.value.sourceProfile.facts
+      .filter((fact) => fact.status === 'verified')
+    const matchResult = await matcher.match({
+      requirements: currentState.value.jobPosting.requirements,
+      verifiedFacts,
+    })
+    if (!matchResult.ok) return matchResult
+    const matchAnalysis = createMatchAnalysis({
+      proposedEvidence: matchResult.value,
+      requirements: currentState.value.jobPosting.requirements,
+      verifiedFacts,
+    })
+    if (matchAnalysis === null) return matchAnalysisUnavailableResult
+    return this.#persistMatchAnalysis({ currentState: currentState.value, matchAnalysis })
+  }
+
+  async #persistMatchAnalysis({ currentState, matchAnalysis }: Readonly<{
+    currentState: ReadyResumeTailoringState
+    matchAnalysis: MatchAnalysis
+  }>) {
+    const persistedState = await this.#dependencies.candidateSessionPersistence.update({
+      sessionId: currentState.sessionId,
+      state: { ...currentState, matchAnalysis },
+    })
+    return persistedState.ok ? persistedState : unavailableResult
   }
 
   async #reviewJobPosting(
@@ -392,7 +430,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     })
     const persistedState = await this.#dependencies.candidateSessionPersistence.update({
       sessionId: currentState.sessionId,
-      state: { ...currentState, sourceProfile },
+      state: { ...currentState, sourceProfile, matchAnalysis: undefined },
     })
     return persistedState.ok ? persistedState : unavailableResult
   }
@@ -443,7 +481,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
   }>) {
     const persistedState = await this.#dependencies.candidateSessionPersistence.update({
       sessionId: currentState.sessionId,
-      state: { ...currentState, jobPosting },
+      state: { ...currentState, jobPosting, matchAnalysis: undefined },
     })
     return persistedState.ok ? persistedState : unavailableResult
   }
@@ -598,6 +636,20 @@ function hasJobPosting(
   return hasReadyState(result) && result.value.jobPosting !== undefined
 }
 
+function hasMatchInputs(
+  result: ResumeTailoringResult<ResumeTailoringView>,
+): result is Readonly<{
+  ok: true
+  value: ReadyResumeTailoringState & {
+    readonly jobPosting: JobPostingReview & { readonly status: 'reviewing-requirements' }
+    readonly sourceProfile: NonNullable<ReadyResumeTailoringState['sourceProfile']>
+  }
+}> {
+  return hasReadyState(result)
+    && result.value.jobPosting?.status === 'reviewing-requirements'
+    && result.value.sourceProfile?.status === 'reviewing-facts'
+}
+
 const workflowAlreadyOpenResult = {
   ok: false,
   error: { type: 'workflow-already-open' },
@@ -626,4 +678,9 @@ const sourceProfileFactConflictResult = {
 const jobRequirementExtractionUnavailableResult = {
   ok: false,
   error: { type: 'job-requirement-extraction-unavailable' },
+} as const satisfies ResumeTailoringResult<ResumeTailoringView>
+
+const matchAnalysisUnavailableResult = {
+  ok: false,
+  error: { type: 'match-analysis-unavailable' },
 } as const satisfies ResumeTailoringResult<ResumeTailoringView>

@@ -326,17 +326,63 @@ h1 {
 }
 
 .source-profile-workspace,
-.job-posting-workspace {
+.job-posting-workspace,
+.match-analysis-workspace {
   padding: 72px 0;
   border-bottom: 1px solid #dfe1df;
 }
 
 .source-profile-workspace > h2,
-.job-posting-workspace > h2 {
+.job-posting-workspace > h2,
+.match-analysis-workspace > h2 {
   margin: 0 0 30px;
   font-family: 'DM Serif Display', Georgia, serif;
   font-size: clamp(36px, 4vw, 54px);
   font-weight: 400;
+}
+
+.match-analysis-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.55fr) minmax(0, 1.45fr);
+  gap: 24px;
+}
+
+.match-score-card {
+  grid-row: span 2;
+}
+
+.match-score {
+  display: block;
+  color: #164f3d;
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: clamp(64px, 8vw, 104px);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.match-warning {
+  padding: 14px;
+  border-left: 4px solid #a66118;
+  background: #fff6e8;
+  color: #6f3c0d;
+}
+
+.match-evidence-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.match-evidence-list > li {
+  padding: 16px 0;
+  border-top: 1px solid #dfe1df;
+}
+
+.match-evidence-list ul,
+.gap-analysis-card ul {
+  margin: 10px 0 0;
+  padding-left: 22px;
+  color: #555b68;
 }
 
 .source-profile-grid {
@@ -506,8 +552,13 @@ h1 {
 }
 
 @media (max-width: 800px) {
-  .source-profile-grid {
+  .source-profile-grid,
+  .match-analysis-grid {
     grid-template-columns: 1fr;
+  }
+
+  .match-score-card {
+    grid-row: auto;
   }
 
   .correction-form {
