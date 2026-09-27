@@ -26,6 +26,7 @@ export type ResumePdfResult =
 type ResumePdfDependencies = Readonly<{
   pdfTextReader?: PdfTextReader
   semanticValidator: ResumeClaimSemanticValidator
+  signal?: AbortSignal
 }>
 
 type PdfPage = Awaited<ReturnType<Awaited<ReturnType<typeof getDocument>['promise']>['getPage']>>
@@ -42,27 +43,55 @@ export async function createTailoredResumePdf({
   inputs,
   pdfTextReader = pdfJsTextReader,
   semanticValidator,
+  signal,
 }: ResumePdfDependencies & Readonly<{
   inputs: TailoredResumePdfInputs
 }>): Promise<ResumePdfResult> {
-  let browser: Browser | undefined
+  if (signal?.aborted === true) return renderingUnavailableResult
+  const browserResult = await launchPdfBrowser()
+  if (!browserResult.ok) return renderingUnavailableResult
+  return renderWithBrowser({
+    browser: browserResult.value, inputs, pdfTextReader, semanticValidator, signal,
+  })
+}
+
+async function launchPdfBrowser() {
   try {
-    browser = await puppeteer.launch({
+    const browser = await puppeteer.launch({
       headless: true,
       args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox'],
     })
+    return { ok: true, value: browser } as const
+  } catch {
+    return { ok: false } as const
+  }
+}
+
+async function renderWithBrowser({
+  browser, inputs, pdfTextReader = pdfJsTextReader, semanticValidator, signal,
+}: Readonly<{
+  browser: Browser
+  inputs: TailoredResumePdfInputs
+}> & ResumePdfDependencies): Promise<ResumePdfResult> {
+  const closeAbortedBrowser = () => { void browser.close().catch(ignoreFailure) }
+  signal?.addEventListener('abort', closeAbortedBrowser, { once: true })
+  try {
+    if (signal?.aborted === true) return renderingUnavailableResult
     return await prepareAndRenderPdf({ browser, inputs, pdfTextReader, semanticValidator })
   } catch {
     return renderingUnavailableResult
   } finally {
-    if (browser !== undefined) await browser.close().catch(ignoreFailure)
+    signal?.removeEventListener('abort', closeAbortedBrowser)
+    await browser.close().catch(ignoreFailure)
   }
 }
 
 async function prepareAndRenderPdf({ browser, inputs, pdfTextReader, semanticValidator }: Readonly<{
   browser: Browser
   inputs: TailoredResumePdfInputs
-}> & Required<ResumePdfDependencies>) {
+  pdfTextReader: PdfTextReader
+  semanticValidator: ResumeClaimSemanticValidator
+}>) {
   const page = await browser.newPage()
   await page.emulateMediaType('print')
   const layoutMeasurer = createPuppeteerLayoutMeasurer({ inputs, page })

@@ -3,6 +3,7 @@
   "private": true,
   "packageManager": "pnpm@10.13.1",
   "scripts": {
+    "benchmark:pdf": "pnpm --filter @resume-tailoring/web benchmark:pdf",
     "build": "turbo run build",
     "check": "pnpm check:architecture && pnpm check:test-conventions && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "check:architecture": "dependency-cruiser --config dependency-cruiser.config.cjs apps packages",
