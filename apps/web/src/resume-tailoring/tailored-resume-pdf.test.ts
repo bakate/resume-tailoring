@@ -1,3 +1,4 @@
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { describe, expect, it } from 'vitest'
 
 import type { TailoredResumePdfInputs } from './tailored-resume-contract'
@@ -81,6 +82,47 @@ describe('createTailoredResumePdf', () => {
 
     expect(result).toEqual({ ok: false, error: { type: 'resume-pdf-provenance-invalid' } })
   })
+
+  it.each([
+    { photoDataUrl: undefined, variant: 'without a Candidate photo' },
+    {
+      photoDataUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=',
+      variant: 'with a Candidate photo',
+    },
+  ])('creates a validated French PDF $variant', async ({ photoDataUrl }) => {
+    const result = await createTailoredResumePdf({
+      inputs: createFrenchInputs({ photoDataUrl }),
+      semanticValidator,
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.ok ? new TextDecoder().decode(result.value.slice(0, 5)) : '').toBe('%PDF-')
+    if (result.ok) await expectFrenchSelectableText({ pdfBytes: result.value })
+  }, 20_000)
+
+  it.each([
+    {
+      extractedTextItems: [
+        'Tailored Resume', 'candidate@example.com', 'Used TypeScript',
+      ],
+      variant: 'missing retained content',
+    },
+    {
+      extractedTextItems: [
+        'Tailored Resume', 'candidate@example.com',
+        'Used TypeScript', 'Delivered 30% faster releases',
+      ],
+      variant: 'reordered retained content',
+    },
+  ])('rejects $variant extracted from the PDF', async ({ extractedTextItems }) => {
+    const result = await createTailoredResumePdf({
+      inputs,
+      pdfTextReader: { read: () => Promise.resolve(extractedTextItems) },
+      semanticValidator,
+    })
+
+    expect(result).toEqual({ ok: false, error: { type: 'resume-pdf-content-mismatch' } })
+  }, 20_000)
 })
 
 const validatedClaims = [
@@ -125,6 +167,104 @@ function createOverflowingRequiredSource(): TailoredResumePdfInputs['source'] {
     }
   })
   return { ...inputs.source, claims }
+}
+
+function createFrenchInputs({ photoDataUrl }: Readonly<{
+  photoDataUrl: string | undefined
+}>): TailoredResumePdfInputs {
+  return {
+    contactItems: [
+      { kind: 'email', value: 'bakateba@gmail.com' },
+      { kind: 'phone', value: '+33 6 10 57 40 00' },
+    ],
+    locale: 'fr',
+    ...(photoDataUrl === undefined ? {} : { photoDataUrl }),
+    source: frenchSource,
+  }
+}
+
+const frenchSource = {
+  claims: [
+    {
+      id: 'resume-claim-c62808ee-c7e7-4950-a01d-c05d2500d9e5',
+      segments: [{
+        factIds: ['source-fact-2c292560-50de-4650-b4c9-38cba4105158'],
+        text: 'Connaissance de HTML5.',
+      }],
+    },
+    {
+      id: 'resume-claim-abf8c32a-8fe8-4ed8-991a-391cdac73103',
+      segments: [
+        {
+          factIds: ['source-fact-cd05dd47-6b03-4dda-8bd5-913449ebc75e'],
+          text: 'Maîtrise de RxJS',
+        },
+        {
+          factIds: ['source-fact-b941446b-c8ea-4adf-a28e-78d063f2d88f'],
+          text: ', utilisé pour la gestion d’état chez Bloomflow.',
+        },
+      ],
+    },
+  ],
+  evidence: [
+    {
+      factIds: ['source-fact-2c292560-50de-4650-b4c9-38cba4105158'],
+      requirementId: 'job-requirement-88e3cc3b-2007-4209-a263-e9bd1c464944',
+    },
+    {
+      factIds: [
+        'source-fact-b941446b-c8ea-4adf-a28e-78d063f2d88f',
+        'source-fact-cd05dd47-6b03-4dda-8bd5-913449ebc75e',
+      ],
+      requirementId: 'job-requirement-a950f68f-54d3-4fd6-8de2-62fa2b7d7385',
+    },
+  ],
+  requirements: [
+    {
+      classification: 'preferred',
+      id: 'job-requirement-88e3cc3b-2007-4209-a263-e9bd1c464944',
+    },
+    {
+      classification: 'preferred',
+      id: 'job-requirement-a950f68f-54d3-4fd6-8de2-62fa2b7d7385',
+    },
+  ],
+  verifiedFacts: [
+    {
+      id: 'source-fact-2c292560-50de-4650-b4c9-38cba4105158',
+      kind: 'skill',
+      value: 'Bakate BA connaît HTML5.',
+    },
+    {
+      id: 'source-fact-b941446b-c8ea-4adf-a28e-78d063f2d88f',
+      kind: 'experience',
+      value: "Bakate BA a utilisé RxJS pour la gestion d'état chez Bloomflow.",
+    },
+    {
+      id: 'source-fact-cd05dd47-6b03-4dda-8bd5-913449ebc75e',
+      kind: 'skill',
+      value: 'Bakate BA maîtrise RxJS.',
+    },
+  ],
+} as const satisfies TailoredResumePdfInputs['source']
+
+async function expectFrenchSelectableText({ pdfBytes }: Readonly<{ pdfBytes: Uint8Array }>) {
+  const loadingTask = getDocument({ data: pdfBytes.slice(), useSystemFonts: false })
+  try {
+    const pdfDocument = await loadingTask.promise
+    const pdfPage = await pdfDocument.getPage(1)
+    const textContent = await pdfPage.getTextContent()
+    const selectableText = textContent.items.flatMap((item) => 'str' in item ? [item.str] : [])
+      .join(' ')
+
+    expect(selectableText).toContain('CV adapté')
+    expect(selectableText).toContain('Points clés sélectionnés')
+    expect(selectableText).toContain('bakateba@gmail.com')
+    expect(selectableText).toContain('Connaissance de HTML5.')
+    expect(selectableText).toContain('Maîtrise de RxJS, utilisé pour la gestion d')
+  } finally {
+    await loadingTask.destroy()
+  }
 }
 
 const semanticValidator = {
