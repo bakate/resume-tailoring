@@ -7,6 +7,7 @@ import type {
   JobRequirementId,
   JobRequirementContent,
   JobRequirement,
+  OutcomeFeedback,
   SourceProfileFact,
   ResumeClaim,
   ResumeClaimId,
@@ -19,6 +20,8 @@ export {
   sourceProfileReviewStatuses,
   jobRequirementClassifications,
   jobRequirementMaximumCount,
+  fidelityAssessments,
+  relevanceAssessments,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export type {
@@ -41,6 +44,7 @@ export type {
   MatchAnalysis,
   MatchEvidence,
   MatchScore,
+  OutcomeFeedback,
   ResumeClaim,
   ResumeClaimId,
   ResumeClaimSegment,
@@ -84,13 +88,42 @@ export type CandidateSessionIdentity = {
 }
 
 export type PrivacySafeTelemetry = {
-  readonly record: (
-    event:
-      | 'resume-tailoring-opened'
-      | 'candidate-session-deleted'
-      | 'candidate-session-expired',
-  ) => Promise<AdapterResult<undefined>>
+  readonly record: (event: PrivacySafeTelemetryEvent) => Promise<AdapterResult<undefined>>
 }
+
+export const matchScoreBands = ['0-24', '25-49', '50-74', '75-100'] as const
+export const correctionKinds = [
+  'source-profile-fact',
+  'resume-claim-removal',
+  'resume-claim-reorder',
+  'resume-claim-reformulation',
+] as const
+
+export type MatchScoreBand = typeof matchScoreBands[number]
+
+export type PrivacySafeTelemetryEvent =
+  | Readonly<{ name: 'resume-tailoring-opened' }>
+  | Readonly<{ name: 'candidate-session-deleted' }>
+  | Readonly<{ name: 'candidate-session-expired' }>
+  | Readonly<{
+      name: 'resume-fidelity-rated'
+      assessment: NonNullable<OutcomeFeedback['fidelity']>
+      matchScoreBand: MatchScoreBand
+    }>
+  | Readonly<{
+      name: 'resume-relevance-rated'
+      assessment: NonNullable<OutcomeFeedback['relevance']>
+      matchScoreBand: MatchScoreBand
+    }>
+  | Readonly<{
+      name: 'resume-correction-recorded'
+      correctionKind: typeof correctionKinds[number]
+      matchScoreBand?: MatchScoreBand
+    }>
+  | Readonly<{
+      name: 'resume-downloaded'
+      matchScoreBand: MatchScoreBand
+    }>
 
 export type SourceDocumentReader = {
   readonly read: (document: Readonly<{

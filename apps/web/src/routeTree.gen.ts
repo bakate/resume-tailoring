@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiAnalyticsRouteImport } from './routes/api.analytics'
 import { Route as ApiJobRequirementExtractionRouteImport } from './routes/api.job-requirement-extraction'
 import { Route as ApiMatchAnalysisRouteImport } from './routes/api.match-analysis'
 import { Route as ApiResumeClaimValidationRouteImport } from './routes/api.resume-claim-validation'
@@ -20,6 +21,11 @@ import { Route as ApiTailoredResumePdfRouteImport } from './routes/api.tailored-
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAnalyticsRoute = ApiAnalyticsRouteImport.update({
+  id: '/api/analytics',
+  path: '/api/analytics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiJobRequirementExtractionRoute =
@@ -58,6 +64,7 @@ const ApiTailoredResumePdfRoute = ApiTailoredResumePdfRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/analytics': typeof ApiAnalyticsRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/analytics': typeof ApiAnalyticsRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
@@ -77,6 +85,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/analytics': typeof ApiAnalyticsRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/api/analytics'
     | '/api/job-requirement-extraction'
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/api/analytics'
     | '/api/job-requirement-extraction'
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/api/analytics'
     | '/api/job-requirement-extraction'
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
@@ -116,6 +128,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiAnalyticsRoute: typeof ApiAnalyticsRoute
   ApiJobRequirementExtractionRoute: typeof ApiJobRequirementExtractionRoute
   ApiMatchAnalysisRoute: typeof ApiMatchAnalysisRoute
   ApiResumeClaimValidationRoute: typeof ApiResumeClaimValidationRoute
@@ -131,6 +144,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/analytics': {
+      id: '/api/analytics'
+      path: '/api/analytics'
+      fullPath: '/api/analytics'
+      preLoaderRoute: typeof ApiAnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/job-requirement-extraction': {
@@ -180,6 +200,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiAnalyticsRoute: ApiAnalyticsRoute,
   ApiJobRequirementExtractionRoute: ApiJobRequirementExtractionRoute,
   ApiMatchAnalysisRoute: ApiMatchAnalysisRoute,
   ApiResumeClaimValidationRoute: ApiResumeClaimValidationRoute,

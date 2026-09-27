@@ -27,6 +27,7 @@ import {
   resumeClaimValidationResultSchema,
   resumeClaimWritingResultSchema,
 } from './resume-claim-schemas'
+import { privacySafeAnalyticsEventSchema } from './privacy-safe-analytics'
 
 export { createBrowserCandidateSessionPersistence } from './candidate-session-indexed-db'
 export { createBrowserSourceDocumentReader } from './source-document-pdf'
@@ -57,9 +58,25 @@ export function createBrowserCandidateSessionIdentity(): CandidateSessionIdentit
   }
 }
 
-export function createPrivacySafeBrowserTelemetry(): PrivacySafeTelemetry {
+export function createPrivacySafeBrowserTelemetry({
+  request = fetch,
+}: Readonly<{ request?: typeof fetch }> = {}): PrivacySafeTelemetry {
   return {
-    record: () => Promise.resolve({ ok: true, value: undefined }),
+    record: (event) => recordPrivacySafeAnalyticsEvent({ event, request }),
+  }
+}
+
+async function recordPrivacySafeAnalyticsEvent({ event, request }: Readonly<{
+  event: Parameters<PrivacySafeTelemetry['record']>[0]
+  request: typeof fetch
+}>) {
+  const validatedEvent = privacySafeAnalyticsEventSchema.safeParse(event)
+  if (!validatedEvent.success) return unavailableResult
+  try {
+    const response = await request('/api/analytics', createJsonRequest(validatedEvent.data))
+    return response.ok ? { ok: true, value: undefined } as const : unavailableResult
+  } catch {
+    return unavailableResult
   }
 }
 

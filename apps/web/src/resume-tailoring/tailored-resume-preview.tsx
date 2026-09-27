@@ -26,6 +26,13 @@ type PreviewState =
   | Readonly<{ status: 'failed' }>
   | Readonly<{ status: 'ready'; value: PreparedPreview }>
 type PreparedPreview = NonNullable<Awaited<ReturnType<typeof preparePreview>>>
+type OutcomeQuestionProps<TAssessment extends string> = Readonly<{
+  choices: readonly (readonly [TAssessment, Parameters<Localization['translate']>[0]])[]
+  localization: Localization
+  onSelect: (assessment: TAssessment) => void
+  question: string
+  selected: TAssessment | null
+}>
 
 export function TailoredResumePreview({ candidateSession, localization }: PreviewProps) {
   const [photo, setPhoto] = useState<PhotoState>({ status: 'empty' })
@@ -58,10 +65,65 @@ export function TailoredResumePreview({ candidateSession, localization }: Previe
       <PhotoControls {...{
         localization, photo, setPhoto,
       }} />
+      <OutcomeFeedback {...{ candidateSession, localization }} />
       <ExportControls {...{ exportState, localization }} onExport={() => {
-        void exportPreview({ preview, setExportState })
+        void exportPreview({ candidateSession, preview, setExportState })
       }} />
     </section>
+  )
+}
+
+function OutcomeFeedback({ candidateSession, localization }: PreviewProps) {
+  return (
+    <div className="resume-outcome-feedback">
+      <FidelityQuestion {...{ candidateSession, localization }} />
+      <RelevanceQuestion {...{ candidateSession, localization }} />
+    </div>
+  )
+}
+
+function FidelityQuestion({ candidateSession, localization }: PreviewProps) {
+  const fidelity = readOutcomeFeedback({ candidateSession })?.fidelity ?? null
+  return <OutcomeQuestion choices={fidelityChoices}
+    question={localization.translate('resumePreview.fidelityQuestion')}
+    selected={fidelity} onSelect={(assessment) => {
+      void candidateSession.rateTailoredResumeFidelity({ assessment })
+    }} localization={localization} />
+}
+
+function RelevanceQuestion({ candidateSession, localization }: PreviewProps) {
+  const relevance = readOutcomeFeedback({ candidateSession })?.relevance ?? null
+  return <OutcomeQuestion choices={relevanceChoices}
+    question={localization.translate('resumePreview.relevanceQuestion')}
+    selected={relevance} onSelect={(assessment) => {
+      void candidateSession.rateTailoredResumeRelevance({ assessment })
+    }} localization={localization} />
+}
+
+function readOutcomeFeedback({ candidateSession }: Readonly<{
+  candidateSession: CandidateSessionController
+}>) {
+  return candidateSession.view.status === 'ready'
+    ? candidateSession.view.outcomeFeedback : undefined
+}
+
+function OutcomeQuestion<TAssessment extends string>({
+  choices,
+  localization,
+  onSelect,
+  question,
+  selected,
+}: OutcomeQuestionProps<TAssessment>) {
+  return (
+    <fieldset>
+      <legend>{question}</legend>
+      {choices.map(([assessment, label]) => (
+        <button aria-pressed={selected === assessment} disabled={selected !== null} key={assessment}
+          onClick={() => { onSelect(assessment) }} type="button">
+          {localization.translate(label)}
+        </button>
+      ))}
+    </fieldset>
   )
 }
 
@@ -267,7 +329,8 @@ function changePhotoInclusion({ photo, status }: Readonly<{
   return { ...photo, status }
 }
 
-async function exportPreview({ preview, setExportState }: Readonly<{
+async function exportPreview({ candidateSession, preview, setExportState }: Readonly<{
+  candidateSession: CandidateSessionController
   preview: PreparedPreview
   setExportState: (state: ExportState) => void
 }>) {
@@ -278,6 +341,7 @@ async function exportPreview({ preview, setExportState }: Readonly<{
     return
   }
   downloadPdf({ pdf: result.value })
+  await candidateSession.recordTailoredResumeDownload()
   setExportState({ status: 'downloaded' })
 }
 
@@ -322,3 +386,11 @@ type BrowserResumePdfFailureType = Exclude<
 
 const allowedPhotoTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const maximumPhotoBytes = 2_000_000
+const fidelityChoices = [
+  ['faithful', 'resumePreview.fidelityFaithful'],
+  ['needs-correction', 'resumePreview.fidelityCorrection'],
+] as const
+const relevanceChoices = [
+  ['relevant', 'resumePreview.relevanceRelevant'],
+  ['needs-improvement', 'resumePreview.relevanceImprovement'],
+] as const

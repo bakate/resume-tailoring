@@ -1,5 +1,7 @@
 import {
   sensitiveContentKinds,
+  fidelityAssessments,
+  relevanceAssessments,
   sourceProfileFactKinds,
   sourceProfileFactStatuses,
   sourceProfileReviewStatuses,
@@ -50,6 +52,11 @@ export const sourceProfileReviewSchema = z.object({
   facts: z.array(sourceProfileFactSchema),
 })
 
+export const outcomeFeedbackSchema = z.object({
+  fidelity: z.enum(fidelityAssessments).optional(),
+  relevance: z.enum(relevanceAssessments).optional(),
+})
+
 export const storedCandidateSessionSchema = z.object({
   status: z.literal('ready'),
   sessionId: candidateSessionIdSchema,
@@ -57,6 +64,7 @@ export const storedCandidateSessionSchema = z.object({
   sourceProfile: z.unknown().optional(),
   jobPosting: z.unknown().optional(),
   matchAnalysis: z.unknown().optional(),
+  outcomeFeedback: outcomeFeedbackSchema.optional(),
   tailoredResume: z.unknown().optional(),
 })
 

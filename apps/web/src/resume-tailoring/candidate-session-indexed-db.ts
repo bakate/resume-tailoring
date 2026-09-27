@@ -191,6 +191,7 @@ function parseCandidateSession(value: unknown): ResumeTailoringState {
     },
     storedJobPosting: result.data.jobPosting,
     storedMatchAnalysis: result.data.matchAnalysis,
+    storedOutcomeFeedback: result.data.outcomeFeedback,
     storedSourceProfile: result.data.sourceProfile,
     storedTailoredResume: result.data.tailoredResume,
   })
@@ -200,12 +201,14 @@ function restoreCandidateContent({
   readyState,
   storedJobPosting,
   storedMatchAnalysis,
+  storedOutcomeFeedback,
   storedSourceProfile,
   storedTailoredResume,
 }: Readonly<{
   readyState: ReadyResumeTailoringState
   storedJobPosting: unknown
   storedMatchAnalysis: unknown
+  storedOutcomeFeedback: NonNullable<ReadyResumeTailoringState['outcomeFeedback']> | undefined
   storedSourceProfile: unknown
   storedTailoredResume: unknown
 }>): ResumeTailoringState {
@@ -226,6 +229,7 @@ function restoreCandidateContent({
     ...(sourceProfile.success ? { sourceProfile: sourceProfile.data } : {}),
     ...(jobPosting.success ? { jobPosting: jobPosting.data } : {}),
     ...(matchAnalysis === null ? {} : { matchAnalysis }),
+    ...(storedOutcomeFeedback === undefined ? {} : { outcomeFeedback: storedOutcomeFeedback }),
     ...(tailoredResume === null ? {} : { tailoredResume }),
   }
 }

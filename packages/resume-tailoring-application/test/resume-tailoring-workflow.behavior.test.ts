@@ -209,15 +209,15 @@ class ResumeTailoringWorkflowTestSystem {
   }
 
   expectWorkflowOpeningToBeRecorded() {
-    expect(this.#telemetry.recordedEvents()).toEqual(['resume-tailoring-opened'])
+    expect(this.#telemetry.recordedEvents()).toEqual([{ name: 'resume-tailoring-opened' }])
   }
 
   expectSessionExpirationToBeRecorded() {
-    expect(this.#telemetry.recordedEvents()).toEqual(['candidate-session-expired'])
+    expect(this.#telemetry.recordedEvents()).toEqual([{ name: 'candidate-session-expired' }])
   }
 
   expectSessionDeletionToBeRecorded() {
-    expect(this.#telemetry.recordedEvents()).toEqual(['candidate-session-deleted'])
+    expect(this.#telemetry.recordedEvents()).toEqual([{ name: 'candidate-session-deleted' }])
   }
 
   #createWorkflow() {

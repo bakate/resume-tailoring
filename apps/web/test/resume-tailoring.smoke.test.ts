@@ -237,10 +237,16 @@ test('a Candidate previews and downloads the same validated one-page resume', as
 
   await system.givenTailoredResumeIsStored()
   await system.givenValidatedResumePdfExportIsAvailable()
+  await system.givenPrivacySafeAnalyticsIsAvailable()
+
+  await system.rateTailoredResumeOutcomes()
+  await system.reloadTailoredResumeOutcomeFeedback()
+  await system.expectTailoredResumeOutcomeFeedbackToRemainRecorded()
 
   await system.downloadTailoredResumePdf()
 
   await system.expectPreviewAndPdfToUseTheSameRetainedClaims()
+  system.expectPrivacySafeMvpOutcomesToBeRecorded()
 })
 
 test('localizes sensitive labels and preserves legitimate French words', async ({ page }) => {
@@ -308,6 +314,7 @@ type CompletedAction =
 
 class ResumeTailoringBrowserTestSystem {
   readonly #page: Page
+  readonly #analyticsEvents: unknown[] = []
   #completedAction: CompletedAction | undefined
   #lateResponseOutcome: unknown
   #extractionRequestContent: string | undefined
@@ -444,6 +451,13 @@ class ResumeTailoringBrowserTestSystem {
         headers: { 'Content-Disposition': 'attachment; filename="tailored-resume.pdf"' },
         body: Buffer.from('%PDF-validated-test'),
       })
+    })
+  }
+
+  async givenPrivacySafeAnalyticsIsAvailable() {
+    await this.#page.route('**/api/analytics', async (route) => {
+      this.#analyticsEvents.push(JSON.parse(route.request().postData() ?? 'null') as unknown)
+      await route.fulfill({ status: 202 })
     })
   }
 
@@ -597,6 +611,17 @@ class ResumeTailoringBrowserTestSystem {
     const download = await downloadPromise
     expect(download.suggestedFilename()).toBe('tailored-resume.pdf')
     this.#completedAction = 'resume-pdf-downloaded'
+  }
+
+  async rateTailoredResumeOutcomes() {
+    await this.#page.getByRole('button', { name: 'Faithful' }).click()
+    await expect(this.#page.getByRole('button', { name: 'Faithful' })).toBeDisabled()
+    await this.#page.getByRole('button', { name: 'Relevant' }).click()
+    await expect(this.#page.getByRole('button', { name: 'Relevant' })).toBeDisabled()
+  }
+
+  async reloadTailoredResumeOutcomeFeedback() {
+    await this.#page.reload()
   }
 
   async extractRequirementsFromMinimizedJobPosting() {
@@ -810,6 +835,27 @@ class ResumeTailoringBrowserTestSystem {
     ])
     expect(hasResumePdfPhoto(this.#resumePdfRequest)).toBe(false)
     expect(hasCallerDerivedDocument(this.#resumePdfRequest)).toBe(false)
+  }
+
+  expectPrivacySafeMvpOutcomesToBeRecorded() {
+    expect(this.#analyticsEvents).toEqual([{
+      name: 'resume-fidelity-rated',
+      assessment: 'faithful',
+      matchScoreBand: '25-49',
+    }, {
+      name: 'resume-relevance-rated',
+      assessment: 'relevant',
+      matchScoreBand: '25-49',
+    }, {
+      name: 'resume-downloaded',
+      matchScoreBand: '25-49',
+    }])
+  }
+
+  async expectTailoredResumeOutcomeFeedbackToRemainRecorded() {
+    await expect(this.#page.getByRole('button', { name: 'Faithful' })).toBeDisabled()
+    await expect(this.#page.getByRole('button', { name: 'Relevant' })).toBeDisabled()
+    expect(this.#analyticsEvents).toHaveLength(2)
   }
 
   async expectFrenchSensitiveLabelAndIntactJobPosting() {

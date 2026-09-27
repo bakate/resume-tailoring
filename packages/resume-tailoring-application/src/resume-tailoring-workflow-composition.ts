@@ -37,6 +37,8 @@ import type {
   JobRequirementGroupIdentity,
   JobRequirementIdentity,
   MatchEvidenceMatcher,
+  MatchScoreBand,
+  PrivacySafeTelemetryEvent,
   ResumeClaimIdentity,
   ResumeClaimSemanticValidator,
   ResumeClaimWriter,
@@ -77,6 +79,24 @@ type ReadyResumeTailoringState = Extract<
   ResumeTailoringState,
   { readonly status: 'ready' }
 >
+type OutcomeReadyState = ReadyResumeTailoringState & {
+  readonly matchAnalysis: MatchAnalysis
+  readonly tailoredResume: TailoredResume
+}
+type OutcomeEventWithoutMatchScore =
+  | Readonly<{
+      name: 'resume-fidelity-rated'
+      assessment: 'faithful' | 'needs-correction'
+    }>
+  | Readonly<{
+      name: 'resume-relevance-rated'
+      assessment: 'relevant' | 'needs-improvement'
+    }>
+  | Readonly<{ name: 'resume-downloaded' }>
+type CorrectionKind = Extract<
+  PrivacySafeTelemetryEvent,
+  { readonly name: 'resume-correction-recorded' }
+>['correctionKind']
 type SourceProfileFactCommand = Exclude<ResumeTailoringCommand,
   | { readonly type: 'open-workflow' }
   | { readonly type: 'delete-session' }
@@ -93,6 +113,9 @@ type SourceProfileFactCommand = Exclude<ResumeTailoringCommand,
   | { readonly type: 'remove-resume-claim' }
   | { readonly type: 'move-resume-claim' }
   | { readonly type: 'reformulate-resume-claim' }
+  | { readonly type: 'rate-tailored-resume-fidelity' }
+  | { readonly type: 'rate-tailored-resume-relevance' }
+  | { readonly type: 'record-tailored-resume-download' }
 >
 
 export function createResumeTailoringWorkflow(
@@ -159,7 +182,53 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (command.type === 'reformulate-resume-claim') {
       return this.#reformulateResumeClaim(command)
     }
+    if (command.type === 'rate-tailored-resume-fidelity') {
+      return this.#recordTailoredResumeOutcome({
+        name: 'resume-fidelity-rated', assessment: command.assessment,
+      })
+    }
+    if (command.type === 'rate-tailored-resume-relevance') {
+      return this.#recordTailoredResumeOutcome({
+        name: 'resume-relevance-rated', assessment: command.assessment,
+      })
+    }
+    if (command.type === 'record-tailored-resume-download') {
+      return this.#recordTailoredResumeOutcome({ name: 'resume-downloaded' })
+    }
     return this.#executeSourceProfileFactCommand(command)
+  }
+
+  async #recordTailoredResumeOutcome(event: OutcomeEventWithoutMatchScore) {
+    const currentState = await this.#readActiveState()
+    if (!hasOutcomeInputs(currentState)) return resumeClaimUnavailableResult
+    if (event.name === 'resume-downloaded') {
+      await this.#recordOutcomeWithMatchScore({ event, state: currentState.value })
+      return currentState
+    }
+    return this.#persistOutcomeFeedback({ event, state: currentState.value })
+  }
+
+  async #persistOutcomeFeedback({ event, state }: Readonly<{
+    event: Exclude<OutcomeEventWithoutMatchScore, { readonly name: 'resume-downloaded' }>
+    state: OutcomeReadyState
+  }>) {
+    const outcomeFeedback = addOutcomeFeedback({ event, state })
+    if (outcomeFeedback === null) return { ok: true, value: state } as const
+    const persistedState = await this.#dependencies.candidateSessionPersistence.update({
+      sessionId: state.sessionId, state: { ...state, outcomeFeedback },
+    })
+    if (!persistedState.ok) return unavailableResult
+    await this.#recordOutcomeWithMatchScore({ event, state })
+    return persistedState
+  }
+
+  #recordOutcomeWithMatchScore({ event, state }: Readonly<{
+    event: OutcomeEventWithoutMatchScore
+    state: OutcomeReadyState
+  }>) {
+    return this.#dependencies.telemetry.record({
+      ...event, matchScoreBand: readMatchScoreBand(state.matchAnalysis.matchScore),
+    })
   }
 
   async #generateResumeClaims(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
@@ -186,11 +255,18 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (claims.length === currentState.value.tailoredResume.claims.length) {
       return resumeClaimUnavailableResult
     }
-    return this.#persistTailoredResume({
+    const result = await this.#persistTailoredResume({
       currentState: currentState.value,
       claims,
       exclusions: currentState.value.tailoredResume.exclusions,
     })
+    if (result.ok) {
+      await this.#recordCorrection({
+        correctionKind: 'resume-claim-removal',
+        matchAnalysis: currentState.value.matchAnalysis,
+      })
+    }
+    return result
   }
 
   async #moveResumeClaim(
@@ -203,11 +279,18 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
       ...command,
     })
     if (claims === null) return resumeClaimUnavailableResult
-    return this.#persistTailoredResume({
+    const result = await this.#persistTailoredResume({
       currentState: currentState.value,
       claims,
       exclusions: currentState.value.tailoredResume.exclusions,
     })
+    if (result.ok) {
+      await this.#recordCorrection({
+        correctionKind: 'resume-claim-reorder',
+        matchAnalysis: currentState.value.matchAnalysis,
+      })
+    }
+    return result
   }
 
   async #reformulateResumeClaim(
@@ -226,7 +309,16 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     })
     if (!validation.ok) return validation
     if (validation.claim === null) return resumeClaimUnavailableResult
-    return this.#persistReformulatedResumeClaim({ command, state: currentState.value, validation })
+    const result = await this.#persistReformulatedResumeClaim({
+      command, state: currentState.value, validation,
+    })
+    if (result.ok) {
+      await this.#recordCorrection({
+        correctionKind: 'resume-claim-reformulation',
+        matchAnalysis: currentState.value.matchAnalysis,
+      })
+    }
+    return result
   }
 
   #persistReformulatedResumeClaim({ command, state, validation }: Readonly<{
@@ -426,7 +518,25 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
       facts: currentState.value.sourceProfile.facts,
       newFactId: identity.value,
     })
-    return this.#persistFactTransition({ currentState: currentState.value, transition })
+    const result = await this.#persistFactTransition({ currentState: currentState.value, transition })
+    if (result.ok) {
+      await this.#recordCorrection({
+        correctionKind: 'source-profile-fact',
+        matchAnalysis: currentState.value.matchAnalysis,
+      })
+    }
+    return result
+  }
+
+  #recordCorrection({ correctionKind, matchAnalysis }: Readonly<{
+    correctionKind: CorrectionKind
+    matchAnalysis?: MatchAnalysis
+  }>) {
+    const matchScoreBand = matchAnalysis === undefined
+      ? {} : { matchScoreBand: readMatchScoreBand(matchAnalysis.matchScore) }
+    return this.#dependencies.telemetry.record({
+      name: 'resume-correction-recorded', correctionKind, ...matchScoreBand,
+    })
   }
 
   async #decideSourceProfileFacts({
@@ -578,7 +688,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (!persistedState.ok) return unavailableResult
 
     this.#scheduleExpiration(state)
-    await this.#dependencies.telemetry.record('resume-tailoring-opened')
+    await this.#dependencies.telemetry.record({ name: 'resume-tailoring-opened' })
     return { ok: true, value: persistedState.value } as const
   }
 
@@ -624,7 +734,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     const deletedState = await this.#eraseSession(currentState.value.sessionId)
     if (!deletedState.ok) return deletedState
 
-    await this.#dependencies.telemetry.record('candidate-session-deleted')
+    await this.#dependencies.telemetry.record({ name: 'candidate-session-deleted' })
     this.#notify(deletedState)
     return deletedState
   }
@@ -648,7 +758,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     const deletedState = await this.#eraseSession(state.sessionId)
     if (!deletedState.ok) return deletedState
 
-    await this.#dependencies.telemetry.record('candidate-session-expired')
+    await this.#dependencies.telemetry.record({ name: 'candidate-session-expired' })
     this.#notify(deletedState)
     return deletedState
   }
@@ -699,6 +809,26 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
 
 function ignoreResult(): undefined {
   return undefined
+}
+
+function readMatchScoreBand(matchScore: number): MatchScoreBand {
+  if (matchScore < 25) return '0-24'
+  if (matchScore < 50) return '25-49'
+  if (matchScore < 75) return '50-74'
+  return '75-100'
+}
+
+function addOutcomeFeedback({ event, state }: Readonly<{
+  event: Exclude<OutcomeEventWithoutMatchScore, { readonly name: 'resume-downloaded' }>
+  state: OutcomeReadyState
+}>): NonNullable<ReadyResumeTailoringState['outcomeFeedback']> | null {
+  const currentFeedback = state.outcomeFeedback ?? {}
+  if (event.name === 'resume-fidelity-rated') {
+    return currentFeedback.fidelity === undefined
+      ? { ...currentFeedback, fidelity: event.assessment } : null
+  }
+  return currentFeedback.relevance === undefined
+    ? { ...currentFeedback, relevance: event.assessment } : null
 }
 
 function identifySourceProfileFacts({
@@ -809,6 +939,17 @@ function hasTailoredResume(
   value: ResumeClaimReadyState & { readonly tailoredResume: TailoredResume }
 }> {
   return hasResumeClaimInputs(result) && result.value.tailoredResume !== undefined
+}
+
+function hasOutcomeInputs(
+  result: ResumeTailoringResult<ResumeTailoringView>,
+): result is Readonly<{
+  ok: true
+  value: OutcomeReadyState
+}> {
+  return hasReadyState(result)
+    && result.value.matchAnalysis !== undefined
+    && result.value.tailoredResume !== undefined
 }
 
 function createResumeClaimSource({
