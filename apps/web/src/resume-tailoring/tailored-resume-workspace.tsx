@@ -14,6 +14,7 @@ type ResumeClaimCardProps = WorkspaceProps & Readonly<{
   claimIndex: number
   claims: readonly ResumeClaim[]
 }>
+type ResumeClaimReformulator = Pick<CandidateSessionController, 'reformulateResumeClaim'>
 
 const leadingPunctuationPattern = /^[,.;:!?%…)'\]}’]/u
 
@@ -143,8 +144,12 @@ function ReformulationForm({ candidateSession, claim, localization }: WorkspaceP
   return (
     <form className="reformulation-form" onSubmit={(event) => {
       event.preventDefault()
-      void submitReformulation({ candidateSession, claim, reformulationRequest })
-        .then(() => { setReformulationRequest('') })
+      void submitReformulation({
+        candidateSession,
+        claim,
+        clearRequest: () => { setReformulationRequest('') },
+        reformulationRequest,
+      })
     }}>
         <label htmlFor={`reformulate-${claim.id}`}>
           {localization.translate('resumeClaims.reformulationLabel')}
@@ -160,13 +165,21 @@ function ReformulationForm({ candidateSession, claim, localization }: WorkspaceP
   )
 }
 
-function submitReformulation({ candidateSession, claim, reformulationRequest }: Readonly<{
-  candidateSession: CandidateSessionController
+export async function submitReformulation({
+  candidateSession,
+  claim,
+  clearRequest,
+  reformulationRequest,
+}: Readonly<{
+  candidateSession: ResumeClaimReformulator
   claim: ResumeClaim
+  clearRequest: () => void
   reformulationRequest: string
 }>) {
-  return candidateSession.reformulateResumeClaim({
+  const result = await candidateSession.reformulateResumeClaim({
     claimId: claim.id,
     request: reformulationRequest,
   })
+  if (result.ok) clearRequest()
+  return result
 }

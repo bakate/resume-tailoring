@@ -222,7 +222,9 @@ async function executeCommand({
   command: ResumeTailoringCommand
 }>) {
   const failureMessageKey = readFailureMessageKey(command)
-  applyResult({ result: await workflow.execute(command), setState, failureMessageKey })
+  const result = await workflow.execute(command)
+  applyResult({ result, setState, failureMessageKey })
+  return result
 }
 
 function readFailureMessageKey(command: ResumeTailoringCommand): CandidateSessionFailureMessageKey {
