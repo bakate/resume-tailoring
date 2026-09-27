@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiJobRequirementExtractionRouteImport } from './routes/api.job-requirement-extraction'
 import { Route as ApiMatchAnalysisRouteImport } from './routes/api.match-analysis'
+import { Route as ApiResumeClaimValidationRouteImport } from './routes/api.resume-claim-validation'
+import { Route as ApiResumeClaimWritingRouteImport } from './routes/api.resume-claim-writing'
 import { Route as ApiSourceProfileExtractionRouteImport } from './routes/api.source-profile-extraction'
 
 const IndexRoute = IndexRouteImport.update({
@@ -30,6 +32,17 @@ const ApiMatchAnalysisRoute = ApiMatchAnalysisRouteImport.update({
   path: '/api/match-analysis',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiResumeClaimValidationRoute =
+  ApiResumeClaimValidationRouteImport.update({
+    id: '/api/resume-claim-validation',
+    path: '/api/resume-claim-validation',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiResumeClaimWritingRoute = ApiResumeClaimWritingRouteImport.update({
+  id: '/api/resume-claim-writing',
+  path: '/api/resume-claim-writing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSourceProfileExtractionRoute =
   ApiSourceProfileExtractionRouteImport.update({
     id: '/api/source-profile-extraction',
@@ -41,12 +54,16 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
+  '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
+  '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
+  '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
+  '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
 }
 export interface FileRoutesById {
@@ -54,6 +71,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
+  '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
+  '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
 }
 export interface FileRouteTypes {
@@ -62,18 +81,24 @@ export interface FileRouteTypes {
     | '/'
     | '/api/job-requirement-extraction'
     | '/api/match-analysis'
+    | '/api/resume-claim-validation'
+    | '/api/resume-claim-writing'
     | '/api/source-profile-extraction'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/api/job-requirement-extraction'
     | '/api/match-analysis'
+    | '/api/resume-claim-validation'
+    | '/api/resume-claim-writing'
     | '/api/source-profile-extraction'
   id:
     | '__root__'
     | '/'
     | '/api/job-requirement-extraction'
     | '/api/match-analysis'
+    | '/api/resume-claim-validation'
+    | '/api/resume-claim-writing'
     | '/api/source-profile-extraction'
   fileRoutesById: FileRoutesById
 }
@@ -81,6 +106,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiJobRequirementExtractionRoute: typeof ApiJobRequirementExtractionRoute
   ApiMatchAnalysisRoute: typeof ApiMatchAnalysisRoute
+  ApiResumeClaimValidationRoute: typeof ApiResumeClaimValidationRoute
+  ApiResumeClaimWritingRoute: typeof ApiResumeClaimWritingRoute
   ApiSourceProfileExtractionRoute: typeof ApiSourceProfileExtractionRoute
 }
 
@@ -107,6 +134,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMatchAnalysisRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/resume-claim-validation': {
+      id: '/api/resume-claim-validation'
+      path: '/api/resume-claim-validation'
+      fullPath: '/api/resume-claim-validation'
+      preLoaderRoute: typeof ApiResumeClaimValidationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/resume-claim-writing': {
+      id: '/api/resume-claim-writing'
+      path: '/api/resume-claim-writing'
+      fullPath: '/api/resume-claim-writing'
+      preLoaderRoute: typeof ApiResumeClaimWritingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/source-profile-extraction': {
       id: '/api/source-profile-extraction'
       path: '/api/source-profile-extraction'
@@ -121,6 +162,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiJobRequirementExtractionRoute: ApiJobRequirementExtractionRoute,
   ApiMatchAnalysisRoute: ApiMatchAnalysisRoute,
+  ApiResumeClaimValidationRoute: ApiResumeClaimValidationRoute,
+  ApiResumeClaimWritingRoute: ApiResumeClaimWritingRoute,
   ApiSourceProfileExtractionRoute: ApiSourceProfileExtractionRoute,
 }
 export const routeTree = rootRouteImport

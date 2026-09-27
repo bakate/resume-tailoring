@@ -4,6 +4,7 @@ import type {
   ResumeTailoringState,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { restoreMatchAnalysis as restoreStoredMatchAnalysis } from '@resume-tailoring/application/match-analysis'
+import { restoreTailoredResume as restoreStoredTailoredResume } from '@resume-tailoring/application/resume-claim-restoration'
 
 import {
   sourceProfileReviewSchema,
@@ -11,6 +12,7 @@ import {
 } from './source-profile-schemas'
 import { jobPostingReviewSchema } from './job-requirement-schemas'
 import { storedMatchAnalysisSchema } from './match-analysis-schemas'
+import { storedTailoredResumeSchema } from './resume-claim-schemas'
 
 const databaseName = 'honest-resume'
 const databaseVersion = 1
@@ -190,6 +192,7 @@ function parseCandidateSession(value: unknown): ResumeTailoringState {
     storedJobPosting: result.data.jobPosting,
     storedMatchAnalysis: result.data.matchAnalysis,
     storedSourceProfile: result.data.sourceProfile,
+    storedTailoredResume: result.data.tailoredResume,
   })
 }
 
@@ -198,11 +201,13 @@ function restoreCandidateContent({
   storedJobPosting,
   storedMatchAnalysis,
   storedSourceProfile,
+  storedTailoredResume,
 }: Readonly<{
   readyState: ReadyResumeTailoringState
   storedJobPosting: unknown
   storedMatchAnalysis: unknown
   storedSourceProfile: unknown
+  storedTailoredResume: unknown
 }>): ResumeTailoringState {
   const sourceProfile = sourceProfileReviewSchema.safeParse(storedSourceProfile)
   const jobPosting = jobPostingReviewSchema.safeParse(storedJobPosting)
@@ -211,12 +216,36 @@ function restoreCandidateContent({
     sourceProfile: sourceProfile.success ? sourceProfile.data : undefined,
     storedMatchAnalysis,
   })
+  const tailoredResume = restoreTailoredResume({
+    matchAnalysis,
+    sourceProfile: sourceProfile.success ? sourceProfile.data : undefined,
+    storedTailoredResume,
+  })
   return {
     ...readyState,
     ...(sourceProfile.success ? { sourceProfile: sourceProfile.data } : {}),
     ...(jobPosting.success ? { jobPosting: jobPosting.data } : {}),
     ...(matchAnalysis === null ? {} : { matchAnalysis }),
+    ...(tailoredResume === null ? {} : { tailoredResume }),
   }
+}
+
+function restoreTailoredResume({
+  matchAnalysis,
+  sourceProfile,
+  storedTailoredResume,
+}: Readonly<{
+  matchAnalysis: ReturnType<typeof restoreMatchAnalysis>
+  sourceProfile: ReturnType<typeof sourceProfileReviewSchema.parse> | undefined
+  storedTailoredResume: unknown
+}>) {
+  if (matchAnalysis === null || sourceProfile === undefined) return null
+  const storedResume = storedTailoredResumeSchema.safeParse(storedTailoredResume)
+  if (!storedResume.success) return null
+  return restoreStoredTailoredResume({
+    sourceFacts: sourceProfile.facts,
+    tailoredResume: storedResume.data,
+  })
 }
 
 function restoreMatchAnalysis({ jobPosting, sourceProfile, storedMatchAnalysis }: Readonly<{

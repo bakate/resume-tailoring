@@ -13,6 +13,7 @@ import type {
 import { SourceProfileWorkspace } from './source-profile-workspace'
 import { JobPostingWorkspace } from './job-posting-workspace'
 import { MatchAnalysisWorkspace } from './match-analysis-workspace'
+import { TailoredResumeWorkspace } from './tailored-resume-workspace'
 
 type LocalizationProps = Readonly<{ localization: Localization }>
 type CandidateSessionProps = Readonly<{
@@ -41,6 +42,10 @@ function LocalizedResumeTailoringScreen({ localization }: LocalizationProps) {
         localization={localization}
       />
       <MatchAnalysisWorkspace
+        candidateSession={candidateSession}
+        localization={localization}
+      />
+      <TailoredResumeWorkspace
         candidateSession={candidateSession}
         localization={localization}
       />

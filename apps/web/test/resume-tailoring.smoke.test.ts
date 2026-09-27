@@ -5,6 +5,7 @@ import type { CandidateSessionPersistence } from '@resume-tailoring/application/
 import { jobRequirementExtractionMaximumCharacters } from '../src/resume-tailoring/job-requirement-schemas'
 import { matchAnalysisRequestSchema } from '../src/resume-tailoring/match-analysis-schemas'
 import { sourceProfileExtractionMaximumCharacters } from '../src/resume-tailoring/source-profile-schemas'
+import { resumeClaimWritingRequestSchema } from '../src/resume-tailoring/resume-claim-schemas'
 
 declare global {
   interface Window {
@@ -204,6 +205,33 @@ test('a Candidate sees an evidence-backed Match Score and Gap Analysis', async (
   await system.expectEvidenceBackedMatchScoreAndGapAnalysis()
 })
 
+test('a Candidate generates validated provenance-backed Resume Claims', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+  await system.givenJobRequirementExtractionIsAvailable()
+  await system.givenMatchAnalysisIsAvailable()
+  await system.givenResumeClaimServicesAreAvailable()
+  await system.buildVerifiedSourceProfile()
+  await system.extractRequirementsFromMinimizedJobPosting()
+  await system.analyzeMatch()
+
+  await system.generateResumeClaims()
+
+  await system.expectValidatedResumeClaimsWithoutFreeEditing()
+})
+
+test('a Candidate restores provenance-backed Resume Claims after reload', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenTailoredResumeIsStored()
+
+  await system.reloadTailoredResume()
+
+  await system.expectTailoredResumeToBeRestored()
+})
+
 test('localizes sensitive labels and preserves legitimate French words', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
@@ -260,6 +288,8 @@ type CompletedAction =
   | 'match-analyzed'
   | 'resume-tailoring-opened'
   | 'resume-tailoring-viewed'
+  | 'resume-claims-generated'
+  | 'resume-claims-reloaded'
   | 'source-profile-built'
   | 'source-profile-reloaded'
   | 'unknown-page-opened'
@@ -345,10 +375,52 @@ class ResumeTailoringBrowserTestSystem {
     })
   }
 
+  async givenResumeClaimServicesAreAvailable() {
+    await this.#page.route('**/api/resume-claim-writing', async (route) => {
+      const writingRequest = resumeClaimWritingRequestSchema.safeParse(
+        JSON.parse(route.request().postData() ?? 'null') as unknown,
+      )
+      const [verifiedFact] = writingRequest.success ? writingRequest.data.verifiedFacts : []
+      const claimTexts = [
+        'Built React applications at Acme',
+        'Worked as a FullStack Developer at Acme',
+      ]
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          value: {
+            claims: verifiedFact === undefined ? [] : claimTexts.map((text) => ({
+              segments: [{ text, factIds: [verifiedFact.id] }],
+            })),
+          },
+        }),
+      })
+    })
+    await this.#page.route('**/api/resume-claim-validation', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: true, value: { supported: true, feedback: [] } }),
+      })
+    })
+  }
+
   async givenVerifiedSourceProfile() {
     await this.givenCandidateSessionIsActive()
     await this.givenStructuredExtractionIsAvailable()
     await this.buildVerifiedSourceProfile()
+  }
+
+  async givenTailoredResumeIsStored() {
+    await this.givenCandidateSessionIsActive()
+    await this.givenStructuredExtractionIsAvailable()
+    await this.givenJobRequirementExtractionIsAvailable()
+    await this.givenMatchAnalysisIsAvailable()
+    await this.givenResumeClaimServicesAreAvailable()
+    await this.buildVerifiedSourceProfile()
+    await this.extractRequirementsFromMinimizedJobPosting()
+    await this.analyzeMatch()
+    await this.generateResumeClaims()
   }
 
   async givenBrowserPrefersLanguages({ languages }: Readonly<{ languages: readonly string[] }>) {
@@ -490,6 +562,11 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'source-profile-reloaded'
   }
 
+  async reloadTailoredResume() {
+    await this.#page.reload()
+    this.#completedAction = 'resume-claims-reloaded'
+  }
+
   async extractRequirementsFromMinimizedJobPosting() {
     await this.#page.getByLabel('Paste the Job Posting').fill(
       `${jobPostingExcerpt}\nContact jobs@example.com\nSalary: competitive`,
@@ -521,6 +598,12 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'match-analyzed'
   }
 
+  async generateResumeClaims() {
+    await this.#page.getByRole('button', { name: 'Generate Resume Claims' }).click()
+    await this.#page.getByText('Built React applications at Acme', { exact: true }).waitFor()
+    this.#completedAction = 'resume-claims-generated'
+  }
+
   async expectResumeTailoringSessionToBeStoredInIndexedDb() {
     this.#expectCompletedAction('resume-tailoring-opened')
     await expect(this.#page.getByText('Workflow opened')).toBeVisible()
@@ -533,7 +616,7 @@ class ResumeTailoringBrowserTestSystem {
   async expectResumeTailoringSessionToBeReady() {
     this.#expectCompletedAction('candidate-session-reloaded')
     await expect(this.#page.getByText('Workflow opened')).toBeVisible()
-    await expect(this.#page.getByRole('button', { name: 'Start tailoring' })).toBeDisabled()
+    await expect(this.#page.getByRole('button', { name: 'Delete private session' })).toBeVisible()
   }
 
   async expectResumeTailoringSessionDeletedInBothTabs({ secondPage }: Readonly<{ secondPage: Page }>) {
@@ -611,8 +694,8 @@ class ResumeTailoringBrowserTestSystem {
     await this.expectResumeTailoringToBeInFrench()
     await expect(this.#page.getByText('Parcours ouvert')).toBeVisible()
     await expect(
-      this.#page.getByRole('button', { name: 'Commencer à adapter mon CV' }),
-    ).toBeDisabled()
+      this.#page.getByRole('button', { name: 'Supprimer ma session privée' }),
+    ).toBeVisible()
     expect(await this.#page.evaluate(() => localStorage.getItem('honest-resume-locale'))).toBe('fr')
   }
 
@@ -655,6 +738,31 @@ class ResumeTailoringBrowserTestSystem {
       name: 'Uncovered required Job Requirements',
     })).toBeVisible()
     await expect(this.#page.getByText('Know TypeScript', { exact: true }).last()).toBeVisible()
+  }
+
+  async expectValidatedResumeClaimsWithoutFreeEditing() {
+    this.#expectCompletedAction('resume-claims-generated')
+    await expect(this.#page.getByText(
+      'Built React applications at Acme',
+      { exact: true },
+    )).toBeVisible()
+    await expect(this.#page.getByText(
+      'Worked as a FullStack Developer at Acme',
+      { exact: true },
+    )).toBeVisible()
+    await expect(this.#page.getByText(/Claims cannot be edited directly/).first()).toBeVisible()
+  }
+
+  async expectTailoredResumeToBeRestored() {
+    this.#expectCompletedAction('resume-claims-reloaded')
+    await expect(this.#page.getByText(
+      'Built React applications at Acme',
+      { exact: true },
+    )).toBeVisible()
+    await expect(this.#page.getByText(
+      'Worked as a FullStack Developer at Acme',
+      { exact: true },
+    )).toBeVisible()
   }
 
   async expectFrenchSensitiveLabelAndIntactJobPosting() {

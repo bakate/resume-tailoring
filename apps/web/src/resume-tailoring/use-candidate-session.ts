@@ -4,7 +4,10 @@ import type {
   ResumeTailoringView,
   ResumeTailoringWorkflow,
 } from '@resume-tailoring/application/resume-tailoring-workflow'
-import type { SourceProfileFactId } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type {
+  ResumeClaimId,
+  SourceProfileFactId,
+} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { createResumeTailoringWorkflow } from '@resume-tailoring/application/resume-tailoring-workflow-composition'
 import { useEffect, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -17,6 +20,9 @@ import {
   createBrowserJobRequirementGroupIdentity,
   createBrowserJobRequirementIdentity,
   createBrowserMatchEvidenceMatcher,
+  createBrowserResumeClaimIdentity,
+  createBrowserResumeClaimSemanticValidator,
+  createBrowserResumeClaimWriter,
   createBrowserSourceDocumentReader,
   createBrowserSourceProfileFactIdentity,
   createBrowserSourceProfileExtractor,
@@ -42,6 +48,7 @@ export type CandidateSessionFailureMessageKey =
   | 'jobPosting.transportFailure'
   | 'matchAnalysis.failure'
   | 'matchAnalysis.transportFailure'
+  | 'resumeClaims.failure'
 
 type CandidateSessionStateSetter = Dispatch<SetStateAction<CandidateSessionState>>
 type CandidateSessionActionDependencies = Readonly<{
@@ -65,6 +72,7 @@ export function useCandidateSession() {
     ...createSourceProfileFactActions({ workflow, setState }),
     ...createJobPostingActions({ workflow, setState }),
     ...createMatchAnalysisActions({ workflow, setState }),
+    ...createResumeClaimActions({ workflow, setState }),
   }
 }
 
@@ -134,6 +142,26 @@ function createMatchAnalysisActions({ workflow, setState }: CandidateSessionActi
   }
 }
 
+function createResumeClaimActions({ workflow, setState }: CandidateSessionActionDependencies) {
+  const execute = (command: ResumeTailoringCommand) => executeCommand({ workflow, setState, command })
+  return {
+    generateResumeClaims: () => execute({ type: 'generate-resume-claims' }),
+    removeResumeClaim: ({ claimId }: Readonly<{ claimId: ResumeClaimId }>) => execute({
+      type: 'remove-resume-claim', claimId,
+    }),
+    moveResumeClaim: ({ claimId, direction }: Readonly<{
+      claimId: ResumeClaimId
+      direction: 'up' | 'down'
+    }>) => execute({
+      type: 'move-resume-claim', claimId, direction,
+    }),
+    reformulateResumeClaim: ({ claimId, request }: Readonly<{
+      claimId: ResumeClaimId
+      request: string
+    }>) => execute({ type: 'reformulate-resume-claim', claimId, request }),
+  }
+}
+
 export type CandidateSessionController = ReturnType<typeof useCandidateSession>
 
 function createBrowserResumeTailoringWorkflow() {
@@ -145,6 +173,9 @@ function createBrowserResumeTailoringWorkflow() {
     jobRequirementGroupIdentity: createBrowserJobRequirementGroupIdentity(),
     jobRequirementIdentity: createBrowserJobRequirementIdentity(),
     matchEvidenceMatcher: createBrowserMatchEvidenceMatcher(),
+    resumeClaimIdentity: createBrowserResumeClaimIdentity(),
+    resumeClaimSemanticValidator: createBrowserResumeClaimSemanticValidator(),
+    resumeClaimWriter: createBrowserResumeClaimWriter(),
     sourceDocumentReader: createBrowserSourceDocumentReader(),
     sourceProfileFactIdentity: createBrowserSourceProfileFactIdentity(),
     sourceProfileExtractor: createBrowserSourceProfileExtractor(),
@@ -191,7 +222,9 @@ async function executeCommand({
   command: ResumeTailoringCommand
 }>) {
   const failureMessageKey = readFailureMessageKey(command)
-  applyResult({ result: await workflow.execute(command), setState, failureMessageKey })
+  const result = await workflow.execute(command)
+  applyResult({ result, setState, failureMessageKey })
+  return result
 }
 
 function readFailureMessageKey(command: ResumeTailoringCommand): CandidateSessionFailureMessageKey {
@@ -199,7 +232,15 @@ function readFailureMessageKey(command: ResumeTailoringCommand): CandidateSessio
   if (command.type === 'delete-session') return 'session.deleteFailure'
   if (isJobPostingCommand(command)) return 'jobPosting.failure'
   if (command.type === 'analyze-match') return 'matchAnalysis.failure'
+  if (isResumeClaimCommand(command)) return 'resumeClaims.failure'
   return 'sourceProfile.failure'
+}
+
+function isResumeClaimCommand(command: ResumeTailoringCommand) {
+  return command.type === 'generate-resume-claims'
+    || command.type === 'remove-resume-claim'
+    || command.type === 'move-resume-claim'
+    || command.type === 'reformulate-resume-claim'
 }
 
 function isJobPostingCommand(command: ResumeTailoringCommand) {

@@ -2,9 +2,11 @@ import type {
   CandidateSessionId,
   JobPostingReview,
   MatchAnalysis,
+  ResumeClaimId,
   SourceProfileFact,
   SourceProfileFactId,
   SourceProfileReview,
+  TailoredResume,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export type SourceDocument = Readonly<{
@@ -57,6 +59,18 @@ export type ResumeTailoringCommand =
   | { readonly type: 'confirm-job-posting-processing-notice' }
   | { readonly type: 'extract-job-requirements' }
   | { readonly type: 'analyze-match' }
+  | { readonly type: 'generate-resume-claims' }
+  | { readonly type: 'remove-resume-claim'; readonly claimId: ResumeClaimId }
+  | {
+      readonly type: 'move-resume-claim'
+      readonly claimId: ResumeClaimId
+      readonly direction: 'up' | 'down'
+    }
+  | {
+      readonly type: 'reformulate-resume-claim'
+      readonly claimId: ResumeClaimId
+      readonly request: string
+    }
 
 export type ResumeTailoringView =
   | { readonly status: 'not-started' }
@@ -67,6 +81,7 @@ export type ResumeTailoringView =
       readonly sourceProfile?: SourceProfileReview
       readonly jobPosting?: JobPostingReview
       readonly matchAnalysis?: MatchAnalysis
+      readonly tailoredResume?: TailoredResume
     }
 
 export type ResumeTailoringFailure =
@@ -82,6 +97,9 @@ export type ResumeTailoringFailure =
   | { readonly type: 'job-requirement-transport-unavailable' }
   | { readonly type: 'match-analysis-unavailable' }
   | { readonly type: 'match-analysis-transport-unavailable' }
+  | { readonly type: 'resume-claim-writing-unavailable' }
+  | { readonly type: 'resume-claim-validation-unavailable' }
+  | { readonly type: 'resume-claim-unavailable' }
 
 export type ResumeTailoringResult<TValue> =
   | { readonly ok: true; readonly value: TValue }

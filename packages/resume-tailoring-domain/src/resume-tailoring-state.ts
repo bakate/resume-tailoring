@@ -3,6 +3,7 @@ export type SourceProfileFactId = `source-fact-${string}`
 export type SourceProfilePropositionKey = `proposition-${string}`
 export type JobRequirementId = `job-requirement-${string}`
 export type JobRequirementGroupId = `job-requirement-group-${string}`
+export type ResumeClaimId = `resume-claim-${string}`
 
 export const sensitiveContentKinds = [
   'email',
@@ -106,6 +107,23 @@ export type MatchAnalysis = Readonly<{
   warning: 'below-generation-threshold' | null
 }>
 
+export type ResumeClaimSegment = Readonly<{
+  text: string
+  factIds: readonly SourceProfileFactId[]
+}>
+
+export type ResumeClaim = Readonly<{
+  id: ResumeClaimId
+  segments: readonly ResumeClaimSegment[]
+}>
+
+export type TailoredResume = Readonly<{
+  claims: readonly ResumeClaim[]
+  exclusions: readonly Readonly<{
+    reason: 'unsupported-after-regeneration'
+  }>[]
+}>
+
 export type JobPostingReview = Readonly<{
   status: 'reviewing-posting' | 'reviewing-requirements'
   detectedSensitiveContent: readonly SensitiveContent[]
@@ -129,6 +147,7 @@ export type ResumeTailoringState =
       readonly sourceProfile?: SourceProfileReview
       readonly jobPosting?: JobPostingReview
       readonly matchAnalysis?: MatchAnalysis
+      readonly tailoredResume?: TailoredResume
     }
 
 export type DomainResult<TValue, TError> =

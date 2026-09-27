@@ -417,18 +417,87 @@ h1 {
 
 .source-profile-workspace,
 .job-posting-workspace,
-.match-analysis-workspace {
+.match-analysis-workspace,
+.tailored-resume-workspace {
   padding: 72px 0;
   border-bottom: 1px solid #dfe1df;
 }
 
 .source-profile-workspace > h2,
 .job-posting-workspace > h2,
-.match-analysis-workspace > h2 {
+.match-analysis-workspace > h2,
+.tailored-resume-workspace > h2 {
   margin: 0 0 30px;
   font-family: 'DM Serif Display', Georgia, serif;
   font-size: clamp(36px, 4vw, 54px);
   font-weight: 400;
+}
+
+.resume-claim-list {
+  display: grid;
+  gap: 20px;
+}
+
+.resume-claim-card {
+  background: #ffffff;
+}
+
+.resume-claim-text {
+  margin: 0;
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: clamp(22px, 2.4vw, 32px);
+  line-height: 1.35;
+}
+
+.resume-claim-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.resume-claim-actions button,
+.reformulation-form button {
+  padding: 9px 14px;
+  border: 1px solid #164f3d;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #164f3d;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.resume-claim-actions button:disabled,
+.reformulation-form button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.reformulation-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.reformulation-form label {
+  grid-column: 1 / -1;
+  font-weight: 600;
+}
+
+.reformulation-form input {
+  min-width: 0;
+  padding: 11px 13px;
+  border: 1px solid #b8bdc4;
+  border-radius: 3px;
+  font: inherit;
+}
+
+.claim-editing-note {
+  margin: 14px 0 0;
+  color: #656b77;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .match-analysis-grid {

@@ -8,6 +8,8 @@ import type {
   JobRequirementContent,
   JobRequirement,
   SourceProfileFact,
+  ResumeClaim,
+  ResumeClaimId,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export {
@@ -39,6 +41,10 @@ export type {
   MatchAnalysis,
   MatchEvidence,
   MatchScore,
+  ResumeClaim,
+  ResumeClaimId,
+  ResumeClaimSegment,
+  TailoredResume,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export type AdapterFailure = {
@@ -171,4 +177,91 @@ export type ProposedMatchAnalysis = Readonly<{
 export type MatchInputs = Readonly<{
   requirements: readonly Pick<JobRequirement, 'classification' | 'id' | 'value'>[]
   verifiedFacts: readonly Pick<SourceProfileFact, 'id' | 'kind' | 'value'>[]
+}>
+
+export type ProposedResumeClaim = Readonly<{
+  segments: readonly Readonly<{
+    text: string
+    factIds: readonly SourceProfileFactId[]
+  }>[]
+}>
+
+export const resumeClaimContractLimits = {
+  claimCount: 100,
+  factCount: 500,
+  referenceCount: 20,
+  segmentCount: 20,
+  textLength: 500,
+} as const
+
+export const resumeClaimSemanticValidationFeedbackCodes = [
+  'inexact-fact-reference',
+  'unsupported-meaning',
+  'strengthened-autonomy',
+  'strengthened-causality',
+  'strengthened-duration',
+  'strengthened-frequency',
+  'strengthened-outcome',
+  'strengthened-quantity',
+  'strengthened-scope',
+  'strengthened-seniority',
+] as const
+
+export const resumeClaimValidationFeedbackCodes = [
+  'invalid-fact-reference',
+  'missing-segment-provenance',
+  'unsupported-number-or-date',
+  ...resumeClaimSemanticValidationFeedbackCodes,
+] as const
+
+export type ResumeClaimValidationFeedbackCode =
+  (typeof resumeClaimValidationFeedbackCodes)[number]
+
+export type ResumeClaimValidationFeedback = Readonly<{
+  code: ResumeClaimValidationFeedbackCode
+  segmentIndex?: number
+}>
+
+export type ResumeClaimWritingInputs = Readonly<{
+  evidence: readonly Readonly<{
+    requirementId: JobRequirementId
+    factIds: readonly SourceProfileFactId[]
+  }>[]
+  requirements: readonly Pick<JobRequirement, 'classification' | 'id' | 'value'>[]
+  verifiedFacts: readonly Pick<SourceProfileFact, 'id' | 'kind' | 'value'>[]
+}>
+
+export type ResumeClaimWriter = Readonly<{
+  write: (request: ResumeClaimWritingInputs) => Promise<
+    | { readonly ok: true; readonly value: readonly ProposedResumeClaim[] }
+    | { readonly ok: false; readonly error: { readonly type: 'resume-claim-writing-unavailable' } }
+  >
+  reformulate: (request: ResumeClaimWritingInputs & Readonly<{
+    claim: ProposedResumeClaim
+    feedback: readonly ResumeClaimValidationFeedback[]
+    request?: string
+  }>) => Promise<
+    | { readonly ok: true; readonly value: ProposedResumeClaim }
+    | { readonly ok: false; readonly error: { readonly type: 'resume-claim-writing-unavailable' } }
+  >
+}>
+
+export type ResumeClaimSemanticValidator = Readonly<{
+  validate: (request: Readonly<{
+    claim: ResumeClaim
+    verifiedFacts: ResumeClaimWritingInputs['verifiedFacts']
+  }>) => Promise<
+    | {
+        readonly ok: true
+        readonly value: Readonly<{
+          supported: boolean
+          feedback: readonly ResumeClaimValidationFeedback[]
+        }>
+      }
+    | { readonly ok: false; readonly error: { readonly type: 'resume-claim-validation-unavailable' } }
+  >
+}>
+
+export type ResumeClaimIdentity = Readonly<{
+  create: () => AdapterResult<ResumeClaimId>
 }>
