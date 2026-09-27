@@ -4,22 +4,25 @@ import type {
 import { sourceProfileFactKinds } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { z } from 'zod'
 
+import type { OpenAiReasoningEffort } from '../openai-model-configuration'
 import { extractedSourceProfileFactsSchema } from './source-profile-schemas'
 
 type OpenAiExtractorDependencies = Readonly<{
   apiKey: string
   model: string
+  reasoningEffort: OpenAiReasoningEffort
   request?: typeof fetch
 }>
 
 export function createOpenAiSourceProfileExtractor({
   apiKey,
   model,
+  reasoningEffort,
   request = fetch,
 }: OpenAiExtractorDependencies): SourceProfileExtractor {
   return {
     extract: ({ professionalContent }) => requestSourceProfileExtraction({
-      apiKey, model, professionalContent, request,
+      apiKey, model, professionalContent, reasoningEffort, request,
     }),
   }
 }
@@ -27,12 +30,12 @@ export function createOpenAiSourceProfileExtractor({
 type ExtractionRequest = OpenAiExtractorDependencies & Readonly<{ professionalContent: string }>
 
 async function requestSourceProfileExtraction(requestDetails: ExtractionRequest) {
-  const { apiKey, model, professionalContent, request = fetch } = requestDetails
+  const { apiKey, model, professionalContent, reasoningEffort, request = fetch } = requestDetails
   try {
     const response = await request('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: createHeaders({ apiKey }),
-      body: JSON.stringify(createRequestBody({ model, professionalContent })),
+      body: JSON.stringify(createRequestBody({ model, professionalContent, reasoningEffort })),
       signal: AbortSignal.timeout(sourceProfileExtractionTimeoutMilliseconds),
     })
     return response.ok ? parseOpenAiResponse({ value: await response.json() }) : unavailableResult
@@ -51,9 +54,15 @@ function createHeaders({ apiKey }: Readonly<{ apiKey: string }>) {
 function createRequestBody({
   model,
   professionalContent,
-}: Readonly<{ model: string; professionalContent: string }>) {
+  reasoningEffort,
+}: Readonly<{
+  model: string
+  professionalContent: string
+  reasoningEffort: OpenAiExtractorDependencies['reasoningEffort']
+}>) {
   return {
     model,
+    reasoning: { effort: reasoningEffort },
     store: false,
     input: createExtractionInput({ professionalContent }),
     text: { format: sourceProfileResponseFormat },

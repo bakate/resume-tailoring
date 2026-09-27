@@ -7,6 +7,7 @@ import {
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { z } from 'zod'
 
+import type { OpenAiReasoningEffort } from '../openai-model-configuration'
 import {
   extractedJobRequirementsSchema,
   hasOnlyJobPostingSourceExcerpts,
@@ -17,17 +18,19 @@ import {
 type OpenAiExtractorDependencies = Readonly<{
   apiKey: string
   model: string
+  reasoningEffort: OpenAiReasoningEffort
   request?: typeof fetch
 }>
 
 export function createOpenAiJobRequirementExtractor({
   apiKey,
   model,
+  reasoningEffort,
   request = fetch,
 }: OpenAiExtractorDependencies): JobRequirementExtractor {
   return {
     extract: ({ jobPostingContent }) => requestJobRequirementExtraction({
-      apiKey, jobPostingContent, model, request,
+      apiKey, jobPostingContent, model, reasoningEffort, request,
     }),
   }
 }
@@ -35,12 +38,12 @@ export function createOpenAiJobRequirementExtractor({
 type ExtractionRequest = OpenAiExtractorDependencies & Readonly<{ jobPostingContent: string }>
 
 async function requestJobRequirementExtraction(requestDetails: ExtractionRequest) {
-  const { apiKey, jobPostingContent, model, request = fetch } = requestDetails
+  const { apiKey, jobPostingContent, model, reasoningEffort, request = fetch } = requestDetails
   try {
     const response = await request('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: createHeaders({ apiKey }),
-      body: JSON.stringify(createRequestBody({ jobPostingContent, model })),
+      body: JSON.stringify(createRequestBody({ jobPostingContent, model, reasoningEffort })),
       signal: AbortSignal.timeout(jobRequirementExtractionTimeoutMilliseconds),
     })
     if (!response.ok) return extractionUnavailableResult
@@ -57,9 +60,15 @@ function createHeaders({ apiKey }: Readonly<{ apiKey: string }>) {
 function createRequestBody({
   jobPostingContent,
   model,
-}: Readonly<{ jobPostingContent: string; model: string }>) {
+  reasoningEffort,
+}: Readonly<{
+  jobPostingContent: string
+  model: string
+  reasoningEffort: OpenAiExtractorDependencies['reasoningEffort']
+}>) {
   return {
     model,
+    reasoning: { effort: reasoningEffort },
     store: false,
     input: createExtractionInput({ jobPostingContent }),
     text: { format: jobRequirementResponseFormat },
