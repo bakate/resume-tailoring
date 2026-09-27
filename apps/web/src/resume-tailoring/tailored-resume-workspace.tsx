@@ -21,7 +21,7 @@ type ResumeClaimReformulator = Pick<CandidateSessionController, 'reformulateResu
 export function formatResumeClaimText({ segments }: Readonly<{
   segments: ResumeClaim['segments']
 }>) {
-  return formatClaim({ claim: { id: 'resume-claim-preview', segments } })
+  return formatClaim({ segments })
 }
 
 export function TailoredResumeWorkspace({ candidateSession, localization }: WorkspaceProps) {

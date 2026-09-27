@@ -2,6 +2,10 @@ import { assert, describe, expect, it } from 'vitest'
 
 import {
   prepareTailoredResumeDocument,
+  prepareValidatedTailoredResumeDocument,
+} from '@resume-tailoring/application/tailored-resume-document'
+import type {
+  TailoredResumeLayoutMeasurer,
 } from '@resume-tailoring/application/tailored-resume-document'
 import type {
   JobRequirement,
@@ -11,30 +15,38 @@ import type {
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 
 describe('Tailored Resume document', () => {
-  it('preserves every validated Resume Claim verbatim when the page budget allows it', () => {
+  it('preserves every validated Resume Claim verbatim when the page budget allows it', async () => {
     const system = createSystemUnderTest()
 
-    system.prepareTailoredResumeDocument()
+    await system.prepareTailoredResumeDocument()
 
     system.expectEveryResumeClaimToBeRetainedVerbatim()
   })
 
-  it('reduces overflowing content in the required, impact, preferred, detail order', () => {
+  it('reduces overflowing content in the required, impact, preferred, detail order', async () => {
     const system = createSystemUnderTest()
 
     system.givenResumeClaimsExceedOnePage()
-    system.prepareTailoredResumeDocument()
+    await system.prepareTailoredResumeDocument()
 
     system.expectHigherPriorityClaimsToBeRetainedFirst()
   })
 
-  it('never silently removes required coverage when required claims exceed one page', () => {
+  it('never silently removes required coverage when required claims exceed one page', async () => {
     const system = createSystemUnderTest()
 
     system.givenRequiredResumeClaimsExceedOnePage()
-    system.prepareTailoredResumeDocument()
+    await system.prepareTailoredResumeDocument()
 
-    system.expectEveryRequiredClaimToBeRetainedForExplicitOverflowValidation()
+    system.expectRequiredContentOverflowFailure()
+  })
+
+  it('rejects semantically unsupported retained claims through the document interface', async () => {
+    const system = createSystemUnderTest()
+
+    await system.prepareSemanticallyUnsupportedDocument()
+
+    system.expectInvalidProvenanceFailure()
   })
 })
 
@@ -44,52 +56,90 @@ function createSystemUnderTest() {
 
 class TailoredResumeDocumentTestSystem {
   #claims: readonly ResumeClaim[] = defaultClaims
-  #document: ReturnType<typeof prepareTailoredResumeDocument> | undefined
+  #maximumItemCount = Number.POSITIVE_INFINITY
+  #document: Awaited<ReturnType<typeof prepareTailoredResumeDocument>> | undefined
 
   givenResumeClaimsExceedOnePage() {
     this.#claims = overflowingClaims
+    this.#maximumItemCount = 2
   }
 
   givenRequiredResumeClaimsExceedOnePage() {
     this.#claims = overflowingRequiredClaims
+    this.#maximumItemCount = 3
   }
 
-  prepareTailoredResumeDocument() {
-    this.#document = prepareTailoredResumeDocument({
-      claims: this.#claims,
-      facts: verifiedFacts,
-      matchAnalysis,
-      requirements,
+  async prepareTailoredResumeDocument() {
+    this.#document = await prepareTailoredResumeDocument({
+      inputs: this.#createInputs(), layoutMeasurer: this.#createLayoutMeasurer(),
     })
   }
 
+  async prepareSemanticallyUnsupportedDocument() {
+    this.#document = await prepareValidatedTailoredResumeDocument({
+      inputs: this.#createInputs(),
+      layoutMeasurer: this.#createLayoutMeasurer(),
+      semanticValidator: {
+        validate: () => Promise.resolve({
+          ok: true,
+          value: { supported: false, feedback: [{ code: 'unsupported-meaning' }] },
+        } as const),
+      },
+    })
+  }
+
+  #createInputs() {
+    return {
+      claims: this.#claims,
+      evidence: matchAnalysis.evidence,
+      requirements,
+      verifiedFacts,
+    }
+  }
+
+  #createLayoutMeasurer(): TailoredResumeLayoutMeasurer {
+    return {
+      fits: ({ document }) => Promise.resolve({
+        ok: true, value: document.items.length <= this.#maximumItemCount,
+      } as const),
+    }
+  }
+
   expectEveryResumeClaimToBeRetainedVerbatim() {
-    expect(this.#readDocument().items.map(({ text }) => text)).toEqual([
+    expect(this.#readDocument().value.items.map(({ text }) => text)).toEqual([
       'Delivered 30% faster releases',
       'Used TypeScript',
     ])
-    expect(this.#readDocument().omittedClaimCount).toBe(0)
+    expect(this.#readDocument().value.omittedClaimCount).toBe(0)
   }
 
   expectHigherPriorityClaimsToBeRetainedFirst() {
-    const document = this.#readDocument()
+    const document = this.#readDocument().value
     expect(document.items.map(({ claimId }) => claimId)).toEqual([
-      'resume-claim-preferred',
       'resume-claim-impact',
       'resume-claim-required',
     ])
-    expect(document.omittedClaimCount).toBe(1)
+    expect(document.omittedClaimCount).toBe(2)
   }
 
-  expectEveryRequiredClaimToBeRetainedForExplicitOverflowValidation() {
-    expect(this.#readDocument().items).toHaveLength(4)
-    expect(this.#readDocument().omittedClaimCount).toBe(0)
+  expectRequiredContentOverflowFailure() {
+    expect(this.#document).toEqual({
+      ok: false,
+      error: { type: 'tailored-resume-required-content-overflow' },
+    })
+  }
+
+  expectInvalidProvenanceFailure() {
+    expect(this.#document).toEqual({
+      ok: false,
+      error: { type: 'tailored-resume-provenance-invalid' },
+    })
   }
 
   #readDocument() {
     expect(this.#document, 'Expected the Tailored Resume document to be prepared').toBeDefined()
     assert(this.#document !== undefined)
-    assert(this.#document !== null)
+    assert(this.#document.ok)
     return this.#document
   }
 }

@@ -1,8 +1,10 @@
 import { prepareTailoredResumeDocument } from '@resume-tailoring/application/tailored-resume-document'
-import { useState } from 'react'
+import type { TailoredResumeDocument } from '@resume-tailoring/application/tailored-resume-document'
+import { useEffect, useState } from 'react'
 import type { ChangeEvent } from 'react'
 
 import type { Localization } from '../localization/localization'
+import { createBrowserLayoutMeasurer } from './tailored-resume-browser-layout'
 import { exportTailoredResumePdf } from './tailored-resume-export'
 import { renderTailoredResumeHtml } from './tailored-resume-html'
 import type { ResumeContactItem } from './tailored-resume-html'
@@ -19,12 +21,35 @@ type PhotoState =
 type ExportState =
   | Readonly<{ status: 'idle' | 'exporting' | 'downloaded' }>
   | Readonly<{ status: 'failed'; failureType: BrowserResumePdfFailureType }>
+type PreviewState =
+  | Readonly<{ status: 'preparing' }>
+  | Readonly<{ status: 'failed' }>
+  | Readonly<{ status: 'ready'; value: PreparedPreview }>
+type PreparedPreview = NonNullable<Awaited<ReturnType<typeof preparePreview>>>
 
 export function TailoredResumePreview({ candidateSession, localization }: PreviewProps) {
   const [photo, setPhoto] = useState<PhotoState>({ status: 'empty' })
   const [exportState, setExportState] = useState<ExportState>({ status: 'idle' })
-  const preview = preparePreview({ candidateSession, localization, photo })
-  if (preview === null) return <p role="alert">{localization.translate('resumePreview.invalid')}</p>
+  const [previewState, setPreviewState] = useState<PreviewState>({ status: 'preparing' })
+  useEffect(() => {
+    const abortController = new AbortController()
+    setPreviewState({ status: 'preparing' })
+    void preparePreview({ locale: localization.locale, photo, view: candidateSession.view })
+      .then((preview) => {
+        if (abortController.signal.aborted) return
+        setPreviewState(preview === null
+          ? { status: 'failed' }
+          : { status: 'ready', value: preview })
+      })
+    return () => { abortController.abort() }
+  }, [candidateSession.view, localization.locale, photo])
+  if (previewState.status === 'preparing') {
+    return <p role="status">{localization.translate('resumePreview.preparing')}</p>
+  }
+  if (previewState.status === 'failed') {
+    return <p role="alert">{localization.translate('resumePreview.invalid')}</p>
+  }
+  const preview = previewState.value
   return (
     <section className="resume-preview-panel" aria-labelledby="resume-preview-title">
       <ResumePreviewHeader localization={localization} omittedClaimCount={preview.omittedClaimCount} />
@@ -40,51 +65,66 @@ export function TailoredResumePreview({ candidateSession, localization }: Previe
   )
 }
 
-function preparePreview({ candidateSession, localization, photo }: PreviewProps & Readonly<{
+async function preparePreview({ locale, photo, view }: Readonly<{
+  locale: Localization['locale']
   photo: PhotoState
+  view: CandidateSessionController['view']
 }>) {
-  const source = readPreviewSource({ candidateSession })
-  if (source === null) return null
-  const document = prepareTailoredResumeDocument(source)
-  if (document === null || document.items.length === 0) return null
-  return createPreview({ document, localization, photo, source })
+  const previewSource = readPreviewSource({ view })
+  if (previewSource === null) return null
+  const photoDataUrl = photo.status === 'included' ? photo.dataUrl : undefined
+  const presentation = createPresentation({ locale, photoDataUrl, previewSource })
+  const layoutMeasurer = createBrowserLayoutMeasurer({ presentation })
+  const result = await prepareTailoredResumeDocument({
+    inputs: previewSource.source, layoutMeasurer,
+  })
+  if (!result.ok || result.value.items.length === 0) return null
+  return createPreview({ document: result.value, presentation, previewSource })
 }
 
-function readPreviewSource({ candidateSession }: Readonly<{
-  candidateSession: CandidateSessionController
-}>) {
-  const { view } = candidateSession
+function readPreviewSource({ view }: Readonly<{ view: CandidateSessionController['view'] }>) {
   if (view.status !== 'ready' || view.sourceProfile === undefined
     || view.jobPosting === undefined || view.matchAnalysis === undefined
     || view.tailoredResume === undefined) return null
   return {
-    claims: view.tailoredResume.claims, facts: view.sourceProfile.facts,
-    matchAnalysis: view.matchAnalysis, requirements: view.jobPosting.requirements,
-    sourceProfile: view.sourceProfile,
+    contactItems: readContactItems({ sourceProfile: view.sourceProfile }),
+    source: {
+      claims: view.tailoredResume.claims,
+      evidence: view.matchAnalysis.evidence,
+      requirements: view.jobPosting.requirements.map(({ classification, id }) => ({
+        classification, id,
+      })),
+      verifiedFacts: view.sourceProfile.facts
+        .filter(({ status }) => status === 'verified')
+        .map(({ id, kind, value }) => ({ id, kind, value })),
+    },
   }
 }
 
-function createPreview({ document, localization, photo, source }: Readonly<{
-  document: NonNullable<ReturnType<typeof prepareTailoredResumeDocument>>
-  localization: Localization
-  photo: PhotoState
-  source: NonNullable<ReturnType<typeof readPreviewSource>>
+function createPresentation({ locale, photoDataUrl, previewSource }: Readonly<{
+  locale: Localization['locale']
+  photoDataUrl?: string
+  previewSource: NonNullable<ReturnType<typeof readPreviewSource>>
 }>) {
-  const contactItems = readContactItems({ sourceProfile: source.sourceProfile })
-  const photoDataUrl = photo.status === 'included' ? photo.dataUrl : undefined
-  const retainedFactIds = new Set(document.items.flatMap(({ factIds }) => factIds))
-  const verifiedFacts = source.facts
-    .filter(({ id, status }) => status === 'verified' && retainedFactIds.has(id))
-    .map(({ id, kind, value }) => ({ id, kind, value }))
   return {
-    contactItems,
-    document,
-    html: renderTailoredResumeHtml({ contactItems, document, locale: localization.locale, photoDataUrl }),
-    locale: localization.locale,
-    omittedClaimCount: document.omittedClaimCount,
-    validatedClaims: source.claims,
-    verifiedFacts,
+    contactItems: previewSource.contactItems,
+    locale,
     ...(photoDataUrl === undefined ? {} : { photoDataUrl }),
+  }
+}
+
+function createPreview({ document, presentation, previewSource }: Readonly<{
+  document: TailoredResumeDocument
+  presentation: ReturnType<typeof createPresentation>
+  previewSource: NonNullable<ReturnType<typeof readPreviewSource>>
+}>) {
+  return {
+    exportInputs: {
+      ...presentation,
+      source: previewSource.source,
+    },
+    html: renderTailoredResumeHtml({ ...presentation, document }),
+    omittedClaimCount: document.omittedClaimCount,
   }
 }
 
@@ -228,11 +268,11 @@ function changePhotoInclusion({ photo, status }: Readonly<{
 }
 
 async function exportPreview({ preview, setExportState }: Readonly<{
-  preview: NonNullable<ReturnType<typeof preparePreview>>
+  preview: PreparedPreview
   setExportState: (state: ExportState) => void
 }>) {
   setExportState({ status: 'exporting' })
-  const result = await exportTailoredResumePdf({ inputs: preview })
+  const result = await exportTailoredResumePdf({ inputs: preview.exportInputs })
   if (!result.ok) {
     setExportState({ status: 'failed', failureType: result.error.type })
     return

@@ -809,6 +809,7 @@ class ResumeTailoringBrowserTestSystem {
       'Worked as a FullStack Developer at Acme',
     ])
     expect(hasResumePdfPhoto(this.#resumePdfRequest)).toBe(false)
+    expect(hasCallerDerivedDocument(this.#resumePdfRequest)).toBe(false)
   }
 
   async expectFrenchSensitiveLabelAndIntactJobPosting() {
@@ -961,15 +962,22 @@ function readMatchRequest(requestBody: string | null) {
 }
 
 function readResumePdfClaimTexts(value: unknown) {
-  if (!isRecord(value) || !isRecord(value.document) || !Array.isArray(value.document.items)) {
+  if (!isRecord(value) || !isRecord(value.source) || !Array.isArray(value.source.claims)) {
     return []
   }
-  return value.document.items.flatMap((item) =>
-    isRecord(item) && typeof item.text === 'string' ? [item.text] : [])
+  return value.source.claims.flatMap((claim) => {
+    if (!isRecord(claim) || !Array.isArray(claim.segments)) return []
+    return claim.segments.flatMap((segment) =>
+      isRecord(segment) && typeof segment.text === 'string' ? [segment.text] : [])
+  })
 }
 
 function hasResumePdfPhoto(value: unknown) {
   return isRecord(value) && 'photoDataUrl' in value
+}
+
+function hasCallerDerivedDocument(value: unknown) {
+  return isRecord(value) && 'document' in value
 }
 
 const jobPostingExcerpt = 'You must know TypeScript and preferably React.'

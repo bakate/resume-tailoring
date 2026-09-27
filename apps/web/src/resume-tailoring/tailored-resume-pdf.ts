@@ -1,24 +1,31 @@
+import {
+  prepareValidatedTailoredResumeDocument,
+} from '@resume-tailoring/application/tailored-resume-document'
+import type {
+  TailoredResumeDocument,
+  TailoredResumePreparationFailureType,
+} from '@resume-tailoring/application/tailored-resume-document'
+import type {
+  ResumeClaimSemanticValidator,
+} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import puppeteer from 'puppeteer'
 import type { Browser, Page } from 'puppeteer'
 
-import {
-  hasVerifiedResumeClaimProvenance,
-} from './tailored-resume-contract'
-import type {
-  ResumePdfFailureType,
-  TailoredResumePdfDependencies,
-  TailoredResumePdfInputs,
-} from './tailored-resume-contract'
-import {
-  renderTailoredResumeHtml,
-} from './tailored-resume-html'
+import type { ResumePdfFailureType, TailoredResumePdfInputs } from './tailored-resume-contract'
+import { renderTailoredResumeHtml } from './tailored-resume-html'
+import type { TailoredResumeRenderInputs } from './tailored-resume-html'
+import { hasTailoredResumeOverflow } from './tailored-resume-layout'
 
 export type ResumePdfFailure = Readonly<{ type: ResumePdfFailureType }>
 
 export type ResumePdfResult =
   | Readonly<{ ok: true; value: Uint8Array }>
   | Readonly<{ ok: false; error: ResumePdfFailure }>
+
+type ResumePdfDependencies = Readonly<{
+  semanticValidator: ResumeClaimSemanticValidator
+}>
 
 const a4WidthPoints = 595.28
 const a4HeightPoints = 841.89
@@ -27,17 +34,16 @@ const pageSizeTolerancePoints = 1
 export async function createTailoredResumePdf({
   inputs,
   semanticValidator,
-}: TailoredResumePdfDependencies & Readonly<{
+}: ResumePdfDependencies & Readonly<{
   inputs: TailoredResumePdfInputs
 }>): Promise<ResumePdfResult> {
-  if (!hasVerifiedResumeClaimProvenance(inputs)) return provenanceInvalidResult
   let browser: Browser | undefined
   try {
     browser = await puppeteer.launch({
       headless: true,
       args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox'],
     })
-    return await renderAndValidatePdf({ browser, inputs, semanticValidator })
+    return await prepareAndRenderPdf({ browser, inputs, semanticValidator })
   } catch {
     return renderingUnavailableResult
   } finally {
@@ -45,67 +51,86 @@ export async function createTailoredResumePdf({
   }
 }
 
-async function validateSemanticProvenance({
-  inputs, semanticValidator,
-}: TailoredResumePdfDependencies & Readonly<{ inputs: TailoredResumePdfInputs }>) {
-  const retainedClaimIds = new Set(inputs.document.items.map(({ claimId }) => claimId))
-  const retainedClaims = inputs.validatedClaims.filter(({ id }) => retainedClaimIds.has(id))
-  try {
-    for (const claim of retainedClaims) {
-      const result = await semanticValidator.validate({
-        claim,
-        verifiedFacts: readClaimFacts({ claim, verifiedFacts: inputs.verifiedFacts }),
-      })
-      if (!result.ok) return validationUnavailableResult
-      if (!result.value.supported) return provenanceInvalidResult
-    }
-    return validLayoutResult
-  } catch {
-    return validationUnavailableResult
+async function prepareAndRenderPdf({ browser, inputs, semanticValidator }: Readonly<{
+  browser: Browser
+  inputs: TailoredResumePdfInputs
+}> & ResumePdfDependencies) {
+  const page = await browser.newPage()
+  await page.emulateMediaType('print')
+  const layoutMeasurer = createPuppeteerLayoutMeasurer({ inputs, page })
+  const preparation = await prepareValidatedTailoredResumeDocument({
+    inputs: inputs.source, layoutMeasurer, semanticValidator,
+  })
+  if (!preparation.ok) return mapPreparationFailure(preparation.error.type)
+  return renderAndValidatePdf({ document: preparation.value, inputs, page })
+}
+
+function createPuppeteerLayoutMeasurer({ inputs, page }: Readonly<{
+  inputs: TailoredResumePdfInputs
+  page: Page
+}>) {
+  return {
+    fits: async ({ document }: Readonly<{ document: TailoredResumeDocument }>) => {
+      try {
+        await renderPage({ document, inputs, page })
+        return { ok: true, value: !(await hasPageOverflow({ page })) } as const
+      } catch {
+        return { ok: false } as const
+      }
+    },
   }
 }
 
-function readClaimFacts({ claim, verifiedFacts }: Readonly<{
-  claim: TailoredResumePdfInputs['validatedClaims'][number]
-  verifiedFacts: TailoredResumePdfInputs['verifiedFacts']
-}>) {
-  const claimFactIds = new Set(claim.segments.flatMap(({ factIds }) => factIds))
-  return verifiedFacts.filter(({ id }) => claimFactIds.has(id))
-}
-
-async function renderAndValidatePdf({ browser, inputs, semanticValidator }: Readonly<{
-  browser: Browser
+async function renderAndValidatePdf({ document, inputs, page }: Readonly<{
+  document: TailoredResumeDocument
   inputs: TailoredResumePdfInputs
-}> & TailoredResumePdfDependencies) {
-  const page = await browser.newPage()
-  await page.emulateMediaType('print')
-  await page.setContent(renderTailoredResumeHtml(inputs), { waitUntil: 'load' })
-  await page.evaluate(() => document.fonts.ready)
-  const layoutValidation = await validatePageLayout({ page })
-  if (!layoutValidation.ok) return layoutValidation
-  const semanticValidation = await validateSemanticProvenance({ inputs, semanticValidator })
-  if (!semanticValidation.ok) return semanticValidation
+  page: Page
+}>): Promise<ResumePdfResult> {
+  const renderInputs = createRenderInputs({ document, inputs })
+  await renderPage({ document, inputs, page })
+  if (await hasPageOverflow({ page })) return overflowResult
   const pdfBytes = await page.pdf({ format: 'A4', preferCSSPageSize: true, printBackground: true })
-  return validatePdf({ inputs, pdfBytes })
+  return validatePdf({ inputs: renderInputs, pdfBytes })
 }
 
-async function validatePageLayout({ page }: Readonly<{ page: Page }>) {
-  const hasOverflow = await page.evaluate(() => {
-    const resumePage = document.querySelector<HTMLElement>('.resume-page')
-    if (resumePage === null) return true
-    const pageBounds = resumePage.getBoundingClientRect()
-    if (resumePage.scrollHeight > resumePage.clientHeight + 1) return true
-    if (resumePage.scrollWidth > resumePage.clientWidth + 1) return true
-    return [...resumePage.querySelectorAll<HTMLElement>('*')].some((element) => {
-      const bounds = element.getBoundingClientRect()
-      return bounds.bottom > pageBounds.bottom + 1 || bounds.right > pageBounds.right + 1
-    })
+async function renderPage({ document: tailoredDocument, inputs, page }: Readonly<{
+  document: TailoredResumeDocument
+  inputs: TailoredResumePdfInputs
+  page: Page
+}>) {
+  await page.setContent(renderTailoredResumeHtml(createRenderInputs({
+    document: tailoredDocument, inputs,
+  })), {
+    waitUntil: 'load',
   })
-  return hasOverflow ? overflowResult : validLayoutResult
+  await page.evaluate(() => document.fonts.ready)
+}
+
+function createRenderInputs({ document, inputs }: Readonly<{
+  document: TailoredResumeDocument
+  inputs: TailoredResumePdfInputs
+}>): TailoredResumeRenderInputs {
+  return {
+    contactItems: inputs.contactItems,
+    document,
+    locale: inputs.locale,
+    ...(inputs.photoDataUrl === undefined ? {} : { photoDataUrl: inputs.photoDataUrl }),
+  }
+}
+
+async function hasPageOverflow({ page }: Readonly<{ page: Page }>) {
+  return page.$eval('.resume-page', hasTailoredResumeOverflow)
+}
+
+function mapPreparationFailure(type: TailoredResumePreparationFailureType): ResumePdfResult {
+  if (type === 'tailored-resume-provenance-invalid') return provenanceInvalidResult
+  if (type === 'tailored-resume-required-content-overflow') return overflowResult
+  if (type === 'tailored-resume-validation-unavailable') return validationUnavailableResult
+  return renderingUnavailableResult
 }
 
 async function validatePdf({ inputs, pdfBytes }: Readonly<{
-  inputs: TailoredResumePdfInputs
+  inputs: TailoredResumeRenderInputs
   pdfBytes: Uint8Array
 }>): Promise<ResumePdfResult> {
   if (!hasExpectedEmbeddedFonts({ pdfBytes })) return fontsNotEmbeddedResult
@@ -113,9 +138,7 @@ async function validatePdf({ inputs, pdfBytes }: Readonly<{
   try {
     const pdfDocument = await loadingTask.promise
     const pageValidation = await validatePdfPage({ inputs, pdfDocument })
-    return pageValidation.ok
-      ? { ok: true, value: pdfBytes }
-      : pageValidation
+    return pageValidation.ok ? { ok: true, value: pdfBytes } : pageValidation
   } catch {
     return renderingUnavailableResult
   } finally {
@@ -131,7 +154,7 @@ function hasExpectedEmbeddedFonts({ pdfBytes }: Readonly<{ pdfBytes: Uint8Array 
 }
 
 async function validatePdfPage({ inputs, pdfDocument }: Readonly<{
-  inputs: TailoredResumePdfInputs
+  inputs: TailoredResumeRenderInputs
   pdfDocument: Awaited<ReturnType<typeof getDocument>['promise']>
 }>): Promise<ResumePdfResult | typeof validLayoutResult> {
   if (pdfDocument.numPages !== 1) return invalidPageCountResult
@@ -151,7 +174,7 @@ async function readSelectableText({ pdfPage }: Readonly<{
 }
 
 function hasExpectedReadingOrder({ inputs, extractedText }: Readonly<{
-  inputs: TailoredResumePdfInputs
+  inputs: TailoredResumeRenderInputs
   extractedText: string
 }>) {
   const normalizedText = normalizeText(extractedText)
