@@ -28,6 +28,7 @@ async function extractJobRequirements({ request }: Readonly<{ request: Request }
   const extractor = createOpenAiJobRequirementExtractor({
     apiKey: environmentResult.value.openAiApiKey,
     model: environmentResult.value.openAiStructuredModel,
+    reasoningEffort: environmentResult.value.openAiStructuredReasoningEffort,
   })
   const result = await extractor.extract({ jobPostingContent: contentResult.value })
   return result.ok

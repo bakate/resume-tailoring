@@ -20,6 +20,7 @@ describe('OpenAI Source Profile extractor contract', () => {
     const extractor = createOpenAiSourceProfileExtractor({
       apiKey: 'test-api-key',
       model: 'structured-model',
+      reasoningEffort: 'low',
       request: () => Promise.resolve(Response.json(createOpenAiResponse({
         value: 'TypeScript\nReact',
       }))),
@@ -38,6 +39,7 @@ describe('OpenAI Source Profile extractor contract', () => {
     const extractor = createOpenAiSourceProfileExtractor({
       apiKey: 'test-api-key',
       model: 'structured-model',
+      reasoningEffort: 'low',
       request: () => Promise.resolve(Response.json(createOpenAiResponse({ value }))),
     })
 
@@ -57,6 +59,7 @@ describe('OpenAI Source Profile extractor contract', () => {
     const extractor = createOpenAiSourceProfileExtractor({
       apiKey: 'test-api-key',
       model: 'structured-model',
+      reasoningEffort: 'low',
       request: () => Promise.reject(new DOMException('Timed out', 'TimeoutError')),
     })
 
@@ -75,6 +78,7 @@ function createContractTestExtractor() {
   const extractor = createOpenAiSourceProfileExtractor({
     apiKey: 'test-api-key',
     model: 'structured-model',
+    reasoningEffort: 'low',
     request: (input, init) => {
       requests.push(new Request(input, init))
       signals.push(init?.signal ?? null)
@@ -119,6 +123,7 @@ const expectedExtractionResult = {
 
 const expectedRequestBody = {
   model: 'structured-model',
+  reasoning: { effort: 'low' },
   store: false,
   input: [
     { role: 'developer' },

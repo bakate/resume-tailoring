@@ -45,6 +45,44 @@ describe('server environment validation', () => {
     })
   })
 
+  it('accepts fallbacks qualified on the reference dataset', () => {
+    const result = validateServerEnvironment({
+      environment: {
+        OPENAI_API_KEY: 'secret-key',
+        OPENAI_STRUCTURED_FALLBACK_MODEL: 'gpt-6-luna',
+        OPENAI_STRUCTURED_FALLBACK_REASONING_EFFORT: 'low',
+        OPENAI_WRITING_FALLBACK_MODEL: 'gpt-6-sol',
+        OPENAI_WRITING_FALLBACK_REASONING_EFFORT: 'medium',
+      },
+    })
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        openAiStructuredFallback: { model: 'gpt-6-luna', reasoningEffort: 'low' },
+        openAiWritingFallback: { model: 'gpt-6-sol', reasoningEffort: 'medium' },
+      },
+    })
+  })
+
+  it.each([
+    {
+      OPENAI_STRUCTURED_FALLBACK_MODEL: 'gpt-6-sol',
+      OPENAI_STRUCTURED_FALLBACK_REASONING_EFFORT: 'medium',
+    },
+    {
+      OPENAI_WRITING_FALLBACK_MODEL: 'gpt-6-luna',
+      OPENAI_WRITING_FALLBACK_REASONING_EFFORT: 'low',
+    },
+    { OPENAI_STRUCTURED_FALLBACK_MODEL: 'gpt-6-luna' },
+  ])('rejects a fallback without same-suite qualification: %o', (fallbackEnvironment) => {
+    const result = validateServerEnvironment({
+      environment: { OPENAI_API_KEY: 'secret-key', ...fallbackEnvironment },
+    })
+
+    expect(result.ok).toBe(false)
+  })
+
   it.each([
     {},
     { OPENAI_API_KEY: '' },

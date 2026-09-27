@@ -25,6 +25,7 @@ describe('OpenAI Job Requirement extractor contract', () => {
     const extractor = createOpenAiJobRequirementExtractor({
       apiKey: 'test-api-key',
       model: 'structured-model',
+      reasoningEffort: 'low',
       request: () => Promise.resolve(Response.json(createOpenAiResponse({
         requirements: [{
           classification: 'required',
@@ -44,6 +45,7 @@ describe('OpenAI Job Requirement extractor contract', () => {
     const extractor = createOpenAiJobRequirementExtractor({
       apiKey: 'test-api-key',
       model: 'structured-model',
+      reasoningEffort: 'low',
       request: () => Promise.resolve(Response.json(createOpenAiResponse({
         requirements: [{
           classification: 'required',
@@ -74,6 +76,7 @@ describe('OpenAI Job Requirement extractor contract', () => {
     const extractor = createOpenAiJobRequirementExtractor({
       apiKey: 'test-api-key',
       model: 'structured-model',
+      reasoningEffort: 'low',
       request: () => Promise.resolve(Response.json(createOpenAiResponse({ requirements }))),
     })
 
@@ -86,6 +89,7 @@ describe('OpenAI Job Requirement extractor contract', () => {
     const extractor = createOpenAiJobRequirementExtractor({
       apiKey: 'test-api-key',
       model: 'structured-model',
+      reasoningEffort: 'low',
       request: () => Promise.reject(new DOMException('Timed out', 'TimeoutError')),
     })
 
@@ -101,6 +105,7 @@ function createContractTestExtractor() {
   const extractor = createOpenAiJobRequirementExtractor({
     apiKey: 'test-api-key',
     model: 'structured-model',
+    reasoningEffort: 'low',
     request: (input, init) => {
       requests.push(new Request(input, init))
       signals.push(init?.signal ?? null)
@@ -154,6 +159,7 @@ const expectedExtractionResult = {
 
 const expectedRequestBody = {
   model: 'structured-model',
+  reasoning: { effort: 'low' },
   store: false,
   input: [
     { role: 'developer' },

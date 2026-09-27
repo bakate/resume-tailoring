@@ -26,6 +26,7 @@ async function extractSourceProfile({ request }: Readonly<{ request: Request }>)
   const extractor = createOpenAiSourceProfileExtractor({
     apiKey: environmentResult.value.openAiApiKey,
     model: environmentResult.value.openAiStructuredModel,
+    reasoningEffort: environmentResult.value.openAiStructuredReasoningEffort,
   })
   const result = await extractor.extract({ professionalContent: professionalContentResult.value })
   return result.ok
