@@ -5,6 +5,8 @@ import type {
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 
 import type { Localization } from '../localization/localization'
+import { groupJobRequirements } from './job-requirement-groups'
+import type { JobRequirementGroup } from './job-requirement-groups'
 import type { CandidateSessionController } from './use-candidate-session'
 
 type WorkspaceProps = Readonly<{
@@ -58,79 +60,170 @@ function MatchAnalysisResult({
   requirements: readonly JobRequirement[]
   verifiedFacts: readonly SourceProfileFact[]
 }>) {
-  const requirementById = new Map(requirements.map((requirement) => [requirement.id, requirement]))
-  const factById = new Map(verifiedFacts.map((fact) => [fact.id, fact]))
-  return (
-    <div className="match-analysis-grid">
-      <MatchScoreSummary {...{ analysis, localization }} />
-      <EvidencePanel {...{ analysis, factById, localization, requirementById }} />
-      <GapAnalysisPanel {...{ analysis, localization, requirementById }} />
-    </div>
-  )
+  const coveredRequirementIds = new Set(analysis.evidence.map((evidence) => evidence.requirementId))
+  const uncoveredRequiredRequirements = requirements.filter((requirement) =>
+    requirement.classification === 'required' && !coveredRequirementIds.has(requirement.id))
+  return <div className="match-analysis-grid">
+    <MatchAnalysisSummary {...{
+      analysis,
+      coveredRequirementIds,
+      localization,
+      requirements,
+      uncoveredRequiredRequirements,
+    }} />
+    <MatchEvidencePanel {...{ analysis, localization, requirements, verifiedFacts }} />
+  </div>
 }
 
-function MatchScoreSummary({ analysis, localization }: Readonly<{
+function MatchAnalysisSummary({
+  analysis,
+  coveredRequirementIds,
+  localization,
+  requirements,
+  uncoveredRequiredRequirements,
+}: Readonly<{
   analysis: MatchAnalysis
+  coveredRequirementIds: ReadonlySet<JobRequirement['id']>
   localization: Localization
+  requirements: readonly JobRequirement[]
+  uncoveredRequiredRequirements: readonly JobRequirement[]
 }>) {
-  return <div className="source-profile-card match-score-card">
-    <h3>{localization.translate('matchAnalysis.score')}</h3>
+  const requiredCoverage = readCoverageCount({
+    classification: 'required', coveredRequirementIds, requirements,
+  })
+  const preferredCoverage = readCoverageCount({
+    classification: 'preferred', coveredRequirementIds, requirements,
+  })
+  return <section className="source-profile-card match-score-card match-analysis-summary"
+    aria-labelledby="match-analysis-summary-title">
+    <h3 id="match-analysis-summary-title" tabIndex={-1}>
+      {localization.translate('matchAnalysis.summaryTitle')}
+    </h3>
+    <p className="match-score-label">{localization.translate('matchAnalysis.score')}</p>
     <strong className="match-score">{analysis.matchScore}%</strong>
+    <p className="match-eligibility">
+      {localization.translate(analysis.generationEligibility === 'eligible'
+        ? 'matchAnalysis.eligibleLabel'
+        : 'matchAnalysis.deniedLabel')}
+    </p>
     {analysis.warning === null ? null : (
       <p className="match-warning" role="status">
         {localization.translate('matchAnalysis.lowScoreWarning')}
       </p>
     )}
-    <p>{localization.translate(
+    <p className="match-eligibility-description">{localization.translate(
       analysis.generationEligibility === 'eligible'
         ? 'matchAnalysis.eligible'
         : 'matchAnalysis.denied',
     )}</p>
+    <dl className="match-coverage-counts">
+      <CoverageCount label={localization.translate('matchAnalysis.requiredCoverage')}
+        {...requiredCoverage} />
+      <CoverageCount label={localization.translate('matchAnalysis.preferredCoverage')}
+        {...preferredCoverage} />
+    </dl>
+    <section className="match-gap-summary" aria-labelledby="match-gap-title">
+      <h4 id="match-gap-title">{localization.translate('matchAnalysis.gapTitle')}</h4>
+      {uncoveredRequiredRequirements.length === 0
+        ? <p>{localization.translate('matchAnalysis.gapNone')}</p>
+        : <ul>{uncoveredRequiredRequirements.map((requirement) => (
+          <li key={requirement.id}>{requirement.value}</li>
+        ))}</ul>}
+    </section>
+  </section>
+}
+
+function readCoverageCount({ classification, coveredRequirementIds, requirements }: Readonly<{
+  classification: JobRequirement['classification']
+  coveredRequirementIds: ReadonlySet<JobRequirement['id']>
+  requirements: readonly JobRequirement[]
+}>) {
+  const classifiedRequirements = requirements.filter((requirement) =>
+    requirement.classification === classification)
+  return {
+    covered: classifiedRequirements.filter((requirement) =>
+      coveredRequirementIds.has(requirement.id)).length,
+    total: classifiedRequirements.length,
+  }
+}
+
+function CoverageCount({ covered, label, total }: Readonly<{
+  covered: number
+  label: string
+  total: number
+}>) {
+  return <div>
+    <dt>{label}</dt>
+    <dd>{`${String(covered)} / ${String(total)}`}</dd>
   </div>
 }
 
-type EvidencePanelProps = Readonly<{
-  analysis: MatchAnalysis
-  factById: ReadonlyMap<SourceProfileFact['id'], SourceProfileFact>
-  localization: Localization
-  requirementById: ReadonlyMap<JobRequirement['id'], JobRequirement>
-}>
-
-function EvidencePanel(props: EvidencePanelProps) {
-  const { analysis, factById, localization, requirementById } = props
-  return <div className="source-profile-card">
-    <h3>{localization.translate('matchAnalysis.evidenceTitle')}</h3>
-    {analysis.evidence.length === 0
-      ? <p>{localization.translate('matchAnalysis.evidenceNone')}</p>
-      : <ul className="match-evidence-list">
-          {analysis.evidence.map((evidence) => (
-            <li key={evidence.requirementId}>
-              <strong>{requirementById.get(evidence.requirementId)?.value}</strong>
-              <ul>
-                {evidence.factIds.map((factId) => (
-                  <li key={factId}>{factById.get(factId)?.value}</li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>}
-  </div>
-}
-
-function GapAnalysisPanel({
+function MatchEvidencePanel({
   analysis,
   localization,
-  requirementById,
-}: Pick<EvidencePanelProps, 'analysis' | 'localization' | 'requirementById'>) {
-  const uncoveredIds = analysis.gapAnalysis.uncoveredRequiredRequirementIds
-  return <div className="source-profile-card gap-analysis-card">
-    <h3>{localization.translate('matchAnalysis.gapTitle')}</h3>
-    {uncoveredIds.length === 0
-      ? <p>{localization.translate('matchAnalysis.gapNone')}</p>
-      : <ul>
-          {uncoveredIds.map((requirementId) => (
-            <li key={requirementId}>{requirementById.get(requirementId)?.value}</li>
-          ))}
-        </ul>}
-  </div>
+  requirements,
+  verifiedFacts,
+}: Readonly<{
+  analysis: MatchAnalysis
+  localization: Localization
+  requirements: readonly JobRequirement[]
+  verifiedFacts: readonly SourceProfileFact[]
+}>) {
+  const factById = new Map(verifiedFacts.map((fact) => [fact.id, fact]))
+  const evidenceByRequirementId = new Map(
+    analysis.evidence.map((evidence) => [evidence.requirementId, evidence]),
+  )
+  const requirementGroups = groupJobRequirements({ requirements })
+    .map((group) => ({
+      ...group,
+      requirements: group.requirements.filter((requirement) =>
+        evidenceByRequirementId.has(requirement.id)),
+    }))
+    .filter((group) => group.requirements.length > 0)
+  return <section className="source-profile-card match-evidence-panel"
+    aria-labelledby="match-evidence-title">
+    <h3 id="match-evidence-title">{localization.translate('matchAnalysis.evidenceTitle')}</h3>
+    {analysis.evidence.length === 0
+      ? <p>{localization.translate('matchAnalysis.evidenceNone')}</p>
+      : <ul className="match-evidence-list">{requirementGroups.map((group) => (
+        <MatchEvidenceGroup key={group.groupId} {...{
+          evidenceByRequirementId, factById, group, localization,
+        }} />
+      ))}</ul>}
+  </section>
+}
+
+type EvidenceGroupProps = Readonly<{
+  evidenceByRequirementId: ReadonlyMap<JobRequirement['id'], MatchAnalysis['evidence'][number]>
+  factById: ReadonlyMap<SourceProfileFact['id'], SourceProfileFact>
+  group: JobRequirementGroup
+  localization: Localization
+}>
+
+function MatchEvidenceGroup({
+  evidenceByRequirementId,
+  factById,
+  group,
+  localization,
+}: EvidenceGroupProps) {
+  const summary = group.requirements.map((requirement) => requirement.value).join(', ')
+  return <li className="match-evidence-group">
+    <details>
+      <summary>{summary}</summary>
+      <p className="source-excerpt">
+        <strong>{localization.translate('jobPosting.sourceExcerpt')}</strong>
+        <span>{group.sourceExcerpt}</span>
+      </p>
+      <ul>{group.requirements.map((requirement) => {
+        const evidence = evidenceByRequirementId.get(requirement.id)
+        if (evidence === undefined) return null
+        return <li key={requirement.id}>
+          <strong>{requirement.value}</strong>
+          <ul>{evidence.factIds.map((factId) => (
+            <li key={factId}>{factById.get(factId)?.value}</li>
+          ))}</ul>
+        </li>
+      })}</ul>
+    </details>
+  </li>
 }
