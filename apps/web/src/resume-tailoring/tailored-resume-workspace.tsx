@@ -15,6 +15,19 @@ type ResumeClaimCardProps = WorkspaceProps & Readonly<{
   claims: readonly ResumeClaim[]
 }>
 
+const leadingPunctuationPattern = /^[,.;:!?%…)'\]}’]/u
+
+export function formatResumeClaimText({ segments }: Readonly<{
+  segments: ResumeClaim['segments']
+}>) {
+  return segments.reduce((resumeClaimText, { text }) => {
+    const normalizedText = text.trim()
+    const separator = resumeClaimText.length === 0
+      || leadingPunctuationPattern.test(normalizedText) ? '' : ' '
+    return `${resumeClaimText}${separator}${normalizedText}`
+  }, '')
+}
+
 export function TailoredResumeWorkspace({ candidateSession, localization }: WorkspaceProps) {
   const { view } = candidateSession
   if (view.status !== 'ready' || view.matchAnalysis === undefined) return null
@@ -88,7 +101,7 @@ function ResumeClaimCard({
   return (
     <article className="source-profile-card resume-claim-card">
       <p className="resume-claim-text">
-        {claim.segments.map(({ text }) => text).join('')}
+        {formatResumeClaimText({ segments: claim.segments })}
       </p>
       <ClaimActions {...{ candidateSession, claim, claimIndex, claims, localization }} />
       <ReformulationForm {...{ candidateSession, claim, localization }} />
