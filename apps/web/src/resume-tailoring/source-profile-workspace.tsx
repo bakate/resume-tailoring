@@ -51,7 +51,7 @@ function SourceDocumentImport({ candidateSession, localization }: WorkspaceProps
   const intake = useSourceDocumentIntake()
   return <div className="source-profile-card">
     <p>{localization.translate('sourceProfile.importDescription')}</p>
-    <SourceDocumentMethodSelector {...{ intake, localization }} />
+    <SourceDocumentMethodSelector {...{ candidateSession, intake, localization }} />
     {intake.method === 'pdf'
       ? <PdfSourceDocumentInput {...{ candidateSession, intake, localization }} />
       : <PastedSourceDocumentInput {...{ candidateSession, intake, localization }} />}
@@ -71,24 +71,28 @@ function useSourceDocumentIntake() {
 type SourceDocumentIntake = ReturnType<typeof useSourceDocumentIntake>
 type IntakeProps = WorkspaceProps & Readonly<{ intake: SourceDocumentIntake }>
 
-function SourceDocumentMethodSelector({ intake, localization }: Omit<IntakeProps, 'candidateSession'>) {
+function SourceDocumentMethodSelector({ candidateSession, intake, localization }: IntakeProps) {
   const { translate } = localization
   return <fieldset className="source-document-methods">
     <legend>{translate('sourceProfile.methodLabel')}</legend>
     <SourceDocumentMethodOption description={translate('sourceProfile.pdfDescription')}
-      intake={intake} label={translate('sourceProfile.pdfMethod')} method="pdf" />
+      intake={intake} label={translate('sourceProfile.pdfMethod')} method="pdf"
+      pendingOperation={candidateSession.pendingOperation} />
     <SourceDocumentMethodOption description={translate('sourceProfile.textDescription')}
-      intake={intake} label={translate('sourceProfile.textMethod')} method="text" />
+      intake={intake} label={translate('sourceProfile.textMethod')} method="text"
+      pendingOperation={candidateSession.pendingOperation} />
   </fieldset>
 }
 
-function SourceDocumentMethodOption({ description, intake, label, method }: Readonly<{
+function SourceDocumentMethodOption({ description, intake, label, method, pendingOperation }: Readonly<{
   description: string
   intake: SourceDocumentIntake
   label: string
   method: SourceDocumentMethod
+  pendingOperation: CandidateSessionController['pendingOperation']
 }>) {
-  return <label><input checked={intake.method === method} name="source-document-method"
+  return <label><input checked={intake.method === method} disabled={pendingOperation !== null}
+    name="source-document-method"
     onChange={() => { intake.setMethod(method) }} type="radio" />
   <span><strong>{label}</strong><small>{description}</small></span></label>
 }
@@ -97,8 +101,8 @@ function PdfSourceDocumentInput({ candidateSession, intake, localization }: Inta
   const { translate } = localization
   const failureMessageKey = readPdfFailureMessageKey({ candidateSession })
   return <div className="source-document-input">
-    <input aria-label={translate('sourceProfile.fileLabel')} accept="application/pdf,.pdf"
-      className="visually-hidden" disabled={candidateSession.pendingOperation !== null}
+    <input accept="application/pdf,.pdf" disabled={candidateSession.pendingOperation !== null}
+      hidden id="source-document-pdf"
       onChange={(event) => { importSelectedPdf({ candidateSession, event, intake }) }}
       ref={intake.fileInput} type="file" />
     <button className="secondary-action" disabled={candidateSession.pendingOperation !== null}

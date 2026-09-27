@@ -174,10 +174,23 @@ function Introduction({ candidateSession, localization }: CandidateSessionProps)
       <PrivacyNote localization={localization} />
       <FailureMessage
         localization={localization}
-        messageKey={candidateSession.failureMessageKey}
+        messageKey={readIntroductionFailureMessageKey({ candidateSession })}
       />
     </div>
   )
+}
+
+function readIntroductionFailureMessageKey({ candidateSession }: Readonly<{
+  candidateSession: CandidateSessionController
+}>) {
+  const messageKey = candidateSession.failureMessageKey
+  const sourceProfile = candidateSession.view.status === 'ready'
+    ? candidateSession.view.sourceProfile
+    : undefined
+  if (sourceProfile !== undefined) return messageKey
+  if (messageKey === 'sourceProfile.unreadableFailure') return null
+  if (messageKey === 'sourceProfile.unsupportedFailure') return null
+  return messageKey === 'sourceProfile.failure' ? null : messageKey
 }
 
 function StartSessionButton({ candidateSession, localization }: CandidateSessionProps) {
