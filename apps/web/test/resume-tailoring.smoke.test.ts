@@ -175,6 +175,88 @@ test('a Candidate can switch locale without losing an active session', async ({ 
   await system.expectFrenchLocaleAndCandidateSessionToBeRetained()
 })
 
+test('English Source Document intake explains distinct PDF and pasted-text options', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+
+  await system.selectPdfSourceDocumentMethod()
+
+  await system.expectClearEnglishSourceDocumentOptions()
+})
+
+test('French Source Document intake localizes every visible PDF control', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+
+  await system.switchResumeTailoringToFrench()
+
+  await system.expectLocalizedFrenchPdfIntake()
+})
+
+test('French unreadable PDF feedback localizes its filename announcement and error', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.switchResumeTailoringToFrench()
+
+  await system.uploadFrenchUnreadablePdf()
+
+  await system.expectLocalizedFrenchUnreadablePdfFeedback()
+})
+
+test('pasted professional text enters the shared outgoing Source Document review', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+
+  await system.reviewPastedProfessionalText()
+
+  await system.expectPastedTextInSharedSourceDocumentReview()
+})
+
+test('an unreadable PDF preserves the Candidate session with adjacent feedback', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+
+  await system.uploadUnreadablePdf()
+
+  await system.expectUnreadablePdfFeedbackBesideIntake()
+})
+
+test('a Candidate recovers from an unreadable PDF with a readable replacement', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenUnreadablePdfWasRejected()
+
+  await system.retryWithReadablePdf()
+
+  await system.expectUnreadablePdfRecoveryToKeepSessionActive()
+})
+
+test('empty pasted professional text shows recoverable validation at the intake control', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+
+  await system.reviewEmptyPastedProfessionalText()
+
+  await system.expectEmptyPastedTextValidation()
+})
+
+test('switching Source Document methods does not start review or extraction', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenSourceProfileExtractionIsObserved()
+
+  await system.switchSourceDocumentMethods()
+
+  await system.expectSourceDocumentMethodSwitchToRemainLocal()
+})
+
 test('a Candidate builds a Verified Source Profile from minimized PDF content', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
@@ -665,6 +747,12 @@ type CompletedAction =
   | 'match-analysis-retried'
   | 'match-analysis-waited'
   | 'source-profile-reopened'
+  | 'pdf-source-document-method-selected'
+  | 'pasted-source-document-reviewed'
+  | 'unreadable-source-document-rejected'
+  | 'unreadable-source-document-recovered'
+  | 'empty-pasted-source-document-reviewed'
+  | 'source-document-method-switched'
   | 'resume-tailoring-opened'
   | 'resume-tailoring-viewed'
   | 'resume-claims-generated'
@@ -750,6 +838,13 @@ class ResumeTailoringBrowserTestSystem {
     await this.#page.route('**/api/source-profile-extraction', async (route) => {
       await new Promise<void>((resolve) => { this.#pendingSourceProfileExtractionResponse = resolve })
       await this.#fulfillDetailedSourceProfileExtraction({ route })
+    })
+  }
+
+  async givenSourceProfileExtractionIsObserved() {
+    await this.#page.route('**/api/source-profile-extraction', async (route) => {
+      this.#sourceProfileExtractionAttemptCount += 1
+      await route.fulfill({ status: 500 })
     })
   }
 
@@ -1248,8 +1343,69 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'resume-tailoring-viewed'
   }
 
+  async selectPdfSourceDocumentMethod() {
+    await this.#page.getByRole('radio', { name: 'Text-based PDF' }).click()
+    this.#completedAction = 'pdf-source-document-method-selected'
+  }
+
+  async reviewPastedProfessionalText() {
+    await this.#page.getByRole('radio', { name: 'Paste professional text' }).check()
+    await this.#page.getByRole('textbox', { name: 'Professional text', exact: true })
+      .fill(pastedProfessionalText)
+    await this.#page.getByRole('button', { name: 'Review pasted text' }).click()
+    this.#completedAction = 'pasted-source-document-reviewed'
+  }
+
+  async givenUnreadablePdfWasRejected() {
+    await this.givenCandidateSessionIsActive()
+    await this.#uploadUnreadablePdf()
+    await this.#page.locator('.source-document-input').getByRole('alert').waitFor()
+  }
+
+  async uploadUnreadablePdf() {
+    await this.#uploadUnreadablePdf()
+    this.#completedAction = 'unreadable-source-document-rejected'
+  }
+
+  async uploadFrenchUnreadablePdf() {
+    await this.#uploadUnreadablePdf()
+    this.#completedAction = 'unreadable-source-document-rejected'
+  }
+
+  async retryWithReadablePdf() {
+    await this.#page.locator('#source-document-pdf').setInputFiles({
+      name: 'resume.pdf',
+      mimeType: 'application/pdf',
+      buffer: createTextPdf('Senior FullStack Developer using React at Acme'),
+    })
+    this.#completedAction = 'unreadable-source-document-recovered'
+  }
+
+  async #uploadUnreadablePdf() {
+    await this.#page.locator('#source-document-pdf').setInputFiles({
+      name: 'scanned-resume.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('not a readable PDF'),
+    })
+  }
+
+  async reviewEmptyPastedProfessionalText() {
+    await this.#page.getByRole('radio', { name: 'Paste professional text' }).check()
+    await this.#page.getByRole('button', { name: 'Review pasted text' }).click()
+    this.#completedAction = 'empty-pasted-source-document-reviewed'
+  }
+
+  async switchSourceDocumentMethods() {
+    await this.#page.getByRole('radio', { name: 'Paste professional text' }).check()
+    await this.#page.getByRole('textbox', { name: 'Professional text', exact: true })
+      .fill(pastedProfessionalText)
+    await this.#page.getByRole('radio', { name: 'Text-based PDF' }).check()
+    await this.#page.getByRole('radio', { name: 'Paste professional text' }).check()
+    this.#completedAction = 'source-document-method-switched'
+  }
+
   async buildVerifiedSourceProfile() {
-    await this.#page.getByLabel('Choose a PDF Source Document').setInputFiles({
+    await this.#page.locator('#source-document-pdf').setInputFiles({
       name: 'resume.pdf',
       mimeType: 'application/pdf',
       buffer: createTextPdf(
@@ -1682,6 +1838,79 @@ class ResumeTailoringBrowserTestSystem {
     expect(this.#extractionRequestContent).not.toContain('+33 6 12 34 56 78')
     await expect(this.#page.getByRole('button', { name: /Source Profile/ }))
       .toContainText('1 verified fact')
+  }
+
+  async expectClearEnglishSourceDocumentOptions() {
+    this.#expectCompletedAction('pdf-source-document-method-selected')
+    await expect(this.#page.getByRole('radio', { name: 'Text-based PDF' })).toBeChecked()
+    await expect(this.#page.getByText('Scanned image-only PDFs cannot be read.')).toBeVisible()
+    await expect(this.#page.getByRole('radio', { name: 'Paste professional text' })).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Choose PDF' })).toBeVisible()
+  }
+
+  async expectLocalizedFrenchPdfIntake() {
+    this.#expectCompletedAction('resume-tailoring-viewed')
+    await expect(this.#page.getByRole('group', { name: 'Méthode du Document Source' })).toBeVisible()
+    await expect(this.#page.getByRole('radio', { name: 'PDF texte' })).toBeChecked()
+    await expect(this.#page.getByRole('button', { name: 'Choisir un PDF' })).toBeVisible()
+    await expect(this.#page.getByText('Aucun PDF sélectionné')).toBeVisible()
+    await expect(this.#page.getByText(/PDF scannés composés uniquement d'images/)).toBeVisible()
+  }
+
+  async expectLocalizedFrenchUnreadablePdfFeedback() {
+    this.#expectCompletedAction('unreadable-source-document-rejected')
+    const input = this.#page.locator('.source-document-input')
+    await expect(input.getByRole('alert')).toHaveText(
+      "Ce PDF n'a pas pu être lu. Choisis un PDF texte valide ; les PDF scannés composés uniquement d'images ne sont pas pris en charge.",
+    )
+    await expect(input.getByText('PDF sélectionné : scanned-resume.pdf'))
+      .toHaveAttribute('aria-live', 'polite')
+    await expect(this.#page.getByRole('alert')).toHaveCount(1)
+  }
+
+  async expectPastedTextInSharedSourceDocumentReview() {
+    this.#expectCompletedAction('pasted-source-document-reviewed')
+    const review = this.#page.getByRole('region', { name: 'Review outgoing Source Document' })
+    await expect(review.getByLabel('Exact content that will be sent for extraction'))
+      .toHaveValue(pastedProfessionalText)
+    await expect(review.getByRole('button', { name: 'Confirm this processing notice' })).toBeEnabled()
+    await expect(review.getByRole('button', { name: 'Extract professional facts' })).toBeDisabled()
+  }
+
+  async expectUnreadablePdfRecoveryToKeepSessionActive() {
+    this.#expectCompletedAction('unreadable-source-document-recovered')
+    await expect(this.#page.getByRole('button', { name: 'Delete private session' })).toBeVisible()
+    await expect(this.#page.getByRole('region', { name: 'Review outgoing Source Document' })).toBeVisible()
+  }
+
+  async expectUnreadablePdfFeedbackBesideIntake() {
+    this.#expectCompletedAction('unreadable-source-document-rejected')
+    const input = this.#page.locator('.source-document-input')
+    await expect(input.getByRole('alert')).toHaveText(
+      'This PDF could not be read. Choose a valid text-based PDF; scanned image-only PDFs are not supported.',
+    )
+    await expect(input.getByText('Selected PDF: scanned-resume.pdf'))
+      .toHaveAttribute('aria-live', 'polite')
+    await expect(this.#page.getByRole('alert')).toHaveCount(1)
+    await expect(this.#page.getByRole('button', { name: 'Delete private session' })).toBeVisible()
+  }
+
+  async expectEmptyPastedTextValidation() {
+    this.#expectCompletedAction('empty-pasted-source-document-reviewed')
+    await expect(this.#page.locator('.source-document-input').getByRole('alert'))
+      .toHaveText('Paste professional text before continuing.')
+    await expect(this.#page.getByRole('region', { name: 'Review outgoing Source Document' }))
+      .not.toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Delete private session' })).toBeVisible()
+  }
+
+  async expectSourceDocumentMethodSwitchToRemainLocal() {
+    this.#expectCompletedAction('source-document-method-switched')
+    await expect(this.#page.getByRole('textbox', { name: 'Professional text', exact: true }))
+      .toHaveValue(pastedProfessionalText)
+    await expect(this.#page.getByRole('region', { name: 'Review outgoing Source Document' }))
+      .not.toBeVisible()
+    expect(this.#sourceProfileExtractionAttemptCount).toBe(0)
   }
 
   async expectCoherentSourceDocumentReviewSurface() {
@@ -2314,7 +2543,7 @@ class ResumeTailoringBrowserTestSystem {
   }
 
   async #uploadSourceDocument() {
-    await this.#page.getByLabel('Choose a PDF Source Document').setInputFiles({
+    await this.#page.locator('#source-document-pdf').setInputFiles({
       name: 'resume.pdf',
       mimeType: 'application/pdf',
       buffer: createTextPdf(
@@ -2374,6 +2603,7 @@ const inactiveSessionOutcome = {
 } as const
 
 const legitimateFrenchJobPosting = "ASTORM bénéficie d'un référencement auprès de clients."
+const pastedProfessionalText = 'Senior FullStack Developer using TypeScript and React at Acme'
 
 async function seedCandidateSession({ page, expiresAt }: Readonly<{ page: Page; expiresAt: number }>) {
   await installCandidateSessionTestPersistence(page)

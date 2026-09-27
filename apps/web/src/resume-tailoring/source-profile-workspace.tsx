@@ -12,10 +12,11 @@ import {
   hasSourceProfileFactConflict,
   sourceProfileProcessingNoticeVersion,
 } from '@resume-tailoring/application/resume-tailoring-workflow'
-import { useEffect, useState } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { ChangeEvent, Dispatch, SetStateAction } from 'react'
 
 import type { Localization } from '../localization/localization'
+import { isSourceDocumentIntakeFailureMessage } from './use-candidate-session'
 import type { CandidateSessionController } from './use-candidate-session'
 
 type WorkspaceProps = Readonly<{
@@ -26,6 +27,8 @@ type SourceProfileReviewProps = WorkspaceProps & Readonly<{ sourceProfile: Sourc
 type FactActionProps = WorkspaceProps & Readonly<{ factId: SourceProfileFactId }>
 type ContentRevision = 'changed' | 'saved'
 type FactStatusFilter = SourceProfileFact['status'] | 'all'
+type SourceDocumentMethod = 'pdf' | 'text'
+type TextValidation = 'empty' | null
 
 export function SourceProfileWorkspace({ candidateSession, localization }: WorkspaceProps) {
   if (candidateSession.view.status !== 'ready') return null
@@ -46,24 +49,130 @@ export function SourceProfileWorkspace({ candidateSession, localization }: Works
 }
 
 function SourceDocumentImport({ candidateSession, localization }: WorkspaceProps) {
+  const intake = useSourceDocumentIntake()
+  return <div className="source-profile-card">
+    <p>{localization.translate('sourceProfile.importDescription')}</p>
+    <SourceDocumentMethodSelector {...{ candidateSession, intake, localization }} />
+    {intake.method === 'pdf'
+      ? <PdfSourceDocumentInput {...{ candidateSession, intake, localization }} />
+      : <PastedSourceDocumentInput {...{ candidateSession, intake, localization }} />}
+  </div>
+}
+
+function useSourceDocumentIntake() {
+  const [method, setMethod] = useState<SourceDocumentMethod>('pdf')
+  const [professionalText, setProfessionalText] = useState('')
+  const [selectedFilename, setSelectedFilename] = useState<string | null>(null)
+  const [textValidation, setTextValidation] = useState<TextValidation>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  return { fileInput, method, professionalText, selectedFilename, setMethod,
+    setProfessionalText, setSelectedFilename, setTextValidation, textValidation } as const
+}
+
+type SourceDocumentIntake = ReturnType<typeof useSourceDocumentIntake>
+type IntakeProps = WorkspaceProps & Readonly<{ intake: SourceDocumentIntake }>
+
+function SourceDocumentMethodSelector({ candidateSession, intake, localization }: IntakeProps) {
   const { translate } = localization
-  return (
-    <div className="source-profile-card">
-      <p>{translate('sourceProfile.importDescription')}</p>
-      <label className="file-field">
-        <span>{translate('sourceProfile.fileLabel')}</span>
-        <input
-          accept="application/pdf,.pdf"
-          disabled={candidateSession.pendingOperation !== null}
-          onChange={(event) => {
-            const [file] = event.currentTarget.files ?? []
-            if (file !== undefined) void candidateSession.importSourceDocument({ file })
-          }}
-          type="file"
-        />
-      </label>
-    </div>
-  )
+  return <fieldset className="source-document-methods">
+    <legend>{translate('sourceProfile.methodLabel')}</legend>
+    <SourceDocumentMethodOption description={translate('sourceProfile.pdfDescription')}
+      intake={intake} label={translate('sourceProfile.pdfMethod')} method="pdf"
+      pendingOperation={candidateSession.pendingOperation} />
+    <SourceDocumentMethodOption description={translate('sourceProfile.textDescription')}
+      intake={intake} label={translate('sourceProfile.textMethod')} method="text"
+      pendingOperation={candidateSession.pendingOperation} />
+  </fieldset>
+}
+
+function SourceDocumentMethodOption({ description, intake, label, method, pendingOperation }: Readonly<{
+  description: string
+  intake: SourceDocumentIntake
+  label: string
+  method: SourceDocumentMethod
+  pendingOperation: CandidateSessionController['pendingOperation']
+}>) {
+  return <label><input checked={intake.method === method} disabled={pendingOperation !== null}
+    name="source-document-method"
+    onChange={() => { intake.setMethod(method) }} type="radio" />
+  <span><strong>{label}</strong><small>{description}</small></span></label>
+}
+
+function PdfSourceDocumentInput({ candidateSession, intake, localization }: IntakeProps) {
+  const { translate } = localization
+  const failureMessageKey = readPdfFailureMessageKey({ candidateSession })
+  return <div className="source-document-input">
+    <input accept="application/pdf,.pdf" disabled={candidateSession.pendingOperation !== null}
+      hidden id="source-document-pdf"
+      onChange={(event) => { importSelectedPdf({ candidateSession, event, intake }) }}
+      ref={intake.fileInput} type="file" />
+    <button className="secondary-action" disabled={candidateSession.pendingOperation !== null}
+      onClick={() => { intake.fileInput.current?.click() }} type="button">
+      {translate('sourceProfile.choosePdf')}</button>
+    <p aria-live="polite">{intake.selectedFilename === null
+      ? translate('sourceProfile.noFileSelected')
+      : `${translate('sourceProfile.selectedFile')} ${intake.selectedFilename}`}</p>
+    {failureMessageKey === null ? null : <p className="intake-failure" role="alert">
+      {translate(failureMessageKey)}
+    </p>}
+  </div>
+}
+
+function importSelectedPdf({ candidateSession, event, intake }: Readonly<{
+  candidateSession: CandidateSessionController
+  event: ChangeEvent<HTMLInputElement>
+  intake: SourceDocumentIntake
+}>) {
+  const [file] = event.currentTarget.files ?? []
+  if (file === undefined) return
+  intake.setSelectedFilename(file.name)
+  void candidateSession.importSourceDocument({ file })
+}
+
+function readPdfFailureMessageKey({ candidateSession }: Readonly<{
+  candidateSession: CandidateSessionController
+}>) {
+  const messageKey = candidateSession.failureMessageKey
+  return isSourceDocumentIntakeFailureMessage(messageKey) ? messageKey : null
+}
+
+function PastedSourceDocumentInput({ candidateSession, intake, localization }: IntakeProps) {
+  const { translate } = localization
+  return <div className="source-document-input pasted-source-document">
+    <label htmlFor="pasted-source-document">{translate('sourceProfile.textLabel')}</label>
+    <textarea id="pasted-source-document" onChange={(event) => {
+      updateProfessionalText({ content: event.currentTarget.value, intake })
+    }} placeholder={translate('sourceProfile.textPlaceholder')} rows={10} value={intake.professionalText} />
+    {intake.textValidation === null ? null : <p className="intake-failure" role="alert">
+      {translate('sourceProfile.emptyTextFailure')}
+    </p>}
+    <button className="secondary-action" disabled={candidateSession.pendingOperation !== null}
+      onClick={() => { reviewPastedText({ candidateSession, intake }) }} type="button">
+      {translate('sourceProfile.reviewText')}</button>
+  </div>
+}
+
+function updateProfessionalText({ content, intake }: Readonly<{
+  content: string
+  intake: SourceDocumentIntake
+}>) {
+  intake.setProfessionalText(content)
+  if (content.trim().length > 0) intake.setTextValidation(null)
+}
+
+function reviewPastedText({ candidateSession, intake }: Readonly<{
+  candidateSession: CandidateSessionController
+  intake: SourceDocumentIntake
+}>) {
+  if (intake.professionalText.trim().length === 0) {
+    intake.setTextValidation('empty')
+    return
+  }
+  intake.setTextValidation(null)
+  const file = new File([intake.professionalText], 'pasted-professional-text.txt', {
+    type: 'text/plain',
+  })
+  void candidateSession.importSourceDocument({ file })
 }
 
 function SourceDocumentReview({ candidateSession, localization, sourceProfile }: SourceProfileReviewProps) {

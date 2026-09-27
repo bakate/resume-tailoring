@@ -7,7 +7,10 @@ import {
   useLocalization,
 } from '../localization/localization'
 import type { Locale, Localization } from '../localization/localization'
-import { useCandidateSession } from './use-candidate-session'
+import {
+  isSourceDocumentIntakeFailureMessage,
+  useCandidateSession,
+} from './use-candidate-session'
 import type {
   CandidateSessionController,
   CandidateSessionFailureMessageKey,
@@ -174,10 +177,21 @@ function Introduction({ candidateSession, localization }: CandidateSessionProps)
       <PrivacyNote localization={localization} />
       <FailureMessage
         localization={localization}
-        messageKey={candidateSession.failureMessageKey}
+        messageKey={readIntroductionFailureMessageKey({ candidateSession })}
       />
     </div>
   )
+}
+
+function readIntroductionFailureMessageKey({ candidateSession }: Readonly<{
+  candidateSession: CandidateSessionController
+}>) {
+  const messageKey = candidateSession.failureMessageKey
+  const sourceProfile = candidateSession.view.status === 'ready'
+    ? candidateSession.view.sourceProfile
+    : undefined
+  if (sourceProfile !== undefined) return messageKey
+  return isSourceDocumentIntakeFailureMessage(messageKey) ? null : messageKey
 }
 
 function StartSessionButton({ candidateSession, localization }: CandidateSessionProps) {

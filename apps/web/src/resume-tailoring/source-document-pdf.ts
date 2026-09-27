@@ -7,6 +7,7 @@ export function createBrowserSourceDocumentReader(): SourceDocumentReader {
 
 async function readSourceDocument(document: Parameters<SourceDocumentReader['read']>[0]):
 ReturnType<SourceDocumentReader['read']> {
+  if (document.mediaType === 'text/plain') return readPastedText({ document })
   if (!isPdf({ document })) return unsupportedResult
   try {
     const [{ getDocument, GlobalWorkerOptions }, workerModule] = await Promise.all([
@@ -25,6 +26,13 @@ ReturnType<SourceDocumentReader['read']> {
   } catch {
     return unreadableResult
   }
+}
+
+function readPastedText({ document }: Readonly<{
+  document: Parameters<SourceDocumentReader['read']>[0]
+}>) {
+  const text = new TextDecoder().decode(document.bytes).trim()
+  return text.length === 0 ? unreadableResult : { ok: true, value: text } as const
 }
 
 async function readPdfText({ pdfDocument }: Readonly<{ pdfDocument: PDFDocumentProxy }>) {

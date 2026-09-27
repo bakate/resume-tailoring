@@ -19,7 +19,7 @@ The transient, browser-local working state used to build a Source Profile. It co
 An immutable professional proposition in the Source Profile Review. It becomes a Verified Fact only after explicit Candidate confirmation.
 
 **Source Document**:
-A text-based LinkedIn PDF or existing resume supplied by the Candidate as input for the Source Profile.
+A text-based LinkedIn PDF, existing resume, or pasted professional text supplied by the Candidate as input for the Source Profile.
 _Avoid_: Profile URL, scraped profile, raw PDF
 
 **Verified Fact**:
