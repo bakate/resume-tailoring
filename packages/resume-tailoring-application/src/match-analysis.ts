@@ -122,7 +122,8 @@ function validateMatchEvidence({
   const evidence = proposedEvidence.map((proposal) => validateEvidenceProposal({
     proposal, referencedRequirementIds, requirementById, verifiedFactById,
   }))
-  return evidence.includes(null) ? null : evidence.filter((item) => item !== null)
+  const validEvidence = evidence.filter((item) => item !== null)
+  return proposedEvidence.length > 0 && validEvidence.length === 0 ? null : validEvidence
 }
 
 function validateEvidenceProposal({
@@ -301,8 +302,10 @@ const controlledTermGroups = [
   ['bilingual', 'bilingue'],
 ].map((terms) => new Set(terms))
 const controlledContextTerms = new Set([
-  'courant', 'courante', 'experience', 'fluent', 'in', 'know', 'knowledge', 'language',
-  'maitrise', 'of', 'proficiency', 'speak', 'spoken', 'used', 'using', 'with',
+  'a', 'appliquer', 'assurer', 'au', 'aux', 'avoir', 'connaitre', 'courant', 'courante',
+  'dans', 'de', 'des', 'disposer', 'du', 'en', 'etre', 'experience', 'faire', 'fluent',
+  'in', 'know', 'knowledge', 'la', 'language', 'le', 'les', 'maitrise', 'maitriser',
+  'of', 'pour', 'proficiency', 'speak', 'spoken', 'sur', 'un', 'une', 'used', 'using', 'with',
 ])
 
 const nonEvidenceTerms = new Set([

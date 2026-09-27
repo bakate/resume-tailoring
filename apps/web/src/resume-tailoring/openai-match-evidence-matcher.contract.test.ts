@@ -42,6 +42,8 @@ describe('OpenAI Match Evidence matcher contract', () => {
       text: { format: { type: 'json_schema', name: 'match_evidence', strict: true } },
     })
     expect(JSON.stringify(requestBody)).toMatch(/controlled synonyms and translations/iu)
+    expect(JSON.stringify(requestBody)).toMatch(/shortest exact contiguous/iu)
+    expect(JSON.stringify(requestBody)).toMatch(/do not calculate or combine employment date ranges/iu)
     expect(JSON.stringify(requestBody)).toMatch(
       /role, a transferable skill, or qualitative seniority as implicit proof/iu,
     )
