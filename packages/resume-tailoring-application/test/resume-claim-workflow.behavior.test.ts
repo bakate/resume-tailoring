@@ -62,6 +62,7 @@ describe('Resume Claim workflow', () => {
     await system.moveResumeClaimUp()
 
     system.expectClaimsToBeReorderedWithoutEditing()
+    system.expectClaimReorderActivityToBeRecorded()
   })
 
   it('removes a claim selected by the Candidate', async () => {
@@ -70,6 +71,7 @@ describe('Resume Claim workflow', () => {
     await system.removeResumeClaim()
 
     system.expectOnlyTheSelectedClaimToBeRemoved()
+    system.expectClaimRemovalActivityToBeRecorded()
   })
 
   it('reformulates one claim through the writing and validation workflow', async () => {
@@ -79,6 +81,7 @@ describe('Resume Claim workflow', () => {
     await system.requestResumeClaimReformulation()
 
     system.expectOnlyTheRequestedClaimToBeReformulated()
+    system.expectClaimReformulationActivityToBeRecorded()
   })
 
   it('preserves the existing Resume Claim when its reformulation is rejected', async () => {
@@ -104,6 +107,7 @@ class ResumeClaimWorkflowTestSystem {
   readonly #reformulationFactIds: string[][] = []
   readonly #writer: ResumeClaimWriter
   readonly #workflow: ResumeTailoringWorkflow
+  readonly #telemetry = createTelemetrySpy()
   #actionResult: ResumeTailoringResult<ResumeTailoringView> | undefined
   #generatedClaims: readonly ProposedResumeClaim[] = [defaultProposedClaim]
   #reformulatedClaims: ProposedResumeClaim[] = []
@@ -150,7 +154,7 @@ class ResumeClaimWorkflowTestSystem {
       },
       resumeClaimSemanticValidator: semanticValidator,
       resumeClaimWriter: this.#writer,
-      telemetry: createTelemetrySpy(),
+      telemetry: this.#telemetry,
     })
   }
 
@@ -267,6 +271,30 @@ class ResumeClaimWorkflowTestSystem {
       },
       existingTailoredResume.claims[1],
     ])
+  }
+
+  expectClaimRemovalActivityToBeRecorded() {
+    expect(this.#telemetry.recordedEvents()).toEqual([{
+      name: 'resume-correction-recorded',
+      correctionKind: 'resume-claim-removal',
+      matchScoreBand: '75-100',
+    }])
+  }
+
+  expectClaimReorderActivityToBeRecorded() {
+    expect(this.#telemetry.recordedEvents()).toEqual([{
+      name: 'resume-correction-recorded',
+      correctionKind: 'resume-claim-reorder',
+      matchScoreBand: '75-100',
+    }])
+  }
+
+  expectClaimReformulationActivityToBeRecorded() {
+    expect(this.#telemetry.recordedEvents()).toEqual([{
+      name: 'resume-correction-recorded',
+      correctionKind: 'resume-claim-reformulation',
+      matchScoreBand: '75-100',
+    }])
   }
 
   async expectReformulationToBeRejectedWithoutChangingTheResume() {

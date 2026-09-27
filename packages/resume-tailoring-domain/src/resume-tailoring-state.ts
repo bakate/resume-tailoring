@@ -124,6 +124,14 @@ export type TailoredResume = Readonly<{
   }>[]
 }>
 
+export const fidelityAssessments = ['faithful', 'needs-correction'] as const
+export const relevanceAssessments = ['relevant', 'needs-improvement'] as const
+
+export type OutcomeFeedback = Readonly<{
+  fidelity?: typeof fidelityAssessments[number]
+  relevance?: typeof relevanceAssessments[number]
+}>
+
 export type JobPostingReview = Readonly<{
   status: 'reviewing-posting' | 'reviewing-requirements'
   detectedSensitiveContent: readonly SensitiveContent[]
@@ -147,6 +155,7 @@ export type ResumeTailoringState =
       readonly sourceProfile?: SourceProfileReview
       readonly jobPosting?: JobPostingReview
       readonly matchAnalysis?: MatchAnalysis
+      readonly outcomeFeedback?: OutcomeFeedback
       readonly tailoredResume?: TailoredResume
     }
 

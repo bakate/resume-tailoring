@@ -2,6 +2,7 @@ import type {
   CandidateSessionId,
   JobPostingReview,
   MatchAnalysis,
+  OutcomeFeedback,
   ResumeClaimId,
   SourceProfileFact,
   SourceProfileFactId,
@@ -71,6 +72,15 @@ export type ResumeTailoringCommand =
       readonly claimId: ResumeClaimId
       readonly request: string
     }
+  | {
+      readonly type: 'rate-tailored-resume-fidelity'
+      readonly assessment: 'faithful' | 'needs-correction'
+    }
+  | {
+      readonly type: 'rate-tailored-resume-relevance'
+      readonly assessment: 'relevant' | 'needs-improvement'
+    }
+  | { readonly type: 'record-tailored-resume-download' }
 
 export type ResumeTailoringView =
   | { readonly status: 'not-started' }
@@ -81,6 +91,7 @@ export type ResumeTailoringView =
       readonly sourceProfile?: SourceProfileReview
       readonly jobPosting?: JobPostingReview
       readonly matchAnalysis?: MatchAnalysis
+      readonly outcomeFeedback?: OutcomeFeedback
       readonly tailoredResume?: TailoredResume
     }
 

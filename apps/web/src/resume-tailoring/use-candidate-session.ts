@@ -73,6 +73,7 @@ export function useCandidateSession() {
     ...createJobPostingActions({ workflow, setState }),
     ...createMatchAnalysisActions({ workflow, setState }),
     ...createResumeClaimActions({ workflow, setState }),
+    ...createMvpOutcomeActions({ workflow, setState }),
   }
 }
 
@@ -159,6 +160,19 @@ function createResumeClaimActions({ workflow, setState }: CandidateSessionAction
       claimId: ResumeClaimId
       request: string
     }>) => execute({ type: 'reformulate-resume-claim', claimId, request }),
+  }
+}
+
+function createMvpOutcomeActions({ workflow, setState }: CandidateSessionActionDependencies) {
+  const execute = (command: ResumeTailoringCommand) => executeCommand({ workflow, setState, command })
+  return {
+    rateTailoredResumeFidelity: ({ assessment }: Readonly<{
+      assessment: 'faithful' | 'needs-correction'
+    }>) => execute({ type: 'rate-tailored-resume-fidelity', assessment }),
+    rateTailoredResumeRelevance: ({ assessment }: Readonly<{
+      assessment: 'relevant' | 'needs-improvement'
+    }>) => execute({ type: 'rate-tailored-resume-relevance', assessment }),
+    recordTailoredResumeDownload: () => execute({ type: 'record-tailored-resume-download' }),
   }
 }
 

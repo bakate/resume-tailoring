@@ -73,3 +73,19 @@ _Avoid_: Generated statement, inferred claim
 **Gap Analysis**:
 An explanation of important Job Posting requirements that are not supported by Verified Facts.
 _Avoid_: Missing skills, weaknesses
+
+**Outcome Feedback**:
+The Candidate's browser-local assessment of whether a Tailored Resume is faithful to their professional history and relevant to the target role. Each assessment is recorded at most once per Candidate session for aggregate MVP measurement.
+_Avoid_: Candidate satisfaction profile, professional-history analytics
+
+**Correction Activity**:
+A privacy-safe operational count of Source Profile Fact corrections and Resume Claim removal, reordering, or reformulation. It records only the correction category and an optional Match Score band, never the corrected content.
+_Avoid_: Edit history, Candidate activity log
+
+**Successful Download**:
+The operational event recorded after a validated Tailored Resume PDF has been created and handed to the browser for download.
+_Avoid_: Stored resume, tracked document
+
+**MVP Outcome Analytics**:
+Aggregate counters for Outcome Feedback, Correction Activity, and Successful Downloads. They may be grouped by Match Score band but never contain Candidate identifiers or Candidate content.
+_Avoid_: Candidate analytics, profile analytics
