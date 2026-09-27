@@ -1306,7 +1306,7 @@ class ResumeTailoringBrowserTestSystem {
     await this.givenSourceProfileExtractionCanBeDelayed()
     await this.startSourceProfileExtraction()
     await this.#page.getByText('Extracting professional facts…').waitFor()
-    await this.#page.getByRole('button', { name: 'Delete private session' }).click()
+    await this.#openPrivateSessionDeletionConfirmation({ page: this.#page })
   }
 
   async givenFrenchCandidateSessionIsActive() {
@@ -1345,14 +1345,19 @@ class ResumeTailoringBrowserTestSystem {
   }
 
   async deleteResumeTailoringSessionInSecondTab({ secondPage }: Readonly<{ secondPage: Page }>) {
-    await secondPage.getByRole('button', { name: 'Delete private session' }).click()
-    await secondPage.getByRole('button', { name: 'Delete session now' }).click()
+    await this.#openPrivateSessionDeletionConfirmation({ page: secondPage })
+    await this.#confirmPrivateSessionDeletion({ page: secondPage })
     this.#completedAction = 'candidate-session-synchronized'
   }
 
   async cancelPrivateSessionDeletion() {
     await this.#page.getByRole('button', { name: 'Cancel' }).click()
     this.#completedAction = 'private-session-deletion-canceled'
+  }
+
+  async confirmPrivateSessionDeletion() {
+    await this.#confirmPrivateSessionDeletion({ page: this.#page })
+    this.#completedAction = 'private-session-deletion-confirmed'
   }
 
   async expireResumeTailoringSessionInBothTabs({ secondPage }: Readonly<{ secondPage: Page }>) {
@@ -1401,7 +1406,7 @@ class ResumeTailoringBrowserTestSystem {
   }
 
   async openPrivateSessionDeletionConfirmation() {
-    await this.#page.getByRole('button', { name: 'Delete private session' }).click()
+    await this.#openPrivateSessionDeletionConfirmation({ page: this.#page })
     this.#completedAction = 'private-session-deletion-confirmation-opened'
   }
 
@@ -1504,11 +1509,23 @@ class ResumeTailoringBrowserTestSystem {
   }
 
   async #restartCandidateSession() {
-    await this.#page.getByRole('button', { name: 'Delete private session' }).click()
-    await this.#page.getByRole('button', { name: 'Delete session now' }).click()
+    await this.#openPrivateSessionDeletionConfirmation({ page: this.#page })
+    await this.#confirmPrivateSessionDeletion({ page: this.#page })
     const startButton = this.#page.getByRole('button', { name: 'Start tailoring' })
     await startButton.waitFor()
     await startButton.click()
+  }
+
+  async #openPrivateSessionDeletionConfirmation({ page }: Readonly<{ page: Page }>) {
+    await page.getByRole('button', {
+      name: /Delete private session|Supprimer ma session privée/,
+    }).click()
+  }
+
+  async #confirmPrivateSessionDeletion({ page }: Readonly<{ page: Page }>) {
+    await page.getByRole('button', {
+      name: /Delete session now|Supprimer la session maintenant/,
+    }).click()
   }
 
   async #givenRecoverableSourceProfileExtractionFailure() {

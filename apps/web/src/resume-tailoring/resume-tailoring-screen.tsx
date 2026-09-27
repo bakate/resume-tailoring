@@ -44,7 +44,7 @@ function LocalizedResumeTailoringScreen({ localization }: LocalizationProps) {
     <WorkflowHero {...{ activeStep, candidateSession, currentStep, localization, selectStep }} />
     <OperationFeedback {...{ candidateSession, localization }} />
     <ActiveWorkflowStep {...{ activeStep, candidateSession, localization }} />
-    <DeleteSessionButton candidateSession={candidateSession} localization={localization} />
+    <DeleteSessionControls candidateSession={candidateSession} localization={localization} />
     <ValueStrip localization={localization} />
   </main>
 }
@@ -437,73 +437,100 @@ function readOperationResultStep({ fallback, operation }: Readonly<{
   return fallback
 }
 
-function DeleteSessionButton({ candidateSession, localization }: CandidateSessionProps) {
-  const { translate } = localization
+function DeleteSessionControls({ candidateSession, localization }: CandidateSessionProps) {
+  const confirmation = useDeleteSessionConfirmation()
+  if (candidateSession.view.status !== 'ready') return null
+  return <section className="session-controls"
+    aria-label={localization.translate('session.controlsLabel')}>
+    <DeleteSessionTrigger {...{ confirmation, localization }} />
+    <DeleteSessionDialog {...{ candidateSession, confirmation, localization }} />
+  </section>
+}
+
+function useDeleteSessionConfirmation() {
   const [confirmationOpen, setConfirmationOpen] = useState(false)
   const confirmationReference = useRef<HTMLDialogElement>(null)
-  const deleteButtonReference = useRef<HTMLButtonElement>(null)
+  const triggerReference = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (confirmationOpen) confirmationReference.current?.showModal()
   }, [confirmationOpen])
-  if (candidateSession.view.status !== 'ready') return null
-  return (
-    <section className="session-controls" aria-label={translate('session.controlsLabel')}>
-      <button
-        className="delete-session-action"
-        onClick={() => { setConfirmationOpen(true) }}
-        ref={deleteButtonReference}
-        type="button"
-      >
-        {translate('session.delete')}
-      </button>
-      <dialog
-        aria-labelledby="delete-session-title"
-        className="delete-session-dialog"
-        onCancel={(event) => {
-          event.preventDefault()
-          confirmationReference.current?.close()
-        }}
-        onClose={() => {
-          setConfirmationOpen(false)
-          deleteButtonReference.current?.focus()
-        }}
-        onKeyDown={(event) => {
-          trapDialogFocus({ dialog: confirmationReference.current, event })
-        }}
-        ref={confirmationReference}
-        role="alertdialog"
-      >
-        <h2 id="delete-session-title">{translate('session.deleteDialogTitle')}</h2>
-        <p>{translate('session.deleteDialogDescription')}</p>
-        <p>{translate('session.deleteContentIntro')}</p>
-        <ul>
-          <li>{translate('session.deleteSourceDocument')}</li>
-          <li>{translate('session.deleteSourceProfile')}</li>
-          <li>{translate('session.deleteJobPosting')}</li>
-          <li>{translate('session.deleteMatchAnalysis')}</li>
-          <li>{translate('session.deleteTailoredResume')}</li>
-          <li>{translate('session.deletePhoto')}</li>
-        </ul>
-        <div className="delete-session-dialog-actions">
-          <button autoFocus onClick={() => { confirmationReference.current?.close() }} type="button">
-            {translate('session.deleteCancel')}
-          </button>
-          <button
-            className="destructive-action"
-            onClick={() => {
-              void candidateSession.delete().then((result) => {
-                if (result.ok) focusElementById({ elementId: 'start-tailoring' })
-              })
-            }}
-            type="button"
-          >
-            {translate('session.deleteConfirm')}
-          </button>
-        </div>
-      </dialog>
-    </section>
-  )
+  return {
+    close: () => { confirmationReference.current?.close() },
+    confirmationReference,
+    open: () => { setConfirmationOpen(true) },
+    restoreTriggerFocus: () => {
+      setConfirmationOpen(false)
+      triggerReference.current?.focus()
+    },
+    triggerReference,
+  } as const
 }
+
+type DeleteSessionConfirmation = ReturnType<typeof useDeleteSessionConfirmation>
+type DeleteSessionConfirmationProps = CandidateSessionProps & Readonly<{
+  confirmation: DeleteSessionConfirmation
+}>
+
+function DeleteSessionTrigger({ confirmation, localization }: Omit<
+DeleteSessionConfirmationProps, 'candidateSession'>) {
+  return <button
+    className="delete-session-action"
+    onClick={confirmation.open}
+    ref={confirmation.triggerReference}
+    type="button"
+  >{localization.translate('session.delete')}</button>
+}
+
+function DeleteSessionDialog({ candidateSession, confirmation, localization }:
+DeleteSessionConfirmationProps) {
+  return <dialog aria-labelledby="delete-session-title" className="delete-session-dialog"
+    onCancel={(event) => {
+      event.preventDefault()
+      confirmation.close()
+    }}
+    onClose={confirmation.restoreTriggerFocus}
+    onKeyDown={(event) => {
+      trapDialogFocus({ dialog: confirmation.confirmationReference.current, event })
+    }}
+    ref={confirmation.confirmationReference} role="alertdialog">
+    <DeleteSessionDescription localization={localization} />
+    <DeleteSessionDialogActions {...{ candidateSession, confirmation, localization }} />
+  </dialog>
+}
+
+function DeleteSessionDescription({ localization }: LocalizationProps) {
+  const { translate } = localization
+  return <>
+    <h2 id="delete-session-title">{translate('session.deleteDialogTitle')}</h2>
+    <p>{translate('session.deleteDialogDescription')}</p>
+    <p>{translate('session.deleteContentIntro')}</p>
+    <ul>{deleteSessionContentKeys.map((key) => <li key={key}>{translate(key)}</li>)}</ul>
+  </>
+}
+
+function DeleteSessionDialogActions(props: DeleteSessionConfirmationProps) {
+  const { candidateSession, confirmation, localization } = props
+  return <div className="delete-session-dialog-actions">
+    <button autoFocus onClick={confirmation.close} type="button">
+      {localization.translate('session.deleteCancel')}
+    </button>
+    <button className="destructive-action" onClick={() => {
+      void deleteCandidateSession({ candidateSession })
+    }} type="button">{localization.translate('session.deleteConfirm')}</button>
+  </div>
+}
+
+async function deleteCandidateSession({ candidateSession }: Readonly<{
+  candidateSession: CandidateSessionController
+}>) {
+  const result = await candidateSession.delete()
+  if (result.ok) focusElementById({ elementId: 'start-tailoring' })
+}
+
+const deleteSessionContentKeys = [
+  'session.deleteSourceDocument', 'session.deleteSourceProfile', 'session.deleteJobPosting',
+  'session.deleteMatchAnalysis', 'session.deleteTailoredResume', 'session.deletePhoto',
+] as const
 
 function trapDialogFocus({ dialog, event }: Readonly<{
   dialog: HTMLDialogElement | null
