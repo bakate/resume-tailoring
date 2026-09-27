@@ -116,7 +116,9 @@ StructuredScoringRequest<'job-requirement-extraction'>) {
     reasoningEffort: configuration.reasoningEffort, request,
   })
   const result = await extractor.extract({ jobPostingContent: fixture.jobPostingContent })
-  const values = result.ok ? result.value.map(({ sourceExcerpt }) => sourceExcerpt) : []
+  const values = result.ok
+    ? result.value.requirements.map(({ sourceExcerpt }) => sourceExcerpt)
+    : []
   const scores = createExtractionScores({ expectedValues: fixture.expectedSourceExcerpts, values })
   return {
     ...scores,

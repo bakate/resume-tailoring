@@ -7,6 +7,7 @@ import type {
   JobRequirementId,
   JobRequirementContent,
   JobRequirement,
+  JobPostingTargetRole,
   OutcomeFeedback,
   SourceProfileFact,
   ResumeClaim,
@@ -37,6 +38,7 @@ export type {
   SourceProfileReviewStatus,
   JobPostingReview,
   JobRequirement,
+  JobPostingTargetRole,
   JobRequirementClassification,
   JobRequirementContent,
   JobRequirementGroupId,
@@ -159,7 +161,13 @@ export type JobRequirementExtractor = {
   readonly extract: (request: Readonly<{
     jobPostingContent: string
   }>) => Promise<
-    | { readonly ok: true; readonly value: readonly JobRequirementContent[] }
+    | {
+        readonly ok: true
+        readonly value: Readonly<{
+          targetRole: JobPostingTargetRole | null
+          requirements: readonly JobRequirementContent[]
+        }>
+      }
     | {
         readonly ok: false
         readonly error: {

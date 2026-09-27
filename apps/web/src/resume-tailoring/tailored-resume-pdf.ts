@@ -14,6 +14,7 @@ import type { Browser, Page } from 'puppeteer'
 
 import type { ResumePdfFailureType, TailoredResumePdfInputs } from './tailored-resume-contract'
 import { renderTailoredResumeHtml } from './tailored-resume-html'
+import { readTailoredResumeTitle } from './tailored-resume-html'
 import type { TailoredResumeRenderInputs } from './tailored-resume-html'
 import { hasTailoredResumeOverflow } from './tailored-resume-layout'
 
@@ -152,6 +153,7 @@ function createRenderInputs({ document, inputs }: Readonly<{
     contactItems: inputs.contactItems,
     document,
     locale: inputs.locale,
+    targetRole: inputs.targetRole,
     ...(inputs.photoDataUrl === undefined ? {} : { photoDataUrl: inputs.photoDataUrl }),
   }
 }
@@ -218,7 +220,7 @@ function hasExpectedReadingOrder({ inputs, extractedTextItems }: Readonly<{
   extractedTextItems: readonly string[]
 }>) {
   const expectedText = [
-    inputs.locale === 'fr' ? 'CV adapté' : 'Tailored Resume',
+    readTailoredResumeTitle(inputs),
     ...inputs.contactItems.map(({ value }) => value),
     ...inputs.document.items.map(({ text }) => text),
   ]

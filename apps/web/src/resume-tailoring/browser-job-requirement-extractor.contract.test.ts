@@ -3,6 +3,29 @@ import { describe, expect, it } from 'vitest'
 import { createBrowserJobRequirementExtractor } from './browser-adapters'
 
 describe('browser Job Requirement extractor contract', () => {
+  it('carries a source-backed target role from the server into browser-local state', async () => {
+    const targetRole = 'Senior FullStack Developer'
+    const extractor = createBrowserJobRequirementExtractor({
+      request: () => Promise.resolve(Response.json({
+        ok: true,
+        value: {
+          targetRole: { sourceExcerpt: targetRole, value: targetRole },
+          requirements: [],
+        },
+      })),
+    })
+
+    const result = await extractor.extract({ jobPostingContent: `Role: ${targetRole}` })
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        targetRole: { sourceExcerpt: targetRole, value: targetRole },
+        requirements: [],
+      },
+    })
+  })
+
   it('maps network failures to a typed recoverable transport failure', async () => {
     const extractor = createBrowserJobRequirementExtractor({
       request: () => Promise.reject(new TypeError('Network unavailable')),

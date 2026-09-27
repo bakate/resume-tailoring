@@ -67,6 +67,7 @@ const representativePdfInputs = {
     { kind: 'email', value: 'synthetic-candidate@example.invalid' },
     { kind: 'url', value: 'https://example.invalid/portfolio' },
   ],
+  jobPostingContent: 'We are hiring a Senior FullStack Developer for our platform team.',
   locale: 'en',
   source: {
     claims: representativeFacts.map(([factSuffix, , value]) => ({
@@ -86,6 +87,10 @@ const representativePdfInputs = {
       kind,
       value,
     })),
+  },
+  targetRole: {
+    sourceExcerpt: 'Senior FullStack Developer',
+    value: 'Senior FullStack Developer',
   },
 } as const satisfies TailoredResumePdfInputs
 

@@ -20,6 +20,7 @@ export function createReviewingJobPosting({ content }: Readonly<{
     status: 'reviewing-posting',
     ...minimizedContent,
     processingNotice: null,
+    targetRole: null,
     requirements: [],
   }
 }
@@ -34,6 +35,7 @@ export function updateJobPosting({
     status: 'reviewing-posting',
     ...minimizeSensitiveContent({ content: outgoingContent }),
     processingNotice: null,
+    targetRole: null,
     requirements: [],
   }
 }

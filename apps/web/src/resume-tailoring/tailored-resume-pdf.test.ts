@@ -26,6 +26,15 @@ describe('createTailoredResumePdf', () => {
     expect(parsedRequest.success).toBe(false)
   })
 
+  it('rejects a target role absent from the reviewed Job Posting content', () => {
+    const parsedRequest = resumePdfRequestSchema.safeParse({
+      ...inputs,
+      jobPostingContent: 'TypeScript is required.',
+    })
+
+    expect(parsedRequest.success).toBe(false)
+  })
+
   it('returns an actionable typed failure when required content cannot fit', async () => {
     const result = await createTailoredResumePdf({
       inputs: { ...inputs, source: createOverflowingRequiredSource() },
@@ -103,16 +112,29 @@ describe('createTailoredResumePdf', () => {
   it.each([
     {
       extractedTextItems: [
-        'Tailored Resume', 'candidate@example.com', 'Used TypeScript',
+        'Senior FullStack Developer', 'candidate@example.com', 'Used TypeScript',
       ],
       variant: 'missing retained content',
     },
     {
       extractedTextItems: [
-        'Tailored Resume', 'candidate@example.com',
+        'Senior FullStack Developer', 'candidate@example.com',
         'Used TypeScript', 'Delivered 30% faster releases',
       ],
       variant: 'reordered retained content',
+    },
+    {
+      extractedTextItems: [
+        'candidate@example.com', 'Delivered 30% faster releases', 'Used TypeScript',
+      ],
+      variant: 'missing target role title',
+    },
+    {
+      extractedTextItems: [
+        'candidate@example.com', 'Senior FullStack Developer',
+        'Delivered 30% faster releases', 'Used TypeScript',
+      ],
+      variant: 'reordered target role title',
     },
   ])('rejects $variant extracted from the PDF', async ({ extractedTextItems }) => {
     const result = await createTailoredResumePdf({
@@ -156,7 +178,12 @@ const verifiedFacts = [
 
 const inputs = {
   contactItems: [{ kind: 'email', value: 'candidate@example.com' }],
+  jobPostingContent: 'Role: Senior FullStack Developer',
   locale: 'en',
+  targetRole: {
+    sourceExcerpt: 'Role: Senior FullStack Developer',
+    value: 'Senior FullStack Developer',
+  },
   source: {
     claims: validatedClaims,
     evidence: [{
@@ -187,10 +214,12 @@ function createFrenchInputs({ photoDataUrl }: Readonly<{
 }>): TailoredResumePdfInputs {
   return {
     contactItems: [
-      { kind: 'email', value: 'bakateba@gmail.com' },
-      { kind: 'phone', value: '+33 6 10 57 40 00' },
+      { kind: 'email', value: 'synthetic-candidate@example.invalid' },
+      { kind: 'phone', value: '+1 202 555 0100' },
     ],
+    jobPostingContent: '',
     locale: 'fr',
+    targetRole: null,
     ...(photoDataUrl === undefined ? {} : { photoDataUrl }),
     source: frenchSource,
   }
@@ -272,7 +301,7 @@ async function expectFrenchSelectableText({ pdfBytes }: Readonly<{ pdfBytes: Uin
 
     expect(selectableText).toContain('CV adapté')
     expect(selectableText).toContain('Points clés sélectionnés')
-    expect(selectableText).toContain('bakateba@gmail.com')
+    expect(selectableText).toContain('synthetic-candidate@example.invalid')
     expect(selectableText).toContain('Connaissance de HTML5.')
     expect(selectableText).toContain('Maîtrise de RxJS, utilisé pour la gestion d')
   } finally {

@@ -38,6 +38,10 @@ _Avoid_: Job offer URL, advert, listing
 The browser-local working state used to minimize one Job Posting, confirm its current processing notice, and review its extracted Job Requirements.
 _Avoid_: Stored job, server-side posting, listing review
 
+**Target Role**:
+The unambiguous role title copied from an exact Job Posting excerpt and reviewed by the Candidate before it becomes the Tailored Resume heading. When the Job Posting does not state one, the interface uses an explicit localized fallback instead of inventing a role.
+_Avoid_: Inferred title, desired role, generated headline
+
 **Job Requirement**:
 An explicit qualification or expectation extracted from a Job Posting and classified as required or preferred.
 _Avoid_: Keyword, criterion

@@ -14,6 +14,10 @@ import {
   jobRequirementSourceExcerptMaximumCharacters,
   jobRequirementValueMaximumCharacters,
 } from './job-requirement-schemas'
+import {
+  jobPostingTargetRoleMaximumCharacters,
+  jobPostingTargetRoleSourceExcerptMaximumCharacters,
+} from './job-posting-target-role-schema'
 
 type OpenAiExtractorDependencies = Readonly<{
   apiKey: string
@@ -116,12 +120,16 @@ function parseRequirements({
   const result = extractedJobRequirementsSchema.safeParse(value)
   if (!result.success) return extractionUnavailableResult
   if (!hasOnlyJobPostingSourceExcerpts({
-    jobPostingContent, requirements: result.data.requirements,
+    jobPostingContent,
+    requirements: result.data.requirements,
+    targetRole: result.data.targetRole,
   })) return extractionUnavailableResult
-  return { ok: true, value: result.data.requirements } as const
+  return { ok: true, value: result.data } as const
 }
 
 const extractionInstructions = [
+  'Extract targetRole only when the Job Posting states one unambiguous role; otherwise return null.',
+  'Copy targetRole.sourceExcerpt exactly from the Job Posting and copy targetRole.value as an exact substring of that excerpt.',
   'Extract every explicit qualification or expectation from the Job Posting.',
   'Classify each one as required only when mandatory wording is explicit; otherwise use preferred.',
   'Split compound passages into indivisible requirements.',
@@ -136,8 +144,26 @@ const jobRequirementResponseFormat = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['requirements'],
+    required: ['targetRole', 'requirements'],
     properties: {
+      targetRole: {
+        anyOf: [
+          { type: 'null' },
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['sourceExcerpt', 'value'],
+            properties: {
+              sourceExcerpt: {
+                type: 'string',
+                minLength: 1,
+                maxLength: jobPostingTargetRoleSourceExcerptMaximumCharacters,
+              },
+              value: { type: 'string', minLength: 1, maxLength: jobPostingTargetRoleMaximumCharacters },
+            },
+          },
+        ],
+      },
       requirements: {
         type: 'array',
         maxItems: jobRequirementMaximumCount,

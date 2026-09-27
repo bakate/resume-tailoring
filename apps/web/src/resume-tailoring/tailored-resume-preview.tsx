@@ -150,6 +150,8 @@ function readPreviewSource({ view }: Readonly<{ view: CandidateSessionController
     || view.tailoredResume === undefined) return null
   return {
     contactItems: readContactItems({ sourceProfile: view.sourceProfile }),
+    jobPostingContent: view.jobPosting.outgoingContent,
+    targetRole: view.jobPosting.targetRole ?? null,
     source: {
       claims: view.tailoredResume.claims,
       evidence: view.matchAnalysis.evidence,
@@ -171,6 +173,7 @@ function createPresentation({ locale, photoDataUrl, previewSource }: Readonly<{
   return {
     contactItems: previewSource.contactItems,
     locale,
+    targetRole: previewSource.targetRole,
     ...(photoDataUrl === undefined ? {} : { photoDataUrl }),
   }
 }
@@ -183,6 +186,7 @@ function createPreview({ document, presentation, previewSource }: Readonly<{
   return {
     exportInputs: {
       ...presentation,
+      jobPostingContent: previewSource.jobPostingContent,
       source: previewSource.source,
     },
     html: renderTailoredResumeHtml({ ...presentation, document }),

@@ -164,6 +164,7 @@ function ExtractJobRequirementsButton({
 function JobRequirementReview({ jobPosting, localization }: ReviewProps) {
   return (
     <div className="source-profile-card">
+      <TargetRoleReview {...{ jobPosting, localization }} />
       <h3>{localization.translate('jobPosting.requirementsTitle')}</h3>
       <ul className="source-fact-list">
         {jobPosting.requirements.map((requirement) => (
@@ -172,6 +173,22 @@ function JobRequirementReview({ jobPosting, localization }: ReviewProps) {
       </ul>
     </div>
   )
+}
+
+function TargetRoleReview({ jobPosting, localization }: Omit<ReviewProps, 'candidateSession'>) {
+  const targetRole = jobPosting.targetRole
+  return <section aria-labelledby="target-role-title">
+    <h3 id="target-role-title">{localization.translate('jobPosting.targetRoleTitle')}</h3>
+    {targetRole === null || targetRole === undefined
+      ? <p>{localization.translate('jobPosting.targetRoleFallback')}</p>
+      : <>
+        <strong>{targetRole.value}</strong>
+        <p className="source-excerpt">
+          <strong>{localization.translate('jobPosting.sourceExcerpt')}</strong>
+          <span>{targetRole.sourceExcerpt}</span>
+        </p>
+      </>}
+  </section>
 }
 
 function JobRequirementCard({ localization, requirement }: Readonly<{

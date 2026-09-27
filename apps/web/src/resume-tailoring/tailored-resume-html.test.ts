@@ -8,9 +8,14 @@ describe('renderTailoredResumeHtml', () => {
       contactItems: [{ kind: 'email', value: 'candidate@example.com' }],
       document: tailoredResumeDocument,
       locale: 'en',
+      targetRole: {
+        sourceExcerpt: 'Role: Senior FullStack Developer',
+        value: 'Senior FullStack Developer',
+      },
     })
 
     expect(html).toContain('<main class="resume-page"')
+    expect(html).toContain('<h1 id="resume-title">Senior FullStack Developer</h1>')
     expect(html).toContain('<address class="resume-contact">candidate@example.com</address>')
     expect(html).toContain('<section aria-labelledby="highlights-title">')
     expect(html).toContain('<li>Delivered 30% faster releases</li>')
@@ -25,11 +30,28 @@ describe('renderTailoredResumeHtml', () => {
       document: tailoredResumeDocument,
       locale: 'fr',
       photoDataUrl: 'data:image/png;base64,cGhvdG8=',
+      targetRole: null,
     })
 
     expect(html).toContain('<html lang="fr"')
+    expect(html).toContain('<h1 id="resume-title">CV adapté</h1>')
     expect(html).toContain('<img class="resume-photo" alt=""')
     expect(html).toContain('data:image/png;base64,cGhvdG8=')
+  })
+
+  it('escapes the source-backed target role before rendering HTML', () => {
+    const html = renderTailoredResumeHtml({
+      contactItems: [],
+      document: tailoredResumeDocument,
+      locale: 'en',
+      targetRole: {
+        sourceExcerpt: 'Senior <script>alert(1)</script> Developer',
+        value: 'Senior <script>alert(1)</script> Developer',
+      },
+    })
+
+    expect(html).toContain('Senior &lt;script&gt;alert(1)&lt;/script&gt; Developer')
+    expect(html).not.toContain('<script>alert(1)</script>')
   })
 })
 
