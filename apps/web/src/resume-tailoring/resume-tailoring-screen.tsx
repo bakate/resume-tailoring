@@ -1,6 +1,7 @@
 import type { ResumeTailoringView } from '@resume-tailoring/application/resume-tailoring-workflow'
 import type { ResumeTailoringCommand } from '@resume-tailoring/application/resume-tailoring-workflow'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 
 import {
   LocalizationFailure,
@@ -43,6 +44,7 @@ function LocalizedResumeTailoringScreen({ localization }: LocalizationProps) {
     <WorkflowHero {...{ activeStep, candidateSession, currentStep, localization, selectStep }} />
     <OperationFeedback {...{ candidateSession, localization }} />
     <ActiveWorkflowStep {...{ activeStep, candidateSession, localization }} />
+    <DeleteSessionButton candidateSession={candidateSession} localization={localization} />
     <ValueStrip localization={localization} />
   </main>
 }
@@ -200,6 +202,7 @@ function StartSessionButton({ candidateSession, localization }: CandidateSession
     <button
       className="primary-action"
       disabled={!candidateSession.isHydrated || candidateSession.view.status === 'ready'}
+      id="start-tailoring"
       onClick={() => void candidateSession.start()}
       type="button"
     >
@@ -242,7 +245,6 @@ function WorkflowSummary(props: WorkflowHeroProps) {
       <h2>{translate('workflow.title')}</h2>
       <WorkflowStatus localization={localization} view={candidateSession.view} />
       <WorkflowSteps {...props} />
-      <DeleteSessionButton candidateSession={candidateSession} localization={localization} />
     </div>
   )
 }
@@ -437,16 +439,84 @@ function readOperationResultStep({ fallback, operation }: Readonly<{
 
 function DeleteSessionButton({ candidateSession, localization }: CandidateSessionProps) {
   const { translate } = localization
+  const [confirmationOpen, setConfirmationOpen] = useState(false)
+  const confirmationReference = useRef<HTMLDialogElement>(null)
+  const deleteButtonReference = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (confirmationOpen) confirmationReference.current?.showModal()
+  }, [confirmationOpen])
   if (candidateSession.view.status !== 'ready') return null
   return (
-    <button
-      className="delete-session-action"
-      onClick={() => void candidateSession.delete()}
-      type="button"
-    >
-      {translate('session.delete')}
-    </button>
+    <section className="session-controls" aria-label={translate('session.controlsLabel')}>
+      <button
+        className="delete-session-action"
+        onClick={() => { setConfirmationOpen(true) }}
+        ref={deleteButtonReference}
+        type="button"
+      >
+        {translate('session.delete')}
+      </button>
+      <dialog
+        aria-labelledby="delete-session-title"
+        className="delete-session-dialog"
+        onCancel={(event) => {
+          event.preventDefault()
+          confirmationReference.current?.close()
+        }}
+        onClose={() => {
+          setConfirmationOpen(false)
+          deleteButtonReference.current?.focus()
+        }}
+        onKeyDown={(event) => {
+          trapDialogFocus({ dialog: confirmationReference.current, event })
+        }}
+        ref={confirmationReference}
+        role="alertdialog"
+      >
+        <h2 id="delete-session-title">{translate('session.deleteDialogTitle')}</h2>
+        <p>{translate('session.deleteDialogDescription')}</p>
+        <p>{translate('session.deleteContentIntro')}</p>
+        <ul>
+          <li>{translate('session.deleteSourceDocument')}</li>
+          <li>{translate('session.deleteSourceProfile')}</li>
+          <li>{translate('session.deleteJobPosting')}</li>
+          <li>{translate('session.deleteMatchAnalysis')}</li>
+          <li>{translate('session.deleteTailoredResume')}</li>
+          <li>{translate('session.deletePhoto')}</li>
+        </ul>
+        <div className="delete-session-dialog-actions">
+          <button autoFocus onClick={() => { confirmationReference.current?.close() }} type="button">
+            {translate('session.deleteCancel')}
+          </button>
+          <button
+            className="destructive-action"
+            onClick={() => {
+              void candidateSession.delete().then((result) => {
+                if (result.ok) focusElementById({ elementId: 'start-tailoring' })
+              })
+            }}
+            type="button"
+          >
+            {translate('session.deleteConfirm')}
+          </button>
+        </div>
+      </dialog>
+    </section>
   )
+}
+
+function trapDialogFocus({ dialog, event }: Readonly<{
+  dialog: HTMLDialogElement | null
+  event: ReactKeyboardEvent<HTMLDialogElement>
+}>) {
+  if (dialog === null || event.key !== 'Tab') return
+  const focusableControls = [...dialog.querySelectorAll<HTMLButtonElement>('button:not([disabled])')]
+  const firstControl = focusableControls[0]
+  const lastControl = focusableControls.at(-1)
+  if (event.shiftKey && document.activeElement === firstControl) lastControl?.focus()
+  else if (!event.shiftKey && document.activeElement === lastControl) firstControl?.focus()
+  else return
+  event.preventDefault()
 }
 
 function ValueStrip({ localization }: LocalizationProps) {

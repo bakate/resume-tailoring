@@ -475,6 +475,7 @@ const pendingOperations = new Set<ResumeTailoringCommand['type']>([
   'reformulate-resume-claim',
 ])
 const concurrentSafeCommands = new Set<ResumeTailoringCommand['type']>([
+  'delete-session',
   'rate-tailored-resume-fidelity',
   'rate-tailored-resume-relevance',
 ])
