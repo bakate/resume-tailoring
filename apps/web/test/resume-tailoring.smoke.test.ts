@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 import type { CandidateSessionPersistence } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 
 import { jobRequirementExtractionMaximumCharacters } from '../src/resume-tailoring/job-requirement-schemas'
@@ -177,6 +177,53 @@ test('a Candidate builds a Verified Source Profile from minimized PDF content', 
   await system.buildVerifiedSourceProfile()
 
   await system.expectVerifiedSourceProfileBuiltFromMinimizedContent()
+})
+
+test('a Candidate reviews outgoing Source Document content and consent in one surface', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.reviewSourceDocumentBeforeConsent()
+
+  await system.expectCoherentSourceDocumentReviewSurface()
+})
+
+test('Source Profile extraction exposes pending, success, and recoverable failure states', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenSourceProfileExtractionCanBeDelayed()
+  await system.startSourceProfileExtraction()
+  await system.expectPendingSourceProfileExtractionThenSuccess()
+
+  await system.restartWithRecoverableSourceProfileExtractionFailure()
+  await system.retryFailedSourceProfileExtraction()
+  await system.expectRetriedSourceProfileExtractionToSucceed()
+})
+
+test('a Candidate confirms only selected visible facts in one domain group', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenDetailedSourceProfileExtractionIsAvailable()
+  await system.extractDetailedSourceProfileFacts()
+
+  await system.selectAndConfirmVisibleExperienceFacts()
+
+  await system.expectOnlyEligibleExperienceFactsToBeBatchConfirmed()
+})
+
+test('conflict resolution and immutable correction remain in the facts review', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenDetailedSourceProfileExtractionIsAvailable()
+  await system.extractDetailedSourceProfileFacts()
+
+  await system.resolveVisibleEducationConflict()
+  await system.correctVisibleSkillFact()
+
+  await system.expectConflictResolutionAndImmutableCorrection()
 })
 
 test('a Candidate restores the Verified Source Profile after reload', async ({ page }) => {
@@ -415,6 +462,12 @@ type CompletedAction =
   | 'resume-claims-reloaded'
   | 'resume-pdf-downloaded'
   | 'source-profile-built'
+  | 'source-document-reviewed'
+  | 'source-profile-batch-confirmed'
+  | 'source-profile-extraction-retried'
+  | 'source-profile-extraction-started'
+  | 'source-profile-facts-corrected'
+  | 'source-profile-facts-extracted'
   | 'source-profile-reloaded'
   | 'unknown-page-opened'
 
@@ -429,7 +482,9 @@ class ResumeTailoringBrowserTestSystem {
   #pendingJobRequirementExtractionResponse: (() => void) | undefined
   #matchAnalysisRequestCount = 0
   #pendingMatchAnalysisResponse: (() => void) | undefined
+  #pendingSourceProfileExtractionResponse: (() => void) | undefined
   #resumePdfRequest: unknown
+  #sourceProfileExtractionAttemptCount = 0
   #unknownRoute: string | undefined
 
   constructor(page: Page) {
@@ -462,6 +517,18 @@ class ResumeTailoringBrowserTestSystem {
           }],
         }),
       })
+    })
+  }
+
+  async givenDetailedSourceProfileExtractionIsAvailable() {
+    await this.#page.route('**/api/source-profile-extraction', (route) =>
+      this.#fulfillDetailedSourceProfileExtraction({ route }))
+  }
+
+  async givenSourceProfileExtractionCanBeDelayed() {
+    await this.#page.route('**/api/source-profile-extraction', async (route) => {
+      await new Promise<void>((resolve) => { this.#pendingSourceProfileExtractionResponse = resolve })
+      await this.#fulfillDetailedSourceProfileExtraction({ route })
     })
   }
 
@@ -796,6 +863,124 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'source-profile-built'
   }
 
+  async reviewSourceDocumentBeforeConsent() {
+    await this.#uploadSourceDocument()
+    this.#completedAction = 'source-document-reviewed'
+  }
+
+  async startSourceProfileExtraction() {
+    await this.#uploadSourceDocument()
+    await this.#page.getByRole('button', { name: 'Confirm this processing notice' }).click()
+    await this.#page.getByRole('button', { name: 'Extract professional facts' }).click()
+    this.#completedAction = 'source-profile-extraction-started'
+  }
+
+  async restartWithRecoverableSourceProfileExtractionFailure() {
+    this.#releasePendingSourceProfileExtraction()
+    await this.#page.getByRole('heading', { name: 'Review extracted facts' }).waitFor()
+    await this.#restartCandidateSession()
+    await this.#givenRecoverableSourceProfileExtractionFailure()
+    await this.startSourceProfileExtraction()
+    await this.#page.getByRole('button', { name: 'Retry Source Profile' }).waitFor()
+  }
+
+  async #restartCandidateSession() {
+    await this.#page.getByRole('button', { name: 'Delete private session' }).click()
+    const startButton = this.#page.getByRole('button', { name: 'Start tailoring' })
+    await startButton.waitFor()
+    await startButton.click()
+  }
+
+  async #givenRecoverableSourceProfileExtractionFailure() {
+    await this.#page.route('**/api/source-profile-extraction', async (route) => {
+      this.#sourceProfileExtractionAttemptCount += 1
+      if (this.#sourceProfileExtractionAttemptCount === 1) {
+        await route.fulfill({ status: 503 })
+        return
+      }
+      await this.#fulfillDetailedSourceProfileExtraction({ route })
+    })
+  }
+
+  async retryFailedSourceProfileExtraction() {
+    await this.#page.getByRole('button', { name: 'Retry Source Profile' }).click()
+    this.#completedAction = 'source-profile-extraction-retried'
+  }
+
+  async extractDetailedSourceProfileFacts() {
+    await this.#uploadSourceDocument()
+    await this.#page.getByRole('button', { name: 'Confirm this processing notice' }).click()
+    await this.#page.getByRole('button', { name: 'Extract professional facts' }).click()
+    await this.#page.getByRole('heading', { name: 'Review extracted facts' }).waitFor()
+    this.#completedAction = 'source-profile-facts-extracted'
+  }
+
+  async selectAndConfirmVisibleExperienceFacts() {
+    const experienceGroup = this.#page.getByRole('region', { name: 'Experience' })
+    const skillGroup = this.#page.getByRole('region', { name: 'Skill' })
+    await this.#selectVisibleFacts({ experienceGroup, skillGroup })
+    await this.#rejectSelectedExperienceFact({ experienceGroup })
+    await this.#confirmExperienceBatch({ experienceGroup })
+    this.#completedAction = 'source-profile-batch-confirmed'
+  }
+
+  async #selectVisibleFacts({ experienceGroup, skillGroup }: Readonly<{
+    experienceGroup: Locator
+    skillGroup: Locator
+  }>) {
+    const groupSelection = experienceGroup.getByRole('checkbox', {
+      name: 'Select visible facts in this group: Experience',
+    })
+    await groupSelection.focus()
+    await this.#page.keyboard.press('Space')
+    await expect(groupSelection).toBeChecked()
+    await skillGroup.getByRole('checkbox', { name: 'Select TypeScript' }).check()
+    await expect(experienceGroup.getByText('3 selected facts', { exact: true })).toBeVisible()
+  }
+
+  async #rejectSelectedExperienceFact({ experienceGroup }: Readonly<{ experienceGroup: Locator }>) {
+    const rejectedFact = readFactCard({
+      group: experienceGroup, page: this.#page, value: 'Built backend APIs at Acme',
+    })
+    await rejectedFact.getByRole('button', { name: 'Reject fact' }).click()
+    await expect(experienceGroup.getByText('2 selected facts', { exact: true })).toBeVisible()
+    await expect(this.#readFactReviewStatus()).toContainText('1 Rejected')
+  }
+
+  async #confirmExperienceBatch({ experienceGroup }: Readonly<{ experienceGroup: Locator }>) {
+    const batchReview = experienceGroup.locator('.fact-batch')
+    await expect(batchReview.getByText('Senior FullStack Developer at Acme')).toBeVisible()
+    await expect(batchReview.getByText('Led a platform migration at Acme')).toBeVisible()
+    await expect(batchReview.getByText('Built backend APIs at Acme')).toHaveCount(0)
+    await expect(batchReview.getByText('TypeScript')).toHaveCount(0)
+    await batchReview.getByRole('button', { name: 'Confirm 2 selected facts' }).click()
+    await expect(this.#readFactReviewStatus()).toContainText('2 Verified')
+  }
+
+  async resolveVisibleEducationConflict() {
+    const conflictReview = this.#page.getByRole('region', { name: 'Conflicts requiring resolution' })
+    await expect(conflictReview.getByRole('checkbox')).toHaveCount(0)
+    await expect(this.#readFactReviewStatus())
+      .toContainText('2 conflicting facts requiring resolution')
+    const selectedFact = readFactCard({
+      group: conflictReview, page: this.#page, value: 'Computer Science degree in 2018',
+    })
+    await selectedFact.getByRole('button', {
+      name: 'Keep this fact and resolve the conflict',
+    }).click()
+    await expect(this.#readFactReviewStatus())
+      .toContainText('0 conflicting facts requiring resolution')
+  }
+
+  async correctVisibleSkillFact() {
+    const skillGroup = this.#page.getByRole('region', { name: 'Skill' })
+    await skillGroup.getByRole('button', { name: 'Confirm fact' }).click()
+    await skillGroup.locator('summary').getByText('Correct this verified fact').click()
+    await skillGroup.getByLabel('Correct this verified fact').fill('Advanced TypeScript')
+    await skillGroup.getByRole('button', { name: 'Create correction' }).click()
+    this.#completedAction = 'source-profile-facts-corrected'
+  }
+
   async reloadVerifiedSourceProfile() {
     await this.#page.reload()
     this.#completedAction = 'source-profile-reloaded'
@@ -1005,6 +1190,126 @@ class ResumeTailoringBrowserTestSystem {
     expect(this.#extractionRequestContent).not.toContain('+33 6 12 34 56 78')
     await expect(this.#page.getByRole('button', { name: /Source Profile/ }))
       .toContainText('1 verified fact')
+  }
+
+  async expectCoherentSourceDocumentReviewSurface() {
+    this.#expectCompletedAction('source-document-reviewed')
+    const review = this.#page.getByRole('region', { name: 'Review outgoing Source Document' })
+    await expect(review.getByLabel('Exact content that will be sent for extraction')).toBeVisible()
+    await expect(review.getByRole('heading', { name: 'Removed before processing' })).toBeVisible()
+    const confirm = review.getByRole('button', { name: 'Confirm this processing notice' })
+    const extract = review.getByRole('button', { name: 'Extract professional facts' })
+    await this.#expectDesktopSourceDocumentReviewLayout({ confirm, extract, review })
+    await expect(confirm).toBeEnabled()
+    await expect(extract).toBeDisabled()
+    await confirm.click()
+    await expect(extract).toBeEnabled()
+    await this.#expectMobileSourceDocumentReviewLayout({ review })
+  }
+
+  async #expectDesktopSourceDocumentReviewLayout({ confirm, extract, review }: Readonly<{
+    confirm: Locator
+    extract: Locator
+    review: Locator
+  }>) {
+    const [sensitivePanel, outgoingPanel] = await review.locator('.source-document-panel').all()
+    const [sensitiveBox, outgoingBox, confirmBox, extractBox] = await Promise.all([
+      sensitivePanel?.boundingBox(), outgoingPanel?.boundingBox(), confirm.boundingBox(), extract.boundingBox(),
+    ])
+    const horizontalGap = (outgoingBox?.x ?? 0) - ((sensitiveBox?.x ?? 0) + (sensitiveBox?.width ?? 0))
+    expect(horizontalGap).toBeGreaterThanOrEqual(20)
+    expect(confirmBox?.y ?? 0).toBeLessThan(extractBox?.y ?? 0)
+  }
+
+  async #expectMobileSourceDocumentReviewLayout({ review }: Readonly<{ review: Locator }>) {
+    await this.#page.setViewportSize({ width: 390, height: 844 })
+    const [sensitivePanel, outgoingPanel] = await review.locator('.source-document-panel').all()
+    const [sensitiveBox, outgoingBox] = await Promise.all([
+      sensitivePanel?.boundingBox(), outgoingPanel?.boundingBox(),
+    ])
+    expect(outgoingBox?.y ?? 0).toBeGreaterThan(
+      (sensitiveBox?.y ?? 0) + (sensitiveBox?.height ?? 0),
+    )
+    expect(await this.#page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
+  }
+
+  async expectPendingSourceProfileExtractionThenSuccess() {
+    this.#expectCompletedAction('source-profile-extraction-started')
+    await expect(this.#page.getByText('Extracting professional facts…')).toBeVisible()
+    await expect(this.#page.locator('.source-profile-workspace')).toHaveAttribute('aria-busy', 'true')
+    await expect(this.#page.getByRole('button', { name: 'Extract professional facts' })).toBeDisabled()
+    await expect.poll(() => this.#pendingSourceProfileExtractionResponse !== undefined).toBe(true)
+  }
+
+  async expectRetriedSourceProfileExtractionToSucceed() {
+    this.#expectCompletedAction('source-profile-extraction-retried')
+    await expect(this.#page.getByRole('heading', { name: 'Review extracted facts' })).toBeVisible()
+    await expect(this.#page.getByRole('region', { name: 'Experience' })).toBeVisible()
+    expect(this.#sourceProfileExtractionAttemptCount).toBe(2)
+  }
+
+  async expectOnlyEligibleExperienceFactsToBeBatchConfirmed() {
+    this.#expectCompletedAction('source-profile-batch-confirmed')
+    const experienceGroup = this.#page.getByRole('region', { name: 'Experience' })
+    await this.#expectExperienceFactStates({ experienceGroup })
+    await this.#expectOtherGroupsExcludedFromExperienceBatch()
+  }
+
+  async #expectExperienceFactStates({ experienceGroup }: Readonly<{ experienceGroup: Locator }>) {
+    await expect(readFactCard({
+      group: experienceGroup, page: this.#page, value: 'Senior FullStack Developer at Acme',
+    }))
+      .toContainText('Verified')
+    await expect(readFactCard({
+      group: experienceGroup, page: this.#page, value: 'Built backend APIs at Acme',
+    }))
+      .toContainText('Rejected')
+    await expect(readFactCard({
+      group: experienceGroup, page: this.#page, value: 'Led a platform migration at Acme',
+    }))
+      .toContainText('Verified')
+  }
+
+  async #expectOtherGroupsExcludedFromExperienceBatch() {
+    const skillGroup = this.#page.getByRole('region', { name: 'Skill' })
+    await expect(skillGroup.getByRole('checkbox', { name: 'Select TypeScript' })).toBeChecked()
+    await expect(readFactCard({ group: skillGroup, page: this.#page, value: 'TypeScript' }))
+      .toContainText('Needs review')
+    await expect(this.#page.getByRole('region', { name: 'Conflicts requiring resolution' }))
+      .toBeVisible()
+    await this.#page.getByRole('button', { name: 'Français' }).click()
+    await expect(this.#page.getByRole('checkbox', {
+      name: 'Sélectionner les faits visibles de ce groupe: Compétence',
+    })).toBeVisible()
+  }
+
+  async expectConflictResolutionAndImmutableCorrection() {
+    this.#expectCompletedAction('source-profile-facts-corrected')
+    await this.#expectResolvedEducationConflict()
+    await this.#expectImmutableSkillCorrection()
+  }
+
+  async #expectResolvedEducationConflict() {
+    const educationGroup = this.#page.getByRole('region', { name: 'Education' })
+    await expect(readFactCard({
+      group: educationGroup, page: this.#page, value: 'Computer Science degree in 2018',
+    }))
+      .toContainText('Verified')
+    await expect(readFactCard({
+      group: educationGroup, page: this.#page, value: 'Computer Science degree in 2019',
+    }))
+      .toContainText('Rejected')
+  }
+
+  async #expectImmutableSkillCorrection() {
+    const skillGroup = this.#page.getByRole('region', { name: 'Skill' })
+    await expect(readFactCard({ group: skillGroup, page: this.#page, value: 'TypeScript' }))
+      .toContainText('Superseded')
+    await expect(readFactCard({
+      group: skillGroup, page: this.#page, value: 'Advanced TypeScript',
+    }))
+      .toContainText('Verified')
+    await expect(this.#readFactReviewStatus()).toContainText('1 Superseded')
   }
 
   async expectVerifiedSourceProfileToBeRestored() {
@@ -1241,12 +1546,39 @@ class ResumeTailoringBrowserTestSystem {
     ).toBe(false)
   }
 
+  #readFactReviewStatus() {
+    return this.#page.locator('.facts-review-card').getByRole('status')
+  }
+
+  async #fulfillDetailedSourceProfileExtraction({ route }: Readonly<{ route: Route }>) {
+    this.#extractionRequestContent = readProfessionalContent(route.request().postData())
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify(detailedSourceProfileExtractionResponse),
+    })
+  }
+
   #releasePendingMatchAnalysis() {
     this.#pendingMatchAnalysisResponse?.()
   }
 
+  #releasePendingSourceProfileExtraction() {
+    this.#pendingSourceProfileExtractionResponse?.()
+  }
+
   #releasePendingJobRequirementExtraction() {
     this.#pendingJobRequirementExtractionResponse?.()
+  }
+
+  async #uploadSourceDocument() {
+    await this.#page.getByLabel('Choose a PDF Source Document').setInputFiles({
+      name: 'resume.pdf',
+      mimeType: 'application/pdf',
+      buffer: createTextPdf(
+        'bakate@example.com Senior FullStack Developer using React at Acme',
+      ),
+    })
+    await this.#page.getByLabel('Exact content that will be sent for extraction').waitFor()
   }
 }
 
@@ -1390,6 +1722,16 @@ function readProfessionalContent(requestBody: string | null) {
     : undefined
 }
 
+function readFactCard({ group, page, value }: Readonly<{
+  group: Locator
+  page: Page
+  value: string
+}>) {
+  return group.locator('.source-fact').filter({
+    has: page.getByText(value, { exact: true }),
+  })
+}
+
 function readJobPostingContent(requestBody: string | null) {
   if (requestBody === null) return undefined
   const value = JSON.parse(requestBody) as unknown
@@ -1425,6 +1767,41 @@ function hasCallerDerivedDocument(value: unknown) {
 }
 
 const jobPostingExcerpt = 'You must know TypeScript and preferably React.'
+const detailedSourceProfileExtractionResponse = {
+  ok: true,
+  value: [
+    {
+      kind: 'experience',
+      propositionKey: 'proposition-experience-acme-role',
+      value: 'Senior FullStack Developer at Acme',
+    },
+    {
+      kind: 'experience',
+      propositionKey: 'proposition-experience-acme-backend',
+      value: 'Built backend APIs at Acme',
+    },
+    {
+      kind: 'experience',
+      propositionKey: 'proposition-experience-acme-migration',
+      value: 'Led a platform migration at Acme',
+    },
+    {
+      kind: 'skill',
+      propositionKey: 'proposition-skill-typescript',
+      value: 'TypeScript',
+    },
+    {
+      kind: 'education',
+      propositionKey: 'proposition-education-computer-science-year',
+      value: 'Computer Science degree in 2018',
+    },
+    {
+      kind: 'education',
+      propositionKey: 'proposition-education-computer-science-year',
+      value: 'Computer Science degree in 2019',
+    },
+  ],
+} as const
 const jobRequirementExtractionResponse = {
   ok: true,
   value: {
