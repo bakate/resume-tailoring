@@ -875,12 +875,16 @@ class ResumeTailoringBrowserTestSystem {
   async resolveVisibleEducationConflict() {
     const conflictReview = this.#page.getByRole('region', { name: 'Conflicts requiring resolution' })
     await expect(conflictReview.getByRole('checkbox')).toHaveCount(0)
+    await expect(this.#readFactReviewStatus())
+      .toContainText('2 conflicting facts requiring resolution')
     const selectedFact = readFactCard({
       group: conflictReview, page: this.#page, value: 'Computer Science degree in 2018',
     })
     await selectedFact.getByRole('button', {
       name: 'Keep this fact and resolve the conflict',
     }).click()
+    await expect(this.#readFactReviewStatus())
+      .toContainText('0 conflicting facts requiring resolution')
   }
 
   async correctVisibleSkillFact() {
