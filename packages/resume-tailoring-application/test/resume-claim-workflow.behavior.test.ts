@@ -80,6 +80,15 @@ describe('Resume Claim workflow', () => {
 
     system.expectOnlyTheRequestedClaimToBeReformulated()
   })
+
+  it('preserves the existing Resume Claim when its reformulation is rejected', async () => {
+    const system = createSystemUnderTest({ tailoredResume: tailoredResumeWithExistingExclusion })
+
+    system.givenAReformulationThatRemainsUnsupported()
+    await system.requestResumeClaimReformulation()
+
+    await system.expectReformulationToBeRejectedWithoutChangingTheResume()
+  })
 })
 
 function createSystemUnderTest({
@@ -177,6 +186,10 @@ class ResumeClaimWorkflowTestSystem {
     }]
   }
 
+  givenAReformulationThatRemainsUnsupported() {
+    this.#semanticResults = [false, false]
+  }
+
   async generateTailoredResume() {
     this.#actionResult = await this.#workflow.execute({ type: 'generate-resume-claims' })
   }
@@ -254,6 +267,16 @@ class ResumeClaimWorkflowTestSystem {
       },
       existingTailoredResume.claims[1],
     ])
+  }
+
+  async expectReformulationToBeRejectedWithoutChangingTheResume() {
+    expect(this.#actionResult).toEqual({
+      ok: false,
+      error: { type: 'resume-claim-unavailable' },
+    })
+    const currentState = await this.#workflow.readView()
+    assert(currentState.ok && currentState.value.status === 'ready')
+    expect(currentState.value.tailoredResume).toEqual(tailoredResumeWithExistingExclusion)
   }
 
   expectOnlyTheSelectedClaimToBeRemoved() {
@@ -362,4 +385,9 @@ const existingTailoredResume = {
     },
   ],
   exclusions: [],
+} as const satisfies ReadyState['tailoredResume']
+
+const tailoredResumeWithExistingExclusion = {
+  ...existingTailoredResume,
+  exclusions: [{ reason: 'unsupported-after-regeneration' }],
 } as const satisfies ReadyState['tailoredResume']

@@ -225,6 +225,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
       claim: operation.claim, source: operation.source, request: command.request,
     })
     if (!validation.ok) return validation
+    if (validation.claim === null) return resumeClaimUnavailableResult
     return this.#persistReformulatedResumeClaim({ command, state: currentState.value, validation })
   }
 
@@ -840,15 +841,11 @@ function replaceResumeClaim({ claim, claimId, tailoredResume }: Readonly<{
   claimId: ResumeClaim['id']
   tailoredResume: TailoredResume
 }>): TailoredResume {
-  const claims = claim === null
-    ? tailoredResume.claims.filter(({ id }) => id !== claimId)
-    : tailoredResume.claims.map((existingClaim) =>
-        existingClaim.id === claimId ? claim : existingClaim)
+  if (claim === null) return tailoredResume
   return {
-    claims,
-    exclusions: claim === null
-      ? [...tailoredResume.exclusions, unsupportedClaimExclusion]
-      : tailoredResume.exclusions,
+    claims: tailoredResume.claims.map((existingClaim) =>
+      existingClaim.id === claimId ? claim : existingClaim),
+    exclusions: tailoredResume.exclusions,
   }
 }
 
@@ -925,7 +922,3 @@ const resumeClaimUnavailableResult = {
   ok: false,
   error: { type: 'resume-claim-unavailable' },
 } as const satisfies ResumeTailoringResult<ResumeTailoringView>
-
-const unsupportedClaimExclusion = {
-  reason: 'unsupported-after-regeneration',
-} as const
