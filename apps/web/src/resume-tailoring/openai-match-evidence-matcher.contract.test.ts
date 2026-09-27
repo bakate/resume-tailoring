@@ -42,6 +42,8 @@ describe('OpenAI Match Evidence matcher contract', () => {
       text: { format: { type: 'json_schema', name: 'match_evidence', strict: true } },
     })
     expect(JSON.stringify(requestBody)).toMatch(/controlled synonyms and translations/iu)
+    expect(JSON.stringify(requestBody)).toMatch(/shortest exact contiguous/iu)
+    expect(JSON.stringify(requestBody)).toMatch(/do not calculate or combine employment date ranges/iu)
     expect(JSON.stringify(requestBody)).toMatch(
       /role, a transferable skill, or qualitative seniority as implicit proof/iu,
     )
@@ -71,6 +73,32 @@ describe('OpenAI Match Evidence matcher contract', () => {
 
     expect(result).toEqual(matchAnalysisUnavailableResult)
   })
+
+  it('matches large Job Requirement sets in bounded requests and combines the evidence', async () => {
+    const requests: Request[] = []
+    const largeRequirements = createRequirements({ count: 26 })
+    const matcher = createOpenAiMatchEvidenceMatcher({
+      apiKey: 'test-api-key',
+      model: 'structured-model',
+      reasoningEffort: 'low',
+      request: (input, init) => {
+        requests.push(new Request(input, init))
+        const offset = requests.length === 1 ? 0 : 25
+        const batchRequirements = largeRequirements.slice(offset, offset + 25)
+        return Promise.resolve(Response.json(createOpenAiResponse({
+          analysis: createAnalysis({ requirements: batchRequirements }),
+        })))
+      },
+    })
+
+    const result = await matcher.match({ requirements: largeRequirements, verifiedFacts })
+
+    expect(result).toEqual({
+      ok: true,
+      value: createAnalysis({ requirements: largeRequirements }),
+    })
+    expect(await readRequirementCounts(requests)).toEqual([25, 1])
+  })
 })
 
 async function readRequestBody(requests: readonly Request[]) {
@@ -89,6 +117,48 @@ function createOpenAiResponse({
     }],
   }
 }
+
+async function readRequirementCounts(requests: readonly Request[]) {
+  return Promise.all(requests.map(async (request) => {
+    const requestBody = await request.json() as OpenAiRequestBody
+    const matchRequest = JSON.parse(requestBody.input[1].content[0].text) as MatchInputs
+    return matchRequest.requirements.length
+  }))
+}
+
+function createRequirements({ count }: Readonly<{ count: number }>) {
+  return Array.from({ length: count }, (unusedValue, requirementIndex) => {
+    void unusedValue
+    return {
+      id: `job-requirement-${String(requirementIndex)}` as const,
+      classification: 'preferred' as const,
+      value: `Use TypeScript for capability ${String(requirementIndex)}`,
+    }
+  })
+}
+
+function createAnalysis({ requirements: inputRequirements }: Readonly<{
+  requirements: MatchInputs['requirements']
+}>) {
+  return {
+    evidence: inputRequirements.map(({ id }) => ({
+      requirementId: id,
+      factMatches: [{
+        factId: 'source-fact-typescript' as const,
+        factTerm: 'TypeScript',
+        relationship: 'exact' as const,
+        requirementTerm: 'TypeScript',
+      }],
+    })),
+    relevantFactIds: ['source-fact-typescript' as const],
+  }
+}
+
+type OpenAiRequestBody = Readonly<{
+  input: readonly [unknown, Readonly<{
+    content: readonly [Readonly<{ text: string }>]
+  }>]
+}>
 
 const verifiedFacts = [{
   id: 'source-fact-typescript',

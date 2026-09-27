@@ -32,6 +32,24 @@ describe('Match Analysis workflow', () => {
     system.expectEvidenceBackedMatchAnalysis()
   })
 
+  it('accepts an exact technology term inside a French instructional requirement', async () => {
+    const system = createSystemUnderTest({ facts: rxJsFacts, jobRequirements: rxJsRequirements })
+
+    system.givenTheMatcherMatchesRxJs()
+    await system.analyzeMatch()
+
+    system.expectRxJsRequirementToBeCovered()
+  })
+
+  it('keeps valid evidence when another proposed evidence link is unsupported', async () => {
+    const system = createSystemUnderTest()
+
+    system.givenValidTypeScriptAndUnsupportedLeadershipEvidence()
+    await system.analyzeMatch()
+
+    system.expectOnlyTypeScriptRequirementToBeCovered()
+  })
+
   it('warns below 50 percent without denying an evidence-backed Tailored Resume', async () => {
     const system = createSystemUnderTest()
 
@@ -371,6 +389,46 @@ class MatchAnalysisWorkflowTestSystem {
     }
   }
 
+  givenTheMatcherMatchesRxJs() {
+    this.#matcherResult = {
+      ok: true,
+      value: {
+        evidence: [{
+          requirementId: 'job-requirement-rxjs',
+          factMatches: [{
+            factId: 'source-fact-rxjs',
+            factTerm: 'RxJS',
+            relationship: 'exact',
+            requirementTerm: 'RxJS',
+          }],
+        }],
+        relevantFactIds: ['source-fact-rxjs'],
+      },
+    }
+  }
+
+  givenValidTypeScriptAndUnsupportedLeadershipEvidence() {
+    this.#matcherResult = {
+      ok: true,
+      value: {
+        evidence: [{
+          requirementId: 'job-requirement-typescript',
+          factMatches: [{
+            factId: 'source-fact-typescript', factTerm: 'TypeScript',
+            relationship: 'controlled', requirementTerm: 'TS',
+          }],
+        }, {
+          requirementId: 'job-requirement-leadership',
+          factMatches: [{
+            factId: 'source-fact-typescript', factTerm: 'TypeScript',
+            relationship: 'controlled', requirementTerm: 'leadership',
+          }],
+        }],
+        relevantFactIds: ['source-fact-typescript'],
+      },
+    }
+  }
+
   givenControlledSynonymsAndTranslationsEstablishCoverage() {
     this.#matcherResult = {
       ok: true,
@@ -437,6 +495,25 @@ class MatchAnalysisWorkflowTestSystem {
       generationEligibility: 'eligible',
       matchScore: 20,
       warning: 'below-generation-threshold',
+    })
+  }
+
+  expectRxJsRequirementToBeCovered() {
+    expect(this.#readMatchAnalysis()).toMatchObject({
+      evidence: [{
+        requirementId: 'job-requirement-rxjs',
+        factIds: ['source-fact-rxjs'],
+      }],
+      matchScore: 100,
+    })
+  }
+
+  expectOnlyTypeScriptRequirementToBeCovered() {
+    expect(this.#readMatchAnalysis()).toMatchObject({
+      evidence: [{
+        requirementId: 'job-requirement-typescript',
+        factIds: ['source-fact-typescript'],
+      }],
     })
   }
 
@@ -542,6 +619,22 @@ const requirements = [
     value: 'Speak French',
   },
 ] as const satisfies readonly JobRequirement[]
+
+const rxJsFacts = [{
+  id: 'source-fact-rxjs',
+  kind: 'skill',
+  propositionKey: 'proposition-skill-rxjs',
+  status: 'verified',
+  value: 'The candidate has experience with RxJS.',
+}] as const satisfies readonly SourceProfileFact[]
+
+const rxJsRequirements = [{
+  id: 'job-requirement-rxjs',
+  groupId: 'job-requirement-group-technical',
+  classification: 'preferred',
+  sourceExcerpt: 'Maîtriser RxJS.',
+  value: 'Maîtriser RxJS.',
+}] as const satisfies readonly JobRequirement[]
 
 function createCandidateSessionState({
   facts,

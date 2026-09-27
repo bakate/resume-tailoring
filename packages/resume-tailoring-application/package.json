@@ -6,6 +6,8 @@
     "./resume-tailoring-workflow": "./src/resume-tailoring-workflow.ts",
     "./resume-tailoring-workflow-composition": "./src/resume-tailoring-workflow-composition.ts",
     "./match-analysis": "./src/match-analysis.ts",
+    "./resume-claims": "./src/resume-claims.ts",
+    "./tailored-resume-document": "./src/tailored-resume-document.ts",
     "./resume-claim-restoration": "./src/resume-claim-restoration.ts",
     "./resume-tailoring-workflow-ports": "./src/resume-tailoring-workflow-ports.ts",
     "./resume-tailoring-workflow-testing": "./src/resume-tailoring-workflow-testing.ts"

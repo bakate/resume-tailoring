@@ -232,6 +232,17 @@ test('a Candidate restores provenance-backed Resume Claims after reload', async 
   await system.expectTailoredResumeToBeRestored()
 })
 
+test('a Candidate previews and downloads the same validated one-page resume', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenTailoredResumeIsStored()
+  await system.givenValidatedResumePdfExportIsAvailable()
+
+  await system.downloadTailoredResumePdf()
+
+  await system.expectPreviewAndPdfToUseTheSameRetainedClaims()
+})
+
 test('localizes sensitive labels and preserves legitimate French words', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
@@ -290,6 +301,7 @@ type CompletedAction =
   | 'resume-tailoring-viewed'
   | 'resume-claims-generated'
   | 'resume-claims-reloaded'
+  | 'resume-pdf-downloaded'
   | 'source-profile-built'
   | 'source-profile-reloaded'
   | 'unknown-page-opened'
@@ -300,6 +312,7 @@ class ResumeTailoringBrowserTestSystem {
   #lateResponseOutcome: unknown
   #extractionRequestContent: string | undefined
   #jobPostingRequestContent: string | undefined
+  #resumePdfRequest: unknown
   #unknownRoute: string | undefined
 
   constructor(page: Page) {
@@ -421,6 +434,17 @@ class ResumeTailoringBrowserTestSystem {
     await this.extractRequirementsFromMinimizedJobPosting()
     await this.analyzeMatch()
     await this.generateResumeClaims()
+  }
+
+  async givenValidatedResumePdfExportIsAvailable() {
+    await this.#page.route('**/api/tailored-resume-pdf', async (route) => {
+      this.#resumePdfRequest = JSON.parse(route.request().postData() ?? 'null') as unknown
+      await route.fulfill({
+        contentType: 'application/pdf',
+        headers: { 'Content-Disposition': 'attachment; filename="tailored-resume.pdf"' },
+        body: Buffer.from('%PDF-validated-test'),
+      })
+    })
   }
 
   async givenBrowserPrefersLanguages({ languages }: Readonly<{ languages: readonly string[] }>) {
@@ -565,6 +589,14 @@ class ResumeTailoringBrowserTestSystem {
   async reloadTailoredResume() {
     await this.#page.reload()
     this.#completedAction = 'resume-claims-reloaded'
+  }
+
+  async downloadTailoredResumePdf() {
+    const downloadPromise = this.#page.waitForEvent('download')
+    await this.#page.getByRole('button', { name: 'Download validated A4 PDF' }).click()
+    const download = await downloadPromise
+    expect(download.suggestedFilename()).toBe('tailored-resume.pdf')
+    this.#completedAction = 'resume-pdf-downloaded'
   }
 
   async extractRequirementsFromMinimizedJobPosting() {
@@ -765,6 +797,21 @@ class ResumeTailoringBrowserTestSystem {
     )).toBeVisible()
   }
 
+  async expectPreviewAndPdfToUseTheSameRetainedClaims() {
+    this.#expectCompletedAction('resume-pdf-downloaded')
+    const preview = this.#page.frameLocator('iframe[title="Tailored Resume one-page preview"]')
+    await expect(preview.getByText('Built React applications at Acme')).toBeVisible()
+    await expect(preview.getByText('Worked as a FullStack Developer at Acme')).toBeVisible()
+    await expect(this.#page.getByText(/After download, this PDF is under your control/))
+      .toBeVisible()
+    expect(readResumePdfClaimTexts(this.#resumePdfRequest)).toEqual([
+      'Built React applications at Acme',
+      'Worked as a FullStack Developer at Acme',
+    ])
+    expect(hasResumePdfPhoto(this.#resumePdfRequest)).toBe(false)
+    expect(hasCallerDerivedDocument(this.#resumePdfRequest)).toBe(false)
+  }
+
   async expectFrenchSensitiveLabelAndIntactJobPosting() {
     this.#expectCompletedAction('job-posting-reviewed')
     await expect(this.#page.getByText('Numéro de téléphone', { exact: true })).toBeVisible()
@@ -912,6 +959,25 @@ function readMatchRequest(requestBody: string | null) {
   const value = JSON.parse(requestBody) as unknown
   const result = matchAnalysisRequestSchema.safeParse(value)
   return result.success ? result.data : undefined
+}
+
+function readResumePdfClaimTexts(value: unknown) {
+  if (!isRecord(value) || !isRecord(value.source) || !Array.isArray(value.source.claims)) {
+    return []
+  }
+  return value.source.claims.flatMap((claim) => {
+    if (!isRecord(claim) || !Array.isArray(claim.segments)) return []
+    return claim.segments.flatMap((segment) =>
+      isRecord(segment) && typeof segment.text === 'string' ? [segment.text] : [])
+  })
+}
+
+function hasResumePdfPhoto(value: unknown) {
+  return isRecord(value) && 'photoDataUrl' in value
+}
+
+function hasCallerDerivedDocument(value: unknown) {
+  return isRecord(value) && 'document' in value
 }
 
 const jobPostingExcerpt = 'You must know TypeScript and preferably React.'

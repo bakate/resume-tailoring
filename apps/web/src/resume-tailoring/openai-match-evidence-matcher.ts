@@ -1,8 +1,8 @@
 import type {
   MatchEvidenceMatcher,
   MatchInputs,
+  ProposedMatchAnalysis,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
-import { jobRequirementMaximumCount } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { z } from 'zod'
 
 import {
@@ -19,6 +19,7 @@ type OpenAiMatcherDependencies = Readonly<{
 }>
 
 type MatchRequest = MatchInputs
+const matchRequirementBatchSize = 25
 
 export function createOpenAiMatchEvidenceMatcher({
   apiKey,
@@ -46,6 +47,30 @@ async function requestMatchEvidence({
   reasoningEffort: OpenAiMatcherDependencies['reasoningEffort']
   request: typeof fetch
 }>) {
+  const analyses = []
+  for (const batchRequest of createMatchRequestBatches({ matchRequest })) {
+    const result = await requestMatchEvidenceBatch({
+      apiKey, matchRequest: batchRequest, model, reasoningEffort, request,
+    })
+    if (!result.ok) return result
+    analyses.push(result.value)
+  }
+  return combineMatchAnalyses({ analyses, matchRequest })
+}
+
+async function requestMatchEvidenceBatch({
+  apiKey,
+  matchRequest,
+  model,
+  reasoningEffort,
+  request,
+}: Readonly<{
+  apiKey: string
+  matchRequest: MatchRequest
+  model: string
+  reasoningEffort: OpenAiMatcherDependencies['reasoningEffort']
+  request: typeof fetch
+}>) {
   try {
     const response = await request('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -58,6 +83,37 @@ async function requestMatchEvidence({
   } catch {
     return matchAnalysisUnavailableResult
   }
+}
+
+function createMatchRequestBatches({ matchRequest }: Readonly<{ matchRequest: MatchRequest }>) {
+  const batches: MatchRequest[] = []
+  for (let requirementIndex = 0;
+    requirementIndex < matchRequest.requirements.length;
+    requirementIndex += matchRequirementBatchSize) {
+    batches.push({
+      requirements: matchRequest.requirements.slice(
+        requirementIndex, requirementIndex + matchRequirementBatchSize,
+      ),
+      verifiedFacts: matchRequest.verifiedFacts,
+    })
+  }
+  return batches
+}
+
+function combineMatchAnalyses({ analyses, matchRequest }: Readonly<{
+  analyses: readonly ProposedMatchAnalysis[]
+  matchRequest: MatchRequest
+}>) {
+  const relevantFactIds = new Set(analyses.flatMap((analysis) => analysis.relevantFactIds))
+  return {
+    ok: true,
+    value: {
+      evidence: analyses.flatMap((analysis) => analysis.evidence),
+      relevantFactIds: matchRequest.verifiedFacts
+        .filter(({ id }) => relevantFactIds.has(id))
+        .map(({ id }) => id),
+    },
+  } as const
 }
 
 function createHeaders({ apiKey }: Readonly<{ apiKey: string }>) {
@@ -131,8 +187,9 @@ const matchingInstructions = [
   'Return evidence only when one or more Verified Facts explicitly prove a Job Requirement.',
   'Coverage is binary; omit every uncovered requirement.',
   'You may recognize controlled synonyms and translations with the same concrete meaning.',
-  'For each fact link, quote the exact requirementTerm and factTerm and classify their relationship.',
+  'For each fact link, quote the shortest exact contiguous requirementTerm and factTerm that name the same skill or concept; never quote a full sentence when a shorter term exists.',
   'Use exact only when the normalized quoted terms are identical; otherwise use controlled.',
+  'Do not calculate or combine employment date ranges to prove a duration; omit duration coverage unless one Verified Fact explicitly states enough duration.',
   'Return relevantFactIds only for Verified Facts relevant enough to support an honest Tailored Resume.',
   'Return no relevantFactIds when the verified material cannot support an honest Tailored Resume.',
   'Do not treat a role, a transferable skill, or qualitative seniority as implicit proof.',
@@ -150,7 +207,7 @@ const matchEvidenceResponseFormat = {
     properties: {
       evidence: {
         type: 'array',
-        maxItems: jobRequirementMaximumCount,
+        maxItems: matchRequirementBatchSize,
         items: {
           type: 'object',
           additionalProperties: false,

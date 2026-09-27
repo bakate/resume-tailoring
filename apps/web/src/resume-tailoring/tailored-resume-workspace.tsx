@@ -1,7 +1,9 @@
 import type { ResumeClaim } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import { formatResumeClaimText as formatClaim } from '@resume-tailoring/application/tailored-resume-document'
 import { useState } from 'react'
 
 import type { Localization } from '../localization/localization'
+import { TailoredResumePreview } from './tailored-resume-preview'
 import type { CandidateSessionController } from './use-candidate-session'
 
 type WorkspaceProps = Readonly<{
@@ -16,17 +18,10 @@ type ResumeClaimCardProps = WorkspaceProps & Readonly<{
 }>
 type ResumeClaimReformulator = Pick<CandidateSessionController, 'reformulateResumeClaim'>
 
-const leadingPunctuationPattern = /^[,.;:!?%…)'\]}’]/u
-
 export function formatResumeClaimText({ segments }: Readonly<{
   segments: ResumeClaim['segments']
 }>) {
-  return segments.reduce((resumeClaimText, { text }) => {
-    const normalizedText = text.trim()
-    const separator = resumeClaimText.length === 0
-      || leadingPunctuationPattern.test(normalizedText) ? '' : ' '
-    return `${resumeClaimText}${separator}${normalizedText}`
-  }, '')
+  return formatClaim({ segments })
 }
 
 export function TailoredResumeWorkspace({ candidateSession, localization }: WorkspaceProps) {
@@ -37,12 +32,15 @@ export function TailoredResumeWorkspace({ candidateSession, localization }: Work
       <h2 id="tailored-resume-title">{localization.translate('resumeClaims.title')}</h2>
       {view.tailoredResume === undefined
         ? <GenerationAction {...{ candidateSession, localization }} />
-        : <CuratedClaims {...{
-            candidateSession,
-            claims: view.tailoredResume.claims,
-            exclusions: view.tailoredResume.exclusions.length,
-            localization,
-          }} />}
+        : <>
+            <CuratedClaims {...{
+              candidateSession,
+              claims: view.tailoredResume.claims,
+              exclusions: view.tailoredResume.exclusions.length,
+              localization,
+            }} />
+            <TailoredResumePreview {...{ candidateSession, localization }} />
+          </>}
     </section>
   )
 }
