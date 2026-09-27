@@ -525,25 +525,77 @@ h1 {
 
 .resume-claim-list {
   display: grid;
-  gap: 20px;
+  gap: 12px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tailored-resume-flow-navigation {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  gap: 8px;
+  margin: -12px 0 28px;
+  padding: 10px;
+  border: 1px solid #dfe1df;
+  background: rgb(255 255 255 / 94%);
+  backdrop-filter: blur(8px);
+}
+
+.tailored-resume-flow-navigation a {
+  padding: 9px 12px;
+  border-radius: 3px;
+  color: #164f3d;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.tailored-resume-flow-navigation a:hover,
+.tailored-resume-flow-navigation a:focus-visible {
+  background: #ecf7f1;
+}
+
+#resume-claims-list-title,
+#resume-preview-title,
+#resume-photo-title,
+#resume-outcome-title,
+#resume-export-title {
+  scroll-margin-top: 82px;
 }
 
 .resume-claim-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 22px;
+  align-items: center;
+  padding: 20px 22px;
   background: #ffffff;
 }
 
+.resume-claim-position {
+  color: #66706c;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 .resume-claim-text {
+  grid-column: 1;
   margin: 0;
-  font-family: 'DM Serif Display', Georgia, serif;
-  font-size: clamp(22px, 2.4vw, 32px);
-  line-height: 1.35;
+  font-size: 17px;
+  line-height: 1.5;
 }
 
 .resume-claim-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 24px;
+  grid-column: 2;
+  grid-row: 1 / span 2;
 }
 
 .resume-claim-actions button,
@@ -568,6 +620,19 @@ h1 {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
   margin-top: 22px;
+}
+
+.reformulation-disclosure {
+  grid-column: 1 / -1;
+  padding-top: 10px;
+  border-top: 1px solid #e3e5e3;
+}
+
+.reformulation-disclosure summary {
+  color: #164f3d;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .reformulation-form label {
@@ -638,6 +703,12 @@ h1 {
   border: 1px solid #dfe1df;
 }
 
+.resume-photo-controls > h4 {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 18px;
+}
+
 .resume-photo-controls > label:first-child {
   grid-column: 1 / -1;
   font-weight: 600;
@@ -667,6 +738,17 @@ h1 {
   gap: 16px;
   max-width: 850px;
   margin-top: 24px;
+}
+
+.resume-outcome-panel {
+  max-width: 850px;
+  margin-top: 24px;
+}
+
+.resume-outcome-panel > h4,
+.resume-export-controls > h4 {
+  margin: 0 0 14px;
+  font-size: 18px;
 }
 
 .resume-outcome-feedback fieldset {
@@ -1423,6 +1505,23 @@ h1 {
 
   .resume-preview-heading {
     display: block;
+  }
+
+  .tailored-resume-flow-navigation {
+    overflow-x: auto;
+  }
+
+  .tailored-resume-flow-navigation a {
+    flex: 0 0 auto;
+  }
+
+  .resume-claim-card {
+    grid-template-columns: 1fr;
+  }
+
+  .resume-claim-actions {
+    grid-column: 1;
+    grid-row: auto;
   }
 
   .resume-photo-controls {

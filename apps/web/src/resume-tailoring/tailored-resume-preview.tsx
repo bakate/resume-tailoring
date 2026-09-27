@@ -75,10 +75,15 @@ export function TailoredResumePreview({ candidateSession, localization }: Previe
 
 function OutcomeFeedback({ candidateSession, localization }: PreviewProps) {
   return (
-    <div className="resume-outcome-feedback">
-      <FidelityQuestion {...{ candidateSession, localization }} />
-      <RelevanceQuestion {...{ candidateSession, localization }} />
-    </div>
+    <section aria-labelledby="resume-outcome-title" className="resume-outcome-panel">
+      <h4 id="resume-outcome-title" tabIndex={-1}>
+        {localization.translate('resumePreview.outcomeSection')}
+      </h4>
+      <div className="resume-outcome-feedback">
+        <FidelityQuestion {...{ candidateSession, localization }} />
+        <RelevanceQuestion {...{ candidateSession, localization }} />
+      </div>
+    </section>
   )
 }
 
@@ -118,7 +123,8 @@ function OutcomeQuestion<TAssessment extends string>({
     <fieldset>
       <legend>{question}</legend>
       {choices.map(([assessment, label]) => (
-        <button aria-pressed={selected === assessment} disabled={selected !== null} key={assessment}
+        <button aria-pressed={selected === assessment}
+          disabled={selected !== null} key={assessment}
           onClick={() => { onSelect(assessment) }} type="button">
           {localization.translate(label)}
         </button>
@@ -223,11 +229,14 @@ function PhotoControls({
   setPhoto: (photo: PhotoState) => void
 }>) {
   return (
-    <div className="resume-photo-controls">
+    <section aria-labelledby="resume-photo-title" className="resume-photo-controls">
+      <h4 id="resume-photo-title" tabIndex={-1}>
+        {localization.translate('resumePreview.photoSection')}
+      </h4>
       <PhotoInput {...{ localization, photo, setPhoto }} />
       <PhotoFeedback {...{ localization, photo }} />
       <p>{localization.translate('resumePreview.photoPrivacy')}</p>
-    </div>
+    </section>
   )
 }
 
@@ -270,7 +279,10 @@ function ExportControls({ exportState, localization, onExport }: Readonly<{
   onExport: () => void
 }>) {
   return (
-    <div className="resume-export-controls">
+    <section aria-labelledby="resume-export-title" className="resume-export-controls">
+      <h4 id="resume-export-title" tabIndex={-1}>
+        {localization.translate('resumePreview.exportSection')}
+      </h4>
       <button className="primary-action compact-action" disabled={exportState.status === 'exporting'}
         onClick={onExport} type="button">
         {localization.translate(exportState.status === 'exporting'
@@ -278,7 +290,7 @@ function ExportControls({ exportState, localization, onExport }: Readonly<{
       </button>
       <p>{localization.translate('resumePreview.controlNotice')}</p>
       <ExportFeedback {...{ exportState, localization }} />
-    </div>
+    </section>
   )
 }
 
