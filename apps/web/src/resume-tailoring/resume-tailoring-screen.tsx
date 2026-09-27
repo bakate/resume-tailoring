@@ -80,7 +80,7 @@ function useResultStepSynchronization({ candidateSession, currentStep, setActive
       operation: candidateSession.completedOperation.type,
     })
     setActiveStep(resultStep)
-    focusWorkflowStep({ step: resultStep })
+    focusOperationResult({ operation: candidateSession.completedOperation.type, step: resultStep })
   }, [candidateSession.completedOperation, currentStep])
 }
 
@@ -372,7 +372,26 @@ function OperationFeedback({ candidateSession, localization }: CandidateSessionP
 }
 
 function focusWorkflowStep({ step }: Readonly<{ step: WorkflowStepId }>) {
-  requestAnimationFrame(() => { document.getElementById(`${step}-title`)?.focus() })
+  focusElementById({ elementId: `${step}-title` })
+}
+
+function focusOperationResult({ operation, step }: Readonly<{
+  operation: ResumeTailoringCommand['type']
+  step: WorkflowStepId
+}>) {
+  if (operation === 'extract-job-requirements') {
+    focusElementById({ elementId: 'job-requirements-title' })
+    return
+  }
+  if (operation === 'analyze-match') {
+    focusElementById({ elementId: 'match-analysis-summary-title' })
+    return
+  }
+  focusWorkflowStep({ step })
+}
+
+function focusElementById({ elementId }: Readonly<{ elementId: string }>) {
+  requestAnimationFrame(() => { document.getElementById(elementId)?.focus() })
 }
 
 function readRetryOperationMessageKey({ type }: Readonly<{

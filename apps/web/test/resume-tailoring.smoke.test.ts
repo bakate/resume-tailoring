@@ -202,6 +202,26 @@ test('a Candidate reviews classified atomic Job Requirements from minimized cont
   await system.expectAtomicJobRequirementsWithSourceProvenance()
 })
 
+test('a delayed Job Requirement extraction reassures the Candidate and focuses its result', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenJobPostingCanBeExtractedWithDelay()
+
+  await system.extractDelayedJobRequirements()
+
+  await system.expectPendingJobRequirementExtractionThenFocusedResult()
+})
+
+test('a Candidate can retry a recoverable Job Requirement extraction failure', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenRecoverableJobRequirementExtractionFailure()
+
+  await system.retryFailedJobRequirementExtraction()
+
+  await system.expectRetryToPreserveJobPostingAndShowRequirements()
+})
+
 test('a Candidate sees an evidence-backed Match Score and Gap Analysis', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
@@ -215,6 +235,20 @@ test('a Candidate sees an evidence-backed Match Score and Gap Analysis', async (
   await system.analyzeMatch()
 
   await system.expectEvidenceBackedMatchScoreAndGapAnalysis()
+})
+
+test('a Candidate can inspect Match Evidence after reviewing the coverage summary', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+  await system.givenJobRequirementExtractionIsAvailable()
+  await system.givenMatchAnalysisIsAvailable()
+  await system.buildVerifiedSourceProfile()
+  await system.extractRequirementsFromMinimizedJobPosting()
+  await system.analyzeMatch()
+
+  await system.expectMatchSummaryBeforeProgressiveEvidence()
 })
 
 test('a Candidate can reopen a completed step without losing progress', async ({ page }) => {
@@ -365,7 +399,10 @@ type CompletedAction =
   | 'candidate-session-response-applied'
   | 'candidate-session-synchronized'
   | 'expiration-extension-attempted'
+  | 'job-requirement-extraction-failed'
+  | 'job-requirement-extraction-inspected'
   | 'job-requirements-extracted'
+  | 'job-requirements-retried'
   | 'job-posting-reviewed'
   | 'match-analyzed'
   | 'match-analysis-inspected'
@@ -389,6 +426,7 @@ class ResumeTailoringBrowserTestSystem {
   #lateResponseOutcome: unknown
   #extractionRequestContent: string | undefined
   #jobPostingRequestContent: string | undefined
+  #pendingJobRequirementExtractionResponse: (() => void) | undefined
   #matchAnalysisRequestCount = 0
   #pendingMatchAnalysisResponse: (() => void) | undefined
   #resumePdfRequest: unknown
@@ -435,6 +473,53 @@ class ResumeTailoringBrowserTestSystem {
         body: JSON.stringify(jobRequirementExtractionResponse),
       })
     })
+  }
+
+  async givenJobPostingCanBeExtractedWithDelay() {
+    await this.givenCandidateSessionIsActive()
+    await this.givenStructuredExtractionIsAvailable()
+    await this.buildVerifiedSourceProfile()
+    await this.prepareMinimizedJobPostingForExtraction()
+    await this.#page.route('**/api/job-requirement-extraction', async (route) => {
+      this.#jobPostingRequestContent = readJobPostingContent(route.request().postData())
+      await new Promise<void>((resolve) => {
+        this.#pendingJobRequirementExtractionResponse = resolve
+      })
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(jobRequirementExtractionResponse),
+      })
+    })
+  }
+
+  async extractDelayedJobRequirements() {
+    const extractionRequest = this.#page.waitForRequest('**/api/job-requirement-extraction')
+    await this.#page.getByRole('button', { name: 'Extract Job Requirements' }).click()
+    await extractionRequest
+    this.#completedAction = 'job-requirement-extraction-inspected'
+  }
+
+  async givenRecoverableJobRequirementExtractionFailure() {
+    await this.givenCandidateSessionIsActive()
+    await this.givenStructuredExtractionIsAvailable()
+    await this.buildVerifiedSourceProfile()
+    await this.prepareMinimizedJobPostingForExtraction()
+    let attemptCount = 0
+    await this.#page.route('**/api/job-requirement-extraction', async (route) => {
+      attemptCount += 1
+      if (attemptCount === 1) {
+        await route.fulfill({ status: 503 })
+        return
+      }
+      this.#jobPostingRequestContent = readJobPostingContent(route.request().postData())
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(jobRequirementExtractionResponse),
+      })
+    })
+    await this.#page.getByRole('button', { name: 'Extract Job Requirements' }).click()
+    await this.#page.getByRole('button', { name: 'Retry Job Posting' }).waitFor()
+    this.#completedAction = 'job-requirement-extraction-failed'
   }
 
   async givenMatchAnalysisIsAvailable() {
@@ -741,6 +826,13 @@ class ResumeTailoringBrowserTestSystem {
   }
 
   async extractRequirementsFromMinimizedJobPosting() {
+    await this.prepareMinimizedJobPostingForExtraction()
+    await this.#page.getByRole('button', { name: 'Extract Job Requirements' }).click()
+    await this.#page.getByRole('heading', { name: 'Review extracted Job Requirements' }).waitFor()
+    this.#completedAction = 'job-requirements-extracted'
+  }
+
+  async prepareMinimizedJobPostingForExtraction() {
     await this.#page.getByRole('button', { name: /Job Posting/ }).click()
     await this.#page.getByLabel('Paste the Job Posting').fill(
       `${jobPostingExcerpt}\nContact jobs@example.com\nSalary: competitive`,
@@ -750,9 +842,11 @@ class ResumeTailoringBrowserTestSystem {
     await editor.fill(jobPostingExcerpt)
     await this.#page.getByRole('button', { name: 'Save minimized Job Posting' }).click()
     await this.#page.getByRole('button', { name: 'Confirm Job Posting processing' }).click()
-    await this.#page.getByRole('button', { name: 'Extract Job Requirements' }).click()
-    await this.#page.getByRole('heading', { name: 'Review extracted Job Requirements' }).waitFor()
-    this.#completedAction = 'job-requirements-extracted'
+  }
+
+  async retryFailedJobRequirementExtraction() {
+    await this.#page.getByRole('button', { name: 'Retry Job Posting' }).click()
+    this.#completedAction = 'job-requirements-retried'
   }
 
   async reviewFrenchJobPostingWithPhoneNumber() {
@@ -926,26 +1020,74 @@ class ResumeTailoringBrowserTestSystem {
     expect(this.#jobPostingRequestContent).toBe(jobPostingExcerpt)
     expect(this.#jobPostingRequestContent).not.toContain('jobs@example.com')
     await this.#page.getByRole('button', { name: /Job Posting/ }).click()
-    await expect(this.#page.getByText('Know TypeScript', { exact: true })).toBeVisible()
-    await expect(this.#page.getByText('Required', { exact: true })).toBeVisible()
-    await expect(this.#page.getByText('Know React', { exact: true })).toBeVisible()
-    await expect(this.#page.getByText('Preferred', { exact: true })).toBeVisible()
-    await expect(this.#page.getByText(jobPostingExcerpt).first()).toBeVisible()
+    const requirementGroup = this.#page.locator('.job-requirement-group')
+    await expect(requirementGroup).toContainText('1 required · 1 preferred')
+    await expect(requirementGroup).toHaveCount(1)
+    const disclosure = requirementGroup.locator('details')
+    await expect(disclosure).not.toHaveAttribute('open', '')
+    await disclosure.locator('summary').click()
+    await expect(disclosure).toHaveAttribute('open', '')
+    await expect(requirementGroup.getByText('Know TypeScript', { exact: true })).toBeVisible()
+    await expect(requirementGroup.getByText('Required', { exact: true })).toBeVisible()
+    await expect(requirementGroup.getByText('Know React', { exact: true })).toBeVisible()
+    await expect(requirementGroup.getByText('Preferred', { exact: true })).toBeVisible()
+    await expect(requirementGroup.getByText(jobPostingExcerpt, { exact: true })).toHaveCount(1)
   }
 
   async expectEvidenceBackedMatchScoreAndGapAnalysis() {
     this.#expectCompletedAction('match-analyzed')
     await this.#page.getByRole('button', { name: /Match Analysis/ }).click()
+    await expect(this.#page.getByRole('heading', { name: 'Match Analysis summary' })).toBeVisible()
     await expect(this.#page.getByText('33%', { exact: true })).toBeVisible()
     await expect(this.#page.getByText(/below 50%/)).toBeVisible()
     await expect(this.#page.getByRole('heading', {
       name: 'Covered Job Requirements and Match Evidence',
     })).toBeVisible()
+    const evidenceDetails = this.#page.locator('.match-evidence-group details')
+    await evidenceDetails.locator('summary').click()
     await expect(this.#page.getByText('Know React', { exact: true }).last()).toBeVisible()
     await expect(this.#page.getByRole('heading', {
       name: 'Uncovered required Job Requirements',
     })).toBeVisible()
     await expect(this.#page.getByText('Know TypeScript', { exact: true }).last()).toBeVisible()
+  }
+
+  async expectPendingJobRequirementExtractionThenFocusedResult() {
+    this.#expectCompletedAction('job-requirement-extraction-inspected')
+    await expect(this.#page.getByText('Extracting Job Requirements…')).toBeVisible()
+    await expect(this.#page.locator('.job-posting-workspace')).toHaveAttribute('aria-busy', 'true')
+    await expect(this.#page.getByRole('button', { name: 'Extract Job Requirements' })).toBeDisabled()
+    expect(this.#pendingJobRequirementExtractionResponse).toBeDefined()
+    this.#releasePendingJobRequirementExtraction()
+    await expect(this.#page.getByRole('heading', { name: 'Review extracted Job Requirements' }))
+      .toBeVisible()
+    await expect(this.#page.locator('#job-requirements-title')).toBeFocused()
+  }
+
+  async expectRetryToPreserveJobPostingAndShowRequirements() {
+    this.#expectCompletedAction('job-requirements-retried')
+    await expect(this.#page.getByRole('heading', { name: 'Review extracted Job Requirements' }))
+      .toBeVisible()
+    await expect(this.#page.locator('#job-requirements-title')).toBeFocused()
+    expect(this.#jobPostingRequestContent).toBe(jobPostingExcerpt)
+  }
+
+  async expectMatchSummaryBeforeProgressiveEvidence() {
+    this.#expectCompletedAction('match-analyzed')
+    await this.#page.getByRole('button', { name: /Match Analysis/ }).click()
+    const summary = this.#page.locator('.match-analysis-summary')
+    await expect(summary).toContainText('33%')
+    await expect(summary).toContainText('eligible')
+    await expect(summary).toContainText('0 / 1')
+    await expect(summary).toContainText('1 / 1')
+    await expect(summary).toContainText('Know TypeScript')
+    await expect(summary.getByText(/below 50%/)).toHaveAttribute('role', 'status')
+    const evidenceDisclosure = this.#page.locator('.match-evidence-group details')
+    await expect(evidenceDisclosure).not.toHaveAttribute('open', '')
+    await evidenceDisclosure.locator('summary').click()
+    await expect(evidenceDisclosure).toHaveAttribute('open', '')
+    await expect(evidenceDisclosure.getByText('Senior FullStack Developer using React at Acme'))
+      .toBeVisible()
   }
 
   async expectCompletedSourceProfileToRemainIntact() {
@@ -991,8 +1133,7 @@ class ResumeTailoringBrowserTestSystem {
     expect(this.#pendingMatchAnalysisResponse).toBeDefined()
     this.#releasePendingMatchAnalysis()
     await expect(this.#page.getByText('33%', { exact: true })).toBeVisible()
-    await expect(this.#page.getByRole('heading', { name: 'Match Score and Gap Analysis' }))
-      .toBeFocused()
+    await expect(this.#page.locator('#match-analysis-summary-title')).toBeFocused()
   }
 
   async expectLongRunningReassuranceWithoutInventedProgress() {
@@ -1102,6 +1243,10 @@ class ResumeTailoringBrowserTestSystem {
 
   #releasePendingMatchAnalysis() {
     this.#pendingMatchAnalysisResponse?.()
+  }
+
+  #releasePendingJobRequirementExtraction() {
+    this.#pendingJobRequirementExtractionResponse?.()
   }
 }
 
