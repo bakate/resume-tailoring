@@ -15,6 +15,13 @@ declare global {
   }
 }
 
+const compactProgressMaximumWidth = 640
+const progressViewports = [
+  { width: 1280, height: 900 },
+  { width: 640, height: 900 },
+  { width: 390, height: 844 },
+] as const
+
 test('a Candidate can start a private Resume Tailoring session', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
@@ -308,7 +315,7 @@ test('a Candidate can reopen a completed step without losing progress', async ({
   await system.expectCompletedSourceProfileToRemainIntact()
 })
 
-test('progress navigation stays usable on mobile and exposes the current step', async ({ page }) => {
+test('progress navigation exposes the full journey on compact screens', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
   await system.givenMobileViewport()
@@ -316,6 +323,57 @@ test('progress navigation stays usable on mobile and exposes the current step', 
   await system.startResumeTailoringSession()
 
   await system.expectMobileProgressToExposeCurrentAndFutureSteps()
+})
+
+test('French progress exposes the full journey on compact screens', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenBrowserPrefersLanguages({ languages: ['fr-FR'] })
+  await system.givenMobileViewport()
+
+  await system.startResumeTailoringSessionInFrench()
+
+  await system.expectFrenchProgressToExposeCurrentAndFutureSteps()
+})
+
+test('partially completed progress stays readable in English', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenVerifiedSourceProfile()
+
+  await system.reopenCompletedSourceProfileWithKeyboard()
+
+  await system.expectPartiallyCompletedProgressToStayReadable()
+})
+
+test('partially completed progress stays readable in French', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenVerifiedSourceProfile()
+
+  await system.switchResumeTailoringToFrench()
+
+  await system.expectFrenchPartiallyCompletedProgressToStayReadable()
+})
+
+test('completed progress stays readable in English', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenTailoredResumeIsStored()
+
+  await system.reopenCompletedSourceProfileWithKeyboard()
+
+  await system.expectCompletedProgressToStayReadable()
+})
+
+test('completed progress stays readable in French', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenTailoredResumeIsStored()
+
+  await system.switchResumeTailoringToFrench()
+
+  await system.expectFrenchCompletedProgressToStayReadable()
 })
 
 test('a delayed operation prevents duplicates and focuses its successful result', async ({ page }) => {
@@ -1134,6 +1192,12 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'resume-tailoring-opened'
   }
 
+  async startResumeTailoringSessionInFrench() {
+    await this.#page.goto('/')
+    await this.#page.getByRole('button', { name: 'Commencer à adapter mon CV' }).click()
+    this.#completedAction = 'resume-tailoring-opened'
+  }
+
   async reloadResumeTailoringSession() {
     await this.#page.reload()
     this.#completedAction = 'candidate-session-reloaded'
@@ -1481,6 +1545,13 @@ class ResumeTailoringBrowserTestSystem {
 
   async reopenCompletedSourceProfile() {
     await this.#page.getByRole('button', { name: /Source Profile/ }).click()
+    this.#completedAction = 'source-profile-reopened'
+  }
+
+  async reopenCompletedSourceProfileWithKeyboard() {
+    const sourceProfileStep = this.#page.getByRole('button', { name: /Source Profile/ })
+    await sourceProfileStep.focus()
+    await sourceProfileStep.press('Enter')
     this.#completedAction = 'source-profile-reopened'
   }
 
@@ -1835,8 +1906,7 @@ class ResumeTailoringBrowserTestSystem {
 
   async expectMobileProgressToExposeCurrentAndFutureSteps() {
     this.#expectCompletedAction('resume-tailoring-opened')
-    const progress = this.#page.getByRole('navigation', { name: 'Resume Tailoring progress' })
-    await expect(progress).toBeVisible()
+    const progress = this.#page.locator('.workflow-progress')
     await expect(progress.getByRole('button', { name: /Source Profile/ })).toHaveAttribute(
       'aria-current',
       'step',
@@ -1844,11 +1914,117 @@ class ResumeTailoringBrowserTestSystem {
     await expect(progress.getByRole('button', { name: /Job Posting/ })).toBeDisabled()
     await expect(progress.getByRole('button', { name: /Match Analysis/ })).toBeDisabled()
     await expect(progress.getByRole('button', { name: /Tailored Resume/ })).toBeDisabled()
-    expect(await this.#page.evaluate(() => ({
-      documentWidth: document.documentElement.scrollWidth,
-      viewportWidth: window.innerWidth,
-    }))).toEqual({ documentWidth: 390, viewportWidth: 390 })
-    await this.#page.waitForLoadState('networkidle')
+    await this.#expectProgressReadableAtRepresentativeWidths({ progress })
+  }
+
+  async expectFrenchProgressToExposeCurrentAndFutureSteps() {
+    this.#expectCompletedAction('resume-tailoring-opened')
+    const progress = this.#page.locator('.workflow-progress')
+    await expect(progress.getByRole('button', { name: /Profil Source/ })).toHaveAttribute(
+      'aria-current',
+      'step',
+    )
+    await expect(progress.getByRole('button', { name: /Offre d'emploi/ })).toBeDisabled()
+    await expect(progress.getByRole('button', { name: /Analyse de Correspondance/ })).toBeDisabled()
+    await expect(progress.getByRole('button', { name: /CV Adapté/ })).toBeDisabled()
+    await this.#expectProgressReadableAtRepresentativeWidths({ progress })
+  }
+
+  async expectPartiallyCompletedProgressToStayReadable() {
+    this.#expectCompletedAction('source-profile-reopened')
+    const progress = this.#page.locator('.workflow-progress')
+    await expect(progress.getByRole('button', { name: /Source Profile/ })).toBeEnabled()
+    await expect(progress.getByRole('button', { name: /Source Profile/ })).toContainText('1 verified fact')
+    await expect(progress.getByRole('button', { name: /Source Profile/ })).toHaveAttribute('aria-expanded', 'true')
+    await expect(progress.getByRole('button', { name: /Job Posting/ })).toHaveAttribute(
+      'aria-current',
+      'step',
+    )
+    await expect(progress.getByRole('button', { name: /Match Analysis/ })).toBeDisabled()
+    await this.#expectProgressReadableAtRepresentativeWidths({ progress })
+  }
+
+  async expectFrenchPartiallyCompletedProgressToStayReadable() {
+    this.#expectCompletedAction('resume-tailoring-viewed')
+    const progress = this.#page.locator('.workflow-progress')
+    await expect(progress.getByRole('button', { name: /Profil Source/ })).toContainText('1 fait vérifié')
+    await expect(progress.getByRole('button', { name: /Offre d'emploi/ })).toHaveAttribute(
+      'aria-current',
+      'step',
+    )
+    await expect(progress.getByRole('button', { name: /Analyse de Correspondance/ })).toBeDisabled()
+    await this.#expectProgressReadableAtRepresentativeWidths({ progress })
+  }
+
+  async expectCompletedProgressToStayReadable() {
+    this.#expectCompletedAction('source-profile-reopened')
+    const progress = this.#page.locator('.workflow-progress')
+    await this.#expectEveryProgressStepEnabled({ progress })
+    await expect(progress.getByRole('button', { name: /Tailored Resume/ })).toHaveAttribute(
+      'aria-current',
+      'step',
+    )
+    await expect(progress.getByRole('button', { name: /Source Profile/ })).toHaveAttribute('aria-expanded', 'true')
+    await this.#expectEnglishCompletedOutcomeSummaries({ progress })
+    await this.#expectProgressReadableAtRepresentativeWidths({ progress })
+  }
+
+  async expectFrenchCompletedProgressToStayReadable() {
+    this.#expectCompletedAction('resume-tailoring-viewed')
+    const progress = this.#page.locator('.workflow-progress')
+    await this.#expectEveryProgressStepEnabled({ progress })
+    await expect(progress.getByRole('button', { name: /CV Adapté/ })).toHaveAttribute(
+      'aria-current',
+      'step',
+    )
+    await this.#expectFrenchCompletedOutcomeSummaries({ progress })
+    await this.#expectProgressReadableAtRepresentativeWidths({ progress })
+  }
+
+  async #expectProgressReadableAtRepresentativeWidths({ progress }: Readonly<{
+    progress: Locator
+  }>) {
+    for (const viewport of progressViewports) {
+      await this.#page.setViewportSize(viewport)
+      const steps = progress.getByRole('button')
+      await expect(steps).toHaveCount(4)
+      for (const step of await steps.all()) await expect(step).toBeVisible()
+      expect(await progress.locator('.workflow-steps').evaluate((element) =>
+        element.scrollWidth === element.clientWidth)).toBe(true)
+      if (viewport.width > compactProgressMaximumWidth) continue
+      await this.#expectCompactProgressContentFits({ progress })
+    }
+  }
+
+  async #expectCompactProgressContentFits({ progress }: Readonly<{ progress: Locator }>) {
+    expect(await progress.locator('.step-copy').evaluateAll((elements) => elements.every(
+      (element) => element.scrollWidth === element.clientWidth
+        && element.scrollHeight === element.clientHeight,
+    ))).toBe(true)
+    expect(await progress.locator('.workflow-step').evaluateAll((steps) => steps.every((step) => {
+      const marker = step.querySelector('.step-number')?.getBoundingClientRect()
+      const copy = step.querySelector('.step-copy')?.getBoundingClientRect()
+      return marker !== undefined && copy !== undefined && marker.right <= copy.left
+    }))).toBe(true)
+  }
+
+  async #expectEveryProgressStepEnabled({ progress }: Readonly<{ progress: Locator }>) {
+    for (const step of await progress.getByRole('button').all()) await expect(step).toBeEnabled()
+  }
+
+  async #expectEnglishCompletedOutcomeSummaries({ progress }: Readonly<{ progress: Locator }>) {
+    await expect(progress.getByRole('button', { name: /Source Profile/ })).toContainText('1 verified fact')
+    await expect(progress.getByRole('button', { name: /Job Posting/ })).toContainText('2 Job Requirements')
+    await expect(progress.getByRole('button', { name: /Match Analysis/ })).toContainText('33% Match Score')
+    await expect(progress.getByRole('button', { name: /Tailored Resume/ })).toContainText('2 Resume Claims ready')
+  }
+
+  async #expectFrenchCompletedOutcomeSummaries({ progress }: Readonly<{ progress: Locator }>) {
+    await expect(progress.getByRole('button', { name: /Profil Source/ })).toContainText('1 fait vérifié')
+    await expect(progress.getByRole('button', { name: /Offre d'emploi/ }))
+      .toContainText("2 Exigences de l'Offre")
+    await expect(progress.getByRole('button', { name: /Analyse de Correspondance/ })).toContainText('33% Score de Correspondance')
+    await expect(progress.getByRole('button', { name: /CV Adapté/ })).toContainText('2 affirmations du CV prêtes')
   }
 
   async expectPendingMatchAnalysisThenFocusedResult() {
