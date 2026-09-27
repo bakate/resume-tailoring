@@ -25,6 +25,7 @@ export type ResumePdfResult =
 
 type ResumePdfDependencies = Readonly<{
   semanticValidator: ResumeClaimSemanticValidator
+  signal?: AbortSignal
 }>
 
 const a4WidthPoints = 595.28
@@ -34,20 +35,42 @@ const pageSizeTolerancePoints = 1
 export async function createTailoredResumePdf({
   inputs,
   semanticValidator,
+  signal,
 }: ResumePdfDependencies & Readonly<{
   inputs: TailoredResumePdfInputs
 }>): Promise<ResumePdfResult> {
-  let browser: Browser | undefined
+  if (signal?.aborted === true) return renderingUnavailableResult
+  const browserResult = await launchPdfBrowser()
+  if (!browserResult.ok) return renderingUnavailableResult
+  return renderWithBrowser({ browser: browserResult.value, inputs, semanticValidator, signal })
+}
+
+async function launchPdfBrowser() {
   try {
-    browser = await puppeteer.launch({
+    const browser = await puppeteer.launch({
       headless: true,
       args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox'],
     })
+    return { ok: true, value: browser } as const
+  } catch {
+    return { ok: false } as const
+  }
+}
+
+async function renderWithBrowser({ browser, inputs, semanticValidator, signal }: Readonly<{
+  browser: Browser
+  inputs: TailoredResumePdfInputs
+}> & ResumePdfDependencies): Promise<ResumePdfResult> {
+  const closeAbortedBrowser = () => { void browser.close().catch(ignoreFailure) }
+  signal?.addEventListener('abort', closeAbortedBrowser, { once: true })
+  try {
+    if (signal?.aborted === true) return renderingUnavailableResult
     return await prepareAndRenderPdf({ browser, inputs, semanticValidator })
   } catch {
     return renderingUnavailableResult
   } finally {
-    if (browser !== undefined) await browser.close().catch(ignoreFailure)
+    signal?.removeEventListener('abort', closeAbortedBrowser)
+    await browser.close().catch(ignoreFailure)
   }
 }
 
