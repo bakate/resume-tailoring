@@ -1537,15 +1537,12 @@ h1 {
   }
 
   .workflow-hero-active .workflow-steps {
-    display: flex;
-    overflow-x: auto;
-    padding: 2px 2px 12px;
-    scroll-snap-type: x proximity;
+    grid-template-columns: 1fr;
+    padding: 2px;
   }
 
   .workflow-hero-active .workflow-step {
-    flex: 0 0 min(78vw, 270px);
-    scroll-snap-align: start;
+    min-width: 0;
   }
 
   .workflow-hero-active .step-copy > span {
