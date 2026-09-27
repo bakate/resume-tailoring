@@ -17,8 +17,9 @@ export function MatchAnalysisWorkspace({ candidateSession, localization }: Works
   if (matchInputs === null) return null
   const { jobPosting, sourceProfile } = matchInputs
   return (
-    <section className="match-analysis-workspace" aria-labelledby="match-analysis-title">
-      <h2 id="match-analysis-title">{localization.translate('matchAnalysis.title')}</h2>
+    <section aria-busy={candidateSession.pendingOperation === 'analyze-match'}
+      className="match-analysis-workspace" aria-labelledby="match-analysis-title">
+      <h2 id="match-analysis-title" tabIndex={-1}>{localization.translate('matchAnalysis.title')}</h2>
       {candidateSession.view.status === 'ready'
         && candidateSession.view.matchAnalysis !== undefined
         ? <MatchAnalysisResult {...{
@@ -28,6 +29,7 @@ export function MatchAnalysisWorkspace({ candidateSession, localization }: Works
             verifiedFacts: sourceProfile.facts.filter((fact) => fact.status === 'verified'),
           }} />
         : <button className="primary-action compact-action"
+            disabled={candidateSession.pendingOperation !== null}
             onClick={() => void candidateSession.analyzeMatch()} type="button">
             {localization.translate('matchAnalysis.action')}
           </button>}

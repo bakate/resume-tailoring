@@ -148,6 +148,16 @@ test('falls back to English for unsupported browser languages', async ({ page })
   await system.expectResumeTailoringToBeInEnglish()
 })
 
+test('ignores browser-extension attributes injected on the document body', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenBrowserExtensionMutatesDocumentBody()
+
+  await system.viewResumeTailoring()
+
+  await system.expectNoHydrationMismatchFromBrowserExtension()
+})
+
 test('a Candidate can switch locale without losing an active session', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
@@ -183,7 +193,9 @@ test('a Candidate reviews classified atomic Job Requirements from minimized cont
   const system = createSystemUnderTest({ page })
 
   await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
   await system.givenJobRequirementExtractionIsAvailable()
+  await system.buildVerifiedSourceProfile()
 
   await system.extractRequirementsFromMinimizedJobPosting()
 
@@ -205,6 +217,56 @@ test('a Candidate sees an evidence-backed Match Score and Gap Analysis', async (
   await system.expectEvidenceBackedMatchScoreAndGapAnalysis()
 })
 
+test('a Candidate can reopen a completed step without losing progress', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenVerifiedSourceProfile()
+
+  await system.reopenCompletedSourceProfile()
+
+  await system.expectCompletedSourceProfileToRemainIntact()
+})
+
+test('progress navigation stays usable on mobile and exposes the current step', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenMobileViewport()
+
+  await system.startResumeTailoringSession()
+
+  await system.expectMobileProgressToExposeCurrentAndFutureSteps()
+})
+
+test('a delayed operation prevents duplicates and focuses its successful result', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenMatchAnalysisCanBeDelayed()
+
+  await system.analyzeDelayedMatchWithDoubleClick()
+
+  await system.expectPendingMatchAnalysisThenFocusedResult()
+})
+
+test('a pending operation reassures the Candidate after ten seconds', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenMatchAnalysisCanBeDelayed()
+
+  await system.waitOnPendingMatchAnalysis()
+
+  await system.expectLongRunningReassuranceWithoutInventedProgress()
+})
+
+test('a Candidate can retry a recoverable failure without losing content', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenRecoverableMatchAnalysisFailure()
+
+  await system.retryFailedMatchAnalysis()
+
+  await system.expectRetryToPreserveProgressAndProduceMatchAnalysis()
+})
+
 test('a Candidate generates validated provenance-backed Resume Claims', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
@@ -216,6 +278,7 @@ test('a Candidate generates validated provenance-backed Resume Claims', async ({
   await system.buildVerifiedSourceProfile()
   await system.extractRequirementsFromMinimizedJobPosting()
   await system.analyzeMatch()
+  await system.givenTailoredResumeStepIsOpen()
 
   await system.generateResumeClaims()
 
@@ -253,6 +316,8 @@ test('localizes sensitive labels and preserves legitimate French words', async (
   const system = createSystemUnderTest({ page })
 
   await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+  await system.buildVerifiedSourceProfile()
   await system.switchResumeTailoringToFrench()
 
   await system.reviewFrenchJobPostingWithPhoneNumber()
@@ -303,6 +368,10 @@ type CompletedAction =
   | 'job-requirements-extracted'
   | 'job-posting-reviewed'
   | 'match-analyzed'
+  | 'match-analysis-inspected'
+  | 'match-analysis-retried'
+  | 'match-analysis-waited'
+  | 'source-profile-reopened'
   | 'resume-tailoring-opened'
   | 'resume-tailoring-viewed'
   | 'resume-claims-generated'
@@ -315,10 +384,13 @@ type CompletedAction =
 class ResumeTailoringBrowserTestSystem {
   readonly #page: Page
   readonly #analyticsEvents: unknown[] = []
+  readonly #consoleMessages: string[] = []
   #completedAction: CompletedAction | undefined
   #lateResponseOutcome: unknown
   #extractionRequestContent: string | undefined
   #jobPostingRequestContent: string | undefined
+  #matchAnalysisRequestCount = 0
+  #pendingMatchAnalysisResponse: (() => void) | undefined
   #resumePdfRequest: unknown
   #unknownRoute: string | undefined
 
@@ -367,32 +439,59 @@ class ResumeTailoringBrowserTestSystem {
 
   async givenMatchAnalysisIsAvailable() {
     await this.#page.route('**/api/match-analysis', async (route) => {
-      const matchRequest = readMatchRequest(route.request().postData())
-      const preferredRequirement = matchRequest?.requirements.find(
-        (requirement) => requirement.classification === 'preferred',
-      )
-      const [verifiedFact] = matchRequest?.verifiedFacts ?? []
       await route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify({
-          ok: true,
-          value: {
-            evidence: preferredRequirement === undefined || verifiedFact === undefined
-              ? []
-              : [{
-                requirementId: preferredRequirement.id,
-                factMatches: [{
-                  factId: verifiedFact.id,
-                  factTerm: 'React',
-                  relationship: 'exact',
-                  requirementTerm: 'React',
-                }],
-              }],
-            relevantFactIds: verifiedFact === undefined ? [] : [verifiedFact.id],
-          },
-        }),
+        body: JSON.stringify(createMatchAnalysisResponse({
+          requestBody: route.request().postData(),
+        })),
       })
     })
+  }
+
+  async givenMatchAnalysisCanBeDelayed() {
+    await this.givenCandidateSessionIsActive()
+    await this.givenStructuredExtractionIsAvailable()
+    await this.givenJobRequirementExtractionIsAvailable()
+    await this.buildVerifiedSourceProfile()
+    await this.extractRequirementsFromMinimizedJobPosting()
+    await this.#page.route('**/api/match-analysis', async (route) => {
+      this.#matchAnalysisRequestCount += 1
+      await new Promise<void>((resolve) => {
+        this.#pendingMatchAnalysisResponse = resolve
+      })
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(createMatchAnalysisResponse({ requestBody: route.request().postData() })),
+      })
+    })
+    await this.#page.getByRole('button', { name: /Match Analysis/ }).click()
+  }
+
+  async givenRecoverableMatchAnalysisFailure() {
+    await this.givenCandidateSessionIsActive()
+    await this.givenStructuredExtractionIsAvailable()
+    await this.givenJobRequirementExtractionIsAvailable()
+    await this.buildVerifiedSourceProfile()
+    await this.extractRequirementsFromMinimizedJobPosting()
+    let attemptCount = 0
+    await this.#page.route('**/api/match-analysis', async (route) => {
+      attemptCount += 1
+      if (attemptCount === 1) {
+        await route.fulfill({ status: 503 })
+        return
+      }
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(createMatchAnalysisResponse({ requestBody: route.request().postData() })),
+      })
+    })
+    await this.#page.getByRole('button', { name: /Match Analysis/ }).click()
+    await this.#page.getByRole('button', { name: 'Analyze the match' }).click()
+    await this.#page.getByRole('button', { name: 'Retry Match Analysis' }).waitFor()
+  }
+
+  async givenMobileViewport() {
+    await this.#page.setViewportSize({ width: 390, height: 844 })
   }
 
   async givenResumeClaimServicesAreAvailable() {
@@ -429,6 +528,7 @@ class ResumeTailoringBrowserTestSystem {
     await this.givenCandidateSessionIsActive()
     await this.givenStructuredExtractionIsAvailable()
     await this.buildVerifiedSourceProfile()
+    await this.#page.getByRole('button', { name: /Job Posting/ }).click()
   }
 
   async givenTailoredResumeIsStored() {
@@ -440,7 +540,12 @@ class ResumeTailoringBrowserTestSystem {
     await this.buildVerifiedSourceProfile()
     await this.extractRequirementsFromMinimizedJobPosting()
     await this.analyzeMatch()
+    await this.givenTailoredResumeStepIsOpen()
     await this.generateResumeClaims()
+  }
+
+  async givenTailoredResumeStepIsOpen() {
+    await this.#page.getByRole('button', { name: /Tailored Resume/ }).click()
   }
 
   async givenValidatedResumePdfExportIsAvailable() {
@@ -479,6 +584,17 @@ class ResumeTailoringBrowserTestSystem {
         subtree: true,
       })
     }, languages)
+  }
+
+  async givenBrowserExtensionMutatesDocumentBody() {
+    this.#page.on('console', (message) => {
+      this.#consoleMessages.push(message.text())
+    })
+    await this.#page.route((url) => url.pathname === '/', async (route) => {
+      const response = await route.fetch()
+      const body = (await response.text()).replace('<body', '<body cz-shortcut-listen="true"')
+      await route.fulfill({ response, body })
+    })
   }
 
   async givenCandidateSessionIsStored() {
@@ -591,7 +707,7 @@ class ResumeTailoringBrowserTestSystem {
     await this.#page.getByRole('button', { name: 'Confirm this processing notice' }).click()
     await this.#page.getByRole('button', { name: 'Extract professional facts' }).click()
     await this.#page.getByRole('button', { name: 'Confirm fact' }).click()
-    await this.#page.getByText('Verified', { exact: true }).waitFor()
+    await this.#page.getByRole('button', { name: /Source Profile 1 verified fact/ }).waitFor()
     this.#completedAction = 'source-profile-built'
   }
 
@@ -625,6 +741,7 @@ class ResumeTailoringBrowserTestSystem {
   }
 
   async extractRequirementsFromMinimizedJobPosting() {
+    await this.#page.getByRole('button', { name: /Job Posting/ }).click()
     await this.#page.getByLabel('Paste the Job Posting').fill(
       `${jobPostingExcerpt}\nContact jobs@example.com\nSalary: competitive`,
     )
@@ -650,6 +767,7 @@ class ResumeTailoringBrowserTestSystem {
   }
 
   async analyzeMatch() {
+    await this.#page.getByRole('button', { name: /Match Analysis/ }).click()
     await this.#page.getByRole('button', { name: 'Analyze the match' }).click()
     await this.#page.getByText('33%', { exact: true }).waitFor()
     this.#completedAction = 'match-analyzed'
@@ -659,6 +777,30 @@ class ResumeTailoringBrowserTestSystem {
     await this.#page.getByRole('button', { name: 'Generate Resume Claims' }).click()
     await this.#page.getByText('Built React applications at Acme', { exact: true }).waitFor()
     this.#completedAction = 'resume-claims-generated'
+  }
+
+  async reopenCompletedSourceProfile() {
+    await this.#page.getByRole('button', { name: /Source Profile/ }).click()
+    this.#completedAction = 'source-profile-reopened'
+  }
+
+  async analyzeDelayedMatchWithDoubleClick() {
+    const analyzeButton = this.#page.getByRole('button', { name: 'Analyze the match' })
+    const matchAnalysisRequest = this.#page.waitForRequest('**/api/match-analysis')
+    await analyzeButton.dblclick({ force: true })
+    await matchAnalysisRequest
+    this.#completedAction = 'match-analysis-inspected'
+  }
+
+  async waitOnPendingMatchAnalysis() {
+    await this.#page.getByRole('button', { name: 'Analyze the match' }).click()
+    await this.#page.waitForTimeout(10_100)
+    this.#completedAction = 'match-analysis-waited'
+  }
+
+  async retryFailedMatchAnalysis() {
+    await this.#page.getByRole('button', { name: 'Retry Match Analysis' }).click()
+    this.#completedAction = 'match-analysis-retried'
   }
 
   async expectResumeTailoringSessionToBeStoredInIndexedDb() {
@@ -729,6 +871,12 @@ class ResumeTailoringBrowserTestSystem {
     )
   }
 
+  async expectNoHydrationMismatchFromBrowserExtension() {
+    this.#expectCompletedAction('resume-tailoring-viewed')
+    await expect(this.#page.locator('body')).toHaveAttribute('cz-shortcut-listen', 'true')
+    expect(this.#consoleMessages.join('\n')).not.toContain('hydrated but some attributes')
+  }
+
   async expectResumeTailoringToBeInFrench() {
     this.#expectCompletedAction('resume-tailoring-viewed')
     await expect(this.#page.locator('html')).toHaveAttribute('lang', 'fr')
@@ -761,12 +909,13 @@ class ResumeTailoringBrowserTestSystem {
     expect(this.#extractionRequestContent).toContain('Senior FullStack Developer using React at Acme')
     expect(this.#extractionRequestContent).not.toContain('bakate@example.com')
     expect(this.#extractionRequestContent).not.toContain('+33 6 12 34 56 78')
-    await expect(this.#page.getByText('Senior FullStack Developer using React at Acme')).toBeVisible()
-    await expect(this.#page.getByText('Verified', { exact: true })).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: /Source Profile/ }))
+      .toContainText('1 verified fact')
   }
 
   async expectVerifiedSourceProfileToBeRestored() {
     this.#expectCompletedAction('source-profile-reloaded')
+    await this.#page.getByRole('button', { name: /Source Profile/ }).click()
     await expect(this.#page.getByRole('heading', { name: 'Review extracted facts' })).toBeVisible()
     await expect(this.#page.getByText('Senior FullStack Developer using React at Acme')).toBeVisible()
     await expect(this.#page.getByText('Verified', { exact: true })).toBeVisible()
@@ -776,6 +925,7 @@ class ResumeTailoringBrowserTestSystem {
     this.#expectCompletedAction('job-requirements-extracted')
     expect(this.#jobPostingRequestContent).toBe(jobPostingExcerpt)
     expect(this.#jobPostingRequestContent).not.toContain('jobs@example.com')
+    await this.#page.getByRole('button', { name: /Job Posting/ }).click()
     await expect(this.#page.getByText('Know TypeScript', { exact: true })).toBeVisible()
     await expect(this.#page.getByText('Required', { exact: true })).toBeVisible()
     await expect(this.#page.getByText('Know React', { exact: true })).toBeVisible()
@@ -785,6 +935,7 @@ class ResumeTailoringBrowserTestSystem {
 
   async expectEvidenceBackedMatchScoreAndGapAnalysis() {
     this.#expectCompletedAction('match-analyzed')
+    await this.#page.getByRole('button', { name: /Match Analysis/ }).click()
     await expect(this.#page.getByText('33%', { exact: true })).toBeVisible()
     await expect(this.#page.getByText(/below 50%/)).toBeVisible()
     await expect(this.#page.getByRole('heading', {
@@ -795,6 +946,72 @@ class ResumeTailoringBrowserTestSystem {
       name: 'Uncovered required Job Requirements',
     })).toBeVisible()
     await expect(this.#page.getByText('Know TypeScript', { exact: true }).last()).toBeVisible()
+  }
+
+  async expectCompletedSourceProfileToRemainIntact() {
+    this.#expectCompletedAction('source-profile-reopened')
+    await expect(this.#page.getByRole('heading', { name: 'Review extracted facts' })).toBeVisible()
+    await expect(this.#page.getByText(
+      'Senior FullStack Developer using React at Acme',
+      { exact: true },
+    )).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: /Source Profile/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+    await expect(this.#page.getByRole('button', { name: /Job Posting/ })).toHaveAttribute(
+      'aria-current',
+      'step',
+    )
+  }
+
+  async expectMobileProgressToExposeCurrentAndFutureSteps() {
+    this.#expectCompletedAction('resume-tailoring-opened')
+    const progress = this.#page.getByRole('navigation', { name: 'Resume Tailoring progress' })
+    await expect(progress).toBeVisible()
+    await expect(progress.getByRole('button', { name: /Source Profile/ })).toHaveAttribute(
+      'aria-current',
+      'step',
+    )
+    await expect(progress.getByRole('button', { name: /Job Posting/ })).toBeDisabled()
+    await expect(progress.getByRole('button', { name: /Match Analysis/ })).toBeDisabled()
+    await expect(progress.getByRole('button', { name: /Tailored Resume/ })).toBeDisabled()
+    expect(await this.#page.evaluate(() => ({
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+    }))).toEqual({ documentWidth: 390, viewportWidth: 390 })
+  }
+
+  async expectPendingMatchAnalysisThenFocusedResult() {
+    this.#expectCompletedAction('match-analysis-inspected')
+    await expect(this.#page.getByText('Building your Match Analysis…')).toBeVisible()
+    await expect(this.#page.locator('.match-analysis-workspace')).toHaveAttribute('aria-busy', 'true')
+    await expect(this.#page.getByRole('button', { name: 'Analyze the match' })).toBeDisabled()
+    expect(this.#matchAnalysisRequestCount).toBe(1)
+    expect(this.#pendingMatchAnalysisResponse).toBeDefined()
+    this.#releasePendingMatchAnalysis()
+    await expect(this.#page.getByText('33%', { exact: true })).toBeVisible()
+    await expect(this.#page.getByRole('heading', { name: 'Match Score and Gap Analysis' }))
+      .toBeFocused()
+  }
+
+  async expectLongRunningReassuranceWithoutInventedProgress() {
+    this.#expectCompletedAction('match-analysis-waited')
+    await expect(this.#page.getByText(
+      'Still working. Your content is safe in this browser.',
+    )).toBeVisible()
+    await expect(this.#page.getByText(/\d+% complete/)).toHaveCount(0)
+    expect(this.#pendingMatchAnalysisResponse).toBeDefined()
+    this.#releasePendingMatchAnalysis()
+  }
+
+  async expectRetryToPreserveProgressAndProduceMatchAnalysis() {
+    this.#expectCompletedAction('match-analysis-retried')
+    await expect(this.#page.getByRole('button', { name: /Match Analysis/ })).toContainText('33%')
+    await expect(this.#page.getByRole('button', { name: /Source Profile/ }))
+      .toContainText('1 verified fact')
+    await expect(this.#page.getByRole('button', { name: /Job Posting/ }))
+      .toContainText('2 Job Requirements')
   }
 
   async expectValidatedResumeClaimsWithoutFreeEditing() {
@@ -882,6 +1099,42 @@ class ResumeTailoringBrowserTestSystem {
       && this.#completedAction !== 'candidate-session-synchronized',
     ).toBe(false)
   }
+
+  #releasePendingMatchAnalysis() {
+    this.#pendingMatchAnalysisResponse?.()
+  }
+}
+
+function createMatchAnalysisResponse({ requestBody }: Readonly<{ requestBody: string | null }>) {
+  const matchRequest = readMatchRequest(requestBody)
+  const preferredRequirement = matchRequest?.requirements.find(
+    (requirement) => requirement.classification === 'preferred',
+  )
+  const [verifiedFact] = matchRequest?.verifiedFacts ?? []
+  return {
+    ok: true,
+    value: {
+      evidence: createPreferredMatchEvidence({ preferredRequirement, verifiedFact }),
+      relevantFactIds: verifiedFact === undefined ? [] : [verifiedFact.id],
+    },
+  }
+}
+
+function createPreferredMatchEvidence({ preferredRequirement, verifiedFact }: Readonly<{
+  preferredRequirement: NonNullable<ReturnType<typeof readMatchRequest>>['requirements'][number]
+    | undefined
+  verifiedFact: NonNullable<ReturnType<typeof readMatchRequest>>['verifiedFacts'][number] | undefined
+}>) {
+  if (preferredRequirement === undefined || verifiedFact === undefined) return []
+  return [{
+    requirementId: preferredRequirement.id,
+    factMatches: [{
+      factId: verifiedFact.id,
+      factTerm: 'React',
+      relationship: 'exact',
+      requirementTerm: 'React',
+    }],
+  }]
 }
 
 const lateResponseSession = {
@@ -1029,18 +1282,21 @@ function hasCallerDerivedDocument(value: unknown) {
 const jobPostingExcerpt = 'You must know TypeScript and preferably React.'
 const jobRequirementExtractionResponse = {
   ok: true,
-  value: [
-    {
-      classification: 'required',
-      sourceExcerpt: jobPostingExcerpt,
-      value: 'Know TypeScript',
-    },
-    {
-      classification: 'preferred',
-      sourceExcerpt: jobPostingExcerpt,
-      value: 'Know React',
-    },
-  ],
+  value: {
+    targetRole: null,
+    requirements: [
+      {
+        classification: 'required',
+        sourceExcerpt: jobPostingExcerpt,
+        value: 'Know TypeScript',
+      },
+      {
+        classification: 'preferred',
+        sourceExcerpt: jobPostingExcerpt,
+        value: 'Know React',
+      },
+    ],
+  },
 } as const
 
 function createTextPdf(text: string) {

@@ -82,7 +82,7 @@ function RootDocument({ children, locale, readiness }: Readonly<{
       <head>
         <HeadContent />
       </head>
-      <body style={readiness === 'pending' ? pendingLocaleStyle : undefined}>
+      <body suppressHydrationWarning style={readiness === 'pending' ? pendingLocaleStyle : undefined}>
         {children}
         <Scripts />
       </body>

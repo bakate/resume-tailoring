@@ -22,8 +22,9 @@ export function JobPostingWorkspace({ candidateSession, localization }: Workspac
   if (candidateSession.view.status !== 'ready') return null
   const jobPosting = candidateSession.view.jobPosting
   return (
-    <section className="job-posting-workspace" aria-labelledby="job-posting-title">
-      <h2 id="job-posting-title">{localization.translate('jobPosting.title')}</h2>
+    <section aria-busy={candidateSession.pendingOperation === 'extract-job-requirements'}
+      className="job-posting-workspace" aria-labelledby="job-posting-title">
+      <h2 id="job-posting-title" tabIndex={-1}>{localization.translate('jobPosting.title')}</h2>
       {jobPosting === undefined
         ? <JobPostingInput {...{ candidateSession, localization }} />
         : jobPosting.status === 'reviewing-posting'
@@ -155,7 +156,8 @@ function ExtractJobRequirementsButton({
   candidateSession, confirmationStatus, localization, revision,
 }: Omit<NoticeActionProps, 'jobPosting'>) {
   return <button className="primary-action compact-action"
-    disabled={confirmationStatus === 'pending' || revision === 'changed'}
+    disabled={candidateSession.pendingOperation !== null
+      || confirmationStatus === 'pending' || revision === 'changed'}
     onClick={() => void candidateSession.extractJobRequirements()} type="button">
     {localization.translate('jobPosting.extract')}
   </button>

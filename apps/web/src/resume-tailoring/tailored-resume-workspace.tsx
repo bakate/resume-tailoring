@@ -28,8 +28,10 @@ export function TailoredResumeWorkspace({ candidateSession, localization }: Work
   const { view } = candidateSession
   if (view.status !== 'ready' || view.matchAnalysis === undefined) return null
   return (
-    <section className="tailored-resume-workspace" aria-labelledby="tailored-resume-title">
-      <h2 id="tailored-resume-title">{localization.translate('resumeClaims.title')}</h2>
+    <section aria-busy={candidateSession.pendingOperation === 'generate-resume-claims'
+      || candidateSession.pendingOperation === 'reformulate-resume-claim'}
+      className="tailored-resume-workspace" aria-labelledby="tailored-resume-title">
+      <h2 id="tailored-resume-title" tabIndex={-1}>{localization.translate('resumeClaims.title')}</h2>
       {view.tailoredResume === undefined
         ? <GenerationAction {...{ candidateSession, localization }} />
         : <>
@@ -50,7 +52,8 @@ function GenerationAction({ candidateSession, localization }: WorkspaceProps) {
     <div className="source-profile-card">
       <p>{localization.translate('resumeClaims.description')}</p>
       <button className="primary-action compact-action"
-        disabled={candidateSession.view.status !== 'ready'
+        disabled={candidateSession.pendingOperation !== null
+          || candidateSession.view.status !== 'ready'
           || candidateSession.view.matchAnalysis?.generationEligibility !== 'eligible'}
         onClick={() => void candidateSession.generateResumeClaims()} type="button">
         {localization.translate('resumeClaims.generate')}
@@ -156,7 +159,8 @@ function ReformulationForm({ candidateSession, claim, localization }: WorkspaceP
           onChange={(event) => {
             setReformulationRequest(event.target.value)
           }} />
-        <button disabled={reformulationRequest.trim().length === 0} type="submit">
+        <button disabled={candidateSession.pendingOperation !== null
+          || reformulationRequest.trim().length === 0} type="submit">
           {localization.translate('resumeClaims.reformulate')}
         </button>
     </form>
