@@ -1,4 +1,6 @@
 import type { ResumeTailoringView } from '@resume-tailoring/application/resume-tailoring-workflow'
+import type { ResumeTailoringCommand } from '@resume-tailoring/application/resume-tailoring-workflow'
+import { useEffect, useState } from 'react'
 
 import {
   LocalizationFailure,
@@ -20,6 +22,8 @@ type CandidateSessionProps = Readonly<{
   candidateSession: CandidateSessionController
   localization: Localization
 }>
+type WorkflowStepId = 'job-posting' | 'match-analysis' | 'source-profile' | 'tailored-resume'
+type WorkflowStepStatus = 'completed' | 'current' | 'unavailable'
 
 export function ResumeTailoringScreen() {
   const localizationResult = useLocalization()
@@ -29,29 +33,55 @@ export function ResumeTailoringScreen() {
 
 function LocalizedResumeTailoringScreen({ localization }: LocalizationProps) {
   const candidateSession = useCandidateSession()
-  return (
-    <main className="app-shell">
-      <SiteHeader localization={localization} />
-      <WorkflowHero candidateSession={candidateSession} localization={localization} />
-      <SourceProfileWorkspace
-        candidateSession={candidateSession}
-        localization={localization}
-      />
-      <JobPostingWorkspace
-        candidateSession={candidateSession}
-        localization={localization}
-      />
-      <MatchAnalysisWorkspace
-        candidateSession={candidateSession}
-        localization={localization}
-      />
-      <TailoredResumeWorkspace
-        candidateSession={candidateSession}
-        localization={localization}
-      />
-      <ValueStrip localization={localization} />
-    </main>
-  )
+  const currentStep = readCurrentStep({ view: candidateSession.view })
+  const { activeStep, selectStep } = useActiveWorkflowStep({ candidateSession, currentStep })
+  return <main className="app-shell">
+    <SiteHeader localization={localization} />
+    <WorkflowHero {...{ activeStep, candidateSession, currentStep, localization, selectStep }} />
+    <OperationFeedback {...{ candidateSession, localization }} />
+    <ActiveWorkflowStep {...{ activeStep, candidateSession, localization }} />
+    <ValueStrip localization={localization} />
+  </main>
+}
+
+function useActiveWorkflowStep({ candidateSession, currentStep }: Readonly<{
+  candidateSession: CandidateSessionController
+  currentStep: WorkflowStepId
+}>) {
+  const [activeStep, setActiveStep] = useState<WorkflowStepId>(currentStep)
+  useCurrentStepSynchronization({ candidateSession, currentStep, setActiveStep })
+  useResultStepSynchronization({ candidateSession, currentStep, setActiveStep })
+  return { activeStep, selectStep: (step: WorkflowStepId) => {
+    setActiveStep(step)
+    focusWorkflowStep({ step })
+  } } as const
+}
+
+function useCurrentStepSynchronization({ candidateSession, currentStep, setActiveStep }: Readonly<{
+  candidateSession: CandidateSessionController
+  currentStep: WorkflowStepId
+  setActiveStep: (step: WorkflowStepId) => void
+}>) {
+  useEffect(() => {
+    if (candidateSession.completedOperation !== null) return
+    setActiveStep(currentStep)
+  }, [candidateSession.completedOperation, currentStep])
+}
+
+function useResultStepSynchronization({ candidateSession, currentStep, setActiveStep }: Readonly<{
+  candidateSession: CandidateSessionController
+  currentStep: WorkflowStepId
+  setActiveStep: (step: WorkflowStepId) => void
+}>) {
+  useEffect(() => {
+    if (candidateSession.completedOperation === null) return
+    const resultStep = readOperationResultStep({
+      fallback: currentStep,
+      operation: candidateSession.completedOperation.type,
+    })
+    setActiveStep(resultStep)
+    focusWorkflowStep({ step: resultStep })
+  }, [candidateSession.completedOperation, currentStep])
 }
 
 function SiteHeader({ localization }: LocalizationProps) {
@@ -115,14 +145,21 @@ function LocaleButton({ activeLocale, label, locale, selectLocale }: LocaleButto
   )
 }
 
-function WorkflowHero({ candidateSession, localization }: CandidateSessionProps) {
+type WorkflowHeroProps = CandidateSessionProps & Readonly<{
+  activeStep: WorkflowStepId
+  currentStep: WorkflowStepId
+  selectStep: (step: WorkflowStepId) => void
+}>
+
+function WorkflowHero(props: WorkflowHeroProps) {
+  const { candidateSession, localization } = props
   const heroClassName = candidateSession.view.status === 'ready'
     ? 'workflow-hero workflow-hero-active'
     : 'workflow-hero'
   return (
     <section className={heroClassName} aria-labelledby="page-title">
       <Introduction candidateSession={candidateSession} localization={localization} />
-      <WorkflowSummary candidateSession={candidateSession} localization={localization} />
+      <WorkflowSummary {...props} />
     </section>
   )
 }
@@ -183,13 +220,14 @@ function FailureMessage({
   )
 }
 
-function WorkflowSummary({ candidateSession, localization }: CandidateSessionProps) {
+function WorkflowSummary(props: WorkflowHeroProps) {
+  const { candidateSession, localization } = props
   const { translate } = localization
   return (
     <div className="workflow-summary">
       <h2>{translate('workflow.title')}</h2>
       <WorkflowStatus localization={localization} view={candidateSession.view} />
-      <WorkflowSteps localization={localization} />
+      <WorkflowSteps {...props} />
       <DeleteSessionButton candidateSession={candidateSession} localization={localization} />
     </div>
   )
@@ -212,41 +250,150 @@ function WorkflowStatus({ localization, view }: Readonly<{
   )
 }
 
-function WorkflowSteps({ localization }: LocalizationProps) {
-  const { translate } = localization
-  const workflowSteps = createWorkflowSteps({ translate })
+function WorkflowSteps(props: WorkflowHeroProps) {
+  const { activeStep, candidateSession, currentStep, localization, selectStep } = props
+  const workflowSteps = createWorkflowSteps({ currentStep, localization, view: candidateSession.view })
   return (
-    <ol className="workflow-steps">
-      {workflowSteps.map((step, stepIndex) => (
-        <li key={step.title}>
-          <span className="step-number">{stepIndex + 1}</span>
-          <div><h3>{step.title}</h3><p>{step.description}</p></div>
-        </li>
-      ))}
-    </ol>
+    <nav aria-label={localization.translate('workflow.progressLabel')} className="workflow-progress">
+      <ol className="workflow-steps">
+        {workflowSteps.map((step, stepIndex) => <WorkflowStep
+          {...{ activeStep, candidateSession, currentStep, localization, selectStep, step, stepIndex }}
+          key={step.id}
+        />)}
+      </ol>
+    </nav>
   )
 }
 
-function createWorkflowSteps({ translate }: Readonly<{
-  translate: Localization['translate']
+function WorkflowStep({
+  activeStep, candidateSession, currentStep, localization, selectStep, step, stepIndex,
+}: WorkflowHeroProps & Readonly<{
+  step: ReturnType<typeof createWorkflowSteps>[number]
+  stepIndex: number
 }>) {
-  return [
-    createWorkflowStep({ translate, name: 'sourceProfile' }),
-    createWorkflowStep({ translate, name: 'jobPosting' }),
-    createWorkflowStep({ translate, name: 'tailoredResume' }),
-  ] as const
+  return <li className={`workflow-step workflow-step-${step.status}`}>
+    <button aria-current={step.id === currentStep ? 'step' : undefined}
+      aria-expanded={step.id === activeStep}
+      disabled={candidateSession.view.status !== 'ready' || step.status === 'unavailable'}
+      onClick={() => { selectStep(step.id) }} type="button">
+      <span className="step-number">{step.status === 'completed' ? '✓' : stepIndex + 1}</span>
+      <span className="step-copy"><strong>{step.title}</strong><span>{step.summary}</span></span>
+      <span className="step-state">{localization.translate(`workflow.${step.status}`)}</span>
+    </button>
+  </li>
 }
 
-type WorkflowStepName = 'jobPosting' | 'sourceProfile' | 'tailoredResume'
-
-function createWorkflowStep({ translate, name }: Readonly<{
-  translate: Localization['translate']
-  name: WorkflowStepName
+function createWorkflowSteps({ currentStep, localization, view }: Readonly<{
+  currentStep: WorkflowStepId
+  localization: Localization
+  view: ResumeTailoringView
 }>) {
-  return {
-    title: translate(`workflow.${name}`),
-    description: translate(`workflow.${name}Description`),
+  return workflowStepIds.map((id) => ({
+    id,
+    status: readStepStatus({ currentStep, id, view }),
+    summary: readStepSummary({ id, localization, view }),
+    title: localization.translate(workflowStepTitleKeys[id]),
+  }))
+}
+
+function readStepStatus({ currentStep, id, view }: Readonly<{
+  currentStep: WorkflowStepId
+  id: WorkflowStepId
+  view: ResumeTailoringView
+}>): WorkflowStepStatus {
+  if (isStepCompleted({ id, view })) return 'completed'
+  return id === currentStep ? 'current' : 'unavailable'
+}
+
+function readCurrentStep({ view }: Readonly<{ view: ResumeTailoringView }>): WorkflowStepId {
+  const incompleteStep = workflowStepIds.find((id) => !isStepCompleted({ id, view }))
+  return incompleteStep ?? 'tailored-resume'
+}
+
+function isStepCompleted({ id, view }: Readonly<{
+  id: WorkflowStepId
+  view: ResumeTailoringView
+}>) {
+  if (view.status !== 'ready') return false
+  if (id === 'source-profile') return view.sourceProfile?.status === 'reviewing-facts'
+    && view.sourceProfile.facts.every((fact) => fact.status !== 'extracted')
+  if (id === 'job-posting') return view.jobPosting?.status === 'reviewing-requirements'
+  if (id === 'match-analysis') return view.matchAnalysis !== undefined
+  return view.tailoredResume !== undefined
+}
+
+function readStepSummary({ id, localization, view }: Readonly<{
+  id: WorkflowStepId
+  localization: Localization
+  view: ResumeTailoringView
+}>) {
+  if (view.status !== 'ready') return localization.translate(workflowStepDescriptionKeys[id])
+  if (id === 'source-profile' && view.sourceProfile?.status === 'reviewing-facts') {
+    const verifiedCount = view.sourceProfile.facts.filter((fact) => fact.status === 'verified').length
+    return `${String(verifiedCount)} ${localization.translate('workflow.verifiedFacts')}`
   }
+  if (id === 'job-posting' && view.jobPosting?.status === 'reviewing-requirements') {
+    return `${String(view.jobPosting.requirements.length)} ${localization.translate('workflow.requirements')}`
+  }
+  if (id === 'match-analysis' && view.matchAnalysis !== undefined) {
+    return `${String(view.matchAnalysis.matchScore)}% ${localization.translate('workflow.matchScore')}`
+  }
+  if (id === 'tailored-resume' && view.tailoredResume !== undefined) {
+    return `${String(view.tailoredResume.claims.length)} ${localization.translate('workflow.resumeClaims')}`
+  }
+  return localization.translate(workflowStepDescriptionKeys[id])
+}
+
+function ActiveWorkflowStep({ activeStep, candidateSession, localization }: CandidateSessionProps
+  & Readonly<{ activeStep: WorkflowStepId }>) {
+  if (candidateSession.view.status !== 'ready') return null
+  if (activeStep === 'source-profile') return <SourceProfileWorkspace {...{ candidateSession, localization }} />
+  if (activeStep === 'job-posting') return <JobPostingWorkspace {...{ candidateSession, localization }} />
+  if (activeStep === 'match-analysis') return <MatchAnalysisWorkspace {...{ candidateSession, localization }} />
+  return <TailoredResumeWorkspace {...{ candidateSession, localization }} />
+}
+
+function OperationFeedback({ candidateSession, localization }: CandidateSessionProps) {
+  const pendingMessage = candidateSession.pendingOperation === null
+    ? null
+    : localization.translate(pendingOperationMessageKeys[candidateSession.pendingOperation])
+  return <div className="operation-feedback" aria-live="polite" role="status">
+    {pendingMessage === null ? null : <p>{pendingMessage}</p>}
+    {candidateSession.isOperationTakingLong
+      ? <p>{localization.translate('operation.stillWorking')}</p> : null}
+    {candidateSession.retryCommand === null ? null : (
+      <button onClick={() => void candidateSession.retryLastOperation()} type="button">
+        {localization.translate(readRetryOperationMessageKey({
+          type: candidateSession.retryCommand.type,
+        }))}
+      </button>
+    )}
+  </div>
+}
+
+function focusWorkflowStep({ step }: Readonly<{ step: WorkflowStepId }>) {
+  requestAnimationFrame(() => { document.getElementById(`${step}-title`)?.focus() })
+}
+
+function readRetryOperationMessageKey({ type }: Readonly<{
+  type: ResumeTailoringCommand['type']
+}>) {
+  if (type === 'extract-source-profile') return 'operation.retrySourceProfile' as const
+  if (type === 'extract-job-requirements') return 'operation.retryJobPosting' as const
+  if (type === 'analyze-match') return 'operation.retryMatchAnalysis' as const
+  if (type === 'generate-resume-claims') return 'operation.retryTailoredResume' as const
+  return 'operation.retry' as const
+}
+
+function readOperationResultStep({ fallback, operation }: Readonly<{
+  fallback: WorkflowStepId
+  operation: ResumeTailoringCommand['type']
+}>): WorkflowStepId {
+  if (sourceProfileOperations.has(operation)) return 'source-profile'
+  if (jobPostingOperations.has(operation)) return 'job-posting'
+  if (operation === 'analyze-match') return 'match-analysis'
+  if (resumeOperations.has(operation)) return 'tailored-resume'
+  return fallback
 }
 
 function DeleteSessionButton({ candidateSession, localization }: CandidateSessionProps) {
@@ -304,3 +451,53 @@ const workflowStatusCopy = {
     description: 'workflow.openedDescription',
   },
 } as const
+
+const workflowStepIds = [
+  'source-profile',
+  'job-posting',
+  'match-analysis',
+  'tailored-resume',
+] as const satisfies readonly WorkflowStepId[]
+const workflowStepTitleKeys = {
+  'source-profile': 'workflow.sourceProfile',
+  'job-posting': 'workflow.jobPosting',
+  'match-analysis': 'workflow.matchAnalysis',
+  'tailored-resume': 'workflow.tailoredResume',
+} as const
+const workflowStepDescriptionKeys = {
+  'source-profile': 'workflow.sourceProfileDescription',
+  'job-posting': 'workflow.jobPostingDescription',
+  'match-analysis': 'workflow.matchAnalysisDescription',
+  'tailored-resume': 'workflow.tailoredResumeDescription',
+} as const
+const pendingOperationMessageKeys = {
+  'analyze-match': 'operation.analyzeMatch',
+  'extract-job-requirements': 'operation.extractJobRequirements',
+  'extract-source-profile': 'operation.extractSourceProfile',
+  'generate-resume-claims': 'operation.generateResumeClaims',
+  'import-source-document': 'operation.importSourceDocument',
+  'reformulate-resume-claim': 'operation.reformulateResumeClaim',
+} as const
+const sourceProfileOperations = new Set<ResumeTailoringCommand['type']>([
+  'import-source-document',
+  'update-source-content',
+  'confirm-processing-notice',
+  'extract-source-profile',
+  'confirm-source-fact',
+  'confirm-source-facts',
+  'reject-source-fact',
+  'correct-source-fact',
+  'resolve-source-fact-conflict',
+])
+const jobPostingOperations = new Set<ResumeTailoringCommand['type']>([
+  'review-job-posting',
+  'update-job-posting-content',
+  'confirm-job-posting-processing-notice',
+  'extract-job-requirements',
+])
+const resumeOperations = new Set<ResumeTailoringCommand['type']>([
+  'generate-resume-claims',
+  'remove-resume-claim',
+  'move-resume-claim',
+  'reformulate-resume-claim',
+])

@@ -227,8 +227,15 @@ h1 {
 }
 
 .workflow-summary {
+  min-width: 0;
   padding: 84px 0 62px clamp(48px, 6vw, 92px);
   border-left: 1px solid #e0e2df;
+}
+
+.workflow-progress {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .workflow-summary h2 {
@@ -263,7 +270,6 @@ h1 {
 }
 
 .workflow-status p,
-.workflow-steps p,
 .value-strip p {
   margin: 6px 0 0;
   color: #666c79;
@@ -271,48 +277,95 @@ h1 {
 }
 
 .workflow-steps {
+  display: grid;
+  gap: 10px;
   margin: 42px 0 0;
   padding: 0;
   list-style: none;
 }
 
-.workflow-steps li {
+.workflow-step {
   position: relative;
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
-  gap: 34px;
-  min-height: 144px;
 }
 
-.workflow-steps li:not(:last-child)::after {
-  position: absolute;
-  top: 64px;
-  bottom: 12px;
-  left: 31px;
-  width: 1px;
-  background: #d7dad8;
-  content: '';
+.workflow-step > button {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.workflow-step > button:focus-visible {
+  outline: 3px solid #94cdb8;
+  outline-offset: 2px;
+}
+
+.workflow-step-current > button {
+  border-color: #164f3d;
+  background: #f2f8f5;
+}
+
+.workflow-step-completed > button {
+  background: #f7faf8;
+}
+
+.workflow-step-unavailable > button {
+  color: #7b818b;
+  cursor: not-allowed;
+  opacity: 0.66;
 }
 
 .step-number {
   display: grid;
-  width: 64px;
-  height: 64px;
+  width: 48px;
+  height: 48px;
   place-items: center;
   border: 1px solid #d4d7dc;
   border-radius: 50%;
-  font-size: 18px;
+  font-size: 16px;
 }
 
-.workflow-steps h3 {
-  margin: 9px 0 0;
-  font-size: 22px;
+.workflow-step-completed .step-number,
+.workflow-step-current .step-number {
+  border-color: #164f3d;
+  background: #164f3d;
+  color: #ffffff;
+}
+
+.step-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.step-copy strong {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 19px;
   font-weight: 400;
 }
 
-.workflow-steps p {
-  max-width: 360px;
-  font-size: 15px;
+.step-copy > span {
+  overflow: hidden;
+  color: #666c79;
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+
+.step-state {
+  color: #53605b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .delete-session-action {
@@ -380,21 +433,15 @@ h1 {
 }
 
 .workflow-hero-active .workflow-steps {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-top: 22px;
 }
 
-.workflow-hero-active .workflow-steps li {
+.workflow-hero-active .workflow-step > button {
   grid-template-columns: 34px minmax(0, 1fr);
   gap: 10px;
-  min-height: 0;
-}
-
-.workflow-hero-active .workflow-steps li::after,
-.workflow-hero-active .workflow-steps p {
-  display: none;
+  padding: 10px;
 }
 
 .workflow-hero-active .step-number {
@@ -403,16 +450,59 @@ h1 {
   font-size: 13px;
 }
 
-.workflow-hero-active .workflow-steps h3 {
-  margin-top: 5px;
+.workflow-hero-active .step-copy strong {
   font-family: 'DM Sans', Arial, sans-serif;
   font-size: 14px;
   font-weight: 600;
 }
 
+.workflow-hero-active .step-state {
+  display: none;
+}
+
 .workflow-hero-active .delete-session-action {
   margin-top: 18px;
   font-size: 13px;
+}
+
+.operation-feedback:not(:empty) {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 28px;
+  padding: 18px 22px;
+  border-left: 4px solid #164f3d;
+  background: #edf7f2;
+  color: #174b3b;
+}
+
+.operation-feedback p {
+  margin: 0;
+  font-weight: 600;
+}
+
+.operation-feedback button {
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  border: 1px solid #164f3d;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #164f3d;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+[aria-busy='true'] {
+  cursor: progress;
+}
+
+.source-profile-workspace > h2:focus-visible,
+.job-posting-workspace > h2:focus-visible,
+.match-analysis-workspace > h2:focus-visible,
+.tailored-resume-workspace > h2:focus-visible {
+  outline: 3px solid #94cdb8;
+  outline-offset: 8px;
 }
 
 .source-profile-workspace,
@@ -1099,6 +1189,27 @@ h1 {
 
   .workflow-summary {
     padding-bottom: 42px;
+  }
+
+  .workflow-hero-active .workflow-steps {
+    display: flex;
+    overflow-x: auto;
+    padding: 2px 2px 12px;
+    scroll-snap-type: x proximity;
+  }
+
+  .workflow-hero-active .workflow-step {
+    flex: 0 0 min(78vw, 270px);
+    scroll-snap-align: start;
+  }
+
+  .workflow-hero-active .step-copy > span {
+    white-space: normal;
+  }
+
+  .operation-feedback:not(:empty) {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .workflow-status {

@@ -1,15 +1,18 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const testPort = process.env.PLAYWRIGHT_TEST_PORT ?? '3000'
+const testBaseUrl = `http://127.0.0.1:${testPort}`
+
 export default defineConfig({
   testDir: './test',
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL: testBaseUrl,
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'pnpm dev',
+    command: `pnpm exec vite dev --host 127.0.0.1 --port ${testPort}`,
     reuseExistingServer: true,
-    url: 'http://127.0.0.1:3000',
+    url: testBaseUrl,
   },
   projects: [
     {

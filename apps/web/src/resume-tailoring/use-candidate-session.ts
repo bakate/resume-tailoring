@@ -9,7 +9,7 @@ import type {
   SourceProfileFactId,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { createResumeTailoringWorkflow } from '@resume-tailoring/application/resume-tailoring-workflow-composition'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 
 import {
@@ -30,9 +30,26 @@ import {
 } from './browser-adapters'
 
 type CandidateSessionState = Readonly<{
+  completedOperation: CompletedOperation | null
   failureMessageKey: CandidateSessionFailureMessageKey | null
   isHydrated: boolean
+  isOperationTakingLong: boolean
+  pendingOperation: PendingOperation | null
+  retryCommand: ResumeTailoringCommand | null
   view: ResumeTailoringView
+}>
+
+export type PendingOperation =
+  | 'analyze-match'
+  | 'extract-job-requirements'
+  | 'extract-source-profile'
+  | 'generate-resume-claims'
+  | 'import-source-document'
+  | 'reformulate-resume-claim'
+
+type CompletedOperation = Readonly<{
+  sequence: number
+  type: ResumeTailoringCommand['type']
 }>
 
 export type CandidateSessionFailureMessageKey =
@@ -52,9 +69,11 @@ export type CandidateSessionFailureMessageKey =
 
 type CandidateSessionStateSetter = Dispatch<SetStateAction<CandidateSessionState>>
 type CandidateSessionActionDependencies = Readonly<{
+  operationTracker: OperationTracker
   setState: CandidateSessionStateSetter
   workflow: ResumeTailoringWorkflow
 }>
+type OperationTracker = { current: PendingOperation | null }
 type FactIdentifier = Readonly<{ factId: SourceProfileFactId }>
 type FactIdentifiers = Readonly<{ factIds: readonly SourceProfileFactId[] }>
 type FactCorrection = FactIdentifier & Readonly<{ correctedValue: string }>
@@ -64,31 +83,36 @@ type SourceDocumentImport = CandidateSessionActionDependencies & Readonly<{ file
 export function useCandidateSession() {
   const [workflow] = useState(createBrowserResumeTailoringWorkflow)
   const [state, setState] = useState<CandidateSessionState>(initialCandidateSessionState)
+  const operationTracker = useRef<PendingOperation | null>(null)
   useEffect(() => connectCandidateSession({ workflow, setState }), [workflow])
+  const dependencies = { operationTracker, workflow, setState }
   return {
     ...state,
-    ...createCandidateSessionActions({ workflow, setState }),
-    ...createSourceDocumentActions({ workflow, setState }),
-    ...createSourceProfileFactActions({ workflow, setState }),
-    ...createJobPostingActions({ workflow, setState }),
-    ...createMatchAnalysisActions({ workflow, setState }),
-    ...createResumeClaimActions({ workflow, setState }),
-    ...createMvpOutcomeActions({ workflow, setState }),
+    ...createCandidateSessionActions(dependencies),
+    ...createSourceDocumentActions(dependencies),
+    ...createSourceProfileFactActions(dependencies),
+    ...createJobPostingActions(dependencies),
+    ...createMatchAnalysisActions(dependencies),
+    ...createResumeClaimActions(dependencies),
+    ...createMvpOutcomeActions(dependencies),
+    retryLastOperation: () => state.retryCommand === null
+      ? Promise.resolve(null)
+      : executeCommand({ ...dependencies, command: state.retryCommand }),
   }
 }
 
-function createCandidateSessionActions({ workflow, setState }: CandidateSessionActionDependencies) {
+function createCandidateSessionActions(dependencies: CandidateSessionActionDependencies) {
   return {
-    start: () => executeCommand({ workflow, setState, command: { type: 'open-workflow' } }),
-    delete: () => executeCommand({ workflow, setState, command: { type: 'delete-session' } }),
+    start: () => executeCommand({ ...dependencies, command: { type: 'open-workflow' } }),
+    delete: () => executeCommand({ ...dependencies, command: { type: 'delete-session' } }),
   }
 }
 
-function createSourceDocumentActions({ workflow, setState }: CandidateSessionActionDependencies) {
-  const execute = (command: ResumeTailoringCommand) => executeCommand({ workflow, setState, command })
+function createSourceDocumentActions(dependencies: CandidateSessionActionDependencies) {
+  const execute = (command: ResumeTailoringCommand) => executeCommand({ ...dependencies, command })
   return {
     importSourceDocument: ({ file }: Readonly<{ file: File }>) => importSourceDocument({
-      file, workflow, setState,
+      ...dependencies, file,
     }),
     updateSourceContent: ({ outgoingContent }: Readonly<{ outgoingContent: string }>) => execute({
       type: 'update-source-content', outgoingContent,
@@ -98,8 +122,8 @@ function createSourceDocumentActions({ workflow, setState }: CandidateSessionAct
   }
 }
 
-function createSourceProfileFactActions({ workflow, setState }: CandidateSessionActionDependencies) {
-  const execute = (command: ResumeTailoringCommand) => executeCommand({ workflow, setState, command })
+function createSourceProfileFactActions(dependencies: CandidateSessionActionDependencies) {
+  const execute = (command: ResumeTailoringCommand) => executeCommand({ ...dependencies, command })
   return {
     confirmSourceProfileFact: ({ factId }: FactIdentifier) => execute({
       type: 'confirm-source-fact', factId,
@@ -117,8 +141,8 @@ function createSourceProfileFactActions({ workflow, setState }: CandidateSession
   }
 }
 
-function createJobPostingActions({ workflow, setState }: CandidateSessionActionDependencies) {
-  const execute = (command: ResumeTailoringCommand) => executeCommand({ workflow, setState, command })
+function createJobPostingActions(dependencies: CandidateSessionActionDependencies) {
+  const execute = (command: ResumeTailoringCommand) => executeCommand({ ...dependencies, command })
   return {
     reviewJobPosting: ({ content }: Readonly<{ content: string }>) => execute({
       type: 'review-job-posting', content,
@@ -133,18 +157,17 @@ function createJobPostingActions({ workflow, setState }: CandidateSessionActionD
   }
 }
 
-function createMatchAnalysisActions({ workflow, setState }: CandidateSessionActionDependencies) {
+function createMatchAnalysisActions(dependencies: CandidateSessionActionDependencies) {
   return {
     analyzeMatch: () => executeCommand({
-      workflow,
-      setState,
+      ...dependencies,
       command: { type: 'analyze-match' },
     }),
   }
 }
 
-function createResumeClaimActions({ workflow, setState }: CandidateSessionActionDependencies) {
-  const execute = (command: ResumeTailoringCommand) => executeCommand({ workflow, setState, command })
+function createResumeClaimActions(dependencies: CandidateSessionActionDependencies) {
+  const execute = (command: ResumeTailoringCommand) => executeCommand({ ...dependencies, command })
   return {
     generateResumeClaims: () => execute({ type: 'generate-resume-claims' }),
     removeResumeClaim: ({ claimId }: Readonly<{ claimId: ResumeClaimId }>) => execute({
@@ -163,8 +186,8 @@ function createResumeClaimActions({ workflow, setState }: CandidateSessionAction
   }
 }
 
-function createMvpOutcomeActions({ workflow, setState }: CandidateSessionActionDependencies) {
-  const execute = (command: ResumeTailoringCommand) => executeCommand({ workflow, setState, command })
+function createMvpOutcomeActions(dependencies: CandidateSessionActionDependencies) {
+  const execute = (command: ResumeTailoringCommand) => executeCommand({ ...dependencies, command })
   return {
     rateTailoredResumeFidelity: ({ assessment }: Readonly<{
       assessment: 'faithful' | 'needs-correction'
@@ -197,19 +220,31 @@ function createBrowserResumeTailoringWorkflow() {
   })
 }
 
-async function importSourceDocument({ file, workflow, setState }: SourceDocumentImport) {
+async function importSourceDocument({ file, ...dependencies }: SourceDocumentImport) {
+  if (dependencies.operationTracker.current !== null) return
+  const pendingOperation = 'import-source-document'
+  const operationTimeout = beginPendingOperation({
+    ...dependencies, pendingOperation,
+  })
+  await waitForPendingPresentation()
   try {
     const bytes = new Uint8Array(await file.arrayBuffer())
-    await executeCommand({
-      workflow,
-      setState,
+    await executePreparedCommand({
+      ...dependencies,
+      operationTimeout,
+      pendingOperation,
       command: {
         type: 'import-source-document',
         document: { bytes, mediaType: file.type, name: file.name },
       },
     })
   } catch {
-    setState((state) => ({ ...state, failureMessageKey: 'sourceProfile.failure' }))
+    clearPendingOperation({ ...dependencies, operationTimeout })
+    dependencies.setState((state) => ({
+      ...state,
+      failureMessageKey: 'sourceProfile.failure',
+      pendingOperation: null,
+    }))
   }
 }
 
@@ -227,18 +262,71 @@ function connectCandidateSession({
 }
 
 async function executeCommand({
+  operationTracker,
   workflow,
   setState,
   command,
-}: Readonly<{
-  workflow: ResumeTailoringWorkflow
-  setState: CandidateSessionStateSetter
+}: CandidateSessionActionDependencies & Readonly<{ command: ResumeTailoringCommand }>) {
+  if (operationTracker.current !== null) return duplicateOperationResult
+  const pendingOperation = readPendingOperation({ command })
+  const operationTimeout = pendingOperation === null
+    ? null
+    : beginPendingOperation({ operationTracker, pendingOperation, setState })
+  if (pendingOperation !== null) await waitForPendingPresentation()
+  return executePreparedCommand({
+    command, operationTimeout, operationTracker, pendingOperation, setState, workflow,
+  })
+}
+
+async function executePreparedCommand({
+  command, operationTimeout, operationTracker, pendingOperation, setState, workflow,
+}: CandidateSessionActionDependencies & Readonly<{
   command: ResumeTailoringCommand
+  operationTimeout: ReturnType<typeof setTimeout> | null
+  pendingOperation: PendingOperation | null
 }>) {
   const failureMessageKey = readFailureMessageKey(command)
   const result = await workflow.execute(command)
-  applyResult({ result, setState, failureMessageKey })
+  clearPendingOperation({ operationTimeout, operationTracker, setState, workflow })
+  applyCommandResult({ command, result, setState, failureMessageKey, pendingOperation })
   return result
+}
+
+function beginPendingOperation({ operationTracker, pendingOperation, setState }:
+Readonly<{
+  operationTracker: OperationTracker
+  pendingOperation: PendingOperation
+  setState: CandidateSessionStateSetter
+}>) {
+  operationTracker.current = pendingOperation
+  setState((state) => ({
+    ...state,
+    failureMessageKey: null,
+    isOperationTakingLong: false,
+    pendingOperation,
+    retryCommand: null,
+  }))
+  return setTimeout(() => {
+    setState((state) => ({ ...state, isOperationTakingLong: true }))
+  }, pendingOperationReassuranceDelay)
+}
+
+function clearPendingOperation({ operationTimeout, operationTracker }: CandidateSessionActionDependencies
+  & Readonly<{ operationTimeout: ReturnType<typeof setTimeout> | null }>) {
+  if (operationTimeout !== null) clearTimeout(operationTimeout)
+  operationTracker.current = null
+}
+
+function waitForPendingPresentation() {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => { resolve() })
+  })
+}
+
+function readPendingOperation({ command }: Readonly<{
+  command: ResumeTailoringCommand
+}>): PendingOperation | null {
+  return pendingOperations.has(command.type) ? command.type as PendingOperation : null
 }
 
 function readFailureMessageKey(command: ResumeTailoringCommand): CandidateSessionFailureMessageKey {
@@ -283,6 +371,54 @@ function applyResult({
   setState((state) => ({ ...state, failureMessageKey: null, view: result.value }))
 }
 
+function applyCommandResult({
+  command,
+  failureMessageKey,
+  pendingOperation,
+  result,
+  setState,
+}: Readonly<{
+  command: ResumeTailoringCommand
+  failureMessageKey: CandidateSessionFailureMessageKey
+  pendingOperation: PendingOperation | null
+  result: ResumeTailoringResult<ResumeTailoringView>
+  setState: CandidateSessionStateSetter
+}>) {
+  if (!result.ok) {
+    applyCommandFailure({ command, failureMessageKey, pendingOperation, result, setState })
+    return
+  }
+  applyCommandSuccess({ command, result, setState })
+}
+
+function applyCommandFailure({ command, failureMessageKey, pendingOperation, result, setState }:
+Readonly<{
+  command: ResumeTailoringCommand
+  failureMessageKey: CandidateSessionFailureMessageKey
+  pendingOperation: PendingOperation | null
+  result: Extract<ResumeTailoringResult<ResumeTailoringView>, { readonly ok: false }>
+  setState: CandidateSessionStateSetter
+}>) {
+  setState((state) => ({
+    ...state,
+    failureMessageKey: readTypedFailureMessageKey({ result, fallback: failureMessageKey }),
+    isOperationTakingLong: false,
+    pendingOperation: null,
+    retryCommand: pendingOperation === null ? null : command,
+  }))
+}
+
+function applyCommandSuccess({ command, result, setState }: Readonly<{
+  command: ResumeTailoringCommand
+  result: Extract<ResumeTailoringResult<ResumeTailoringView>, { readonly ok: true }>
+  setState: CandidateSessionStateSetter
+}>) {
+  setState((state) => ({ ...state, completedOperation: {
+    sequence: (state.completedOperation?.sequence ?? 0) + 1, type: command.type,
+  }, failureMessageKey: null, isOperationTakingLong: false, pendingOperation: null,
+  retryCommand: null, view: result.value }))
+}
+
 function readTypedFailureMessageKey({
   fallback,
   result,
@@ -311,7 +447,25 @@ function readTypedFailureMessageKey({
 }
 
 const initialCandidateSessionState = {
+  completedOperation: null,
   failureMessageKey: null,
   isHydrated: false,
+  isOperationTakingLong: false,
+  pendingOperation: null,
+  retryCommand: null,
   view: { status: 'not-started' },
 } as const satisfies CandidateSessionState
+
+const pendingOperations = new Set<ResumeTailoringCommand['type']>([
+  'analyze-match',
+  'extract-job-requirements',
+  'extract-source-profile',
+  'generate-resume-claims',
+  'import-source-document',
+  'reformulate-resume-claim',
+])
+const pendingOperationReassuranceDelay = 10_000
+const duplicateOperationResult = {
+  ok: false,
+  error: { type: 'candidate-session-unavailable' },
+} as const satisfies ResumeTailoringResult<never>

@@ -25,8 +25,9 @@ export function SourceProfileWorkspace({ candidateSession, localization }: Works
   if (candidateSession.view.status !== 'ready') return null
   const sourceProfile = candidateSession.view.sourceProfile
   return (
-    <section className="source-profile-workspace" aria-labelledby="source-profile-title">
-      <h2 id="source-profile-title">{localization.translate('sourceProfile.title')}</h2>
+    <section aria-busy={isSourceProfilePending({ candidateSession })}
+      className="source-profile-workspace" aria-labelledby="source-profile-title">
+      <h2 id="source-profile-title" tabIndex={-1}>{localization.translate('sourceProfile.title')}</h2>
       {sourceProfile === undefined ? (
         <SourceDocumentImport {...{ candidateSession, localization }} />
       ) : sourceProfile.status === 'reviewing-document' ? (
@@ -47,6 +48,7 @@ function SourceDocumentImport({ candidateSession, localization }: WorkspaceProps
         <span>{translate('sourceProfile.fileLabel')}</span>
         <input
           accept="application/pdf,.pdf"
+          disabled={candidateSession.pendingOperation !== null}
           onChange={(event) => {
             const [file] = event.currentTarget.files ?? []
             if (file !== undefined) void candidateSession.importSourceDocument({ file })
@@ -162,7 +164,8 @@ function NoticeConfirmation({ candidateSession, confirmationStatus, contentRevis
 
 function ExtractFactsButton({ candidateSession, confirmationStatus, contentRevision, localization }: NoticeActionProps) {
   return <button className="primary-action compact-action"
-    disabled={confirmationStatus === 'pending' || contentRevision === 'changed'}
+    disabled={candidateSession.pendingOperation !== null
+      || confirmationStatus === 'pending' || contentRevision === 'changed'}
     onClick={() => void candidateSession.extractSourceProfile()} type="button">
     {localization.translate('sourceProfile.extract')}
   </button>
@@ -363,3 +366,10 @@ function readFactFilterLabel({ filter, localization }: Readonly<{
 
 const factStatusFilters = ['all', 'extracted', 'verified', 'rejected', 'superseded'] as const
 const factPageSize = 20
+
+function isSourceProfilePending({ candidateSession }: Readonly<{
+  candidateSession: CandidateSessionController
+}>) {
+  return candidateSession.pendingOperation === 'import-source-document'
+    || candidateSession.pendingOperation === 'extract-source-profile'
+}
