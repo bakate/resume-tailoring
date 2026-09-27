@@ -54,6 +54,17 @@ test('deleting a Candidate session invalidates every open tab', async ({ page })
   await system.expectFreshStartControlFocusedInSecondTab({ secondPage })
 })
 
+test('deleting a Candidate session interrupts work pending in another tab', async ({ page }) => {
+  const secondPage = await page.context().newPage()
+  const system = createSystemUnderTest({ page })
+
+  await system.givenPendingSourceProfileExtractionInFirstTab({ secondPage })
+
+  await system.deleteResumeTailoringSessionInSecondTab({ secondPage })
+
+  await system.expectResumeTailoringSessionDeletedInBothTabs({ secondPage })
+})
+
 test('expiration invalidates Candidate content in every open tab', async ({ page }) => {
   const secondPage = await page.context().newPage()
   const system = createSystemUnderTest({ page })
@@ -194,6 +205,26 @@ test('canceling private-session deletion preserves the active Candidate context'
   await system.cancelPrivateSessionDeletion()
 
   await system.expectActiveCandidateContextToBePreserved()
+})
+
+test('confirming deletion interrupts a pending Candidate operation', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenPendingSourceProfileExtractionAndDeletionConfirmation()
+
+  await system.confirmPrivateSessionDeletion()
+
+  await system.expectCandidateSessionDeletedDuringPendingOperation()
+})
+
+test('a deleted operation cannot disturb a restarted Candidate session', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionRestartedBeforeDeletedOperationCompletes()
+
+  await system.completeDeletedCandidateOperation()
+
+  await system.expectRestartedCandidateSessionToRemainActive()
 })
 
 test('French private-session deletion confirmation traps keyboard focus', async ({ page }) => {
@@ -767,8 +798,10 @@ type CompletedAction =
   | 'candidate-session-reloaded'
   | 'candidate-session-response-applied'
   | 'candidate-session-synchronized'
+  | 'deleted-candidate-operation-completed'
   | 'private-session-deletion-confirmation-opened'
   | 'private-session-deletion-canceled'
+  | 'private-session-deletion-confirmed'
   | 'expiration-extension-attempted'
   | 'job-requirement-extraction-failed'
   | 'job-requirement-extraction-inspected'
@@ -822,6 +855,7 @@ class ResumeTailoringBrowserTestSystem {
   #matchAnalysisRequestCount = 0
   #pendingMatchAnalysisResponse: (() => void) | undefined
   #releasePendingResumeClaimWriting: (() => void) | undefined
+  #pendingSourceProfileExtractionCompletion: Promise<void> | undefined
   #pendingSourceProfileExtractionResponse: (() => void) | undefined
   #resumeClaimWritingRequestCount = 0
   readonly #resumeClaimReformulationRequests: string[] = []
@@ -868,9 +902,14 @@ class ResumeTailoringBrowserTestSystem {
   }
 
   async givenSourceProfileExtractionCanBeDelayed() {
+    let completeSourceProfileExtraction = () => {}
+    this.#pendingSourceProfileExtractionCompletion = new Promise((resolve) => {
+      completeSourceProfileExtraction = resolve
+    })
     await this.#page.route('**/api/source-profile-extraction', async (route) => {
       await new Promise<void>((resolve) => { this.#pendingSourceProfileExtractionResponse = resolve })
       await this.#fulfillDetailedSourceProfileExtraction({ route })
+      completeSourceProfileExtraction()
     })
   }
 
@@ -1296,6 +1335,15 @@ class ResumeTailoringBrowserTestSystem {
     ])
   }
 
+  async givenPendingSourceProfileExtractionInFirstTab({ secondPage }: Readonly<{
+    secondPage: Page
+  }>) {
+    await this.givenCandidateSessionIsActiveInBothTabs({ secondPage })
+    await this.givenSourceProfileExtractionCanBeDelayed()
+    await this.startSourceProfileExtraction()
+    await this.#page.getByText('Extracting professional facts…').waitFor()
+  }
+
   async givenCandidateSessionAlreadyExpired() {
     await this.#page.goto('/')
     await seedCandidateSession({ page: this.#page, expiresAt: Date.now() - 1 })
@@ -1358,6 +1406,19 @@ class ResumeTailoringBrowserTestSystem {
   async confirmPrivateSessionDeletion() {
     await this.#confirmPrivateSessionDeletion({ page: this.#page })
     this.#completedAction = 'private-session-deletion-confirmed'
+  }
+
+  async givenCandidateSessionRestartedBeforeDeletedOperationCompletes() {
+    await this.givenPendingSourceProfileExtractionAndDeletionConfirmation()
+    await this.#confirmPrivateSessionDeletion({ page: this.#page })
+    await this.#page.getByRole('button', { name: 'Start tailoring' }).click()
+    await this.#page.getByText('Workflow opened').waitFor()
+  }
+
+  async completeDeletedCandidateOperation() {
+    this.#releasePendingSourceProfileExtraction()
+    await this.#pendingSourceProfileExtractionCompletion
+    this.#completedAction = 'deleted-candidate-operation-completed'
   }
 
   async expireResumeTailoringSessionInBothTabs({ secondPage }: Readonly<{ secondPage: Page }>) {
@@ -1846,6 +1907,18 @@ class ResumeTailoringBrowserTestSystem {
     await expect(this.#page.getByRole('button', { name: /Source Profile/ }))
       .toHaveAttribute('aria-current', 'step')
     await expect(this.#page.getByRole('button', { name: 'Delete private session' })).toBeFocused()
+  }
+
+  async expectCandidateSessionDeletedDuringPendingOperation() {
+    this.#expectCompletedAction('private-session-deletion-confirmed')
+    await expect(this.#page.getByText('Ready to begin')).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Start tailoring' })).toBeFocused()
+  }
+
+  async expectRestartedCandidateSessionToRemainActive() {
+    this.#expectCompletedAction('deleted-candidate-operation-completed')
+    await expect(this.#page.getByText('Workflow opened')).toBeVisible()
+    await expect(this.#page.getByText('Something went wrong')).toHaveCount(0)
   }
 
   async expectFrenchDeletionConfirmationToTrapFocus() {
