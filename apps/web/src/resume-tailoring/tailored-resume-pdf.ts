@@ -61,11 +61,17 @@ async function launchPdfBrowser() {
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox'],
+      ...readConfiguredExecutablePath(),
     })
     return { ok: true, value: browser } as const
   } catch {
     return { ok: false } as const
   }
+}
+
+function readConfiguredExecutablePath() {
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH?.trim()
+  return executablePath === undefined || executablePath.length === 0 ? {} : { executablePath }
 }
 
 async function renderWithBrowser({

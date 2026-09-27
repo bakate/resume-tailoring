@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiAnalyticsRouteImport } from './routes/api.analytics'
+import { Route as ApiDemoAccessRouteImport } from './routes/api.demo-access'
 import { Route as ApiJobRequirementExtractionRouteImport } from './routes/api.job-requirement-extraction'
 import { Route as ApiMatchAnalysisRouteImport } from './routes/api.match-analysis'
 import { Route as ApiResumeClaimValidationRouteImport } from './routes/api.resume-claim-validation'
@@ -26,6 +27,11 @@ const IndexRoute = IndexRouteImport.update({
 const ApiAnalyticsRoute = ApiAnalyticsRouteImport.update({
   id: '/api/analytics',
   path: '/api/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDemoAccessRoute = ApiDemoAccessRouteImport.update({
+  id: '/api/demo-access',
+  path: '/api/demo-access',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiJobRequirementExtractionRoute =
@@ -65,6 +71,7 @@ const ApiTailoredResumePdfRoute = ApiTailoredResumePdfRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/analytics': typeof ApiAnalyticsRoute
+  '/api/demo-access': typeof ApiDemoAccessRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/analytics': typeof ApiAnalyticsRoute
+  '/api/demo-access': typeof ApiDemoAccessRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/analytics': typeof ApiAnalyticsRoute
+  '/api/demo-access': typeof ApiDemoAccessRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/api/analytics'
+    | '/api/demo-access'
     | '/api/job-requirement-extraction'
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/api/analytics'
+    | '/api/demo-access'
     | '/api/job-requirement-extraction'
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/api/analytics'
+    | '/api/demo-access'
     | '/api/job-requirement-extraction'
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
@@ -129,6 +141,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiAnalyticsRoute: typeof ApiAnalyticsRoute
+  ApiDemoAccessRoute: typeof ApiDemoAccessRoute
   ApiJobRequirementExtractionRoute: typeof ApiJobRequirementExtractionRoute
   ApiMatchAnalysisRoute: typeof ApiMatchAnalysisRoute
   ApiResumeClaimValidationRoute: typeof ApiResumeClaimValidationRoute
@@ -151,6 +164,13 @@ declare module '@tanstack/react-router' {
       path: '/api/analytics'
       fullPath: '/api/analytics'
       preLoaderRoute: typeof ApiAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/demo-access': {
+      id: '/api/demo-access'
+      path: '/api/demo-access'
+      fullPath: '/api/demo-access'
+      preLoaderRoute: typeof ApiDemoAccessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/job-requirement-extraction': {
@@ -201,6 +221,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiAnalyticsRoute: ApiAnalyticsRoute,
+  ApiDemoAccessRoute: ApiDemoAccessRoute,
   ApiJobRequirementExtractionRoute: ApiJobRequirementExtractionRoute,
   ApiMatchAnalysisRoute: ApiMatchAnalysisRoute,
   ApiResumeClaimValidationRoute: ApiResumeClaimValidationRoute,

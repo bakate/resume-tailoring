@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
+import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
 import { createOpenAiResumeClaimSemanticValidator } from '../resume-tailoring/openai-resume-claim-service'
 import { createTailoredResumePdf } from '../resume-tailoring/tailored-resume-pdf'
@@ -14,6 +15,8 @@ export const Route = createFileRoute('/api/tailored-resume-pdf')({
 })
 
 async function exportTailoredResumePdf({ request }: Readonly<{ request: Request }>) {
+  const accessResponse = createDemoAccessGuardResponse({ request })
+  if (accessResponse !== null) return accessResponse
   const parsedRequest = await readRequest({ request })
   if (!parsedRequest.ok) return createInvalidRequestResponse()
   const environment = validateServerEnvironment({ environment: process.env })

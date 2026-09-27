@@ -2,6 +2,7 @@ import type { ResumeClaimWriter } from '@resume-tailoring/application/resume-tai
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
+import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
 import { createOpenAiResumeClaimWriter } from '../resume-tailoring/openai-resume-claim-service'
 import { resumeClaimWritingRequestSchema } from '../resume-tailoring/resume-claim-schemas'
@@ -14,6 +15,8 @@ export const Route = createFileRoute('/api/resume-claim-writing')({
 })
 
 async function writeResumeClaims({ request }: Readonly<{ request: Request }>) {
+  const accessResponse = createDemoAccessGuardResponse({ request })
+  if (accessResponse !== null) return accessResponse
   const writingRequest = await readWritingRequest({ request })
   if (!writingRequest.ok) return createFailureResponse({ status: 400 })
   const environment = validateServerEnvironment({ environment: process.env })

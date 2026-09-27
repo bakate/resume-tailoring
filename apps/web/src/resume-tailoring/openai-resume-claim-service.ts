@@ -157,13 +157,16 @@ function createOpenAiRequest({
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model, reasoning: { effort: reasoningEffort }, store: false,
+      model, max_output_tokens: maximumOutputTokens,
+      reasoning: { effort: reasoningEffort }, store: false,
       input: createOpenAiInput({ developerText, userValue }),
       text: { format: responseFormat },
     }),
     signal: AbortSignal.timeout(resumeClaimTimeoutMilliseconds),
   } as const
 }
+
+const maximumOutputTokens = 12_000
 
 function createOpenAiInput({ developerText, userValue }: Readonly<{
   developerText: string

@@ -15,6 +15,46 @@ body {
   background: #ffffff;
 }
 
+.demo-access-gate {
+  display: grid;
+  min-height: 100vh;
+  padding: clamp(24px, 5vw, 72px);
+  background: #f4f1e9;
+  place-items: center;
+}
+
+.demo-access-brand {
+  position: absolute;
+  top: clamp(24px, 5vw, 72px);
+  left: clamp(24px, 5vw, 72px);
+  margin: 0;
+  color: #164f3d;
+  font-weight: 600;
+}
+
+.demo-access-card {
+  width: min(100%, 680px);
+  padding: clamp(36px, 6vw, 72px);
+  border: 1px solid #d9d5ca;
+  background: #ffffff;
+}
+
+.demo-access-card h1 {
+  font-size: clamp(42px, 6vw, 68px);
+}
+
+.demo-access-card p {
+  margin: 28px 0 0;
+  color: #555b68;
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+.demo-access-challenge {
+  min-height: 70px;
+  margin-top: 34px;
+}
+
 .not-found {
   display: flex;
   min-height: 100vh;

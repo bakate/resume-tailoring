@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Honest Resume public demo on AWS Lambda
+
+Parameters:
+  ApplicationName:
+    Type: String
+    Default: honest-resume-demo
+  ContainerImageUri:
+    Type: String
+    MinLength: 1
+  DemoSessionSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+  DemoOriginSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+  DemoPublicHostname:
+    Type: String
+    MinLength: 1
+  OpenAiApiKey:
+    Type: String
+    NoEcho: true
+    MinLength: 1
+  TurnstileSecretKey:
+    Type: String
+    NoEcho: true
+    MinLength: 1
+  TurnstileSiteKey:
+    Type: String
+    MinLength: 1
+
+Resources:
+  WebFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      DockerContext: .
+      Dockerfile: Dockerfile
+      DockerTag: latest
+    Properties:
+      FunctionName: !Ref ApplicationName
+      PackageType: Image
+      ImageUri: !Ref ContainerImageUri
+      Architectures:
+        - arm64
+      MemorySize: 2048
+      Timeout: 120
+      EphemeralStorage:
+        Size: 1024
+      Environment:
+        Variables:
+          DEMO_ACCESS_MODE: enforced
+          DEMO_ORIGIN_SECRET: !Ref DemoOriginSecret
+          DEMO_PUBLIC_HOSTNAME: !Ref DemoPublicHostname
+          DEMO_SESSION_SECRET: !Ref DemoSessionSecret
+          OPENAI_API_KEY: !Ref OpenAiApiKey
+          OPENAI_STRUCTURED_MODEL: gpt-6-luna
+          OPENAI_STRUCTURED_REASONING_EFFORT: low
+          OPENAI_WRITING_MODEL: gpt-6-sol
+          OPENAI_WRITING_REASONING_EFFORT: medium
+          TURNSTILE_SECRET_KEY: !Ref TurnstileSecretKey
+          TURNSTILE_SITE_KEY: !Ref TurnstileSiteKey
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: BUFFERED
+
+  WebFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ApplicationName}
+      RetentionInDays: 7
+
+Outputs:
+  DemoUrl:
+    Description: Public HTTPS URL for the protected demo
+    Value: !GetAtt WebFunctionUrl.FunctionUrl

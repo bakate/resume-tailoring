@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 import type { ZodError } from 'zod'
 
+import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
 import { createOpenAiSourceProfileExtractor } from '../resume-tailoring/openai-source-profile-extractor'
 import { sourceProfileExtractionRequestSchema } from '../resume-tailoring/source-profile-schemas'
@@ -16,6 +17,8 @@ export const Route = createFileRoute('/api/source-profile-extraction')({
 })
 
 async function extractSourceProfile({ request }: Readonly<{ request: Request }>) {
+  const accessResponse = createDemoAccessGuardResponse({ request })
+  if (accessResponse !== null) return accessResponse
   const professionalContentResult = await readProfessionalContent({ request })
   if (!professionalContentResult.ok) {
     return createFailureResponse({ status: professionalContentResult.status })
