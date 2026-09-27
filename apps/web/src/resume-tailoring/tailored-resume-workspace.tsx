@@ -2,6 +2,7 @@ import type { ResumeClaim } from '@resume-tailoring/application/resume-tailoring
 import { useState } from 'react'
 
 import type { Localization } from '../localization/localization'
+import { TailoredResumePreview } from './tailored-resume-preview'
 import type { CandidateSessionController } from './use-candidate-session'
 
 type WorkspaceProps = Readonly<{
@@ -37,12 +38,15 @@ export function TailoredResumeWorkspace({ candidateSession, localization }: Work
       <h2 id="tailored-resume-title">{localization.translate('resumeClaims.title')}</h2>
       {view.tailoredResume === undefined
         ? <GenerationAction {...{ candidateSession, localization }} />
-        : <CuratedClaims {...{
-            candidateSession,
-            claims: view.tailoredResume.claims,
-            exclusions: view.tailoredResume.exclusions.length,
-            localization,
-          }} />}
+        : <>
+            <CuratedClaims {...{
+              candidateSession,
+              claims: view.tailoredResume.claims,
+              exclusions: view.tailoredResume.exclusions.length,
+              localization,
+            }} />
+            <TailoredResumePreview {...{ candidateSession, localization }} />
+          </>}
     </section>
   )
 }

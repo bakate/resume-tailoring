@@ -44,6 +44,7 @@ export type {
   ResumeClaim,
   ResumeClaimId,
   ResumeClaimSegment,
+  SensitiveContentKind,
   TailoredResume,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 

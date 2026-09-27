@@ -15,6 +15,7 @@ import { Route as ApiMatchAnalysisRouteImport } from './routes/api.match-analysi
 import { Route as ApiResumeClaimValidationRouteImport } from './routes/api.resume-claim-validation'
 import { Route as ApiResumeClaimWritingRouteImport } from './routes/api.resume-claim-writing'
 import { Route as ApiSourceProfileExtractionRouteImport } from './routes/api.source-profile-extraction'
+import { Route as ApiTailoredResumePdfRouteImport } from './routes/api.tailored-resume-pdf'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -49,6 +50,11 @@ const ApiSourceProfileExtractionRoute =
     path: '/api/source-profile-extraction',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiTailoredResumePdfRoute = ApiTailoredResumePdfRouteImport.update({
+  id: '/api/tailored-resume-pdf',
+  path: '/api/tailored-resume-pdf',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
+  '/api/tailored-resume-pdf': typeof ApiTailoredResumePdfRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByTo {
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
+  '/api/tailored-resume-pdf': typeof ApiTailoredResumePdfRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -74,6 +82,7 @@ export interface FileRoutesById {
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
+  '/api/tailored-resume-pdf': typeof ApiTailoredResumePdfRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -84,6 +93,7 @@ export interface FileRouteTypes {
     | '/api/resume-claim-validation'
     | '/api/resume-claim-writing'
     | '/api/source-profile-extraction'
+    | '/api/tailored-resume-pdf'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -92,6 +102,7 @@ export interface FileRouteTypes {
     | '/api/resume-claim-validation'
     | '/api/resume-claim-writing'
     | '/api/source-profile-extraction'
+    | '/api/tailored-resume-pdf'
   id:
     | '__root__'
     | '/'
@@ -100,6 +111,7 @@ export interface FileRouteTypes {
     | '/api/resume-claim-validation'
     | '/api/resume-claim-writing'
     | '/api/source-profile-extraction'
+    | '/api/tailored-resume-pdf'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -109,6 +121,7 @@ export interface RootRouteChildren {
   ApiResumeClaimValidationRoute: typeof ApiResumeClaimValidationRoute
   ApiResumeClaimWritingRoute: typeof ApiResumeClaimWritingRoute
   ApiSourceProfileExtractionRoute: typeof ApiSourceProfileExtractionRoute
+  ApiTailoredResumePdfRoute: typeof ApiTailoredResumePdfRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -155,6 +168,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSourceProfileExtractionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/tailored-resume-pdf': {
+      id: '/api/tailored-resume-pdf'
+      path: '/api/tailored-resume-pdf'
+      fullPath: '/api/tailored-resume-pdf'
+      preLoaderRoute: typeof ApiTailoredResumePdfRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -165,6 +185,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiResumeClaimValidationRoute: ApiResumeClaimValidationRoute,
   ApiResumeClaimWritingRoute: ApiResumeClaimWritingRoute,
   ApiSourceProfileExtractionRoute: ApiSourceProfileExtractionRoute,
+  ApiTailoredResumePdfRoute: ApiTailoredResumePdfRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
