@@ -67,6 +67,14 @@ export type CandidateSessionFailureMessageKey =
   | 'matchAnalysis.transportFailure'
   | 'resumeClaims.failure'
 
+export function isSourceDocumentIntakeFailureMessage(
+  messageKey: CandidateSessionFailureMessageKey | null,
+) {
+  return messageKey === 'sourceProfile.failure'
+    || messageKey === 'sourceProfile.unreadableFailure'
+    || messageKey === 'sourceProfile.unsupportedFailure'
+}
+
 type CandidateSessionStateSetter = Dispatch<SetStateAction<CandidateSessionState>>
 type CandidateSessionActionDependencies = Readonly<{
   operationTracker: OperationTracker

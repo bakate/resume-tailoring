@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, Dispatch, SetStateAction } from 'react'
 
 import type { Localization } from '../localization/localization'
+import { isSourceDocumentIntakeFailureMessage } from './use-candidate-session'
 import type { CandidateSessionController } from './use-candidate-session'
 
 type WorkspaceProps = Readonly<{
@@ -132,9 +133,7 @@ function readPdfFailureMessageKey({ candidateSession }: Readonly<{
   candidateSession: CandidateSessionController
 }>) {
   const messageKey = candidateSession.failureMessageKey
-  if (messageKey === 'sourceProfile.unreadableFailure') return messageKey
-  if (messageKey === 'sourceProfile.unsupportedFailure') return messageKey
-  return messageKey === 'sourceProfile.failure' ? messageKey : null
+  return isSourceDocumentIntakeFailureMessage(messageKey) ? messageKey : null
 }
 
 function PastedSourceDocumentInput({ candidateSession, intake, localization }: IntakeProps) {
