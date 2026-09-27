@@ -24,8 +24,15 @@ export type ResumePdfResult =
   | Readonly<{ ok: false; error: ResumePdfFailure }>
 
 type ResumePdfDependencies = Readonly<{
+  pdfTextReader?: PdfTextReader
   semanticValidator: ResumeClaimSemanticValidator
   signal?: AbortSignal
+}>
+
+type PdfPage = Awaited<ReturnType<Awaited<ReturnType<typeof getDocument>['promise']>['getPage']>>
+
+type PdfTextReader = Readonly<{
+  read: (inputs: Readonly<{ pdfPage: PdfPage }>) => Promise<readonly string[]>
 }>
 
 const a4WidthPoints = 595.28
@@ -34,6 +41,7 @@ const pageSizeTolerancePoints = 1
 
 export async function createTailoredResumePdf({
   inputs,
+  pdfTextReader = pdfJsTextReader,
   semanticValidator,
   signal,
 }: ResumePdfDependencies & Readonly<{
@@ -42,7 +50,9 @@ export async function createTailoredResumePdf({
   if (signal?.aborted === true) return renderingUnavailableResult
   const browserResult = await launchPdfBrowser()
   if (!browserResult.ok) return renderingUnavailableResult
-  return renderWithBrowser({ browser: browserResult.value, inputs, semanticValidator, signal })
+  return renderWithBrowser({
+    browser: browserResult.value, inputs, pdfTextReader, semanticValidator, signal,
+  })
 }
 
 async function launchPdfBrowser() {
@@ -57,7 +67,9 @@ async function launchPdfBrowser() {
   }
 }
 
-async function renderWithBrowser({ browser, inputs, semanticValidator, signal }: Readonly<{
+async function renderWithBrowser({
+  browser, inputs, pdfTextReader = pdfJsTextReader, semanticValidator, signal,
+}: Readonly<{
   browser: Browser
   inputs: TailoredResumePdfInputs
 }> & ResumePdfDependencies): Promise<ResumePdfResult> {
@@ -65,7 +77,7 @@ async function renderWithBrowser({ browser, inputs, semanticValidator, signal }:
   signal?.addEventListener('abort', closeAbortedBrowser, { once: true })
   try {
     if (signal?.aborted === true) return renderingUnavailableResult
-    return await prepareAndRenderPdf({ browser, inputs, semanticValidator })
+    return await prepareAndRenderPdf({ browser, inputs, pdfTextReader, semanticValidator })
   } catch {
     return renderingUnavailableResult
   } finally {
@@ -74,10 +86,12 @@ async function renderWithBrowser({ browser, inputs, semanticValidator, signal }:
   }
 }
 
-async function prepareAndRenderPdf({ browser, inputs, semanticValidator }: Readonly<{
+async function prepareAndRenderPdf({ browser, inputs, pdfTextReader, semanticValidator }: Readonly<{
   browser: Browser
   inputs: TailoredResumePdfInputs
-}> & ResumePdfDependencies) {
+  pdfTextReader: PdfTextReader
+  semanticValidator: ResumeClaimSemanticValidator
+}>) {
   const page = await browser.newPage()
   await page.emulateMediaType('print')
   const layoutMeasurer = createPuppeteerLayoutMeasurer({ inputs, page })
@@ -85,7 +99,7 @@ async function prepareAndRenderPdf({ browser, inputs, semanticValidator }: Reado
     inputs: inputs.source, layoutMeasurer, semanticValidator,
   })
   if (!preparation.ok) return mapPreparationFailure(preparation.error.type)
-  return renderAndValidatePdf({ document: preparation.value, inputs, page })
+  return renderAndValidatePdf({ document: preparation.value, inputs, page, pdfTextReader })
 }
 
 function createPuppeteerLayoutMeasurer({ inputs, page }: Readonly<{
@@ -104,16 +118,17 @@ function createPuppeteerLayoutMeasurer({ inputs, page }: Readonly<{
   }
 }
 
-async function renderAndValidatePdf({ document, inputs, page }: Readonly<{
+async function renderAndValidatePdf({ document, inputs, page, pdfTextReader }: Readonly<{
   document: TailoredResumeDocument
   inputs: TailoredResumePdfInputs
   page: Page
+  pdfTextReader: PdfTextReader
 }>): Promise<ResumePdfResult> {
   const renderInputs = createRenderInputs({ document, inputs })
   await renderPage({ document, inputs, page })
   if (await hasPageOverflow({ page })) return overflowResult
   const pdfBytes = await page.pdf({ format: 'A4', preferCSSPageSize: true, printBackground: true })
-  return validatePdf({ inputs: renderInputs, pdfBytes })
+  return validatePdf({ inputs: renderInputs, pdfBytes, pdfTextReader })
 }
 
 async function renderPage({ document: tailoredDocument, inputs, page }: Readonly<{
@@ -152,15 +167,16 @@ function mapPreparationFailure(type: TailoredResumePreparationFailureType): Resu
   return renderingUnavailableResult
 }
 
-async function validatePdf({ inputs, pdfBytes }: Readonly<{
+async function validatePdf({ inputs, pdfBytes, pdfTextReader }: Readonly<{
   inputs: TailoredResumeRenderInputs
   pdfBytes: Uint8Array
+  pdfTextReader: PdfTextReader
 }>): Promise<ResumePdfResult> {
   if (!hasExpectedEmbeddedFonts({ pdfBytes })) return fontsNotEmbeddedResult
   const loadingTask = getDocument({ data: pdfBytes.slice(), useSystemFonts: false })
   try {
     const pdfDocument = await loadingTask.promise
-    const pageValidation = await validatePdfPage({ inputs, pdfDocument })
+    const pageValidation = await validatePdfPage({ inputs, pdfDocument, pdfTextReader })
     return pageValidation.ok ? { ok: true, value: pdfBytes } : pageValidation
   } catch {
     return renderingUnavailableResult
@@ -176,43 +192,95 @@ function hasExpectedEmbeddedFonts({ pdfBytes }: Readonly<{ pdfBytes: Uint8Array 
     && expectedPdfFontNames.every((fontName) => pdfSource.includes(`+${fontName}`))
 }
 
-async function validatePdfPage({ inputs, pdfDocument }: Readonly<{
+async function validatePdfPage({ inputs, pdfDocument, pdfTextReader }: Readonly<{
   inputs: TailoredResumeRenderInputs
   pdfDocument: Awaited<ReturnType<typeof getDocument>['promise']>
+  pdfTextReader: PdfTextReader
 }>): Promise<ResumePdfResult | typeof validLayoutResult> {
   if (pdfDocument.numPages !== 1) return invalidPageCountResult
   const pdfPage = await pdfDocument.getPage(1)
   if (!hasA4Dimensions({ view: pdfPage.view })) return invalidPageCountResult
-  const extractedText = await readSelectableText({ pdfPage })
-  return hasExpectedReadingOrder({ inputs, extractedText })
+  const extractedTextItems = await pdfTextReader.read({ pdfPage })
+  return hasExpectedReadingOrder({ inputs, extractedTextItems })
     ? validLayoutResult
     : contentMismatchResult
 }
 
-async function readSelectableText({ pdfPage }: Readonly<{
-  pdfPage: Awaited<ReturnType<Awaited<ReturnType<typeof getDocument>['promise']>['getPage']>>
+async function readSelectableTextItems({ pdfPage }: Readonly<{
+  pdfPage: PdfPage
 }>) {
   const textContent = await pdfPage.getTextContent()
-  return textContent.items.flatMap((item) => 'str' in item ? [item.str] : []).join(' ')
+  return textContent.items.flatMap((item) => 'str' in item ? [item.str] : [])
 }
 
-function hasExpectedReadingOrder({ inputs, extractedText }: Readonly<{
+function hasExpectedReadingOrder({ inputs, extractedTextItems }: Readonly<{
   inputs: TailoredResumeRenderInputs
-  extractedText: string
+  extractedTextItems: readonly string[]
 }>) {
-  const normalizedText = normalizeText(extractedText)
   const expectedText = [
     inputs.locale === 'fr' ? 'CV adapté' : 'Tailored Resume',
     ...inputs.contactItems.map(({ value }) => value),
     ...inputs.document.items.map(({ text }) => text),
   ]
-  let previousPosition = -1
+  return hasExpectedPdfTextInReadingOrder({ expectedText, extractedTextItems })
+}
+
+function hasExpectedPdfTextInReadingOrder({ expectedText, extractedTextItems }: Readonly<{
+  expectedText: readonly string[]
+  extractedTextItems: readonly string[]
+}>) {
+  const extractedText = extractedTextItems.map((value) => normalizeText({ value }))
+    .join(textItemBoundary)
+  let nextPosition = 0
   for (const text of expectedText) {
-    const position = normalizedText.indexOf(normalizeText(text), previousPosition + 1)
-    if (position <= previousPosition) return false
-    previousPosition = position
+    const matchEnd = findTextEnd({
+      extractedText, expectedText: normalizeText({ value: text }), nextPosition,
+    })
+    if (matchEnd === null) return false
+    nextPosition = matchEnd
   }
   return true
+}
+
+function findTextEnd({ extractedText, expectedText, nextPosition }: Readonly<{
+  extractedText: string
+  expectedText: string
+  nextPosition: number
+}>) {
+  for (let candidatePosition = nextPosition; candidatePosition < extractedText.length;
+    candidatePosition += 1) {
+    const matchEnd = matchTextAt({ candidatePosition, expectedText, extractedText })
+    if (matchEnd !== null) return matchEnd
+  }
+  return null
+}
+
+function matchTextAt({ candidatePosition, expectedText, extractedText }: Readonly<{
+  candidatePosition: number
+  expectedText: string
+  extractedText: string
+}>) {
+  let extractedPosition = candidatePosition
+  let expectedPosition = 0
+  while (expectedPosition < expectedText.length && extractedPosition < extractedText.length) {
+    if (extractedText[extractedPosition] === textItemBoundary) {
+      extractedPosition += 1
+      if (expectedText[expectedPosition] === ' ') expectedPosition += 1
+      continue
+    }
+    if (extractedText[extractedPosition] !== expectedText[expectedPosition]) return null
+    extractedPosition += 1
+    expectedPosition += 1
+  }
+  return expectedPosition === expectedText.length ? extractedPosition : null
+}
+
+function normalizeText({ value }: Readonly<{ value: string }>) {
+  return value
+    .normalize('NFKC')
+    .replace(/[\u02BC\u2018\u2019]/gu, "'")
+    .replace(/\s+/gu, ' ')
+    .trim()
 }
 
 function hasA4Dimensions({ view }: Readonly<{ view: readonly number[] }>) {
@@ -221,10 +289,6 @@ function hasA4Dimensions({ view }: Readonly<{ view: readonly number[] }>) {
   if (width === undefined || height === undefined) return false
   return Math.abs(width - a4WidthPoints) <= pageSizeTolerancePoints
     && Math.abs(height - a4HeightPoints) <= pageSizeTolerancePoints
-}
-
-function normalizeText(value: string) {
-  return value.replace(/\s+/gu, ' ').trim()
 }
 
 function ignoreFailure() {}
@@ -259,3 +323,5 @@ const validationUnavailableResult = {
   error: { type: 'resume-pdf-validation-unavailable' },
 } as const satisfies ResumePdfResult
 const expectedPdfFontNames = ['Inter', 'Lora'] as const
+const pdfJsTextReader = { read: readSelectableTextItems } as const satisfies PdfTextReader
+const textItemBoundary = '\u0000'
