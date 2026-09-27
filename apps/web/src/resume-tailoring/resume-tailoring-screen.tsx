@@ -387,11 +387,17 @@ function focusOperationResult({ operation, step }: Readonly<{
     focusElementById({ elementId: 'match-analysis-summary-title' })
     return
   }
+  if (operation === 'generate-resume-claims' || operation === 'reformulate-resume-claim') {
+    focusElementById({ elementId: 'resume-claims-list-title' })
+    return
+  }
   focusWorkflowStep({ step })
 }
 
 function focusElementById({ elementId }: Readonly<{ elementId: string }>) {
-  requestAnimationFrame(() => { document.getElementById(elementId)?.focus() })
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => { document.getElementById(elementId)?.focus() })
+  })
 }
 
 function readRetryOperationMessageKey({ type }: Readonly<{

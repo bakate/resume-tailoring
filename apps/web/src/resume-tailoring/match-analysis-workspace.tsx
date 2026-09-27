@@ -24,8 +24,9 @@ export function MatchAnalysisWorkspace({ candidateSession, localization }: Works
       <h2 id="match-analysis-title" tabIndex={-1}>{localization.translate('matchAnalysis.title')}</h2>
       {candidateSession.view.status === 'ready'
         && candidateSession.view.matchAnalysis !== undefined
-        ? <MatchAnalysisResult {...{
+          ? <MatchAnalysisResult {...{
             analysis: candidateSession.view.matchAnalysis,
+            candidateSession,
             localization,
             requirements: jobPosting.requirements,
             verifiedFacts: sourceProfile.facts.filter((fact) => fact.status === 'verified'),
@@ -51,11 +52,13 @@ function readMatchInputs({ candidateSession }: Readonly<{
 
 function MatchAnalysisResult({
   analysis,
+  candidateSession,
   localization,
   requirements,
   verifiedFacts,
 }: Readonly<{
   analysis: MatchAnalysis
+  candidateSession: CandidateSessionController
   localization: Localization
   requirements: readonly JobRequirement[]
   verifiedFacts: readonly SourceProfileFact[]
@@ -66,6 +69,7 @@ function MatchAnalysisResult({
   return <div className="match-analysis-grid">
     <MatchAnalysisSummary {...{
       analysis,
+      candidateSession,
       coveredRequirementIds,
       localization,
       requirements,
@@ -77,12 +81,14 @@ function MatchAnalysisResult({
 
 function MatchAnalysisSummary({
   analysis,
+  candidateSession,
   coveredRequirementIds,
   localization,
   requirements,
   uncoveredRequiredRequirements,
 }: Readonly<{
   analysis: MatchAnalysis
+  candidateSession: CandidateSessionController
   coveredRequirementIds: ReadonlySet<JobRequirement['id']>
   localization: Localization
   requirements: readonly JobRequirement[]
@@ -116,6 +122,13 @@ function MatchAnalysisSummary({
         ? 'matchAnalysis.eligible'
         : 'matchAnalysis.denied',
     )}</p>
+    {analysis.generationEligibility === 'eligible' ? (
+      <button className="primary-action compact-action"
+        disabled={candidateSession.pendingOperation !== null}
+        onClick={() => void candidateSession.generateResumeClaims()} type="button">
+        {localization.translate('resumeClaims.generate')}
+      </button>
+    ) : null}
     <dl className="match-coverage-counts">
       <CoverageCount label={localization.translate('matchAnalysis.requiredCoverage')}
         {...requiredCoverage} />

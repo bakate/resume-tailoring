@@ -267,7 +267,9 @@ async function executeCommand({
   setState,
   command,
 }: CandidateSessionActionDependencies & Readonly<{ command: ResumeTailoringCommand }>) {
-  if (operationTracker.current !== null) return duplicateOperationResult
+  if (operationTracker.current !== null && !concurrentSafeCommands.has(command.type)) {
+    return duplicateOperationResult
+  }
   const pendingOperation = readPendingOperation({ command })
   const operationTimeout = pendingOperation === null
     ? null
@@ -463,6 +465,10 @@ const pendingOperations = new Set<ResumeTailoringCommand['type']>([
   'generate-resume-claims',
   'import-source-document',
   'reformulate-resume-claim',
+])
+const concurrentSafeCommands = new Set<ResumeTailoringCommand['type']>([
+  'rate-tailored-resume-fidelity',
+  'rate-tailored-resume-relevance',
 ])
 const pendingOperationReassuranceDelay = 10_000
 const duplicateOperationResult = {

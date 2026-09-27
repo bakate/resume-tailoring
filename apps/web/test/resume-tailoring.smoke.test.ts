@@ -366,6 +366,83 @@ test('a Candidate generates validated provenance-backed Resume Claims', async ({
   await system.expectValidatedResumeClaimsWithoutFreeEditing()
 })
 
+test('eligible delayed generation prevents duplicates and focuses curated Resume Claims', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+  await system.givenJobRequirementExtractionIsAvailable()
+  await system.givenMatchAnalysisIsAvailable()
+  await system.givenResumeClaimGenerationCanBeDelayed()
+  await system.buildVerifiedSourceProfile()
+  await system.extractRequirementsFromMinimizedJobPosting()
+  await system.analyzeMatch()
+
+  await system.generateDelayedResumeClaimsWithDoubleClick()
+
+  await system.expectPendingResumeClaimGenerationThenFocusedCollection()
+})
+
+test('an ineligible Match Analysis exposes no Resume Claim generation action', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+  await system.givenJobRequirementExtractionIsAvailable()
+  await system.givenIneligibleMatchAnalysis()
+  await system.buildVerifiedSourceProfile()
+  await system.extractRequirementsFromMinimizedJobPosting()
+
+  await system.analyzeIneligibleMatch()
+
+  await system.expectGenerationActionToRemainUnavailableInMatchAnalysis()
+})
+
+test('an ineligible Tailored Resume explains why generation is unavailable', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenIneligibleMatchAnalysisIsCompleted()
+
+  await system.openIneligibleTailoredResume()
+
+  await system.expectIneligibleTailoredResumeToExplainUnavailableGeneration()
+})
+
+test('a Candidate retries failed Resume Claim generation without losing context', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+  await system.givenJobRequirementExtractionIsAvailable()
+  await system.givenMatchAnalysisIsAvailable()
+  await system.givenResumeClaimGenerationFailsOnce()
+  await system.buildVerifiedSourceProfile()
+  await system.extractRequirementsFromMinimizedJobPosting()
+  await system.analyzeMatch()
+  await system.givenResumeClaimGenerationHasFailed()
+
+  await system.retryResumeClaimGeneration()
+
+  await system.expectRetriedResumeClaimGenerationToPreserveContext()
+})
+
+test('claims excluded after validation failure are explained without model details', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+  await system.givenJobRequirementExtractionIsAvailable()
+  await system.givenMatchAnalysisIsAvailable()
+  await system.givenResumeClaimRemainsUnsupported()
+  await system.buildVerifiedSourceProfile()
+  await system.extractRequirementsFromMinimizedJobPosting()
+  await system.analyzeMatch()
+
+  await system.generateExcludedResumeClaim()
+
+  await system.expectUnsupportedResumeClaimExclusionToBeClear()
+})
+
 test('a Candidate restores provenance-backed Resume Claims after reload', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
@@ -374,6 +451,80 @@ test('a Candidate restores provenance-backed Resume Claims after reload', async 
   await system.reloadTailoredResume()
 
   await system.expectTailoredResumeToBeRestored()
+})
+
+test('a Candidate reorders a compact ordered Resume Claim collection', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenTailoredResumeIsStored()
+
+  await system.moveFirstResumeClaimDown()
+
+  await system.expectResumeClaimOrderToChange()
+})
+
+test('a Candidate removes one Resume Claim from the compact collection', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenTailoredResumeIsStored()
+
+  await system.removeFirstResumeClaim()
+
+  await system.expectResumeClaimRemoval()
+})
+
+test('reformulation controls stay compact and keep provenance rules explicit', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenTailoredResumeIsStored()
+
+  await system.openFirstResumeClaimReformulation()
+
+  await system.expectCompactReformulationControls()
+})
+
+test('delayed reformulation prevents duplicates without blocking safe navigation', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenTailoredResumeIsStored()
+  await system.givenResumeClaimReformulationCanBeDelayed()
+
+  await system.requestDelayedResumeClaimReformulation()
+
+  await system.expectPendingReformulationThenFocusedCollection()
+})
+
+test('Outcome Feedback remains usable while a Resume Claim is reformulated', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenTailoredResumeIsStored()
+  await system.givenResumeClaimReformulationIsPending()
+
+  await system.rateTailoredResumeFidelityDuringReformulation()
+
+  await system.expectConcurrentFidelityRatingToBeRecorded()
+})
+
+test('a Candidate retries failed reformulation without losing their request', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenTailoredResumeIsStored()
+  await system.givenResumeClaimReformulationHasFailed()
+
+  await system.retryResumeClaimReformulation()
+
+  await system.expectRetriedReformulationToPreserveContext()
+})
+
+test('curation and preview preparation stay continuous on mobile', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenTailoredResumeIsStored()
+  await system.givenMobileViewport()
+
+  await system.navigateToTailoredResumeExport()
+
+  await system.expectContinuousTailoredResumeFlowOnMobile()
 })
 
 test('a Candidate previews and downloads the same validated one-page resume', async ({ page }) => {
@@ -459,7 +610,16 @@ type CompletedAction =
   | 'resume-tailoring-opened'
   | 'resume-tailoring-viewed'
   | 'resume-claims-generated'
+  | 'resume-claim-reordered'
+  | 'resume-claim-removed'
+  | 'resume-claim-reformulation-opened'
+  | 'resume-claims-excluded'
   | 'resume-claims-reloaded'
+  | 'resume-claims-retried'
+  | 'resume-claim-reformulation-requested'
+  | 'resume-claim-reformulation-retried'
+  | 'resume-fidelity-rated-during-reformulation'
+  | 'resume-preview-navigated'
   | 'resume-pdf-downloaded'
   | 'source-profile-built'
   | 'source-document-reviewed'
@@ -482,7 +642,10 @@ class ResumeTailoringBrowserTestSystem {
   #pendingJobRequirementExtractionResponse: (() => void) | undefined
   #matchAnalysisRequestCount = 0
   #pendingMatchAnalysisResponse: (() => void) | undefined
+  #releasePendingResumeClaimWriting: (() => void) | undefined
   #pendingSourceProfileExtractionResponse: (() => void) | undefined
+  #resumeClaimWritingRequestCount = 0
+  readonly #resumeClaimReformulationRequests: string[] = []
   #resumePdfRequest: unknown
   #sourceProfileExtractionAttemptCount = 0
   #unknownRoute: string | undefined
@@ -600,6 +763,18 @@ class ResumeTailoringBrowserTestSystem {
     })
   }
 
+  async givenIneligibleMatchAnalysis() {
+    await this.#page.route('**/api/match-analysis', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          value: { evidence: [], relevantFactIds: [] },
+        }),
+      })
+    })
+  }
+
   async givenMatchAnalysisCanBeDelayed() {
     await this.givenCandidateSessionIsActive()
     await this.givenStructuredExtractionIsAvailable()
@@ -668,11 +843,173 @@ class ResumeTailoringBrowserTestSystem {
         }),
       })
     })
+    await this.#givenSupportedResumeClaimValidation()
+  }
+
+  async givenResumeClaimGenerationCanBeDelayed() {
+    await this.#page.route('**/api/resume-claim-writing', async (route) => {
+      this.#resumeClaimWritingRequestCount += 1
+      const writingRequest = resumeClaimWritingRequestSchema.safeParse(
+        JSON.parse(route.request().postData() ?? 'null') as unknown,
+      )
+      const [verifiedFact] = writingRequest.success ? writingRequest.data.verifiedFacts : []
+      await new Promise<void>((resolve) => {
+        this.#releasePendingResumeClaimWriting = resolve
+      })
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          value: {
+            claims: verifiedFact === undefined ? [] : [{
+              segments: [{
+                text: 'Built React applications at Acme',
+                factIds: [verifiedFact.id],
+              }],
+            }],
+          },
+        }),
+      })
+    })
+    await this.#givenSupportedResumeClaimValidation()
+  }
+
+  async givenResumeClaimGenerationFailsOnce() {
+    await this.#page.route('**/api/resume-claim-writing', async (route) => {
+      this.#resumeClaimWritingRequestCount += 1
+      if (this.#resumeClaimWritingRequestCount === 1) {
+        await this.#fulfillUnavailableResumeClaimWriting({ route })
+        return
+      }
+      await this.#fulfillResumeClaimWriting({ route, text: 'Built React applications at Acme' })
+    })
+    await this.#givenSupportedResumeClaimValidation()
+  }
+
+  async givenResumeClaimGenerationHasFailed() {
+    await this.#page.getByRole('button', { name: 'Generate Resume Claims' }).click()
+    await this.#page.getByRole('button', { name: 'Retry Tailored Resume' }).waitFor()
+  }
+
+  async givenIneligibleMatchAnalysisIsCompleted() {
+    await this.givenCandidateSessionIsActive()
+    await this.givenStructuredExtractionIsAvailable()
+    await this.givenJobRequirementExtractionIsAvailable()
+    await this.givenIneligibleMatchAnalysis()
+    await this.buildVerifiedSourceProfile()
+    await this.extractRequirementsFromMinimizedJobPosting()
+    await this.analyzeIneligibleMatch()
+  }
+
+  async givenResumeClaimRemainsUnsupported() {
+    await this.#page.route('**/api/resume-claim-writing', (route) =>
+      this.#fulfillResumeClaimWriting({ route, text: 'Led every company initiative' }))
+    await this.#page.route('**/api/resume-claim-validation', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          value: {
+            supported: false,
+            feedback: [{ code: 'strengthened-scope', segmentIndex: 0 }],
+          },
+        }),
+      })
+    })
+  }
+
+  async givenResumeClaimReformulationCanBeDelayed() {
+    await this.#page.unroute('**/api/resume-claim-writing')
+    this.#resumeClaimWritingRequestCount = 0
+    await this.#page.route('**/api/resume-claim-writing', async (route) => {
+      this.#resumeClaimWritingRequestCount += 1
+      await new Promise<void>((resolve) => {
+        this.#releasePendingResumeClaimWriting = resolve
+      })
+      await this.#fulfillResumeClaimWriting({
+        route,
+        text: 'Built accessible React applications at Acme',
+      })
+    })
+  }
+
+  async givenResumeClaimReformulationHasFailed() {
+    await this.#page.unroute('**/api/resume-claim-writing')
+    this.#resumeClaimWritingRequestCount = 0
+    await this.#page.route('**/api/resume-claim-writing', async (route) => {
+      this.#resumeClaimWritingRequestCount += 1
+      this.#recordResumeClaimReformulationRequest({ route })
+      if (this.#resumeClaimWritingRequestCount === 1) {
+        await this.#fulfillUnavailableResumeClaimWriting({ route })
+        return
+      }
+      await this.#fulfillResumeClaimWriting({
+        route,
+        text: 'Built accessible React applications at Acme',
+      })
+    })
+    const firstClaim = this.#readFirstResumeClaim()
+    await firstClaim.getByText('Request a wording change — Resume Claim 1', { exact: true }).click()
+    await firstClaim.getByLabel('Request a wording change').fill('Make the impact clearer')
+    await firstClaim.getByRole('button', { name: 'Request reformulation' }).click()
+    await this.#page.getByRole('button', { name: 'Retry operation' }).waitFor()
+  }
+
+  async givenResumeClaimReformulationIsPending() {
+    await this.givenResumeClaimReformulationCanBeDelayed()
+    const firstClaim = this.#readFirstResumeClaim()
+    await firstClaim.getByText('Request a wording change — Resume Claim 1', { exact: true }).click()
+    await firstClaim.getByLabel('Request a wording change').fill('Make the impact clearer')
+    const writingRequest = this.#page.waitForRequest('**/api/resume-claim-writing')
+    await firstClaim.getByRole('button', { name: 'Request reformulation' }).click()
+    await writingRequest
+    await this.#page.getByText('Reformulating your Resume Claim…').waitFor()
+  }
+
+  #recordResumeClaimReformulationRequest({ route }: Readonly<{ route: Route }>) {
+    const writingRequest = resumeClaimWritingRequestSchema.safeParse(
+      JSON.parse(route.request().postData() ?? 'null') as unknown,
+    )
+    if (writingRequest.success && writingRequest.data.operation === 'reformulate') {
+      this.#resumeClaimReformulationRequests.push(writingRequest.data.request ?? '')
+    }
+  }
+
+  async #givenSupportedResumeClaimValidation() {
     await this.#page.route('**/api/resume-claim-validation', async (route) => {
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify({ ok: true, value: { supported: true, feedback: [] } }),
       })
+    })
+  }
+
+  async #fulfillUnavailableResumeClaimWriting({ route }: Readonly<{ route: Route }>) {
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: false,
+        error: { type: 'resume-claim-writing-unavailable' },
+      }),
+    })
+  }
+
+  async #fulfillResumeClaimWriting({ route, text }: Readonly<{ route: Route; text: string }>) {
+    const writingRequest = resumeClaimWritingRequestSchema.safeParse(
+      JSON.parse(route.request().postData() ?? 'null') as unknown,
+    )
+    const [verifiedFact] = writingRequest.success ? writingRequest.data.verifiedFacts : []
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        value: {
+          claims: verifiedFact === undefined ? [] : [{
+            segments: [{ text, factIds: [verifiedFact.id] }],
+          }],
+        },
+      }),
     })
   }
 
@@ -991,6 +1328,58 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'resume-claims-reloaded'
   }
 
+  async moveFirstResumeClaimDown() {
+    await this.#readResumeClaims().getByRole('button', {
+      name: 'Move down — Resume Claim 1',
+    }).click()
+    this.#completedAction = 'resume-claim-reordered'
+  }
+
+  async removeFirstResumeClaim() {
+    await this.#readResumeClaims().getByRole('button', {
+      name: 'Remove claim — Resume Claim 1',
+    }).click()
+    this.#completedAction = 'resume-claim-removed'
+  }
+
+  async openFirstResumeClaimReformulation() {
+    await this.#readFirstResumeClaim()
+      .getByText('Request a wording change — Resume Claim 1', { exact: true })
+      .click()
+    this.#completedAction = 'resume-claim-reformulation-opened'
+  }
+
+  async requestDelayedResumeClaimReformulation() {
+    const firstClaim = this.#readFirstResumeClaim()
+    await firstClaim.getByText('Request a wording change — Resume Claim 1', { exact: true }).click()
+    await firstClaim.getByLabel('Request a wording change').fill('Make the impact clearer')
+    const writingRequest = this.#page.waitForRequest('**/api/resume-claim-writing')
+    await firstClaim.getByRole('button', { name: 'Request reformulation' })
+      .dblclick({ force: true })
+    await writingRequest
+    this.#completedAction = 'resume-claim-reformulation-requested'
+  }
+
+  async retryResumeClaimReformulation() {
+    await this.#page.getByRole('button', { name: 'Retry operation' }).click()
+    await this.#page.getByText('Built accessible React applications at Acme', { exact: true })
+      .waitFor()
+    this.#completedAction = 'resume-claim-reformulation-retried'
+  }
+
+  async rateTailoredResumeFidelityDuringReformulation() {
+    await this.#page.getByRole('button', { name: 'Faithful' }).click()
+    this.#completedAction = 'resume-fidelity-rated-during-reformulation'
+  }
+
+  async navigateToTailoredResumeExport() {
+    const flowNavigation = this.#page.getByRole('navigation', {
+      name: 'Tailored Resume curation',
+    })
+    await flowNavigation.getByRole('link', { name: 'PDF export' }).click()
+    this.#completedAction = 'resume-preview-navigated'
+  }
+
   async downloadTailoredResumePdf() {
     const downloadPromise = this.#page.waitForEvent('download')
     await this.#page.getByRole('button', { name: 'Download validated A4 PDF' }).click()
@@ -1052,10 +1441,42 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'match-analyzed'
   }
 
+  async analyzeIneligibleMatch() {
+    await this.#page.getByRole('button', { name: /Match Analysis/ }).click()
+    await this.#page.getByRole('button', { name: 'Analyze the match' }).click()
+    await this.#page.getByText('Generation eligibility: not eligible').waitFor()
+    this.#completedAction = 'match-analyzed'
+  }
+
   async generateResumeClaims() {
     await this.#page.getByRole('button', { name: 'Generate Resume Claims' }).click()
     await this.#page.getByText('Built React applications at Acme', { exact: true }).waitFor()
     this.#completedAction = 'resume-claims-generated'
+  }
+
+  async generateDelayedResumeClaimsWithDoubleClick() {
+    const generationAction = this.#page.getByRole('button', { name: 'Generate Resume Claims' })
+    const writingRequest = this.#page.waitForRequest('**/api/resume-claim-writing')
+    await generationAction.dblclick({ force: true })
+    await writingRequest
+    this.#completedAction = 'resume-claims-generated'
+  }
+
+  async retryResumeClaimGeneration() {
+    await this.#page.getByRole('button', { name: 'Retry Tailored Resume' }).click()
+    await this.#page.getByText('Built React applications at Acme', { exact: true }).waitFor()
+    this.#completedAction = 'resume-claims-retried'
+  }
+
+  async generateExcludedResumeClaim() {
+    await this.#page.getByRole('button', { name: 'Generate Resume Claims' }).click()
+    await this.#page.getByText(/Content that remained unsupported/).waitFor()
+    this.#completedAction = 'resume-claims-excluded'
+  }
+
+  async openIneligibleTailoredResume() {
+    await this.#page.getByRole('button', { name: /Tailored Resume/ }).click()
+    this.#completedAction = 'resume-tailoring-viewed'
   }
 
   async reopenCompletedSourceProfile() {
@@ -1427,6 +1848,7 @@ class ResumeTailoringBrowserTestSystem {
       documentWidth: document.documentElement.scrollWidth,
       viewportWidth: window.innerWidth,
     }))).toEqual({ documentWidth: 390, viewportWidth: 390 })
+    await this.#page.waitForLoadState('networkidle')
   }
 
   async expectPendingMatchAnalysisThenFocusedResult() {
@@ -1473,6 +1895,49 @@ class ResumeTailoringBrowserTestSystem {
     await expect(this.#page.getByText(/Claims cannot be edited directly/).first()).toBeVisible()
   }
 
+  async expectPendingResumeClaimGenerationThenFocusedCollection() {
+    this.#expectCompletedAction('resume-claims-generated')
+    await expect(this.#page.getByText('Drafting your Tailored Resume…')).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Generate Resume Claims' })).toBeDisabled()
+    expect(this.#resumeClaimWritingRequestCount).toBe(1)
+    this.#releasePendingResumeClaimWriting?.()
+    await expect(this.#page.getByText('Preparing the exact one-page layout…')).toBeVisible()
+    await expect(this.#page.getByText('Built React applications at Acme', { exact: true }))
+      .toBeVisible()
+    await expect(this.#page.locator('#resume-claims-list-title')).toBeFocused()
+  }
+
+  async expectGenerationActionToRemainUnavailableInMatchAnalysis() {
+    this.#expectCompletedAction('match-analyzed')
+    await expect(this.#page.getByRole('button', { name: 'Generate Resume Claims' })).toHaveCount(0)
+  }
+
+  async expectIneligibleTailoredResumeToExplainUnavailableGeneration() {
+    this.#expectCompletedAction('resume-tailoring-viewed')
+    await expect(this.#page.getByRole('button', { name: 'Generate Resume Claims' })).toHaveCount(0)
+    await expect(this.#page.getByText(/not enough verified, relevant material/)).toBeVisible()
+  }
+
+  async expectRetriedResumeClaimGenerationToPreserveContext() {
+    this.#expectCompletedAction('resume-claims-retried')
+    expect(this.#resumeClaimWritingRequestCount).toBe(2)
+    await expect(this.#page.getByRole('button', { name: /Source Profile/ }))
+      .toContainText('1 verified fact')
+    await expect(this.#page.getByRole('button', { name: /Match Analysis/ }))
+      .toContainText('33%')
+    await expect(this.#page.locator('#resume-claims-list-title')).toBeFocused()
+  }
+
+  async expectUnsupportedResumeClaimExclusionToBeClear() {
+    this.#expectCompletedAction('resume-claims-excluded')
+    await expect(this.#page.getByText(
+      'Content that remained unsupported after one isolated rewrite was excluded from your Tailored Resume.',
+      { exact: true },
+    )).toHaveAttribute('role', 'status')
+    await expect(this.#page.getByText(/No supported Resume Claim remains/)).toBeVisible()
+    await expect(this.#page.getByText(/strengthened-scope/)).toHaveCount(0)
+  }
+
   async expectTailoredResumeToBeRestored() {
     this.#expectCompletedAction('resume-claims-reloaded')
     await expect(this.#page.getByText(
@@ -1483,6 +1948,100 @@ class ResumeTailoringBrowserTestSystem {
       'Worked as a FullStack Developer at Acme',
       { exact: true },
     )).toBeVisible()
+  }
+
+  async expectResumeClaimOrderToChange() {
+    this.#expectCompletedAction('resume-claim-reordered')
+    const claims = this.#readResumeClaims()
+    expect(await claims.evaluate((element) => element.tagName)).toBe('OL')
+    await expect(claims.getByRole('listitem')).toHaveCount(2)
+    await expect(claims.getByRole('listitem').first())
+      .toContainText('Worked as a FullStack Developer at Acme')
+    await expect(claims.getByRole('button', {
+      name: 'Move up — Resume Claim 1',
+    })).toBeVisible()
+  }
+
+  async expectResumeClaimRemoval() {
+    this.#expectCompletedAction('resume-claim-removed')
+    const claims = this.#readResumeClaims()
+    await expect(claims.getByRole('listitem')).toHaveCount(1)
+    await expect(claims.getByText('Worked as a FullStack Developer at Acme', { exact: true }))
+      .toBeVisible()
+  }
+
+  async expectCompactReformulationControls() {
+    this.#expectCompletedAction('resume-claim-reformulation-opened')
+    const claims = this.#readResumeClaims()
+    await expect(this.#readFirstResumeClaim().getByLabel('Request a wording change')).toBeVisible()
+    await expect(claims.getByRole('button', {
+      name: 'Remove claim — Resume Claim 1',
+    })).toBeVisible()
+    await expect(this.#page.getByText(/Claims cannot be edited directly/)).toHaveCount(1)
+  }
+
+  async expectPendingReformulationThenFocusedCollection() {
+    this.#expectCompletedAction('resume-claim-reformulation-requested')
+    const claims = this.#readResumeClaims()
+    const firstClaim = this.#readFirstResumeClaim()
+    await expect(this.#page.getByText('Reformulating your Resume Claim…')).toBeVisible()
+    await expect(firstClaim.locator('.reformulation-form button')).toBeDisabled()
+    await expect(firstClaim.getByRole('button', {
+      name: 'Move down — Resume Claim 1',
+    })).toBeDisabled()
+    await expect(firstClaim.getByRole('button', {
+      name: 'Remove claim — Resume Claim 1',
+    })).toBeDisabled()
+    await expect(this.#page.getByRole('navigation', {
+      name: 'Tailored Resume curation',
+    }).getByRole('link', { name: 'Preview and export' })).toBeEnabled()
+    expect(this.#resumeClaimWritingRequestCount).toBe(1)
+    this.#releasePendingResumeClaimWriting?.()
+    await expect(claims.getByText(
+      'Built accessible React applications at Acme',
+      { exact: true },
+    )).toBeVisible()
+    await expect(this.#page.locator('#resume-claims-list-title')).toBeFocused()
+  }
+
+  async expectRetriedReformulationToPreserveContext() {
+    this.#expectCompletedAction('resume-claim-reformulation-retried')
+    expect(this.#resumeClaimWritingRequestCount).toBe(2)
+    expect(this.#resumeClaimReformulationRequests).toEqual([
+      'Make the impact clearer',
+      'Make the impact clearer',
+    ])
+    await expect(this.#page.locator('#resume-claims-list-title')).toBeFocused()
+  }
+
+  async expectConcurrentFidelityRatingToBeRecorded() {
+    this.#expectCompletedAction('resume-fidelity-rated-during-reformulation')
+    await expect(this.#page.getByRole('button', { name: 'Faithful' })).toBeEnabled()
+    await expect(this.#page.getByText('Reformulating your Resume Claim…')).toBeVisible()
+    expect(this.#resumeClaimWritingRequestCount).toBe(1)
+    this.#releasePendingResumeClaimWriting?.()
+    await expect(this.#page.getByText(
+      'Built accessible React applications at Acme',
+      { exact: true },
+    )).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Faithful' })).toBeDisabled()
+  }
+
+  async expectContinuousTailoredResumeFlowOnMobile() {
+    this.#expectCompletedAction('resume-preview-navigated')
+    const flowNavigation = this.#page.getByRole('navigation', {
+      name: 'Tailored Resume curation',
+    })
+    await expect(flowNavigation).toBeVisible()
+    await expect(flowNavigation.getByRole('link')).toHaveText([
+      'Retained Resume Claims',
+      'Preview and export',
+      'Photo',
+      'Outcome Feedback',
+      'PDF export',
+    ])
+    await expect(this.#page.getByRole('heading', { name: 'PDF export' })).toBeInViewport()
+    expect(await this.#page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
   }
 
   async expectPreviewAndPdfToUseTheSameRetainedClaims() {
@@ -1548,6 +2107,14 @@ class ResumeTailoringBrowserTestSystem {
 
   #readFactReviewStatus() {
     return this.#page.locator('.facts-review-card').getByRole('status')
+  }
+
+  #readResumeClaims() {
+    return this.#page.getByRole('list', { name: 'Retained Resume Claims' })
+  }
+
+  #readFirstResumeClaim() {
+    return this.#readResumeClaims().getByRole('listitem').first()
   }
 
   async #fulfillDetailedSourceProfileExtraction({ route }: Readonly<{ route: Route }>) {

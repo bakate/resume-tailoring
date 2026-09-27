@@ -35,6 +35,7 @@ export function TailoredResumeWorkspace({ candidateSession, localization }: Work
       {view.tailoredResume === undefined
         ? <GenerationAction {...{ candidateSession, localization }} />
         : <>
+            <TailoredResumeFlowNavigation localization={localization} />
             <CuratedClaims {...{
               candidateSession,
               claims: view.tailoredResume.claims,
@@ -47,17 +48,36 @@ export function TailoredResumeWorkspace({ candidateSession, localization }: Work
   )
 }
 
+function TailoredResumeFlowNavigation({ localization }: Readonly<{
+  localization: Localization
+}>) {
+  return (
+    <nav aria-label={localization.translate('resumeClaims.flowNavigation')}
+      className="tailored-resume-flow-navigation">
+      <a href="#resume-claims-list-title">
+        {localization.translate('resumeClaims.collectionTitle')}
+      </a>
+      <a href="#resume-preview-title">{localization.translate('resumePreview.title')}</a>
+      <a href="#resume-photo-title">{localization.translate('resumePreview.photoSection')}</a>
+      <a href="#resume-outcome-title">{localization.translate('resumePreview.outcomeSection')}</a>
+      <a href="#resume-export-title">{localization.translate('resumePreview.exportSection')}</a>
+    </nav>
+  )
+}
+
 function GenerationAction({ candidateSession, localization }: WorkspaceProps) {
+  const isEligible = candidateSession.view.status === 'ready'
+    && candidateSession.view.matchAnalysis?.generationEligibility === 'eligible'
   return (
     <div className="source-profile-card">
       <p>{localization.translate('resumeClaims.description')}</p>
-      <button className="primary-action compact-action"
-        disabled={candidateSession.pendingOperation !== null
-          || candidateSession.view.status !== 'ready'
-          || candidateSession.view.matchAnalysis?.generationEligibility !== 'eligible'}
-        onClick={() => void candidateSession.generateResumeClaims()} type="button">
-        {localization.translate('resumeClaims.generate')}
-      </button>
+      {isEligible ? (
+        <button className="primary-action compact-action"
+          disabled={candidateSession.pendingOperation !== null}
+          onClick={() => void candidateSession.generateResumeClaims()} type="button">
+          {localization.translate('resumeClaims.generate')}
+        </button>
+      ) : <p className="match-warning">{localization.translate('matchAnalysis.denied')}</p>}
     </div>
   )
 }
@@ -72,15 +92,20 @@ function CuratedClaims({
   exclusions: number
 }>) {
   return (
-    <div className="resume-claim-list">
+    <section aria-labelledby="resume-claims-list-title">
+      <h3 id="resume-claims-list-title" tabIndex={-1}>
+        {localization.translate('resumeClaims.collectionTitle')}
+      </h3>
       {exclusions === 0 ? null : (
         <p className="match-warning" role="status">
           {localization.translate('resumeClaims.excluded')}
         </p>
       )}
+      <p className="claim-editing-note">{localization.translate('resumeClaims.noFreeEdit')}</p>
       {claims.length === 0
         ? <p>{localization.translate('resumeClaims.empty')}</p>
-        : claims.map((claim, claimIndex) => (
+        : <ol aria-labelledby="resume-claims-list-title" className="resume-claim-list">
+          {claims.map((claim, claimIndex) => (
             <ResumeClaimCard key={claim.id} {...{
               candidateSession,
               claim,
@@ -89,7 +114,8 @@ function CuratedClaims({
               localization,
             }} />
           ))}
-    </div>
+        </ol>}
+    </section>
   )
 }
 
@@ -100,15 +126,18 @@ function ResumeClaimCard({
   claims,
   localization,
 }: ResumeClaimCardProps) {
+  const claimLabel = createResumeClaimLabel({ claimIndex, localization })
   return (
-    <article className="source-profile-card resume-claim-card">
-      <p className="resume-claim-text">
-        {formatResumeClaimText({ segments: claim.segments })}
-      </p>
-      <ClaimActions {...{ candidateSession, claim, claimIndex, claims, localization }} />
-      <ReformulationForm {...{ candidateSession, claim, localization }} />
-      <p className="claim-editing-note">{localization.translate('resumeClaims.noFreeEdit')}</p>
-    </article>
+    <li>
+      <article aria-label={claimLabel} className="source-profile-card resume-claim-card">
+        <span className="resume-claim-position">{claimLabel}</span>
+        <p className="resume-claim-text">
+          {formatResumeClaimText({ segments: claim.segments })}
+        </p>
+        <ClaimActions {...{ candidateSession, claim, claimIndex, claims, localization }} />
+        <ReformulationForm {...{ candidateSession, claim, claimIndex, localization }} />
+      </article>
+    </li>
   )
 }
 
@@ -118,7 +147,12 @@ function ClaimActions(props: ResumeClaimCardProps) {
     <div className="resume-claim-actions">
       <MoveClaimButton {...props} direction="up" />
       <MoveClaimButton {...props} direction="down" />
-      <button onClick={() => void candidateSession.removeResumeClaim({ claimId: claim.id })}
+      <button aria-label={createClaimActionLabel({
+        action: localization.translate('resumeClaims.remove'),
+        claimIndex: props.claimIndex,
+        localization,
+      })} disabled={candidateSession.pendingOperation !== null}
+        onClick={() => void candidateSession.removeResumeClaim({ claimId: claim.id })}
         type="button">
         {localization.translate('resumeClaims.remove')}
       </button>
@@ -128,9 +162,14 @@ function ClaimActions(props: ResumeClaimCardProps) {
 
 function MoveClaimButton(props: ResumeClaimCardProps & Readonly<{ direction: 'up' | 'down' }>) {
   const { candidateSession, claim, claimIndex, claims, direction, localization } = props
-  const disabled = direction === 'up' ? claimIndex === 0 : claimIndex === claims.length - 1
+  const reachedBoundary = direction === 'up' ? claimIndex === 0 : claimIndex === claims.length - 1
   return (
-    <button disabled={disabled}
+    <button aria-label={createClaimActionLabel({
+      action: localization.translate(direction === 'up'
+        ? 'resumeClaims.moveUp' : 'resumeClaims.moveDown'),
+      claimIndex,
+      localization,
+    })} disabled={reachedBoundary || candidateSession.pendingOperation !== null}
       onClick={() => void candidateSession.moveResumeClaim({ claimId: claim.id, direction })}
       type="button">
       {localization.translate(direction === 'up' ? 'resumeClaims.moveUp' : 'resumeClaims.moveDown')}
@@ -138,20 +177,29 @@ function MoveClaimButton(props: ResumeClaimCardProps & Readonly<{ direction: 'up
   )
 }
 
-function ReformulationForm({ candidateSession, claim, localization }: WorkspaceProps & Readonly<{
-  claim: ResumeClaim
-}>) {
+function ReformulationForm({
+  candidateSession,
+  claim,
+  claimIndex,
+  localization,
+}: WorkspaceProps & Readonly<{ claim: ResumeClaim; claimIndex: number }>) {
   const [reformulationRequest, setReformulationRequest] = useState('')
   return (
-    <form className="reformulation-form" onSubmit={(event) => {
-      event.preventDefault()
-      void submitReformulation({
-        candidateSession,
-        claim,
-        clearRequest: () => { setReformulationRequest('') },
-        reformulationRequest,
-      })
-    }}>
+    <details className="reformulation-disclosure">
+      <summary>{createClaimActionLabel({
+        action: localization.translate('resumeClaims.reformulationLabel'),
+        claimIndex,
+        localization,
+      })}</summary>
+      <form className="reformulation-form" onSubmit={(event) => {
+        event.preventDefault()
+        void submitReformulation({
+          candidateSession,
+          claim,
+          clearRequest: () => { setReformulationRequest('') },
+          reformulationRequest,
+        })
+      }}>
         <label htmlFor={`reformulate-${claim.id}`}>
           {localization.translate('resumeClaims.reformulationLabel')}
         </label>
@@ -163,8 +211,24 @@ function ReformulationForm({ candidateSession, claim, localization }: WorkspaceP
           || reformulationRequest.trim().length === 0} type="submit">
           {localization.translate('resumeClaims.reformulate')}
         </button>
-    </form>
+      </form>
+    </details>
   )
+}
+
+function createClaimActionLabel({ action, claimIndex, localization }: Readonly<{
+  action: string
+  claimIndex: number
+  localization: Localization
+}>) {
+  return `${action} — ${createResumeClaimLabel({ claimIndex, localization })}`
+}
+
+function createResumeClaimLabel({ claimIndex, localization }: Readonly<{
+  claimIndex: number
+  localization: Localization
+}>) {
+  return `${localization.translate('resumeClaims.claimLabel')} ${String(claimIndex + 1)}`
 }
 
 export async function submitReformulation({
