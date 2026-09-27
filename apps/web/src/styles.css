@@ -753,6 +753,17 @@ h1 {
   gap: 24px;
 }
 
+.source-document-review > h3 {
+  margin-bottom: 24px;
+}
+
+.source-document-panel {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid #dfe1df;
+  background: #ffffff;
+}
+
 .source-profile-card {
   padding: clamp(24px, 4vw, 44px);
   border: 1px solid #dfe1df;
@@ -863,8 +874,7 @@ h1 {
   background: #ecf7f1;
 }
 
-.fact-batch summary {
-  cursor: pointer;
+.fact-batch > strong {
   font-weight: 600;
 }
 
@@ -882,6 +892,64 @@ h1 {
 .facts-review-card {
   padding: clamp(20px, 3vw, 34px);
   background: #ffffff;
+}
+
+.source-fact-groups {
+  display: grid;
+  gap: 22px;
+  margin-top: 22px;
+}
+
+.fact-group {
+  border: 1px solid #dfe1df;
+  background: #ffffff;
+}
+
+.fact-group-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  padding: 14px 18px;
+  background: #f4f6f4;
+}
+
+.fact-group-heading h4,
+.fact-group-heading p {
+  margin: 0;
+}
+
+.fact-group-heading > span {
+  display: grid;
+  min-width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  background: #dfe9e4;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fact-group-selection {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.conflict-group {
+  border-color: #d8aaa6;
+}
+
+.conflict-group .fact-group-heading {
+  background: #fff4f2;
+}
+
+.conflict-group .fact-group-heading p {
+  width: 100%;
+  color: #6f3b36;
 }
 
 .facts-review-header {
@@ -959,14 +1027,26 @@ h1 {
 
 .source-fact {
   display: grid;
-  grid-template-columns: minmax(120px, 0.22fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(120px, 0.22fr) minmax(0, 1fr) auto auto;
   gap: 8px 24px;
   align-items: center;
   min-height: 92px;
-  padding: 16px 4px;
+  padding: 16px 18px;
   border-top: 1px solid #dfe1df;
   content-visibility: auto;
   contain-intrinsic-size: auto 92px;
+}
+
+.source-fact:first-child {
+  border-top: 0;
+}
+
+.fact-selection {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .fact-heading {
@@ -1094,6 +1174,11 @@ h1 {
 
   .correction-disclosure {
     grid-column: auto;
+  }
+
+  .fact-group-selection {
+    width: 100%;
+    margin-left: 0;
   }
 
   .fact-batch {

@@ -1,13 +1,16 @@
 import type {
   SourceProfileFact,
   SourceProfileFactId,
+  SourceProfileFactKind,
   SourceProfileReview,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import { sourceProfileFactKinds } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import {
   hasSourceProfileFactConflict,
   sourceProfileProcessingNoticeVersion,
 } from '@resume-tailoring/application/resume-tailoring-workflow'
 import { useEffect, useState } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 
 import type { Localization } from '../localization/localization'
 import type { CandidateSessionController } from './use-candidate-session'
@@ -67,20 +70,26 @@ function SourceDocumentReview({ candidateSession, localization, sourceProfile }:
   }, [sourceProfile.outgoingContent])
   const contentRevision = outgoingContent === sourceProfile.outgoingContent ? 'saved' : 'changed'
   return (
-    <div className="source-profile-grid">
-      <SensitiveContentPanel {...{ localization, sourceProfile }} />
-      <OutgoingContentPanel {...{
-        candidateSession, contentRevision, localization, outgoingContent, setOutgoingContent, sourceProfile,
-      }} />
-    </div>
+    <section aria-labelledby="source-document-review-title"
+      className="source-profile-card source-document-review">
+      <h3 id="source-document-review-title">
+        {localization.translate('sourceProfile.reviewSurfaceTitle')}
+      </h3>
+      <div className="source-profile-grid">
+        <SensitiveContentPanel {...{ localization, sourceProfile }} />
+        <OutgoingContentPanel {...{
+          candidateSession, contentRevision, localization, outgoingContent, setOutgoingContent, sourceProfile,
+        }} />
+      </div>
+    </section>
   )
 }
 
 function SensitiveContentPanel({ localization, sourceProfile }: Omit<SourceProfileReviewProps, 'candidateSession'>) {
-  return <div className="source-profile-card">
+  return <section className="source-document-panel">
     <h3>{localization.translate('sourceProfile.detectedTitle')}</h3>
     <SensitiveContentList {...{ localization, sourceProfile }} />
-  </div>
+  </section>
 }
 
 type OutgoingContentPanelProps = SourceProfileReviewProps & Readonly<{
@@ -91,14 +100,14 @@ type OutgoingContentPanelProps = SourceProfileReviewProps & Readonly<{
 
 function OutgoingContentPanel(props: OutgoingContentPanelProps) {
   const { candidateSession, contentRevision, localization, outgoingContent, sourceProfile } = props
-  return <div className="source-profile-card source-profile-review">
+  return <section className="source-document-panel source-profile-review">
     <OutgoingContentEditor {...props} />
     <button className="secondary-action" disabled={contentRevision === 'saved'}
       onClick={() => void candidateSession.updateSourceContent({ outgoingContent })} type="button">
       {localization.translate('sourceProfile.saveContent')}
     </button>
     <ProcessingNotice {...{ candidateSession, contentRevision, localization, sourceProfile }} />
-  </div>
+  </section>
 }
 
 function OutgoingContentEditor({ localization, outgoingContent, setOutgoingContent }: OutgoingContentPanelProps) {
@@ -174,22 +183,21 @@ function ExtractFactsButton({ candidateSession, confirmationStatus, contentRevis
 function SourceProfileFactsReview({ candidateSession, localization, sourceProfile }: SourceProfileReviewProps) {
   const [statusFilter, setStatusFilter] = useState<FactStatusFilter>('all')
   const [visibleCount, setVisibleCount] = useState(factPageSize)
+  const [selectedFactIds, setSelectedFactIds] = useState<ReadonlySet<SourceProfileFactId>>(
+    () => new Set(),
+  )
   const filteredFacts = statusFilter === 'all'
     ? sourceProfile.facts
     : sourceProfile.facts.filter((fact) => fact.status === statusFilter)
   const visibleFacts = filteredFacts.slice(0, visibleCount)
-  const confirmableFacts = visibleFacts.filter(
-    (fact) => fact.status === 'extracted'
-      && !hasSourceProfileFactConflict({ fact, facts: sourceProfile.facts }),
-  )
   return (
     <div className="source-profile-card facts-review-card">
       <FactsReviewHeader {...{
         facts: sourceProfile.facts, localization, setStatusFilter, setVisibleCount, statusFilter,
       }} />
-      <TransparentBatch {...{ candidateSession, confirmableFacts, localization }} />
-      <SourceProfileFactsList {...{
-        candidateSession, facts: visibleFacts, localization, sourceProfile,
+      <GroupedSourceProfileFacts {...{
+        candidateSession, facts: visibleFacts, localization, selectedFactIds,
+        setSelectedFactIds, sourceProfile,
       }} />
       <ShowMoreFacts {...{
         filteredCount: filteredFacts.length, localization, setVisibleCount, visibleCount,
@@ -212,7 +220,7 @@ function FactsReviewHeader(props: FactsReviewHeaderProps) {
   return <div className="facts-review-header">
     <div>
       <h3>{localization.translate('sourceProfile.factsTitle')}</h3>
-      <p className="facts-review-progress">
+      <p aria-live="polite" className="facts-review-progress">
         {localization.translate('sourceProfile.reviewProgress')} {reviewedCount}/{facts.length}
       </p>
       <progress max={Math.max(facts.length, 1)} value={reviewedCount} />
@@ -233,15 +241,30 @@ function FactStatusFilters(props: FactsReviewHeaderProps) {
   </div>
 }
 
-function SourceProfileFactsList({ candidateSession, facts, localization, sourceProfile }:
-WorkspaceProps & Readonly<{ facts: readonly SourceProfileFact[]; sourceProfile: SourceProfileReview }>) {
+type FactSelectionProps = Readonly<{
+  selectedFactIds: ReadonlySet<SourceProfileFactId>
+  setSelectedFactIds: Dispatch<SetStateAction<ReadonlySet<SourceProfileFactId>>>
+}>
+
+type FactsCollectionProps = WorkspaceProps & FactSelectionProps & Readonly<{
+  facts: readonly SourceProfileFact[]
+  sourceProfile: SourceProfileReview
+}>
+
+function GroupedSourceProfileFacts(props: FactsCollectionProps) {
+  const { facts, localization, sourceProfile } = props
   if (facts.length === 0) return <p className="facts-empty-state">
     {localization.translate('sourceProfile.filterEmpty')}
   </p>
-  return <ul className="source-fact-list">
-    {facts.map((fact) => <SourceProfileFactCard
-      {...{ candidateSession, fact, facts: sourceProfile.facts, localization }} key={fact.id} />)}
-  </ul>
+  const conflictingFacts = facts.filter((fact) => hasSourceProfileFactConflict({
+    fact, facts: sourceProfile.facts,
+  }))
+  return <div className="source-fact-groups">
+    {conflictingFacts.length === 0 ? null : <ConflictFactsReview {...props} facts={conflictingFacts} />}
+    {sourceProfileFactKinds.map((kind) => <SourceProfileFactGroup
+      {...props} facts={readNonConflictingFacts({ facts, kind, sourceProfile })}
+      key={kind} kind={kind} />)}
+  </div>
 }
 
 function ShowMoreFacts({ filteredCount, localization, setVisibleCount, visibleCount }: Readonly<{
@@ -258,37 +281,116 @@ function ShowMoreFacts({ filteredCount, localization, setVisibleCount, visibleCo
   </button>
 }
 
-function TransparentBatch({ candidateSession, confirmableFacts, localization }:
-WorkspaceProps & Readonly<{ confirmableFacts: readonly SourceProfileFact[] }>) {
-  if (confirmableFacts.length < 2) return null
+function ConflictFactsReview(props: FactsCollectionProps) {
+  const { facts, localization } = props
+  return <section aria-labelledby="source-profile-conflicts-title" className="fact-group conflict-group">
+    <div className="fact-group-heading">
+      <h4 id="source-profile-conflicts-title">
+        {localization.translate('sourceProfile.conflictsTitle')}
+      </h4>
+      <p>{localization.translate('sourceProfile.conflictsDescription')}</p>
+    </div>
+    <SourceProfileFactsList {...props} facts={facts} />
+  </section>
+}
+
+function SourceProfileFactGroup(props: FactsCollectionProps & Readonly<{
+  kind: SourceProfileFactKind
+}>) {
+  const { facts, kind } = props
+  if (facts.length === 0) return null
+  const titleId = `source-profile-fact-group-${kind}`
+  return <section aria-labelledby={titleId} className="fact-group">
+    <FactGroupHeading {...props} titleId={titleId} />
+    <FactBatchReview {...props} />
+    <SourceProfileFactsList {...props} facts={facts} />
+  </section>
+}
+
+function FactGroupHeading(props: FactsCollectionProps & Readonly<{
+  kind: SourceProfileFactKind
+  titleId: string
+}>) {
+  const { facts, kind, localization, selectedFactIds, setSelectedFactIds } = props
+  const confirmableFacts = facts.filter((fact) => fact.status === 'extracted')
+  const allSelected = confirmableFacts.length > 0
+    && confirmableFacts.every((fact) => selectedFactIds.has(fact.id))
+  return <div className="fact-group-heading">
+    <h4 id={props.titleId}>{localization.translate(`sourceProfile.kind.${kind}`)}</h4>
+    <span>{facts.length}</span>
+    {confirmableFacts.length === 0 ? null : <label className="fact-group-selection">
+      <input aria-label={`${localization.translate('sourceProfile.selectAll')} ${
+        localization.translate(`sourceProfile.kind.${kind}`)} ${localization.translate('sourceProfile.facts')}`}
+        checked={allSelected} onChange={() => {
+          setSelectedFactIds((current) => updateFactSelection({
+            current,
+            factIds: confirmableFacts.map((fact) => fact.id),
+            selectionAction: allSelected ? 'deselect' : 'select',
+          }))
+        }} type="checkbox" />
+      <span>{localization.translate('sourceProfile.selectGroup')}</span>
+    </label>}
+  </div>
+}
+
+function FactBatchReview(props: FactsCollectionProps) {
+  const { candidateSession, facts, localization, selectedFactIds } = props
+  const selectedFacts = facts.filter(
+    (fact) => fact.status === 'extracted' && selectedFactIds.has(fact.id),
+  )
+  if (selectedFacts.length === 0) return null
   const { translate } = localization
   return (
-    <details className="fact-batch">
-      <summary>{translate('sourceProfile.batchTitle')} ({confirmableFacts.length})</summary>
+    <div aria-live="polite" className="fact-batch">
+      <strong>{readSelectionCount({ count: selectedFacts.length, localization })}</strong>
       <p>{translate('sourceProfile.batchDescription')}</p>
-      <ul>{confirmableFacts.map((fact) => <li key={fact.id}>{fact.value}</li>)}</ul>
+      <ul>{selectedFacts.map((fact) => <li key={fact.id}>{fact.value}</li>)}</ul>
       <button className="secondary-action" type="button" onClick={() => void candidateSession
-        .confirmSourceProfileFacts({ factIds: confirmableFacts.map((fact) => fact.id) })}>
-        {translate('sourceProfile.batchConfirm')}
+        .confirmSourceProfileFacts({ factIds: selectedFacts.map((fact) => fact.id) })}>
+        {translate('sourceProfile.batchConfirm')} {readSelectionCount({
+          count: selectedFacts.length, localization,
+        })}
       </button>
-    </details>
+    </div>
   )
+}
+
+function SourceProfileFactsList(props: FactsCollectionProps) {
+  const { facts, sourceProfile } = props
+  return <ul className="source-fact-list">
+    {facts.map((fact) => <SourceProfileFactCard
+      {...props} fact={fact} facts={sourceProfile.facts} key={fact.id} />)}
+  </ul>
 }
 
 type SourceProfileFactCardProps = WorkspaceProps & Readonly<{
   fact: SourceProfileFact
   facts: readonly SourceProfileFact[]
-}>
+}> & FactSelectionProps
 
-function SourceProfileFactCard({ candidateSession, fact, facts, localization }: SourceProfileFactCardProps) {
+function SourceProfileFactCard(props: SourceProfileFactCardProps) {
+  const { candidateSession, fact, facts, localization, selectedFactIds, setSelectedFactIds } = props
   const conflict = hasSourceProfileFactConflict({ fact, facts })
   return (
-    <li className={`source-fact source-fact-${fact.status}`}>
+    <li aria-live="polite" className={`source-fact source-fact-${fact.status}`}>
       <div className="fact-heading">
         <strong>{localization.translate(`sourceProfile.kind.${fact.kind}`)}</strong>
         <span>{localization.translate(`sourceProfile.status.${fact.status}`)}</span>
       </div>
       <p>{fact.value}</p>
+      {fact.status === 'extracted' && !conflict
+        ? <label className="fact-selection">
+          <input aria-label={`${localization.translate('sourceProfile.selectFact')} ${fact.value}`}
+            checked={selectedFactIds.has(fact.id)} onChange={(event) => {
+              const selectionAction = event.currentTarget.checked ? 'select' : 'deselect'
+              setSelectedFactIds((current) => updateFactSelection({
+                current,
+                factIds: [fact.id],
+                selectionAction,
+              }))
+            }} type="checkbox" />
+          <span>{localization.translate('sourceProfile.select')}</span>
+        </label> : null}
       {conflict
         ? <ConflictDecisionActions {...{ candidateSession, factId: fact.id, localization }} />
         : fact.status === 'extracted'
@@ -298,6 +400,38 @@ function SourceProfileFactCard({ candidateSession, fact, facts, localization }: 
         ? <CorrectionForm {...{ candidateSession, fact, localization }} /> : null}
     </li>
   )
+}
+
+function readNonConflictingFacts({ facts, kind, sourceProfile }: Readonly<{
+  facts: readonly SourceProfileFact[]
+  kind: SourceProfileFactKind
+  sourceProfile: SourceProfileReview
+}>) {
+  return facts.filter((fact) => fact.kind === kind
+    && !hasSourceProfileFactConflict({ fact, facts: sourceProfile.facts }))
+}
+
+function updateFactSelection({ current, factIds, selectionAction }: Readonly<{
+  current: ReadonlySet<SourceProfileFactId>
+  factIds: readonly SourceProfileFactId[]
+  selectionAction: 'deselect' | 'select'
+}>) {
+  const next = new Set(current)
+  factIds.forEach((factId) => {
+    if (selectionAction === 'select') next.add(factId)
+    else next.delete(factId)
+  })
+  return next
+}
+
+function readSelectionCount({ count, localization }: Readonly<{
+  count: number
+  localization: Localization
+}>) {
+  const label = count === 1
+    ? localization.translate('sourceProfile.selectedFact')
+    : localization.translate('sourceProfile.selectedFacts')
+  return `${String(count)} ${label}`
 }
 
 function ConflictDecisionActions({ candidateSession, factId, localization }: FactActionProps) {
