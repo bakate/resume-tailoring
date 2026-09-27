@@ -705,12 +705,67 @@ h1 {
 
 .match-analysis-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 0.55fr) minmax(0, 1.45fr);
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
   gap: 24px;
+  align-items: start;
 }
 
 .match-score-card {
-  grid-row: span 2;
+  grid-row: auto;
+}
+
+.match-eligibility {
+  margin: 0 0 14px;
+  color: #164f3d;
+  font-weight: 700;
+}
+
+.match-score-label {
+  margin: 0;
+  color: #555b68;
+  font-weight: 600;
+}
+
+.match-eligibility-description {
+  line-height: 1.5;
+}
+
+.match-coverage-counts {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.match-coverage-counts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #dfe1df;
+}
+
+.match-coverage-counts dt {
+  color: #555b68;
+}
+
+.match-coverage-counts dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.match-gap-summary {
+  padding-top: 18px;
+  border-top: 1px solid #dfe1df;
+}
+
+.match-gap-summary h4 {
+  margin: 0;
+}
+
+.match-gap-summary ul {
+  margin: 10px 0 0;
+  padding-left: 22px;
+  color: #555b68;
 }
 
 .match-score {
@@ -738,6 +793,63 @@ h1 {
 .match-evidence-list > li {
   padding: 16px 0;
   border-top: 1px solid #dfe1df;
+}
+
+.match-evidence-group details > summary,
+.job-requirement-group details > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 18px;
+  color: #164f3d;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.match-evidence-group details[open] > summary,
+.job-requirement-group details[open] > summary {
+  margin-bottom: 14px;
+}
+
+.match-evidence-group details > summary:focus-visible,
+.job-requirement-group details > summary:focus-visible {
+  outline: 3px solid #94cdb8;
+  outline-offset: 5px;
+}
+
+.match-evidence-group details > ul,
+.grouped-requirement-list {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.grouped-requirement-list .source-fact {
+  display: block;
+  min-height: 0;
+  padding: 10px 0;
+  border-bottom: 1px solid #dfe1df;
+  content-visibility: visible;
+  contain-intrinsic-size: auto;
+}
+
+.requirement-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 0 0 18px;
+  color: #555b68;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.job-requirement-group {
+  padding: 18px 0;
+  border-top: 1px solid #dfe1df;
+}
+
+.job-requirement-group .source-excerpt {
+  margin-bottom: 0;
 }
 
 .match-evidence-list ul,
@@ -1069,6 +1181,23 @@ h1 {
 .fact-heading span {
   color: #666c79;
   font-size: 13px;
+}
+
+.requirement-classification {
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.requirement-classification-required {
+  background: #e7f2ed;
+  color: #164f3d;
+}
+
+.requirement-classification-preferred {
+  background: #f1f0e8;
+  color: #66500f;
 }
 
 .source-fact > p {

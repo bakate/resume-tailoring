@@ -9,6 +9,8 @@ import {
 import { useEffect, useState } from 'react'
 
 import type { Localization } from '../localization/localization'
+import { groupJobRequirements } from './job-requirement-groups'
+import type { JobRequirementGroup } from './job-requirement-groups'
 import type { CandidateSessionController } from './use-candidate-session'
 
 type WorkspaceProps = Readonly<{
@@ -164,17 +166,61 @@ function ExtractJobRequirementsButton({
 }
 
 function JobRequirementReview({ jobPosting, localization }: ReviewProps) {
+  const requirementGroups = groupJobRequirements({ requirements: jobPosting.requirements })
+  const requiredCount = countRequirements({ classification: 'required', requirements: jobPosting.requirements })
+  const preferredCount = countRequirements({ classification: 'preferred', requirements: jobPosting.requirements })
   return (
     <div className="source-profile-card">
       <TargetRoleReview {...{ jobPosting, localization }} />
-      <h3>{localization.translate('jobPosting.requirementsTitle')}</h3>
+      <h3 id="job-requirements-title" tabIndex={-1}>
+        {localization.translate('jobPosting.requirementsTitle')}
+      </h3>
+      <p className="requirement-counts">
+        <span>{`${String(requiredCount)} ${localization.translate('jobPosting.requiredShort')}`}</span>
+        <span>{`${String(preferredCount)} ${localization.translate('jobPosting.preferredShort')}`}</span>
+      </p>
       <ul className="source-fact-list">
-        {jobPosting.requirements.map((requirement) => (
-          <JobRequirementCard key={requirement.id} {...{ localization, requirement }} />
+        {requirementGroups.map((group) => (
+          <JobRequirementGroup key={group.groupId} {...{ group, localization }} />
         ))}
       </ul>
     </div>
   )
+}
+
+function JobRequirementGroup({ group, localization }: Readonly<{
+  group: JobRequirementGroup
+  localization: Localization
+}>) {
+  const requiredCount = countRequirements({ classification: 'required', requirements: group.requirements })
+  const preferredCount = countRequirements({ classification: 'preferred', requirements: group.requirements })
+  return <li className="job-requirement-group">
+    <details>
+      <summary>
+        <span>{localization.translate('jobPosting.requirementGroup')}</span>
+        <span className="requirement-counts">
+          {`${String(requiredCount)} ${localization.translate('jobPosting.requiredShort')} · `}
+          {`${String(preferredCount)} ${localization.translate('jobPosting.preferredShort')}`}
+        </span>
+      </summary>
+      <ul className="grouped-requirement-list">
+        {group.requirements.map((requirement) => (
+          <JobRequirementCard key={requirement.id} {...{ localization, requirement }} />
+        ))}
+      </ul>
+      <p className="source-excerpt">
+        <strong>{localization.translate('jobPosting.sourceExcerpt')}</strong>
+        <span>{group.sourceExcerpt}</span>
+      </p>
+    </details>
+  </li>
+}
+
+function countRequirements({ classification, requirements }: Readonly<{
+  classification: JobRequirement['classification']
+  requirements: readonly JobRequirement[]
+}>) {
+  return requirements.filter((requirement) => requirement.classification === classification).length
 }
 
 function TargetRoleReview({ jobPosting, localization }: Omit<ReviewProps, 'candidateSession'>) {
@@ -198,15 +244,13 @@ function JobRequirementCard({ localization, requirement }: Readonly<{
   requirement: JobRequirement
 }>) {
   return (
-    <li className="source-fact" data-requirement-group={requirement.groupId}>
+    <li className="source-fact" data-requirement-id={requirement.id}>
       <div className="fact-heading">
         <strong>{requirement.value}</strong>
-        <span>{localization.translate(`jobPosting.classification.${requirement.classification}`)}</span>
+        <span className={`requirement-classification requirement-classification-${requirement.classification}`}>
+          {localization.translate(`jobPosting.classification.${requirement.classification}`)}
+        </span>
       </div>
-      <p className="source-excerpt">
-        <strong>{localization.translate('jobPosting.sourceExcerpt')}</strong>
-        <span>{requirement.sourceExcerpt}</span>
-      </p>
     </li>
   )
 }
