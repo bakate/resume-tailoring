@@ -969,6 +969,77 @@ h1 {
   font-size: 22px;
 }
 
+.source-document-methods {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 26px 0;
+  padding: 0;
+  border: 0;
+}
+
+.source-document-methods legend {
+  grid-column: 1 / -1;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+
+.source-document-methods label {
+  display: flex;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #b8bdc4;
+  border-radius: 3px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.source-document-methods label:has(input:checked) {
+  border-color: #164f3d;
+  box-shadow: inset 0 0 0 1px #164f3d;
+}
+
+.source-document-methods small,
+.source-document-methods strong {
+  display: block;
+}
+
+.source-document-methods small {
+  margin-top: 6px;
+  color: #555b68;
+  line-height: 1.45;
+}
+
+.source-document-input {
+  max-width: 720px;
+}
+
+.source-document-input > p {
+  margin: 10px 0 0;
+}
+
+.pasted-source-document label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.pasted-source-document textarea {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #b8bdc4;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #151820;
+  font: inherit;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.intake-failure {
+  color: #982f28;
+}
+
 .file-field,
 .source-profile-review > label,
 .correction-form label {
@@ -1376,6 +1447,7 @@ h1 {
 }
 
 @media (max-width: 800px) {
+  .source-document-methods,
   .source-profile-grid,
   .match-analysis-grid {
     grid-template-columns: 1fr;
