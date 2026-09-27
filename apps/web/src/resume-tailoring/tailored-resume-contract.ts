@@ -1,4 +1,7 @@
 import type {
+  JobPostingTargetRole,
+} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type {
   TailoredResumeDocumentInputs,
 } from '@resume-tailoring/application/tailored-resume-document'
 
@@ -19,7 +22,9 @@ export type ResumePdfFailureType = typeof resumePdfFailureTypes[number]
 
 export type TailoredResumePdfInputs = Readonly<{
   contactItems: readonly ResumeContactItem[]
+  jobPostingContent: string
   locale: ResumeDocumentLocale
   photoDataUrl?: string
+  targetRole: JobPostingTargetRole | null
   source: TailoredResumeDocumentInputs
 }>

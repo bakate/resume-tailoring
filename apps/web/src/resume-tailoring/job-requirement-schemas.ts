@@ -3,10 +3,15 @@ import {
   jobRequirementMaximumCount,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import type {
+  JobPostingTargetRole,
   JobRequirementContent,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { z } from 'zod'
 
+import {
+  hasSourceBackedTargetRole,
+  jobPostingTargetRoleSchema,
+} from './job-posting-target-role-schema'
 import { sensitiveContentSchema } from './source-profile-schemas'
 
 export const jobRequirementValueMaximumCharacters = 500
@@ -26,12 +31,13 @@ const jobRequirementContentSchema = z.object(jobRequirementContentShape).superRe
 const jobRequirementContentsSchema = z.array(jobRequirementContentSchema).max(jobRequirementMaximumCount)
 
 export const extractedJobRequirementsSchema = z.object({
+  targetRole: jobPostingTargetRoleSchema.nullable(),
   requirements: jobRequirementContentsSchema,
 })
 
 export const jobRequirementExtractionSuccessSchema = z.object({
   ok: z.literal(true),
-  value: jobRequirementContentsSchema,
+  value: extractedJobRequirementsSchema,
 })
 
 export const jobRequirementExtractionResultSchema = z.discriminatedUnion('ok', [
@@ -53,6 +59,7 @@ export const jobPostingReviewSchema = z.object({
     retentionPolicy: z.string(),
     transmittedDataCategories: z.array(z.string()),
   }).nullable(),
+  targetRole: jobPostingTargetRoleSchema.nullable().optional(),
   requirements: z.array(z.object({
     classification: jobRequirementContentShape.classification,
     sourceExcerpt: jobRequirementContentShape.sourceExcerpt,
@@ -64,6 +71,14 @@ export const jobPostingReviewSchema = z.object({
       context.addIssue({ code: 'custom', path: ['value'], message: 'Expected one atomic requirement' })
     }
   })).max(jobRequirementMaximumCount),
+}).superRefine((jobPosting, context) => {
+  if (hasSourceBackedTargetRole({
+    jobPostingContent: jobPosting.outgoingContent,
+    targetRole: jobPosting.targetRole,
+  })) return
+  context.addIssue({
+    code: 'custom', path: ['targetRole', 'sourceExcerpt'], message: 'Expected exact Job Posting source',
+  })
 })
 
 export const jobRequirementExtractionMaximumCharacters = 100_000
@@ -77,11 +92,14 @@ export const jobRequirementExtractionRequestSchema = z.object({
 export function hasOnlyJobPostingSourceExcerpts({
   jobPostingContent,
   requirements,
+  targetRole,
 }: Readonly<{
   jobPostingContent: string
   requirements: readonly JobRequirementContent[]
+  targetRole: JobPostingTargetRole | null
 }>) {
-  return requirements.every(({ sourceExcerpt }) => jobPostingContent.includes(sourceExcerpt))
+  return hasSourceBackedTargetRole({ jobPostingContent, targetRole })
+    && requirements.every(({ sourceExcerpt }) => jobPostingContent.includes(sourceExcerpt))
 }
 
 function isAtomicValue({ value }: Readonly<{ value: string }>) {

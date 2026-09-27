@@ -22,6 +22,7 @@ const sessionStartedAt = Date.UTC(2026, 8, 26, 12)
 const sessionExpiresAt = Date.UTC(2026, 8, 27, 12)
 const sessionIdentifier = 'candidate-session-00000000-0000-4000-8000-000000000009' as const
 const compoundSourceExcerpt = 'You must know TypeScript and preferably React.'
+const targetRoleSourceExcerpt = 'Senior FullStack Developer'
 const legitimateFrenchJobPosting = "ASTORM bénéficie d'un référencement auprès de clients."
 
 describe('Job Requirement workflow', () => {
@@ -119,6 +120,19 @@ describe('Job Requirement workflow', () => {
     system.expectAtomicRequirementsToShareTheirSourceGroup()
   })
 
+  it('carries the source-backed target role into Job Posting Review', async () => {
+    const system = createSystemUnderTest({ jobPosting: confirmedJobPosting })
+
+    // Given
+    system.givenTheStructuredModelFindsAnUnambiguousTargetRole()
+
+    // Action
+    await system.extractJobRequirements()
+
+    // Then
+    system.expectSourceBackedTargetRoleToBeReviewable()
+  })
+
   it('returns to Job Posting review when extracted content changes', async () => {
     const system = createSystemUnderTest({ jobPosting: extractedJobPosting })
 
@@ -181,7 +195,7 @@ class JobRequirementWorkflowTestSystem {
   #actionResult: ResumeTailoringResult<ResumeTailoringView> | undefined
   #extractionResult: Awaited<ReturnType<JobRequirementExtractor['extract']>> = {
     ok: true,
-    value: [],
+    value: { requirements: [], targetRole: null },
   }
 
   constructor(jobPosting: JobPostingReview | undefined) {
@@ -214,7 +228,7 @@ class JobRequirementWorkflowTestSystem {
   givenTheStructuredModelDecomposesACompoundPassage() {
     this.#extractionResult = {
       ok: true,
-      value: [
+      value: { targetRole: null, requirements: [
         {
           classification: 'required',
           sourceExcerpt: compoundSourceExcerpt,
@@ -225,18 +239,31 @@ class JobRequirementWorkflowTestSystem {
           sourceExcerpt: compoundSourceExcerpt,
           value: 'Know React',
         },
-      ],
+      ] },
+    }
+  }
+
+  givenTheStructuredModelFindsAnUnambiguousTargetRole() {
+    this.#extractionResult = {
+      ok: true,
+      value: {
+        targetRole: {
+          sourceExcerpt: targetRoleSourceExcerpt,
+          value: targetRoleSourceExcerpt,
+        },
+        requirements: [],
+      },
     }
   }
 
   givenTheStructuredModelReturnsTooManyRequirements() {
     this.#extractionResult = {
       ok: true,
-      value: Array.from({ length: 201 }, (_unusedValue, requirementIndex) => ({
+      value: { targetRole: null, requirements: Array.from({ length: 201 }, (_unusedValue, requirementIndex) => ({
         classification: 'required',
         sourceExcerpt: compoundSourceExcerpt,
         value: `Know technology ${String(requirementIndex)}`,
-      })),
+      })) },
     }
   }
 
@@ -348,6 +375,13 @@ class JobRequirementWorkflowTestSystem {
     expect(this.#modelRequests).toEqual([compoundSourceExcerpt])
   }
 
+  expectSourceBackedTargetRoleToBeReviewable() {
+    expect(this.#readJobPosting().targetRole).toEqual({
+      sourceExcerpt: targetRoleSourceExcerpt,
+      value: targetRoleSourceExcerpt,
+    })
+  }
+
   expectChangedExtractedJobPostingToRequireFreshReview() {
     expect(this.#readJobPosting()).toMatchObject({
       status: 'reviewing-posting',
@@ -435,6 +469,7 @@ const reviewingJobPosting = {
   detectedSensitiveContent: [],
   outgoingContent: `${compoundSourceExcerpt}\nSalary: competitive`,
   processingNotice: null,
+  targetRole: null,
   requirements: [],
 } as const satisfies JobPostingReview
 

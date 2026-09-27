@@ -444,7 +444,8 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (!extraction.ok) return extraction
     return this.#persistExtractedJobRequirements({
       currentState: currentState.value,
-      requirements: extraction.value,
+      requirements: extraction.value.requirements,
+      targetRole: extraction.value.targetRole,
     })
   }
 
@@ -460,20 +461,29 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     const extraction = await extractor.extract({ jobPostingContent: jobPosting.outgoingContent })
     if (!extraction.ok) return extraction
     const requirements = identifyJobRequirements({
-      contents: extraction.value, groupIdentity, requirementIdentity,
+      contents: extraction.value.requirements, groupIdentity, requirementIdentity,
     })
     return requirements === null
       ? jobRequirementExtractionUnavailableResult
-      : { ok: true, value: requirements } as const
+      : {
+          ok: true,
+          value: { requirements, targetRole: extraction.value.targetRole },
+        } as const
   }
 
-  #persistExtractedJobRequirements({ currentState, requirements }: Readonly<{
+  #persistExtractedJobRequirements({ currentState, requirements, targetRole }: Readonly<{
     currentState: ReadyResumeTailoringState & { readonly jobPosting: JobPostingReview }
     requirements: readonly JobRequirement[]
+    targetRole: JobPostingReview['targetRole']
   }>) {
     return this.#persistJobPosting({
       currentState,
-      jobPosting: { ...currentState.jobPosting, status: 'reviewing-requirements', requirements },
+      jobPosting: {
+        ...currentState.jobPosting,
+        status: 'reviewing-requirements',
+        requirements,
+        targetRole,
+      },
     })
   }
 

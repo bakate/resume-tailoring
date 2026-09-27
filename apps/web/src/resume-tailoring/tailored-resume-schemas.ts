@@ -1,5 +1,9 @@
 import { z } from 'zod'
 
+import {
+  hasSourceBackedTargetRole,
+  jobPostingTargetRoleSchema,
+} from './job-posting-target-role-schema'
 import { resumePdfFailureTypes } from './tailored-resume-contract'
 
 const resumeClaimIdSchema = z.string().regex(/^resume-claim-[\w-]+$/u).max(200)
@@ -33,10 +37,11 @@ const contactItemSchema = z.object({
   kind: z.enum(['address', 'email', 'phone', 'url']),
   value: z.string().trim().min(1).max(500),
 }).strict()
-
 export const resumePdfRequestSchema = z.object({
   contactItems: z.array(contactItemSchema).max(20),
+  jobPostingContent: z.string().max(100_000),
   locale: z.enum(['en', 'fr']),
+  targetRole: jobPostingTargetRoleSchema.nullable(),
   photoDataUrl: z.string()
     .max(2_800_000)
     .regex(/^data:image\/(?:jpeg|png|webp);base64,[a-zA-Z0-9+/]+=*$/u)
@@ -47,7 +52,15 @@ export const resumePdfRequestSchema = z.object({
     requirements: z.array(requirementSchema).max(200),
     verifiedFacts: z.array(verifiedFactSchema).min(1).max(500),
   }).strict(),
-}).strict()
+}).strict().superRefine((request, context) => {
+  if (hasSourceBackedTargetRole({
+    jobPostingContent: request.jobPostingContent,
+    targetRole: request.targetRole,
+  })) return
+  context.addIssue({
+    code: 'custom', path: ['targetRole', 'sourceExcerpt'], message: 'Expected exact Job Posting source',
+  })
+})
 
 export const resumePdfFailureSchema = z.object({
   ok: z.literal(false),

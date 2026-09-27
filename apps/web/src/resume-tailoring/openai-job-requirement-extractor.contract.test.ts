@@ -17,6 +17,69 @@ describe('OpenAI Job Requirement extractor contract', () => {
     expect(signals).toEqual([expect.any(AbortSignal)])
   })
 
+  it('returns an unambiguous target role with exact source provenance', async () => {
+    const targetRole = 'Senior FullStack Developer'
+    const extractor = createOpenAiJobRequirementExtractor({
+      apiKey: 'test-api-key',
+      model: 'structured-model',
+      reasoningEffort: 'low',
+      request: () => Promise.resolve(Response.json(createOpenAiResponse({
+        targetRole: { sourceExcerpt: targetRole, value: targetRole },
+        requirements: [],
+      }))),
+    })
+
+    const result = await extractor.extract({ jobPostingContent: `Role: ${targetRole}` })
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        targetRole: { sourceExcerpt: targetRole, value: targetRole },
+        requirements: [],
+      },
+    })
+  })
+
+  it('preserves a missing target role instead of inventing one', async () => {
+    const { extractor } = createContractTestExtractor()
+
+    const result = await extractor.extract({ jobPostingContent })
+
+    expect(result).toMatchObject({ ok: true, value: { targetRole: null } })
+  })
+
+  it('rejects a target role without exact source provenance', async () => {
+    const extractor = createOpenAiJobRequirementExtractor({
+      apiKey: 'test-api-key',
+      model: 'structured-model',
+      reasoningEffort: 'low',
+      request: () => Promise.resolve(Response.json(createOpenAiResponse({
+        targetRole: { sourceExcerpt: 'Invented role', value: 'Invented role' },
+        requirements: [],
+      }))),
+    })
+
+    const result = await extractor.extract({ jobPostingContent })
+
+    expect(result).toEqual(extractionUnavailableResult)
+  })
+
+  it('rejects an invented target role value despite a valid source excerpt', async () => {
+    const extractor = createOpenAiJobRequirementExtractor({
+      apiKey: 'test-api-key',
+      model: 'structured-model',
+      reasoningEffort: 'low',
+      request: () => Promise.resolve(Response.json(createOpenAiResponse({
+        targetRole: { sourceExcerpt: jobPostingContent, value: 'Chief Technology Officer' },
+        requirements: [],
+      }))),
+    })
+
+    const result = await extractor.extract({ jobPostingContent })
+
+    expect(result).toEqual(extractionUnavailableResult)
+  })
+
   it.each([
     ['multiple lines in one requirement', 'Know TypeScript\nKnow React', jobPostingContent],
     ['semicolon-separated requirements', 'Know TypeScript; Know React', jobPostingContent],
@@ -27,6 +90,7 @@ describe('OpenAI Job Requirement extractor contract', () => {
       model: 'structured-model',
       reasoningEffort: 'low',
       request: () => Promise.resolve(Response.json(createOpenAiResponse({
+        targetRole: null,
         requirements: [{
           classification: 'required',
           sourceExcerpt,
@@ -47,6 +111,7 @@ describe('OpenAI Job Requirement extractor contract', () => {
       model: 'structured-model',
       reasoningEffort: 'low',
       request: () => Promise.resolve(Response.json(createOpenAiResponse({
+        targetRole: null,
         requirements: [{
           classification: 'required',
           sourceExcerpt,
@@ -59,11 +124,14 @@ describe('OpenAI Job Requirement extractor contract', () => {
 
     expect(result).toEqual({
       ok: true,
-      value: [{
-        classification: 'required',
-        sourceExcerpt,
-        value: 'Build robust and reusable libraries with JavaScript / Vanilla JS.',
-      }],
+      value: {
+        targetRole: null,
+        requirements: [{
+          classification: 'required',
+          sourceExcerpt,
+          value: 'Build robust and reusable libraries with JavaScript / Vanilla JS.',
+        }],
+      },
     })
   })
 
@@ -77,7 +145,7 @@ describe('OpenAI Job Requirement extractor contract', () => {
       apiKey: 'test-api-key',
       model: 'structured-model',
       reasoningEffort: 'low',
-      request: () => Promise.resolve(Response.json(createOpenAiResponse({ requirements }))),
+      request: () => Promise.resolve(Response.json(createOpenAiResponse({ targetRole: null, requirements }))),
     })
 
     const result = await extractor.extract({ jobPostingContent })
@@ -122,8 +190,10 @@ async function readRequestBody(requests: readonly Request[]) {
 }
 
 function createOpenAiResponse({
-  requirements = expectedExtractionResult.value,
+  targetRole = expectedExtractionResult.value.targetRole,
+  requirements = expectedExtractionResult.value.requirements,
 }: Readonly<{
+  targetRole?: Readonly<{ sourceExcerpt: string; value: string }> | null
   requirements?: readonly Readonly<{
     classification: string
     sourceExcerpt: string
@@ -135,7 +205,7 @@ function createOpenAiResponse({
       type: 'message',
       content: [{
         type: 'output_text',
-        text: JSON.stringify({ requirements }),
+        text: JSON.stringify({ requirements, targetRole }),
       }],
     }],
   }
@@ -143,18 +213,21 @@ function createOpenAiResponse({
 
 const expectedExtractionResult = {
   ok: true,
-  value: [
-    {
-      classification: 'required',
-      sourceExcerpt: jobPostingContent,
-      value: 'Know TypeScript',
-    },
-    {
-      classification: 'preferred',
-      sourceExcerpt: jobPostingContent,
-      value: 'Know React',
-    },
-  ],
+  value: {
+    targetRole: null,
+    requirements: [
+      {
+        classification: 'required',
+        sourceExcerpt: jobPostingContent,
+        value: 'Know TypeScript',
+      },
+      {
+        classification: 'preferred',
+        sourceExcerpt: jobPostingContent,
+        value: 'Know React',
+      },
+    ],
+  },
 } as const
 
 const expectedRequestBody = {
@@ -170,7 +243,10 @@ const expectedRequestBody = {
       type: 'json_schema',
       name: 'job_requirements',
       strict: true,
-      schema: { properties: { requirements: { maxItems: 200 } } },
+      schema: {
+        required: ['targetRole', 'requirements'],
+        properties: { requirements: { maxItems: 200 } },
+      },
     },
   },
 } as const

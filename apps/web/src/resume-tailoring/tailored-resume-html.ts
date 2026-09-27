@@ -1,7 +1,10 @@
 import type {
   TailoredResumeDocument,
 } from '@resume-tailoring/application/tailored-resume-document'
-import type { SensitiveContentKind } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type {
+  JobPostingTargetRole,
+  SensitiveContentKind,
+} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import interFontUrl from '@fontsource/inter/files/inter-latin-400-normal.woff2?inline'
 import loraFontUrl from '@fontsource/lora/files/lora-latin-400-normal.woff2?inline'
 
@@ -17,34 +20,42 @@ export type TailoredResumeRenderInputs = Readonly<{
   document: TailoredResumeDocument
   locale: ResumeDocumentLocale
   photoDataUrl?: string
+  targetRole: JobPostingTargetRole | null
 }>
 
 const labels = {
   en: {
-    title: 'Tailored Resume',
+    fallbackTitle: 'Tailored Resume',
     highlights: 'Selected highlights',
   },
   fr: {
-    title: 'CV adapté',
+    fallbackTitle: 'CV adapté',
     highlights: 'Points clés sélectionnés',
   },
 } as const
 
 export function renderTailoredResumeHtml(inputs: TailoredResumeRenderInputs) {
-  const localizedLabels = labels[inputs.locale]
+  const title = readTailoredResumeTitle(inputs)
   return `<!doctype html>
 <html lang="${inputs.locale}" data-typography="${inputs.document.typography}">
-${renderDocumentHead({ title: localizedLabels.title })}
-${renderDocumentBody({ inputs, title: localizedLabels.title })}
+${renderDocumentHead({ title })}
+${renderDocumentBody({ inputs, title })}
 </html>`
 }
 
+export function readTailoredResumeTitle({ locale, targetRole }: Pick<
+TailoredResumeRenderInputs, 'locale' | 'targetRole'
+>) {
+  return targetRole?.value ?? labels[locale].fallbackTitle
+}
+
 function renderDocumentHead({ title }: Readonly<{ title: string }>) {
+  const escapedTitle = escapeHtml(title)
   return `<head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src data:; img-src data:; style-src 'unsafe-inline'">
-  <title>${title}</title>
+  <title>${escapedTitle}</title>
   <style>${createResumeDocumentStyles()}</style>
 </head>`
 }
@@ -53,11 +64,12 @@ function renderDocumentBody({ inputs, title }: Readonly<{
   inputs: TailoredResumeRenderInputs
   title: string
 }>) {
+  const escapedTitle = escapeHtml(title)
   return `<body>
   <main class="resume-page" aria-labelledby="resume-title">
     <header class="resume-header">
       <div>
-        <h1 id="resume-title">${title}</h1>
+        <h1 id="resume-title">${escapedTitle}</h1>
         ${renderContactItems({ contactItems: inputs.contactItems })}
       </div>
       ${renderPhoto({ photoDataUrl: inputs.photoDataUrl })}

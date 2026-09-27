@@ -83,6 +83,11 @@ export type JobRequirementContent = Readonly<{
   value: string
 }>
 
+export type JobPostingTargetRole = Readonly<{
+  sourceExcerpt: string
+  value: string
+}>
+
 export type JobRequirement = JobRequirementContent & Readonly<{
   id: JobRequirementId
   groupId: JobRequirementGroupId
@@ -143,6 +148,7 @@ export type JobPostingReview = Readonly<{
     retentionPolicy: string
     transmittedDataCategories: readonly string[]
   }> | null
+  targetRole?: JobPostingTargetRole | null
   requirements: readonly JobRequirement[]
 }>
 
