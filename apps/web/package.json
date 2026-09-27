@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "benchmark:pdf": "vitest run --maxWorkers=1 src/pdf-capacity/pdf-capacity-benchmark.evaluation.test.ts --reporter=verbose",
     "build": "vite build",
     "dev": "vite dev",
     "start": "node .output/server/index.mjs",

@@ -81,6 +81,19 @@ describe('createTailoredResumePdf', () => {
 
     expect(result).toEqual({ ok: false, error: { type: 'resume-pdf-provenance-invalid' } })
   })
+
+  it('does not start Chromium when the render was already aborted', async () => {
+    const renderController = new AbortController()
+    renderController.abort()
+
+    const result = await createTailoredResumePdf({
+      inputs,
+      semanticValidator,
+      signal: renderController.signal,
+    })
+
+    expect(result).toEqual({ ok: false, error: { type: 'resume-pdf-rendering-unavailable' } })
+  })
 })
 
 const validatedClaims = [
