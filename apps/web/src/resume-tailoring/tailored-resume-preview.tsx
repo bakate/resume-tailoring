@@ -12,17 +12,18 @@ type PreviewProps = Readonly<{
   candidateSession: CandidateSessionController
   localization: Localization
 }>
-type PhotoState = Readonly<{ dataUrl: string; name: string }>
+type PhotoState =
+  | Readonly<{ status: 'empty' | 'invalid' }>
+  | Readonly<{ status: 'excluded'; dataUrl: string; name: string }>
+  | Readonly<{ status: 'included'; dataUrl: string; name: string }>
 type ExportState =
   | Readonly<{ status: 'idle' | 'exporting' | 'downloaded' }>
   | Readonly<{ status: 'failed'; failureType: BrowserResumePdfFailureType }>
 
 export function TailoredResumePreview({ candidateSession, localization }: PreviewProps) {
-  const [photo, setPhoto] = useState<PhotoState | null>(null)
-  const [photoIncluded, setPhotoIncluded] = useState(false)
-  const [photoFailure, setPhotoFailure] = useState(false)
+  const [photo, setPhoto] = useState<PhotoState>({ status: 'empty' })
   const [exportState, setExportState] = useState<ExportState>({ status: 'idle' })
-  const preview = preparePreview({ candidateSession, localization, photo, photoIncluded })
+  const preview = preparePreview({ candidateSession, localization, photo })
   if (preview === null) return <p role="alert">{localization.translate('resumePreview.invalid')}</p>
   return (
     <section className="resume-preview-panel" aria-labelledby="resume-preview-title">
@@ -30,7 +31,7 @@ export function TailoredResumePreview({ candidateSession, localization }: Previe
       <iframe className="resume-preview-frame" srcDoc={preview.html}
         title={localization.translate('resumePreview.frameTitle')} />
       <PhotoControls {...{
-        localization, photo, photoFailure, photoIncluded, setPhoto, setPhotoFailure, setPhotoIncluded,
+        localization, photo, setPhoto,
       }} />
       <ExportControls {...{ exportState, localization }} onExport={() => {
         void exportPreview({ preview, setExportState })
@@ -39,29 +40,50 @@ export function TailoredResumePreview({ candidateSession, localization }: Previe
   )
 }
 
-function preparePreview({ candidateSession, localization, photo, photoIncluded }: PreviewProps & Readonly<{
-  photo: PhotoState | null
-  photoIncluded: boolean
+function preparePreview({ candidateSession, localization, photo }: PreviewProps & Readonly<{
+  photo: PhotoState
+}>) {
+  const source = readPreviewSource({ candidateSession })
+  if (source === null) return null
+  const document = prepareTailoredResumeDocument(source)
+  if (document === null || document.items.length === 0) return null
+  return createPreview({ document, localization, photo, source })
+}
+
+function readPreviewSource({ candidateSession }: Readonly<{
+  candidateSession: CandidateSessionController
 }>) {
   const { view } = candidateSession
   if (view.status !== 'ready' || view.sourceProfile === undefined
     || view.jobPosting === undefined || view.matchAnalysis === undefined
     || view.tailoredResume === undefined) return null
-  const document = prepareTailoredResumeDocument({
-    claims: view.tailoredResume.claims,
-    facts: view.sourceProfile.facts,
-    matchAnalysis: view.matchAnalysis,
-    requirements: view.jobPosting.requirements,
-  })
-  if (document === null || document.items.length === 0) return null
-  const contactItems = readContactItems({ sourceProfile: view.sourceProfile })
-  const photoDataUrl = photoIncluded && photo !== null ? photo.dataUrl : undefined
+  return {
+    claims: view.tailoredResume.claims, facts: view.sourceProfile.facts,
+    matchAnalysis: view.matchAnalysis, requirements: view.jobPosting.requirements,
+    sourceProfile: view.sourceProfile,
+  }
+}
+
+function createPreview({ document, localization, photo, source }: Readonly<{
+  document: NonNullable<ReturnType<typeof prepareTailoredResumeDocument>>
+  localization: Localization
+  photo: PhotoState
+  source: NonNullable<ReturnType<typeof readPreviewSource>>
+}>) {
+  const contactItems = readContactItems({ sourceProfile: source.sourceProfile })
+  const photoDataUrl = photo.status === 'included' ? photo.dataUrl : undefined
+  const retainedFactIds = new Set(document.items.flatMap(({ factIds }) => factIds))
+  const verifiedFacts = source.facts
+    .filter(({ id, status }) => status === 'verified' && retainedFactIds.has(id))
+    .map(({ id, kind, value }) => ({ id, kind, value }))
   return {
     contactItems,
     document,
     html: renderTailoredResumeHtml({ contactItems, document, locale: localization.locale, photoDataUrl }),
     locale: localization.locale,
     omittedClaimCount: document.omittedClaimCount,
+    validatedClaims: source.claims,
+    verifiedFacts,
     ...(photoDataUrl === undefined ? {} : { photoDataUrl }),
   }
 }
@@ -88,37 +110,52 @@ function ResumePreviewHeader({ localization, omittedClaimCount }: Readonly<{
 function PhotoControls({
   localization,
   photo,
-  photoFailure,
-  photoIncluded,
   setPhoto,
-  setPhotoFailure,
-  setPhotoIncluded,
 }: Readonly<{
   localization: Localization
-  photo: PhotoState | null
-  photoFailure: boolean
-  photoIncluded: boolean
-  setPhoto: (photo: PhotoState | null) => void
-  setPhotoFailure: (failed: boolean) => void
-  setPhotoIncluded: (included: boolean) => void
+  photo: PhotoState
+  setPhoto: (photo: PhotoState) => void
 }>) {
   return (
     <div className="resume-photo-controls">
-      <label htmlFor="candidate-photo">{localization.translate('resumePreview.photoLabel')}</label>
-      <input id="candidate-photo" accept="image/jpeg,image/png,image/webp" type="file"
-        onChange={(event) => void selectPhoto({ event, setPhoto, setPhotoFailure, setPhotoIncluded })} />
-      <label className="resume-photo-choice">
-        <input checked={photoIncluded} disabled={photo === null} type="checkbox"
-          onChange={(event) => { setPhotoIncluded(event.target.checked) }} />
-        {localization.translate('resumePreview.photoInclude')}
-      </label>
-      {photo === null ? null : <p>{photo.name}</p>}
-      {photoFailure ? <p className="failure-message" role="alert">
-        {localization.translate('resumePreview.photoFailure')}
-      </p> : null}
+      <PhotoInput {...{ localization, photo, setPhoto }} />
+      <PhotoFeedback {...{ localization, photo }} />
       <p>{localization.translate('resumePreview.photoPrivacy')}</p>
     </div>
   )
+}
+
+function PhotoInput({ localization, photo, setPhoto }: Readonly<{
+  localization: Localization
+  photo: PhotoState
+  setPhoto: (photo: PhotoState) => void
+}>) {
+  const hasPhoto = photo.status === 'excluded' || photo.status === 'included'
+  return <>
+    <label htmlFor="candidate-photo">{localization.translate('resumePreview.photoLabel')}</label>
+    <input id="candidate-photo" accept="image/jpeg,image/png,image/webp" type="file"
+      onChange={(event) => void selectPhoto({ event, setPhoto })} />
+    <label className="resume-photo-choice">
+      <input checked={photo.status === 'included'} disabled={!hasPhoto} type="checkbox"
+        onChange={(event) => { setPhoto(changePhotoInclusion({
+          photo,
+          status: event.target.checked ? 'included' : 'excluded',
+        })) }} />
+      {localization.translate('resumePreview.photoInclude')}
+    </label>
+  </>
+}
+
+function PhotoFeedback({ localization, photo }: Readonly<{
+  localization: Localization
+  photo: PhotoState
+}>) {
+  if (photo.status === 'invalid') {
+    return <p className="failure-message" role="alert">
+      {localization.translate('resumePreview.photoFailure')}
+    </p>
+  }
+  return photo.status === 'excluded' || photo.status === 'included' ? <p>{photo.name}</p> : null
 }
 
 function ExportControls({ exportState, localization, onExport }: Readonly<{
@@ -134,36 +171,39 @@ function ExportControls({ exportState, localization, onExport }: Readonly<{
           ? 'resumePreview.exporting' : 'resumePreview.download')}
       </button>
       <p>{localization.translate('resumePreview.controlNotice')}</p>
-      {exportState.status === 'failed' ? (
-        <p className="failure-message" role="alert">
-          {localization.translate(readPdfFailureMessageKey(exportState.failureType))}
-        </p>
-      ) : null}
-      {exportState.status === 'downloaded' ? (
-        <p className="export-success" role="status">
-          {localization.translate('resumePreview.downloaded')}
-        </p>
-      ) : null}
+      <ExportFeedback {...{ exportState, localization }} />
     </div>
   )
 }
 
-async function selectPhoto({ event, setPhoto, setPhotoFailure, setPhotoIncluded }: Readonly<{
+function ExportFeedback({ exportState, localization }: Readonly<{
+  exportState: ExportState
+  localization: Localization
+}>) {
+  if (exportState.status === 'failed') {
+    return <p className="failure-message" role="alert">
+      {localization.translate(readPdfFailureMessageKey(exportState.failureType))}
+    </p>
+  }
+  return exportState.status === 'downloaded' ? (
+    <p className="export-success" role="status">
+      {localization.translate('resumePreview.downloaded')}
+    </p>
+  ) : null
+}
+
+async function selectPhoto({ event, setPhoto }: Readonly<{
   event: ChangeEvent<HTMLInputElement>
-  setPhoto: (photo: PhotoState | null) => void
-  setPhotoFailure: (failed: boolean) => void
-  setPhotoIncluded: (included: boolean) => void
+  setPhoto: (photo: PhotoState) => void
 }>) {
   const [file] = event.target.files ?? []
   if (file === undefined) return
   const result = await readPrivacySafePhoto({ file })
-  setPhotoFailure(!result.ok)
-  setPhoto(result.ok ? result.value : null)
-  setPhotoIncluded(false)
+  setPhoto(result.ok ? result.value : { status: 'invalid' })
 }
 
 async function readPrivacySafePhoto({ file }: Readonly<{ file: File }>): Promise<
-  | Readonly<{ ok: true; value: PhotoState }>
+  | Readonly<{ ok: true; value: Extract<PhotoState, { status: 'excluded' }> }>
   | Readonly<{ ok: false }>
 > {
   if (!allowedPhotoTypes.has(file.type) || file.size > maximumPhotoBytes) return { ok: false }
@@ -171,12 +211,20 @@ async function readPrivacySafePhoto({ file }: Readonly<{ file: File }>): Promise
     const reader = new FileReader()
     reader.addEventListener('load', () => {
       resolve(typeof reader.result === 'string'
-        ? { ok: true, value: { dataUrl: reader.result, name: file.name } }
+        ? { ok: true, value: { status: 'excluded', dataUrl: reader.result, name: file.name } }
         : { ok: false })
     })
     reader.addEventListener('error', () => { resolve({ ok: false }) })
     reader.readAsDataURL(file)
   })
+}
+
+function changePhotoInclusion({ photo, status }: Readonly<{
+  photo: PhotoState
+  status: 'excluded' | 'included'
+}>): PhotoState {
+  if (photo.status !== 'excluded' && photo.status !== 'included') return photo
+  return { ...photo, status }
 }
 
 async function exportPreview({ preview, setExportState }: Readonly<{
@@ -222,6 +270,8 @@ function readPdfFailureMessageKey(failureType: BrowserResumePdfFailureType) {
   if (failureType === 'resume-pdf-fonts-not-embedded') return 'resumePreview.fontFailure'
   if (failureType === 'resume-pdf-page-count-invalid') return 'resumePreview.pageFailure'
   if (failureType === 'resume-pdf-request-invalid') return 'resumePreview.requestFailure'
+  if (failureType === 'resume-pdf-provenance-invalid') return 'resumePreview.provenanceFailure'
+  if (failureType === 'resume-pdf-validation-unavailable') return 'resumePreview.validationFailure'
   return 'resumePreview.renderFailure'
 }
 

@@ -1,35 +1,18 @@
-import type { TailoredResumeDocument } from '@resume-tailoring/application/tailored-resume-document'
-
-import type { ResumeContactItem, ResumeDocumentLocale } from './tailored-resume-html'
+import type { ResumePdfFailureType, TailoredResumePdfInputs } from './tailored-resume-contract'
 import { resumePdfFailureSchema } from './tailored-resume-schemas'
-
-type ExportInputs = Readonly<{
-  contactItems: readonly ResumeContactItem[]
-  document: TailoredResumeDocument
-  locale: ResumeDocumentLocale
-  photoDataUrl?: string
-}>
 
 export type BrowserResumePdfResult =
   | Readonly<{ ok: true; value: Blob }>
   | Readonly<{
       ok: false
-      error: Readonly<{
-        type:
-          | 'resume-pdf-content-mismatch'
-          | 'resume-pdf-fonts-not-embedded'
-          | 'resume-pdf-overflow'
-          | 'resume-pdf-page-count-invalid'
-          | 'resume-pdf-rendering-unavailable'
-          | 'resume-pdf-request-invalid'
-      }>
+      error: Readonly<{ type: ResumePdfFailureType }>
     }>
 
 export async function exportTailoredResumePdf({
   inputs,
   request = fetch,
 }: Readonly<{
-  inputs: ExportInputs
+  inputs: TailoredResumePdfInputs
   request?: typeof fetch
 }>): Promise<BrowserResumePdfResult> {
   try {
@@ -44,7 +27,7 @@ export async function exportTailoredResumePdf({
   }
 }
 
-function createRequest(inputs: ExportInputs) {
+function createRequest(inputs: TailoredResumePdfInputs) {
   return {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

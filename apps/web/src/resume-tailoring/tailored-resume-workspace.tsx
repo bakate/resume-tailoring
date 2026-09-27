@@ -1,4 +1,5 @@
 import type { ResumeClaim } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import { formatResumeClaimText as formatClaim } from '@resume-tailoring/application/tailored-resume-document'
 import { useState } from 'react'
 
 import type { Localization } from '../localization/localization'
@@ -17,17 +18,10 @@ type ResumeClaimCardProps = WorkspaceProps & Readonly<{
 }>
 type ResumeClaimReformulator = Pick<CandidateSessionController, 'reformulateResumeClaim'>
 
-const leadingPunctuationPattern = /^[,.;:!?%…)'\]}’]/u
-
 export function formatResumeClaimText({ segments }: Readonly<{
   segments: ResumeClaim['segments']
 }>) {
-  return segments.reduce((resumeClaimText, { text }) => {
-    const normalizedText = text.trim()
-    const separator = resumeClaimText.length === 0
-      || leadingPunctuationPattern.test(normalizedText) ? '' : ' '
-    return `${resumeClaimText}${separator}${normalizedText}`
-  }, '')
+  return formatClaim({ claim: { id: 'resume-claim-preview', segments } })
 }
 
 export function TailoredResumeWorkspace({ candidateSession, localization }: WorkspaceProps) {

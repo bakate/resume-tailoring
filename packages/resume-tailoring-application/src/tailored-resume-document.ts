@@ -12,6 +12,7 @@ export type TailoredResumeTypography = 'comfortable' | 'compact' | 'dense'
 
 export type TailoredResumeDocumentItem = Readonly<{
   claimId: ResumeClaimId
+  factIds: readonly SourceProfileFactId[]
   kind: SourceProfileFactKind
   text: string
 }>
@@ -37,7 +38,7 @@ type RankedItem = TailoredResumeDocumentItem & Readonly<{
 
 const maximumContentLines = 30
 const approximateCharactersPerLine = 88
-const demonstratedImpactPattern = /(?:\b\d+(?:[.,]\d+)?\s*%|\b(?:improved|increased|reduced|grew|saved|delivered|achieved)\b)/iu
+const demonstratedImpactPattern = /(?:\b\d+(?:[.,]\d+)?\s*%|[$€£]\s*\d|\b(?:achieved|amélioré|augmenté|delivered|économisé|géré|grew|improved|increased|livré|managed|réduit|reduced|saved)\b)/iu
 
 export function prepareTailoredResumeDocument(
   inputs: DocumentInputs,
@@ -47,9 +48,7 @@ export function prepareTailoredResumeDocument(
   const retainedItems = retainWithinPageBudget({ rankedItems })
   const omittedClaimCount = inputs.claims.length - retainedItems.length
   return {
-    items: omittedClaimCount === 0
-      ? restoreCandidateOrder({ items: retainedItems })
-      : removeEditorialMetadata({ items: retainedItems }),
+    items: restoreCandidateOrder({ items: retainedItems }),
     omittedClaimCount,
     typography: selectTypography({ retainedItems }),
   }
@@ -95,31 +94,57 @@ function createRankedItem({
   originalIndex: number
 }>): RankedItem | null {
   const supportingFactIds = claim.segments.flatMap(({ factIds }) => factIds)
-  const supportingFacts = supportingFactIds.flatMap((factId) => {
-    const fact = factById.get(factId)
-    return fact === undefined ? [] : [fact]
-  })
+  const supportingFacts = readSupportingFacts({ factById, supportingFactIds })
   if (supportingFacts.length !== new Set(supportingFactIds).size) return null
-  const text = joinClaimSegments({ claim })
+  const text = formatResumeClaimText({ claim })
+  return createRankedItemValue({
+    claim, classificationByFactId, originalIndex, supportingFactIds, supportingFacts, text,
+  })
+}
+
+function createRankedItemValue({
+  claim, classificationByFactId, originalIndex, supportingFactIds, supportingFacts, text,
+}: Readonly<{
+  claim: ResumeClaim
+  classificationByFactId: ReadonlyMap<SourceProfileFactId, JobRequirement['classification']>
+  originalIndex: number
+  supportingFactIds: readonly SourceProfileFactId[]
+  supportingFacts: readonly SourceProfileFact[]
+  text: string
+}>): RankedItem {
   return {
     claimId: claim.id,
+    factIds: [...new Set(supportingFactIds)],
     kind: supportingFacts[0]?.kind ?? 'experience',
     text,
     estimatedLines: Math.max(1, Math.ceil(text.length / approximateCharactersPerLine)) + 1,
     originalIndex,
-    priority: readEditorialPriority({ classificationByFactId, supportingFacts }),
+    priority: readEditorialPriority({ classificationByFactId, supportingFacts, text }),
   }
+}
+
+function readSupportingFacts({ factById, supportingFactIds }: Readonly<{
+  factById: ReadonlyMap<SourceProfileFactId, SourceProfileFact>
+  supportingFactIds: readonly SourceProfileFactId[]
+}>) {
+  return supportingFactIds.flatMap((factId) => {
+    const fact = factById.get(factId)
+    return fact === undefined ? [] : [fact]
+  })
 }
 
 function readEditorialPriority({
   classificationByFactId,
   supportingFacts,
+  text,
 }: Readonly<{
   classificationByFactId: ReadonlyMap<SourceProfileFactId, JobRequirement['classification']>
   supportingFacts: readonly SourceProfileFact[]
+  text: string
 }>) {
   if (supportingFacts.some(({ id }) => classificationByFactId.get(id) === 'required')) return 0
-  if (supportingFacts.some(({ value }) => demonstratedImpactPattern.test(value))) return 1
+  if (demonstratedImpactPattern.test(text)
+    || supportingFacts.some(({ value }) => demonstratedImpactPattern.test(value))) return 1
   if (supportingFacts.some(({ id }) => classificationByFactId.get(id) === 'preferred')) return 2
   return 3
 }
@@ -151,7 +176,7 @@ function restoreCandidateOrder({ items }: Readonly<{ items: readonly RankedItem[
 }
 
 function removeEditorialMetadata({ items }: Readonly<{ items: readonly RankedItem[] }>) {
-  return items.map(({ claimId, kind, text }) => ({ claimId, kind, text }))
+  return items.map(({ claimId, factIds, kind, text }) => ({ claimId, factIds, kind, text }))
 }
 
 function selectTypography({ retainedItems }: Readonly<{ retainedItems: readonly RankedItem[] }>) {
@@ -164,7 +189,7 @@ function selectTypography({ retainedItems }: Readonly<{ retainedItems: readonly 
   return 'dense'
 }
 
-function joinClaimSegments({ claim }: Readonly<{ claim: ResumeClaim }>) {
+export function formatResumeClaimText({ claim }: Readonly<{ claim: ResumeClaim }>) {
   return claim.segments.reduce((claimText, { text }) => {
     const normalizedText = text.trim()
     const needsSpace = claimText.length > 0 && !/^[,.;:!?%…)'\]}’]/u.test(normalizedText)

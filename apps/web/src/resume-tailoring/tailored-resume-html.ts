@@ -2,6 +2,8 @@ import type {
   TailoredResumeDocument,
 } from '@resume-tailoring/application/tailored-resume-document'
 import type { SensitiveContentKind } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import interFontUrl from '@fontsource/inter/files/inter-latin-400-normal.woff2?inline'
+import loraFontUrl from '@fontsource/lora/files/lora-latin-400-normal.woff2?inline'
 
 export type ResumeDocumentLocale = 'en' | 'fr'
 
@@ -10,7 +12,7 @@ export type ResumeContactItem = Readonly<{
   value: string
 }>
 
-type RenderInputs = Readonly<{
+export type TailoredResumeRenderInputs = Readonly<{
   contactItems: readonly ResumeContactItem[]
   document: TailoredResumeDocument
   locale: ResumeDocumentLocale
@@ -28,30 +30,41 @@ const labels = {
   },
 } as const
 
-export function renderTailoredResumeHtml(inputs: RenderInputs) {
+export function renderTailoredResumeHtml(inputs: TailoredResumeRenderInputs) {
   const localizedLabels = labels[inputs.locale]
   return `<!doctype html>
 <html lang="${inputs.locale}" data-typography="${inputs.document.typography}">
-<head>
+${renderDocumentHead({ title: localizedLabels.title })}
+${renderDocumentBody({ inputs, title: localizedLabels.title })}
+</html>`
+}
+
+function renderDocumentHead({ title }: Readonly<{ title: string }>) {
+  return `<head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">
-  <title>${localizedLabels.title}</title>
-  <style>${resumeDocumentStyles}</style>
-</head>
-<body>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src data:; img-src data:; style-src 'unsafe-inline'">
+  <title>${title}</title>
+  <style>${createResumeDocumentStyles()}</style>
+</head>`
+}
+
+function renderDocumentBody({ inputs, title }: Readonly<{
+  inputs: TailoredResumeRenderInputs
+  title: string
+}>) {
+  return `<body>
   <main class="resume-page" aria-labelledby="resume-title">
     <header class="resume-header">
       <div>
-        <h1 id="resume-title">${localizedLabels.title}</h1>
+        <h1 id="resume-title">${title}</h1>
         ${renderContactItems({ contactItems: inputs.contactItems })}
       </div>
       ${renderPhoto({ photoDataUrl: inputs.photoDataUrl })}
     </header>
     ${renderSections({ items: inputs.document.items, locale: inputs.locale })}
   </main>
-</body>
-</html>`
+</body>`
 }
 
 function renderContactItems({ contactItems }: Readonly<{
@@ -87,11 +100,14 @@ function escapeHtml(value: string) {
     .replaceAll("'", '&#039;')
 }
 
-const resumeDocumentStyles = `
+function createResumeDocumentStyles() {
+  return `
+@font-face { font-family: 'Resume Inter'; font-style: normal; font-weight: 400; src: url('${interFontUrl}') format('woff2'); }
+@font-face { font-family: 'Resume Lora'; font-style: normal; font-weight: 400; src: url('${loraFontUrl}') format('woff2'); }
 @page { size: A4; margin: 0; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #eef0ed; }
-body { color: #151820; font-family: Arial, sans-serif; }
+body { color: #151820; font-family: 'Resume Inter', sans-serif; }
 .resume-page {
   width: 210mm;
   height: 297mm;
@@ -107,7 +123,7 @@ body { color: #151820; font-family: Arial, sans-serif; }
   padding-bottom: 7mm;
   border-bottom: 0.5mm solid #164f3d;
 }
-h1, h2 { margin: 0; font-family: Georgia, serif; font-weight: 400; }
+h1, h2 { margin: 0; font-family: 'Resume Lora', serif; font-weight: 400; }
 h1 { color: #164f3d; font-size: 26pt; letter-spacing: -0.02em; }
 .resume-contact { margin-top: 3mm; color: #555b68; font-size: 9pt; font-style: normal; }
 .resume-photo { width: 24mm; height: 24mm; flex: 0 0 24mm; border-radius: 50%; object-fit: cover; }
@@ -135,3 +151,4 @@ html[data-typography='dense'] li { margin-top: 1.3mm; font-size: 9.5pt; line-hei
 @media print {
   html, body { width: 210mm; height: 297mm; background: #fff; }
 }`
+}

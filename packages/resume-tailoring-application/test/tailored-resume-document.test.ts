@@ -27,6 +27,15 @@ describe('Tailored Resume document', () => {
 
     system.expectHigherPriorityClaimsToBeRetainedFirst()
   })
+
+  it('never silently removes required coverage when required claims exceed one page', () => {
+    const system = createSystemUnderTest()
+
+    system.givenRequiredResumeClaimsExceedOnePage()
+    system.prepareTailoredResumeDocument()
+
+    system.expectEveryRequiredClaimToBeRetainedForExplicitOverflowValidation()
+  })
 })
 
 function createSystemUnderTest() {
@@ -39,6 +48,10 @@ class TailoredResumeDocumentTestSystem {
 
   givenResumeClaimsExceedOnePage() {
     this.#claims = overflowingClaims
+  }
+
+  givenRequiredResumeClaimsExceedOnePage() {
+    this.#claims = overflowingRequiredClaims
   }
 
   prepareTailoredResumeDocument() {
@@ -61,11 +74,16 @@ class TailoredResumeDocumentTestSystem {
   expectHigherPriorityClaimsToBeRetainedFirst() {
     const document = this.#readDocument()
     expect(document.items.map(({ claimId }) => claimId)).toEqual([
-      'resume-claim-required',
-      'resume-claim-impact',
       'resume-claim-preferred',
+      'resume-claim-impact',
+      'resume-claim-required',
     ])
     expect(document.omittedClaimCount).toBe(1)
+  }
+
+  expectEveryRequiredClaimToBeRetainedForExplicitOverflowValidation() {
+    expect(this.#readDocument().items).toHaveLength(4)
+    expect(this.#readDocument().omittedClaimCount).toBe(0)
   }
 
   #readDocument() {
@@ -97,7 +115,7 @@ const verifiedFacts = [
   createFact({ id: 'source-fact-required', kind: 'skill', value: 'TypeScript' }),
   createFact({ id: 'source-fact-impact', kind: 'experience', value: 'Improved releases by 30%' }),
   createFact({ id: 'source-fact-preferred', kind: 'language', value: 'French' }),
-  createFact({ id: 'source-fact-detail', kind: 'education', value: 'Computer science degree' }),
+  createFact({ id: 'source-fact-detail', kind: 'education', value: 'Graduated in 2020' }),
 ] as const satisfies readonly SourceProfileFact[]
 
 const matchAnalysis = {
@@ -122,6 +140,13 @@ const overflowingClaims = [
   createLongClaim({ id: 'resume-claim-preferred', factId: 'source-fact-preferred' }),
   createLongClaim({ id: 'resume-claim-impact', factId: 'source-fact-impact' }),
   createLongClaim({ id: 'resume-claim-required', factId: 'source-fact-required' }),
+] as const satisfies readonly ResumeClaim[]
+
+const overflowingRequiredClaims = [
+  createLongClaim({ id: 'resume-claim-required-one', factId: 'source-fact-required' }),
+  createLongClaim({ id: 'resume-claim-required-two', factId: 'source-fact-required' }),
+  createLongClaim({ id: 'resume-claim-required-three', factId: 'source-fact-required' }),
+  createLongClaim({ id: 'resume-claim-required-four', factId: 'source-fact-required' }),
 ] as const satisfies readonly ResumeClaim[]
 
 function createFact({ id, kind, value }: Readonly<{

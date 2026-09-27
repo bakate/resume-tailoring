@@ -37,11 +37,13 @@ const tailoredResumeDocument = {
   items: [
     {
       claimId: 'resume-claim-impact',
+      factIds: ['source-fact-impact'],
       kind: 'experience',
       text: 'Delivered 30% faster releases',
     },
     {
       claimId: 'resume-claim-required',
+      factIds: ['source-fact-required'],
       kind: 'skill',
       text: 'Used TypeScript',
     },
