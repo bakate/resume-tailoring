@@ -1,6 +1,7 @@
 import type { ResumeTailoringView } from '@resume-tailoring/application/resume-tailoring-workflow'
 import type { ResumeTailoringCommand } from '@resume-tailoring/application/resume-tailoring-workflow'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 
 import {
   LocalizationFailure,
@@ -43,6 +44,7 @@ function LocalizedResumeTailoringScreen({ localization }: LocalizationProps) {
     <WorkflowHero {...{ activeStep, candidateSession, currentStep, localization, selectStep }} />
     <OperationFeedback {...{ candidateSession, localization }} />
     <ActiveWorkflowStep {...{ activeStep, candidateSession, localization }} />
+    <DeleteSessionControls candidateSession={candidateSession} localization={localization} />
     <ValueStrip localization={localization} />
   </main>
 }
@@ -200,6 +202,7 @@ function StartSessionButton({ candidateSession, localization }: CandidateSession
     <button
       className="primary-action"
       disabled={!candidateSession.isHydrated || candidateSession.view.status === 'ready'}
+      id="start-tailoring"
       onClick={() => void candidateSession.start()}
       type="button"
     >
@@ -242,7 +245,6 @@ function WorkflowSummary(props: WorkflowHeroProps) {
       <h2>{translate('workflow.title')}</h2>
       <WorkflowStatus localization={localization} view={candidateSession.view} />
       <WorkflowSteps {...props} />
-      <DeleteSessionButton candidateSession={candidateSession} localization={localization} />
     </div>
   )
 }
@@ -435,18 +437,113 @@ function readOperationResultStep({ fallback, operation }: Readonly<{
   return fallback
 }
 
-function DeleteSessionButton({ candidateSession, localization }: CandidateSessionProps) {
-  const { translate } = localization
+function DeleteSessionControls({ candidateSession, localization }: CandidateSessionProps) {
+  const confirmation = useDeleteSessionConfirmation()
   if (candidateSession.view.status !== 'ready') return null
-  return (
-    <button
-      className="delete-session-action"
-      onClick={() => void candidateSession.delete()}
-      type="button"
-    >
-      {translate('session.delete')}
+  return <section className="session-controls"
+    aria-label={localization.translate('session.controlsLabel')}>
+    <DeleteSessionTrigger {...{ confirmation, localization }} />
+    <DeleteSessionDialog {...{ candidateSession, confirmation, localization }} />
+  </section>
+}
+
+function useDeleteSessionConfirmation() {
+  const [confirmationOpen, setConfirmationOpen] = useState(false)
+  const confirmationReference = useRef<HTMLDialogElement>(null)
+  const triggerReference = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (confirmationOpen) confirmationReference.current?.showModal()
+  }, [confirmationOpen])
+  return {
+    close: () => { confirmationReference.current?.close() },
+    confirmationReference,
+    open: () => { setConfirmationOpen(true) },
+    restoreTriggerFocus: () => {
+      setConfirmationOpen(false)
+      triggerReference.current?.focus()
+    },
+    triggerReference,
+  } as const
+}
+
+type DeleteSessionConfirmation = ReturnType<typeof useDeleteSessionConfirmation>
+type DeleteSessionConfirmationProps = CandidateSessionProps & Readonly<{
+  confirmation: DeleteSessionConfirmation
+}>
+
+function DeleteSessionTrigger({ confirmation, localization }: Omit<
+DeleteSessionConfirmationProps, 'candidateSession'>) {
+  return <button
+    className="delete-session-action"
+    onClick={confirmation.open}
+    ref={confirmation.triggerReference}
+    type="button"
+  >{localization.translate('session.delete')}</button>
+}
+
+function DeleteSessionDialog({ candidateSession, confirmation, localization }:
+DeleteSessionConfirmationProps) {
+  return <dialog aria-labelledby="delete-session-title" className="delete-session-dialog"
+    onCancel={(event) => {
+      event.preventDefault()
+      confirmation.close()
+    }}
+    onClose={confirmation.restoreTriggerFocus}
+    onKeyDown={(event) => {
+      trapDialogFocus({ dialog: confirmation.confirmationReference.current, event })
+    }}
+    ref={confirmation.confirmationReference} role="alertdialog">
+    <DeleteSessionDescription localization={localization} />
+    <DeleteSessionDialogActions {...{ candidateSession, confirmation, localization }} />
+  </dialog>
+}
+
+function DeleteSessionDescription({ localization }: LocalizationProps) {
+  const { translate } = localization
+  return <>
+    <h2 id="delete-session-title">{translate('session.deleteDialogTitle')}</h2>
+    <p>{translate('session.deleteDialogDescription')}</p>
+    <p>{translate('session.deleteContentIntro')}</p>
+    <ul>{deleteSessionContentKeys.map((key) => <li key={key}>{translate(key)}</li>)}</ul>
+  </>
+}
+
+function DeleteSessionDialogActions(props: DeleteSessionConfirmationProps) {
+  const { candidateSession, confirmation, localization } = props
+  return <div className="delete-session-dialog-actions">
+    <button autoFocus onClick={confirmation.close} type="button">
+      {localization.translate('session.deleteCancel')}
     </button>
-  )
+    <button className="destructive-action" onClick={() => {
+      void deleteCandidateSession({ candidateSession })
+    }} type="button">{localization.translate('session.deleteConfirm')}</button>
+  </div>
+}
+
+async function deleteCandidateSession({ candidateSession }: Readonly<{
+  candidateSession: CandidateSessionController
+}>) {
+  const result = await candidateSession.delete()
+  if (result.ok) focusElementById({ elementId: 'start-tailoring' })
+}
+
+const deleteSessionContentKeys = [
+  'session.deleteSourceDocument', 'session.deleteSourceProfile', 'session.deleteJobPosting',
+  'session.deleteMatchAnalysis', 'session.deleteTailoredResume', 'session.deletePhoto',
+] as const
+
+function trapDialogFocus({ dialog, event }: Readonly<{
+  dialog: HTMLDialogElement | null
+  event: ReactKeyboardEvent<HTMLDialogElement>
+}>) {
+  if (dialog === null || event.key !== 'Tab') return
+  const focusableControls = [...dialog.querySelectorAll<HTMLButtonElement>('button:not([disabled])')]
+  const firstControl = focusableControls[0]
+  const lastControl = focusableControls.at(-1)
+  if (event.shiftKey && document.activeElement === firstControl) lastControl?.focus()
+  else if (!event.shiftKey && document.activeElement === lastControl) firstControl?.focus()
+  else return
+  event.preventDefault()
 }
 
 function ValueStrip({ localization }: LocalizationProps) {

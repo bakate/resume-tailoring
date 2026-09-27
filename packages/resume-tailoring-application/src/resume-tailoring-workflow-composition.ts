@@ -135,11 +135,12 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
   constructor(dependencies: ResumeTailoringDependencies) {
     this.#dependencies = dependencies
     dependencies.candidateSessionPersistence.subscribe(() => {
-      void this.#enqueue(() => this.#notifyCurrentState())
+      void this.#notifyCurrentState()
     })
   }
 
   execute(command: ResumeTailoringCommand) {
+    if (command.type === 'delete-session') return this.#deleteSession()
     return this.#enqueue(() => this.#executeCommand(command))
   }
 
@@ -744,7 +745,9 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     const deletedState = await this.#eraseSession(currentState.value.sessionId)
     if (!deletedState.ok) return deletedState
 
-    await this.#dependencies.telemetry.record({ name: 'candidate-session-deleted' })
+    this.#executionQueue = Promise.resolve()
+    void this.#dependencies.telemetry.record({ name: 'candidate-session-deleted' })
+      .then(ignoreResult, ignoreResult)
     this.#notify(deletedState)
     return deletedState
   }

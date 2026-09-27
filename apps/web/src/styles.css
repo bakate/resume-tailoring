@@ -378,6 +378,67 @@ h1 {
   font-weight: 600;
 }
 
+.session-controls {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 28px 0 52px;
+  border-top: 1px solid #dfe1df;
+  text-align: right;
+}
+
+.delete-session-dialog {
+  width: min(520px, calc(100% - 32px));
+  padding: 30px;
+  border: 1px solid #c9cecb;
+  border-radius: 8px;
+  box-shadow: 0 24px 72px rgb(20 33 28 / 28%);
+  color: #1d2924;
+}
+
+.delete-session-dialog::backdrop {
+  background: rgb(12 24 19 / 58%);
+  backdrop-filter: blur(3px);
+}
+
+.delete-session-dialog h2 {
+  margin: 0 0 14px;
+  color: #74231e;
+  font-size: 30px;
+}
+
+.delete-session-dialog p,
+.delete-session-dialog ul {
+  text-align: left;
+}
+
+.delete-session-dialog ul {
+  margin: 10px 0 0;
+  padding-left: 24px;
+}
+
+.delete-session-dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 28px;
+}
+
+.delete-session-dialog-actions button {
+  padding: 11px 16px;
+  border: 1px solid #164f3d;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #164f3d;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.delete-session-dialog-actions .destructive-action {
+  border-color: #8b2923;
+  background: #8b2923;
+  color: #ffffff;
+}
+
 .workflow-hero-active {
   min-height: 0;
 }
@@ -1609,12 +1670,15 @@ h1 {
   }
 
   .workflow-hero-active .workflow-steps {
-    grid-template-columns: 1fr;
-    padding: 2px;
+    display: flex;
+    overflow-x: auto;
+    padding: 2px 2px 12px;
+    scroll-snap-type: x proximity;
   }
 
   .workflow-hero-active .workflow-step {
-    min-width: 0;
+    flex: 0 0 min(78vw, 270px);
+    scroll-snap-align: start;
   }
 
   .workflow-hero-active .step-copy > span {

@@ -51,6 +51,18 @@ test('deleting a Candidate session invalidates every open tab', async ({ page })
   await system.deleteResumeTailoringSessionInSecondTab({ secondPage })
 
   await system.expectResumeTailoringSessionDeletedInBothTabs({ secondPage })
+  await system.expectFreshStartControlFocusedInSecondTab({ secondPage })
+})
+
+test('deleting a Candidate session interrupts work pending in another tab', async ({ page }) => {
+  const secondPage = await page.context().newPage()
+  const system = createSystemUnderTest({ page })
+
+  await system.givenPendingSourceProfileExtractionInFirstTab({ secondPage })
+
+  await system.deleteResumeTailoringSessionInSecondTab({ secondPage })
+
+  await system.expectResumeTailoringSessionDeletedInBothTabs({ secondPage })
 })
 
 test('expiration invalidates Candidate content in every open tab', async ({ page }) => {
@@ -173,6 +185,56 @@ test('a Candidate can switch locale without losing an active session', async ({ 
   await system.switchResumeTailoringToFrench()
 
   await system.expectFrenchLocaleAndCandidateSessionToBeRetained()
+})
+
+test('a Candidate discovers a safeguarded private-session deletion away from workflow actions', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+
+  await system.openPrivateSessionDeletionConfirmation()
+
+  await system.expectLocalizedPrivateSessionDeletionConfirmation()
+})
+
+test('canceling private-session deletion preserves the active Candidate context', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenPendingSourceProfileExtractionAndDeletionConfirmation()
+
+  await system.cancelPrivateSessionDeletion()
+
+  await system.expectActiveCandidateContextToBePreserved()
+})
+
+test('confirming deletion interrupts a pending Candidate operation', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenPendingSourceProfileExtractionAndDeletionConfirmation()
+
+  await system.confirmPrivateSessionDeletion()
+
+  await system.expectCandidateSessionDeletedDuringPendingOperation()
+})
+
+test('a deleted operation cannot disturb a restarted Candidate session', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionRestartedBeforeDeletedOperationCompletes()
+
+  await system.completeDeletedCandidateOperation()
+
+  await system.expectRestartedCandidateSessionToRemainActive()
+})
+
+test('French private-session deletion confirmation traps keyboard focus', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenFrenchCandidateSessionIsActive()
+
+  await system.openFrenchPrivateSessionDeletionConfirmation()
+
+  await system.expectFrenchDeletionConfirmationToTrapFocus()
 })
 
 test('English Source Document intake explains distinct PDF and pasted-text options', async ({ page }) => {
@@ -736,6 +798,10 @@ type CompletedAction =
   | 'candidate-session-reloaded'
   | 'candidate-session-response-applied'
   | 'candidate-session-synchronized'
+  | 'deleted-candidate-operation-completed'
+  | 'private-session-deletion-confirmation-opened'
+  | 'private-session-deletion-canceled'
+  | 'private-session-deletion-confirmed'
   | 'expiration-extension-attempted'
   | 'job-requirement-extraction-failed'
   | 'job-requirement-extraction-inspected'
@@ -789,6 +855,7 @@ class ResumeTailoringBrowserTestSystem {
   #matchAnalysisRequestCount = 0
   #pendingMatchAnalysisResponse: (() => void) | undefined
   #releasePendingResumeClaimWriting: (() => void) | undefined
+  #pendingSourceProfileExtractionCompletion: Promise<void> | undefined
   #pendingSourceProfileExtractionResponse: (() => void) | undefined
   #resumeClaimWritingRequestCount = 0
   readonly #resumeClaimReformulationRequests: string[] = []
@@ -835,9 +902,14 @@ class ResumeTailoringBrowserTestSystem {
   }
 
   async givenSourceProfileExtractionCanBeDelayed() {
+    let completeSourceProfileExtraction = () => {}
+    this.#pendingSourceProfileExtractionCompletion = new Promise((resolve) => {
+      completeSourceProfileExtraction = resolve
+    })
     await this.#page.route('**/api/source-profile-extraction', async (route) => {
       await new Promise<void>((resolve) => { this.#pendingSourceProfileExtractionResponse = resolve })
       await this.#fulfillDetailedSourceProfileExtraction({ route })
+      completeSourceProfileExtraction()
     })
   }
 
@@ -1263,9 +1335,31 @@ class ResumeTailoringBrowserTestSystem {
     ])
   }
 
+  async givenPendingSourceProfileExtractionInFirstTab({ secondPage }: Readonly<{
+    secondPage: Page
+  }>) {
+    await this.givenCandidateSessionIsActiveInBothTabs({ secondPage })
+    await this.givenSourceProfileExtractionCanBeDelayed()
+    await this.startSourceProfileExtraction()
+    await this.#page.getByText('Extracting professional facts…').waitFor()
+  }
+
   async givenCandidateSessionAlreadyExpired() {
     await this.#page.goto('/')
     await seedCandidateSession({ page: this.#page, expiresAt: Date.now() - 1 })
+  }
+
+  async givenPendingSourceProfileExtractionAndDeletionConfirmation() {
+    await this.givenCandidateSessionIsActive()
+    await this.givenSourceProfileExtractionCanBeDelayed()
+    await this.startSourceProfileExtraction()
+    await this.#page.getByText('Extracting professional facts…').waitFor()
+    await this.#openPrivateSessionDeletionConfirmation({ page: this.#page })
+  }
+
+  async givenFrenchCandidateSessionIsActive() {
+    await this.givenCandidateSessionIsActive()
+    await this.switchResumeTailoringToFrench()
   }
 
   async givenCandidateSessionWasDeleted() {
@@ -1299,8 +1393,32 @@ class ResumeTailoringBrowserTestSystem {
   }
 
   async deleteResumeTailoringSessionInSecondTab({ secondPage }: Readonly<{ secondPage: Page }>) {
-    await secondPage.getByRole('button', { name: 'Delete private session' }).click()
+    await this.#openPrivateSessionDeletionConfirmation({ page: secondPage })
+    await this.#confirmPrivateSessionDeletion({ page: secondPage })
     this.#completedAction = 'candidate-session-synchronized'
+  }
+
+  async cancelPrivateSessionDeletion() {
+    await this.#page.getByRole('button', { name: 'Cancel' }).click()
+    this.#completedAction = 'private-session-deletion-canceled'
+  }
+
+  async confirmPrivateSessionDeletion() {
+    await this.#confirmPrivateSessionDeletion({ page: this.#page })
+    this.#completedAction = 'private-session-deletion-confirmed'
+  }
+
+  async givenCandidateSessionRestartedBeforeDeletedOperationCompletes() {
+    await this.givenPendingSourceProfileExtractionAndDeletionConfirmation()
+    await this.#confirmPrivateSessionDeletion({ page: this.#page })
+    await this.#page.getByRole('button', { name: 'Start tailoring' }).click()
+    await this.#page.getByText('Workflow opened').waitFor()
+  }
+
+  async completeDeletedCandidateOperation() {
+    this.#releasePendingSourceProfileExtraction()
+    await this.#pendingSourceProfileExtractionCompletion
+    this.#completedAction = 'deleted-candidate-operation-completed'
   }
 
   async expireResumeTailoringSessionInBothTabs({ secondPage }: Readonly<{ secondPage: Page }>) {
@@ -1346,6 +1464,16 @@ class ResumeTailoringBrowserTestSystem {
   async selectPdfSourceDocumentMethod() {
     await this.#page.getByRole('radio', { name: 'Text-based PDF' }).click()
     this.#completedAction = 'pdf-source-document-method-selected'
+  }
+
+  async openPrivateSessionDeletionConfirmation() {
+    await this.#openPrivateSessionDeletionConfirmation({ page: this.#page })
+    this.#completedAction = 'private-session-deletion-confirmation-opened'
+  }
+
+  async openFrenchPrivateSessionDeletionConfirmation() {
+    await this.#page.getByRole('button', { name: 'Supprimer ma session privée' }).click()
+    this.#completedAction = 'private-session-deletion-confirmation-opened'
   }
 
   async reviewPastedProfessionalText() {
@@ -1442,10 +1570,23 @@ class ResumeTailoringBrowserTestSystem {
   }
 
   async #restartCandidateSession() {
-    await this.#page.getByRole('button', { name: 'Delete private session' }).click()
+    await this.#openPrivateSessionDeletionConfirmation({ page: this.#page })
+    await this.#confirmPrivateSessionDeletion({ page: this.#page })
     const startButton = this.#page.getByRole('button', { name: 'Start tailoring' })
     await startButton.waitFor()
     await startButton.click()
+  }
+
+  async #openPrivateSessionDeletionConfirmation({ page }: Readonly<{ page: Page }>) {
+    await page.getByRole('button', {
+      name: /Delete private session|Supprimer ma session privée/,
+    }).click()
+  }
+
+  async #confirmPrivateSessionDeletion({ page }: Readonly<{ page: Page }>) {
+    await page.getByRole('button', {
+      name: /Delete session now|Supprimer la session maintenant/,
+    }).click()
   }
 
   async #givenRecoverableSourceProfileExtractionFailure() {
@@ -1751,6 +1892,54 @@ class ResumeTailoringBrowserTestSystem {
     await expect(secondPage.getByText('Ready to begin')).toBeVisible()
   }
 
+  async expectFreshStartControlFocusedInSecondTab({ secondPage }: Readonly<{
+    secondPage: Page
+  }>) {
+    this.#expectCompletedAction('candidate-session-synchronized')
+    await expect(secondPage.getByRole('button', { name: 'Start tailoring' })).toBeFocused()
+  }
+
+  async expectActiveCandidateContextToBePreserved() {
+    this.#expectCompletedAction('private-session-deletion-canceled')
+    await expect(this.#page.getByLabel('Exact content that will be sent for extraction'))
+      .toHaveValue(/Senior FullStack Developer/)
+    await expect(this.#page.getByText('Extracting professional facts…')).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: /Source Profile/ }))
+      .toHaveAttribute('aria-current', 'step')
+    await expect(this.#page.getByRole('button', { name: 'Delete private session' })).toBeFocused()
+  }
+
+  async expectCandidateSessionDeletedDuringPendingOperation() {
+    this.#expectCompletedAction('private-session-deletion-confirmed')
+    await expect(this.#page.getByText('Ready to begin')).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Start tailoring' })).toBeFocused()
+  }
+
+  async expectRestartedCandidateSessionToRemainActive() {
+    this.#expectCompletedAction('deleted-candidate-operation-completed')
+    await expect(this.#page.getByText('Workflow opened')).toBeVisible()
+    await expect(this.#page.getByText('Something went wrong')).toHaveCount(0)
+  }
+
+  async expectFrenchDeletionConfirmationToTrapFocus() {
+    this.#expectCompletedAction('private-session-deletion-confirmation-opened')
+    const confirmation = this.#page.getByRole('alertdialog', {
+      name: 'Supprimer ma session privée ?',
+    })
+    await expect(confirmation).toContainText('Document Source')
+    await expect(confirmation).toContainText('Profil Source')
+    await expect(confirmation).toContainText("Offre d'emploi")
+    await expect(confirmation).toContainText('Analyse de Correspondance')
+    await expect(confirmation).toContainText('CV Adapté')
+    await expect(confirmation).toContainText('Photo fournie par le Candidat')
+    await this.#page.keyboard.press('Shift+Tab')
+    await expect(confirmation.getByRole('button', {
+      name: 'Supprimer la session maintenant',
+    })).toBeFocused()
+    await this.#page.keyboard.press('Tab')
+    await expect(confirmation.getByRole('button', { name: 'Annuler' })).toBeFocused()
+  }
+
   async expectResumeTailoringSessionToBeNotStarted() {
     this.#expectCompletedAction('candidate-session-reloaded')
     await expect(this.#page.getByText('Ready to begin')).toBeVisible()
@@ -1829,6 +2018,21 @@ class ResumeTailoringBrowserTestSystem {
       this.#page.getByRole('button', { name: 'Supprimer ma session privée' }),
     ).toBeVisible()
     expect(await this.#page.evaluate(() => localStorage.getItem('honest-resume-locale'))).toBe('fr')
+  }
+
+  async expectLocalizedPrivateSessionDeletionConfirmation() {
+    this.#expectCompletedAction('private-session-deletion-confirmation-opened')
+    const confirmation = this.#page.getByRole('alertdialog', { name: 'Delete private session?' })
+    await expect(confirmation).toBeVisible()
+    await expect(confirmation).toContainText('Source Document')
+    await expect(confirmation).toContainText('Source Profile')
+    await expect(confirmation).toContainText('Job Posting')
+    await expect(confirmation).toContainText('Match Analysis')
+    await expect(confirmation).toContainText('Tailored Resume')
+    await expect(confirmation).toContainText('photo')
+    await expect(confirmation.getByRole('button', { name: 'Cancel' })).toBeFocused()
+    await expect(this.#page.getByRole('navigation', { name: 'Resume tailoring progress' }))
+      .not.toContainText('Delete private session')
   }
 
   async expectVerifiedSourceProfileBuiltFromMinimizedContent() {

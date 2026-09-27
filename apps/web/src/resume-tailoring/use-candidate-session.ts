@@ -77,11 +77,13 @@ export function isSourceDocumentIntakeFailureMessage(
 
 type CandidateSessionStateSetter = Dispatch<SetStateAction<CandidateSessionState>>
 type CandidateSessionActionDependencies = Readonly<{
+  operationGeneration: OperationGeneration
   operationTracker: OperationTracker
   setState: CandidateSessionStateSetter
   workflow: ResumeTailoringWorkflow
 }>
 type OperationTracker = { current: PendingOperation | null }
+type OperationGeneration = { current: number }
 type FactIdentifier = Readonly<{ factId: SourceProfileFactId }>
 type FactIdentifiers = Readonly<{ factIds: readonly SourceProfileFactId[] }>
 type FactCorrection = FactIdentifier & Readonly<{ correctedValue: string }>
@@ -91,9 +93,12 @@ type SourceDocumentImport = CandidateSessionActionDependencies & Readonly<{ file
 export function useCandidateSession() {
   const [workflow] = useState(createBrowserResumeTailoringWorkflow)
   const [state, setState] = useState<CandidateSessionState>(initialCandidateSessionState)
+  const operationGeneration = useRef(0)
   const operationTracker = useRef<PendingOperation | null>(null)
-  useEffect(() => connectCandidateSession({ workflow, setState }), [workflow])
-  const dependencies = { operationTracker, workflow, setState }
+  useEffect(() => connectCandidateSession({
+    operationGeneration, operationTracker, workflow, setState,
+  }), [workflow])
+  const dependencies = { operationGeneration, operationTracker, workflow, setState }
   return {
     ...state,
     ...createCandidateSessionActions(dependencies),
@@ -230,84 +235,135 @@ function createBrowserResumeTailoringWorkflow() {
 
 async function importSourceDocument({ file, ...dependencies }: SourceDocumentImport) {
   if (dependencies.operationTracker.current !== null) return
+  const executionGeneration = dependencies.operationGeneration.current
   const pendingOperation = 'import-source-document'
   const operationTimeout = beginPendingOperation({
     ...dependencies, pendingOperation,
   })
   await waitForPendingPresentation()
   try {
-    const bytes = new Uint8Array(await file.arrayBuffer())
+    const command = await createSourceDocumentImportCommand({ file })
+    if (executionGeneration !== dependencies.operationGeneration.current) return
     await executePreparedCommand({
-      ...dependencies,
-      operationTimeout,
-      pendingOperation,
-      command: {
-        type: 'import-source-document',
-        document: { bytes, mediaType: file.type, name: file.name },
-      },
+      ...dependencies, command, executionGeneration, operationTimeout, pendingOperation,
     })
   } catch {
-    clearPendingOperation({ ...dependencies, operationTimeout })
-    dependencies.setState((state) => ({
-      ...state,
-      failureMessageKey: 'sourceProfile.failure',
-      pendingOperation: null,
-    }))
+    applySourceDocumentImportFailure({ ...dependencies, executionGeneration, operationTimeout })
   }
 }
 
+async function createSourceDocumentImportCommand({ file }: Readonly<{ file: File }>) {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  return {
+    type: 'import-source-document',
+    document: { bytes, mediaType: file.type, name: file.name },
+  } as const
+}
+
+function applySourceDocumentImportFailure({ executionGeneration, operationTimeout, ...dependencies }:
+CandidateSessionActionDependencies & Readonly<{
+  executionGeneration: number
+  operationTimeout: ReturnType<typeof setTimeout>
+}>) {
+  if (executionGeneration !== dependencies.operationGeneration.current) return
+  clearPendingOperation({ ...dependencies, operationTimeout })
+  dependencies.setState((state) => ({
+    ...state, failureMessageKey: 'sourceProfile.failure', pendingOperation: null,
+  }))
+}
+
 function connectCandidateSession({
+  operationGeneration,
+  operationTracker,
   workflow,
   setState,
-}: Readonly<{ workflow: ResumeTailoringWorkflow; setState: CandidateSessionStateSetter }>) {
+}: CandidateSessionActionDependencies) {
   setState((state) => ({ ...state, isHydrated: true }))
   const updateState = (result: ResumeTailoringResult<ResumeTailoringView>) => {
-    applyResult({ result, setState, failureMessageKey: 'session.loadFailure' })
+    synchronizeCandidateSession({ operationGeneration, operationTracker, result, setState })
   }
   const unsubscribe = workflow.subscribe(updateState)
   void workflow.readView().then(updateState)
   return unsubscribe
 }
 
-async function executeCommand({
-  operationTracker,
-  workflow,
-  setState,
-  command,
-}: CandidateSessionActionDependencies & Readonly<{ command: ResumeTailoringCommand }>) {
+function synchronizeCandidateSession({ operationGeneration, operationTracker, result, setState }:
+Readonly<{
+  operationGeneration: OperationGeneration
+  operationTracker: OperationTracker
+  result: ResumeTailoringResult<ResumeTailoringView>
+  setState: CandidateSessionStateSetter
+}>) {
+  if (!result.ok) {
+    applyResult({ result, setState, failureMessageKey: 'session.loadFailure' })
+    return
+  }
+  operationGeneration.current += 1
+  operationTracker.current = null
+  setState((state) => ({
+    ...state, failureMessageKey: null, isOperationTakingLong: false,
+    pendingOperation: null, retryCommand: null, view: result.value,
+  }))
+}
+
+async function executeCommand({ command, operationGeneration, operationTracker, setState, workflow }:
+CandidateSessionActionDependencies & Readonly<{ command: ResumeTailoringCommand }>) {
   if (operationTracker.current !== null && !concurrentSafeCommands.has(command.type)) {
     return duplicateOperationResult
   }
-  const pendingOperation = readPendingOperation({ command })
-  const operationTimeout = pendingOperation === null
-    ? null
-    : beginPendingOperation({ operationTracker, pendingOperation, setState })
+  const execution = prepareCommandExecution({
+    command, operationGeneration, operationTracker, setState,
+  })
+  const { executionGeneration, operationTimeout, pendingOperation } = execution
   if (pendingOperation !== null) await waitForPendingPresentation()
   return executePreparedCommand({
-    command, operationTimeout, operationTracker, pendingOperation, setState, workflow,
+    command, executionGeneration, operationGeneration, operationTimeout, operationTracker,
+    pendingOperation, setState, workflow,
   })
 }
 
+function prepareCommandExecution({ command, operationGeneration, operationTracker, setState }:
+Readonly<{
+  command: ResumeTailoringCommand
+  operationGeneration: OperationGeneration
+  operationTracker: OperationTracker
+  setState: CandidateSessionStateSetter
+}>) {
+  if (command.type === 'delete-session') operationGeneration.current += 1
+  const pendingOperation = readPendingOperation({ command })
+  const operationTimeout = pendingOperation === null
+    ? null
+    : beginPendingOperation({ operationGeneration, operationTracker, pendingOperation, setState })
+  return { executionGeneration: operationGeneration.current, operationTimeout, pendingOperation }
+}
+
 async function executePreparedCommand({
-  command, operationTimeout, operationTracker, pendingOperation, setState, workflow,
+  command, executionGeneration, operationGeneration, operationTimeout, operationTracker,
+  pendingOperation, setState, workflow,
 }: CandidateSessionActionDependencies & Readonly<{
   command: ResumeTailoringCommand
+  executionGeneration: number
   operationTimeout: ReturnType<typeof setTimeout> | null
   pendingOperation: PendingOperation | null
 }>) {
   const failureMessageKey = readFailureMessageKey(command)
   const result = await workflow.execute(command)
-  clearPendingOperation({ operationTimeout, operationTracker, setState, workflow })
+  if (executionGeneration !== operationGeneration.current) return result
+  clearPendingOperation({
+    operationGeneration, operationTimeout, operationTracker, setState, workflow,
+  })
   applyCommandResult({ command, result, setState, failureMessageKey, pendingOperation })
   return result
 }
 
-function beginPendingOperation({ operationTracker, pendingOperation, setState }:
+function beginPendingOperation({ operationGeneration, operationTracker, pendingOperation, setState }:
 Readonly<{
+  operationGeneration: OperationGeneration
   operationTracker: OperationTracker
   pendingOperation: PendingOperation
   setState: CandidateSessionStateSetter
 }>) {
+  const executionGeneration = operationGeneration.current
   operationTracker.current = pendingOperation
   setState((state) => ({
     ...state,
@@ -316,7 +372,17 @@ Readonly<{
     pendingOperation,
     retryCommand: null,
   }))
+  return schedulePendingReassurance({ executionGeneration, operationGeneration, setState })
+}
+
+function schedulePendingReassurance({ executionGeneration, operationGeneration, setState }:
+Readonly<{
+  executionGeneration: number
+  operationGeneration: OperationGeneration
+  setState: CandidateSessionStateSetter
+}>) {
   return setTimeout(() => {
+    if (executionGeneration !== operationGeneration.current) return
     setState((state) => ({ ...state, isOperationTakingLong: true }))
   }, pendingOperationReassuranceDelay)
 }
@@ -475,6 +541,7 @@ const pendingOperations = new Set<ResumeTailoringCommand['type']>([
   'reformulate-resume-claim',
 ])
 const concurrentSafeCommands = new Set<ResumeTailoringCommand['type']>([
+  'delete-session',
   'rate-tailored-resume-fidelity',
   'rate-tailored-resume-relevance',
 ])
