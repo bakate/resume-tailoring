@@ -1002,7 +1002,7 @@ h1 {
 }
 
 .facts-review-card {
-  padding: clamp(20px, 3vw, 34px);
+  padding: clamp(16px, 2vw, 24px);
   background: #ffffff;
 }
 
@@ -1020,8 +1020,8 @@ h1 {
 
 .source-fact-groups {
   display: grid;
-  gap: 22px;
-  margin-top: 22px;
+  gap: 14px;
+  margin-top: 16px;
 }
 
 .fact-group {
@@ -1034,7 +1034,7 @@ h1 {
   flex-wrap: wrap;
   gap: 10px 14px;
   align-items: center;
-  padding: 14px 18px;
+  padding: 10px 14px;
   background: #f4f6f4;
 }
 
@@ -1152,13 +1152,13 @@ h1 {
 .source-fact {
   display: grid;
   grid-template-columns: minmax(120px, 0.22fr) minmax(0, 1fr) auto auto;
-  gap: 8px 24px;
+  gap: 6px 18px;
   align-items: center;
-  min-height: 92px;
-  padding: 16px 18px;
+  min-height: 72px;
+  padding: 12px 14px;
   border-top: 1px solid #dfe1df;
   content-visibility: auto;
-  contain-intrinsic-size: auto 92px;
+  contain-intrinsic-size: auto 72px;
 }
 
 .source-fact:first-child {
@@ -1237,12 +1237,28 @@ h1 {
 .correction-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 8px 10px;
   align-items: end;
   margin-top: 18px;
 }
 
+.correction-form input,
+.correction-form button {
+  height: 42px;
+  min-height: 42px;
+}
+
+.correction-form button {
+  margin: 0;
+  padding: 0 14px;
+}
+
 .correction-disclosure {
+  grid-column: 3 / -1;
+  align-self: center;
+}
+
+.correction-disclosure[open] {
   grid-column: 2 / -1;
 }
 
@@ -1314,6 +1330,10 @@ h1 {
   }
 
   .correction-disclosure {
+    grid-column: auto;
+  }
+
+  .correction-disclosure[open] {
     grid-column: auto;
   }
 
