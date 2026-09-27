@@ -8,6 +8,7 @@ import { z } from 'zod'
 import {
   hasOnlyResumeClaimInputReferences,
   proposedResumeClaimsSchema,
+  resumeClaimSemanticValidationSchema,
 } from './resume-claim-schemas'
 
 type OpenAiModelConfiguration = Readonly<{
@@ -115,7 +116,7 @@ async function validateResumeClaim({
     userValue: validationRequest,
   })
   if (!response.ok) return resumeClaimValidationUnavailableResult
-  const validation = semanticValidationSchema.safeParse(response.value)
+  const validation = resumeClaimSemanticValidationSchema.safeParse(response.value)
   return validation.success
     ? { ok: true, value: validation.data } as const
     : resumeClaimValidationUnavailableResult
@@ -212,115 +213,29 @@ const validationInstructions = [
   'For each failure, return its segmentIndex and the exact failure code as feedback.',
 ].join(' ')
 
-const segmentJsonSchema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['text', 'factIds'],
-  properties: {
-    text: { type: 'string', minLength: 1, maxLength: 500 },
-    factIds: {
-      type: 'array',
-      minItems: 1,
-      maxItems: 20,
-      items: { type: 'string', pattern: '^source-fact-.+$' },
-    },
-  },
-} as const
-
-const resumeClaimResponseFormat = {
-  type: 'json_schema',
+const resumeClaimResponseFormat = createStructuredOutputFormat({
   name: 'resume_claims',
-  strict: true,
-  schema: {
-    type: 'object',
-    additionalProperties: false,
-    required: ['claims'],
-    properties: {
-      claims: {
-        type: 'array',
-        maxItems: 100,
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['segments'],
-          properties: {
-            segments: { type: 'array', minItems: 1, maxItems: 20, items: segmentJsonSchema },
-          },
-        },
-      },
-    },
-  },
-} as const
+  schema: proposedResumeClaimsSchema,
+})
 
-const resumeClaimValidationResponseFormat = {
-  type: 'json_schema',
+const resumeClaimValidationResponseFormat = createStructuredOutputFormat({
   name: 'resume_claim_validation',
-  strict: true,
-  schema: {
-    type: 'object',
-    additionalProperties: false,
-    required: ['supported', 'feedback'],
-    properties: {
-      supported: { type: 'boolean' },
-      feedback: {
-        type: 'array',
-        maxItems: 20,
-        items: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['code', 'segmentIndex'],
-          properties: {
-            code: {
-              type: 'string',
-              enum: [
-                'unsupported-meaning',
-                'inexact-fact-reference',
-                'strengthened-autonomy',
-                'strengthened-causality',
-                'strengthened-duration',
-                'strengthened-frequency',
-                'strengthened-outcome',
-                'strengthened-quantity',
-                'strengthened-scope',
-                'strengthened-seniority',
-              ],
-            },
-            segmentIndex: { type: 'integer', minimum: 0 },
-          },
-        },
-      },
-    },
-  },
-} as const
+  schema: resumeClaimSemanticValidationSchema,
+})
+
+function createStructuredOutputFormat({ name, schema }: Readonly<{
+  name: string
+  schema: z.ZodType
+}>) {
+  const jsonSchema = z.toJSONSchema(schema, { target: 'draft-7' })
+  const schemaWithoutDialect = Object.fromEntries(Object.entries(jsonSchema)
+    .filter(([propertyName]) => propertyName !== '$schema'))
+  return { type: 'json_schema', name, strict: true, schema: schemaWithoutDialect } as const
+}
 
 const openAiResponseSchema = z.object({ output: z.array(z.unknown()) })
 const openAiOutputItemSchema = z.object({ content: z.array(z.unknown()) })
 const openAiOutputTextSchema = z.object({ type: z.literal('output_text'), text: z.string() })
-const semanticValidationSchema = z.object({
-  supported: z.boolean(),
-  feedback: z.array(z.object({
-    code: z.enum([
-      'unsupported-meaning',
-      'inexact-fact-reference',
-      'strengthened-autonomy',
-      'strengthened-causality',
-      'strengthened-duration',
-      'strengthened-frequency',
-      'strengthened-outcome',
-      'strengthened-quantity',
-      'strengthened-scope',
-      'strengthened-seniority',
-    ]),
-    segmentIndex: z.number().int().min(0),
-  })).max(20),
-}).superRefine((validation, context) => {
-  if (!validation.supported && validation.feedback.length === 0) {
-    context.addIssue({ code: 'custom', path: ['feedback'], message: 'Feedback is required' })
-  }
-  if (validation.supported && validation.feedback.length > 0) {
-    context.addIssue({ code: 'custom', path: ['feedback'], message: 'Feedback must be empty' })
-  }
-})
 const resumeClaimTimeoutMilliseconds = 30_000
 const unavailableOpenAiResult = { ok: false } as const
 const resumeClaimWritingUnavailableResult = {

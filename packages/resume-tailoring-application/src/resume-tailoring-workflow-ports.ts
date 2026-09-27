@@ -186,21 +186,39 @@ export type ProposedResumeClaim = Readonly<{
   }>[]
 }>
 
+export const resumeClaimContractLimits = {
+  claimCount: 100,
+  factCount: 500,
+  referenceCount: 20,
+  segmentCount: 20,
+  textLength: 500,
+} as const
+
+export const resumeClaimSemanticValidationFeedbackCodes = [
+  'inexact-fact-reference',
+  'unsupported-meaning',
+  'strengthened-autonomy',
+  'strengthened-causality',
+  'strengthened-duration',
+  'strengthened-frequency',
+  'strengthened-outcome',
+  'strengthened-quantity',
+  'strengthened-scope',
+  'strengthened-seniority',
+] as const
+
+export const resumeClaimValidationFeedbackCodes = [
+  'invalid-fact-reference',
+  'missing-segment-provenance',
+  'unsupported-number-or-date',
+  ...resumeClaimSemanticValidationFeedbackCodes,
+] as const
+
+export type ResumeClaimValidationFeedbackCode =
+  (typeof resumeClaimValidationFeedbackCodes)[number]
+
 export type ResumeClaimValidationFeedback = Readonly<{
-  code:
-    | 'invalid-fact-reference'
-    | 'inexact-fact-reference'
-    | 'missing-segment-provenance'
-    | 'unsupported-number-or-date'
-    | 'unsupported-meaning'
-    | 'strengthened-autonomy'
-    | 'strengthened-causality'
-    | 'strengthened-duration'
-    | 'strengthened-frequency'
-    | 'strengthened-outcome'
-    | 'strengthened-quantity'
-    | 'strengthened-scope'
-    | 'strengthened-seniority'
+  code: ResumeClaimValidationFeedbackCode
   segmentIndex?: number
 }>
 

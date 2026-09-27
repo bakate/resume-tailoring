@@ -149,8 +149,11 @@ function createResumeClaimActions({ workflow, setState }: CandidateSessionAction
     removeResumeClaim: ({ claimId }: Readonly<{ claimId: ResumeClaimId }>) => execute({
       type: 'remove-resume-claim', claimId,
     }),
-    reorderResumeClaims: ({ claimIds }: Readonly<{ claimIds: readonly ResumeClaimId[] }>) => execute({
-      type: 'reorder-resume-claims', claimIds,
+    moveResumeClaim: ({ claimId, direction }: Readonly<{
+      claimId: ResumeClaimId
+      direction: 'up' | 'down'
+    }>) => execute({
+      type: 'move-resume-claim', claimId, direction,
     }),
     reformulateResumeClaim: ({ claimId, request }: Readonly<{
       claimId: ResumeClaimId
@@ -234,7 +237,7 @@ function readFailureMessageKey(command: ResumeTailoringCommand): CandidateSessio
 function isResumeClaimCommand(command: ResumeTailoringCommand) {
   return command.type === 'generate-resume-claims'
     || command.type === 'remove-resume-claim'
-    || command.type === 'reorder-resume-claims'
+    || command.type === 'move-resume-claim'
     || command.type === 'reformulate-resume-claim'
 }
 

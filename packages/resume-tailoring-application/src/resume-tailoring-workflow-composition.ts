@@ -40,9 +40,9 @@ import type {
   ResumeClaimIdentity,
   ResumeClaimSemanticValidator,
   ResumeClaimWriter,
-  ResumeClaimWritingInputs,
 } from './resume-tailoring-workflow-ports'
 import { createResumeClaimGeneration } from './resume-claim-generation'
+import type { ResumeClaimSource } from './resume-claim-generation'
 import { createMatchAnalysis } from './match-analysis'
 import {
   createReviewingJobPosting,
@@ -91,7 +91,7 @@ type SourceProfileFactCommand = Exclude<ResumeTailoringCommand,
   | { readonly type: 'analyze-match' }
   | { readonly type: 'generate-resume-claims' }
   | { readonly type: 'remove-resume-claim' }
-  | { readonly type: 'reorder-resume-claims' }
+  | { readonly type: 'move-resume-claim' }
   | { readonly type: 'reformulate-resume-claim' }
 >
 
@@ -155,7 +155,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (command.type === 'analyze-match') return this.#analyzeMatch()
     if (command.type === 'generate-resume-claims') return this.#generateResumeClaims()
     if (command.type === 'remove-resume-claim') return this.#removeResumeClaim(command)
-    if (command.type === 'reorder-resume-claims') return this.#reorderResumeClaims(command)
+    if (command.type === 'move-resume-claim') return this.#moveResumeClaim(command)
     if (command.type === 'reformulate-resume-claim') {
       return this.#reformulateResumeClaim(command)
     }
@@ -167,8 +167,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (!hasResumeClaimInputs(currentState)) return resumeClaimUnavailableResult
     const generation = createResumeClaimGenerationFrom(this.#dependencies)
     if (generation === null) return resumeClaimUnavailableResult
-    const inputs = createResumeClaimWritingInputs({ state: currentState.value })
-    const result = await generation.generate(inputs)
+    const result = await generation.generate(createResumeClaimSource({ state: currentState.value }))
     if (!result.ok) return result
     return this.#persistTailoredResume({
       currentState: currentState.value,
@@ -194,20 +193,19 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     })
   }
 
-  async #reorderResumeClaims(
-    { claimIds }: Extract<ResumeTailoringCommand, { readonly type: 'reorder-resume-claims' }>,
+  async #moveResumeClaim(
+    command: Extract<ResumeTailoringCommand, { readonly type: 'move-resume-claim' }>,
   ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
     const currentState = await this.#readActiveState()
     if (!hasTailoredResume(currentState)) return resumeClaimUnavailableResult
-    const claimById = new Map(currentState.value.tailoredResume.claims
-      .map((claim) => [claim.id, claim]))
-    if (new Set(claimIds).size !== claimById.size
-      || claimIds.some((claimId) => !claimById.has(claimId))) return resumeClaimUnavailableResult
-    const claims = claimIds.map((claimId) => claimById.get(claimId))
-    if (claims.some((claim) => claim === undefined)) return resumeClaimUnavailableResult
+    const claims = moveResumeClaim({
+      claims: currentState.value.tailoredResume.claims,
+      ...command,
+    })
+    if (claims === null) return resumeClaimUnavailableResult
     return this.#persistTailoredResume({
       currentState: currentState.value,
-      claims: claims.filter((claim) => claim !== undefined),
+      claims,
       exclusions: currentState.value.tailoredResume.exclusions,
     })
   }
@@ -224,7 +222,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     })
     if (operation === null) return resumeClaimUnavailableResult
     const validation = await operation.generation.reformulate({
-      claim: operation.claim, inputs: operation.inputs, request: command.request,
+      claim: operation.claim, source: operation.source, request: command.request,
     })
     if (!validation.ok) return validation
     return this.#persistReformulatedResumeClaim({ command, state: currentState.value, validation })
@@ -812,39 +810,13 @@ function hasTailoredResume(
   return hasResumeClaimInputs(result) && result.value.tailoredResume !== undefined
 }
 
-function createResumeClaimWritingInputs({
+function createResumeClaimSource({
   state,
-}: Readonly<{ state: ResumeClaimReadyState }>): ResumeClaimWritingInputs {
-  const relevantFactIds = new Set(state.matchAnalysis.relevantFactIds)
-  const coveredRequirementIds = new Set(state.matchAnalysis.evidence
-    .map(({ requirementId }) => requirementId))
+}: Readonly<{ state: ResumeClaimReadyState }>): ResumeClaimSource {
   return {
-    evidence: state.matchAnalysis.evidence,
-    requirements: state.jobPosting.requirements
-      .filter(({ id }) => coveredRequirementIds.has(id))
-      .map(({ classification, id, value }) => ({ classification, id, value })),
-    verifiedFacts: state.sourceProfile.facts
-      .filter((fact) => fact.status === 'verified' && relevantFactIds.has(fact.id))
-      .map(({ id, kind, value }) => ({ id, kind, value })),
-  }
-}
-
-function createReformulationInputs({
-  claim,
-  inputs,
-}: Readonly<{
-  claim: ResumeClaim
-  inputs: ResumeClaimWritingInputs
-}>): ResumeClaimWritingInputs {
-  const supportingFactIds = new Set(claim.segments.flatMap(({ factIds }) => factIds))
-  return {
-    ...inputs,
-    evidence: inputs.evidence.flatMap((item) => {
-      const factIds = item.factIds.filter((factId) => supportingFactIds.has(factId))
-      return factIds.length === 0 ? [] : [{ ...item, factIds }]
-    }),
-    verifiedFacts: inputs.verifiedFacts
-      .filter(({ id }) => supportingFactIds.has(id)),
+    matchAnalysis: state.matchAnalysis,
+    requirements: state.jobPosting.requirements,
+    sourceFacts: state.sourceProfile.facts,
   }
 }
 
@@ -859,9 +831,7 @@ function prepareResumeClaimReformulation({ command, dependencies, state }: Reado
   return {
     claim,
     generation,
-    inputs: createReformulationInputs({
-      claim, inputs: createResumeClaimWritingInputs({ state }),
-    }),
+    source: createResumeClaimSource({ state }),
   }
 }
 
@@ -880,6 +850,22 @@ function replaceResumeClaim({ claim, claimId, tailoredResume }: Readonly<{
       ? [...tailoredResume.exclusions, unsupportedClaimExclusion]
       : tailoredResume.exclusions,
   }
+}
+
+function moveResumeClaim({ claimId, claims, direction }: Readonly<{
+  claimId: ResumeClaim['id']
+  claims: readonly ResumeClaim[]
+  direction: 'up' | 'down'
+}>) {
+  const sourceIndex = claims.findIndex(({ id }) => id === claimId)
+  const targetIndex = sourceIndex + (direction === 'up' ? -1 : 1)
+  const sourceClaim = claims[sourceIndex]
+  const targetClaim = claims[targetIndex]
+  if (sourceClaim === undefined || targetClaim === undefined) return null
+  return claims.map((claim, claimIndex) => {
+    if (claimIndex === sourceIndex) return targetClaim
+    return claimIndex === targetIndex ? sourceClaim : claim
+  })
 }
 
 function createResumeClaimGenerationFrom(dependencies: ResumeTailoringDependencies) {

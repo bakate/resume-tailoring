@@ -222,6 +222,16 @@ test('a Candidate generates validated provenance-backed Resume Claims', async ({
   await system.expectValidatedResumeClaimsWithoutFreeEditing()
 })
 
+test('a Candidate restores provenance-backed Resume Claims after reload', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenTailoredResumeIsStored()
+
+  await system.reloadTailoredResume()
+
+  await system.expectTailoredResumeToBeRestored()
+})
+
 test('localizes sensitive labels and preserves legitimate French words', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
@@ -279,6 +289,7 @@ type CompletedAction =
   | 'resume-tailoring-opened'
   | 'resume-tailoring-viewed'
   | 'resume-claims-generated'
+  | 'resume-claims-reloaded'
   | 'source-profile-built'
   | 'source-profile-reloaded'
   | 'unknown-page-opened'
@@ -398,6 +409,18 @@ class ResumeTailoringBrowserTestSystem {
     await this.givenCandidateSessionIsActive()
     await this.givenStructuredExtractionIsAvailable()
     await this.buildVerifiedSourceProfile()
+  }
+
+  async givenTailoredResumeIsStored() {
+    await this.givenCandidateSessionIsActive()
+    await this.givenStructuredExtractionIsAvailable()
+    await this.givenJobRequirementExtractionIsAvailable()
+    await this.givenMatchAnalysisIsAvailable()
+    await this.givenResumeClaimServicesAreAvailable()
+    await this.buildVerifiedSourceProfile()
+    await this.extractRequirementsFromMinimizedJobPosting()
+    await this.analyzeMatch()
+    await this.generateResumeClaims()
   }
 
   async givenBrowserPrefersLanguages({ languages }: Readonly<{ languages: readonly string[] }>) {
@@ -537,6 +560,11 @@ class ResumeTailoringBrowserTestSystem {
   async reloadVerifiedSourceProfile() {
     await this.#page.reload()
     this.#completedAction = 'source-profile-reloaded'
+  }
+
+  async reloadTailoredResume() {
+    await this.#page.reload()
+    this.#completedAction = 'resume-claims-reloaded'
   }
 
   async extractRequirementsFromMinimizedJobPosting() {
@@ -723,6 +751,18 @@ class ResumeTailoringBrowserTestSystem {
       { exact: true },
     )).toBeVisible()
     await expect(this.#page.getByText(/Claims cannot be edited directly/).first()).toBeVisible()
+  }
+
+  async expectTailoredResumeToBeRestored() {
+    this.#expectCompletedAction('resume-claims-reloaded')
+    await expect(this.#page.getByText(
+      'Built React applications at Acme',
+      { exact: true },
+    )).toBeVisible()
+    await expect(this.#page.getByText(
+      'Worked as a FullStack Developer at Acme',
+      { exact: true },
+    )).toBeVisible()
   }
 
   async expectFrenchSensitiveLabelAndIntactJobPosting() {

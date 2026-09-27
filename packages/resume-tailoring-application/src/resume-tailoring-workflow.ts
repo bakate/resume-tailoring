@@ -61,7 +61,11 @@ export type ResumeTailoringCommand =
   | { readonly type: 'analyze-match' }
   | { readonly type: 'generate-resume-claims' }
   | { readonly type: 'remove-resume-claim'; readonly claimId: ResumeClaimId }
-  | { readonly type: 'reorder-resume-claims'; readonly claimIds: readonly ResumeClaimId[] }
+  | {
+      readonly type: 'move-resume-claim'
+      readonly claimId: ResumeClaimId
+      readonly direction: 'up' | 'down'
+    }
   | {
       readonly type: 'reformulate-resume-claim'
       readonly claimId: ResumeClaimId

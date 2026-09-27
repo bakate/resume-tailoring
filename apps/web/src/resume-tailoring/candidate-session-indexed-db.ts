@@ -4,7 +4,7 @@ import type {
   ResumeTailoringState,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { restoreMatchAnalysis as restoreStoredMatchAnalysis } from '@resume-tailoring/application/match-analysis'
-import { validateProposedResumeClaim } from '@resume-tailoring/application/resume-claims'
+import { restoreTailoredResume as restoreStoredTailoredResume } from '@resume-tailoring/application/resume-claim-restoration'
 
 import {
   sourceProfileReviewSchema,
@@ -242,14 +242,10 @@ function restoreTailoredResume({
   if (matchAnalysis === null || sourceProfile === undefined) return null
   const storedResume = storedTailoredResumeSchema.safeParse(storedTailoredResume)
   if (!storedResume.success) return null
-  const verifiedFacts = sourceProfile.facts.filter((fact) => fact.status === 'verified')
-  const claims = storedResume.data.claims.map(({ id, segments }) =>
-    validateProposedResumeClaim({ claimId: id, proposal: { segments }, verifiedFacts }))
-  if (claims.some((claim) => !claim.ok)) return null
-  return {
-    claims: claims.flatMap((claim) => claim.ok ? [claim.value] : []),
-    exclusions: storedResume.data.exclusions,
-  }
+  return restoreStoredTailoredResume({
+    sourceFacts: sourceProfile.facts,
+    tailoredResume: storedResume.data,
+  })
 }
 
 function restoreMatchAnalysis({ jobPosting, sourceProfile, storedMatchAnalysis }: Readonly<{

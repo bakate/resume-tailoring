@@ -1,6 +1,9 @@
 import type {
+  JobRequirement,
+  MatchAnalysis,
   ResumeClaim,
   ResumeClaimId,
+  SourceProfileFact,
   TailoredResume,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
@@ -20,6 +23,12 @@ type ResumeClaimGenerationDependencies = Readonly<{
   writer: ResumeClaimWriter
 }>
 
+export type ResumeClaimSource = Readonly<{
+  matchAnalysis: MatchAnalysis
+  requirements: readonly JobRequirement[]
+  sourceFacts: readonly SourceProfileFact[]
+}>
+
 type ClaimResult = Readonly<
   | { ok: true; claim: ResumeClaim | null }
   | {
@@ -37,12 +46,40 @@ export function createResumeClaimGeneration(
   dependencies: ResumeClaimGenerationDependencies,
 ) {
   return {
-    generate: (inputs: ResumeClaimWritingInputs) => generateClaims({ dependencies, inputs }),
+    generate: (source: ResumeClaimSource) => generateClaims({
+      dependencies,
+      inputs: createWritingInputs({ source }),
+    }),
     reformulate: (request: Readonly<{
       claim: ResumeClaim
-      inputs: ResumeClaimWritingInputs
       request: string
-    }>) => reformulateClaim({ dependencies, ...request }),
+      source: ResumeClaimSource
+    }>) => reformulateClaim({
+      dependencies,
+      inputs: restrictInputsToClaim({
+        claim: request.claim,
+        inputs: createWritingInputs({ source: request.source }),
+      }),
+      claim: request.claim,
+      request: request.request,
+    }),
+  }
+}
+
+function createWritingInputs({ source }: Readonly<{
+  source: ResumeClaimSource
+}>): ResumeClaimWritingInputs {
+  const relevantFactIds = new Set(source.matchAnalysis.relevantFactIds)
+  const coveredRequirementIds = new Set(source.matchAnalysis.evidence
+    .map(({ requirementId }) => requirementId))
+  return {
+    evidence: source.matchAnalysis.evidence,
+    requirements: source.requirements
+      .filter(({ id }) => coveredRequirementIds.has(id))
+      .map(({ classification, id, value }) => ({ classification, id, value })),
+    verifiedFacts: source.sourceFacts
+      .filter((fact) => fact.status === 'verified' && relevantFactIds.has(fact.id))
+      .map(({ id, kind, value }) => ({ id, kind, value })),
   }
 }
 
@@ -149,6 +186,21 @@ function restrictInputsToProposal({ inputs, proposal }: Readonly<{
   proposal: ProposedResumeClaim
 }>) {
   const supportingFactIds = new Set(proposal.segments.flatMap(({ factIds }) => factIds))
+  return restrictInputsToFactIds({ inputs, supportingFactIds })
+}
+
+function restrictInputsToClaim({ claim, inputs }: Readonly<{
+  claim: ResumeClaim
+  inputs: ResumeClaimWritingInputs
+}>) {
+  const supportingFactIds = new Set(claim.segments.flatMap(({ factIds }) => factIds))
+  return restrictInputsToFactIds({ inputs, supportingFactIds })
+}
+
+function restrictInputsToFactIds({ inputs, supportingFactIds }: Readonly<{
+  inputs: ResumeClaimWritingInputs
+  supportingFactIds: ReadonlySet<SourceProfileFact['id']>
+}>) {
   return {
     ...inputs,
     evidence: inputs.evidence.flatMap((item) => {

@@ -56,10 +56,10 @@ describe('Resume Claim workflow', () => {
     system.expectTheUnsupportedClaimToBeExcluded()
   })
 
-  it('reorders claims without changing their provenance-backed content', async () => {
+  it('moves a claim without requiring the Candidate interface to rebuild the order', async () => {
     const system = createSystemUnderTest({ tailoredResume: existingTailoredResume })
 
-    await system.reorderResumeClaims()
+    await system.moveResumeClaimUp()
 
     system.expectClaimsToBeReorderedWithoutEditing()
   })
@@ -181,10 +181,11 @@ class ResumeClaimWorkflowTestSystem {
     this.#actionResult = await this.#workflow.execute({ type: 'generate-resume-claims' })
   }
 
-  async reorderResumeClaims() {
+  async moveResumeClaimUp() {
     this.#actionResult = await this.#workflow.execute({
-      type: 'reorder-resume-claims',
-      claimIds: ['resume-claim-education', 'resume-claim-experience'],
+      type: 'move-resume-claim',
+      claimId: 'resume-claim-education',
+      direction: 'up',
     })
   }
 

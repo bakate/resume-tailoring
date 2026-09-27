@@ -112,12 +112,11 @@ function ClaimActions(props: ResumeClaimCardProps) {
 }
 
 function MoveClaimButton(props: ResumeClaimCardProps & Readonly<{ direction: 'up' | 'down' }>) {
-  const { candidateSession, claimIndex, claims, direction, localization } = props
-  const offset = direction === 'up' ? -1 : 1
+  const { candidateSession, claim, claimIndex, claims, direction, localization } = props
   const disabled = direction === 'up' ? claimIndex === 0 : claimIndex === claims.length - 1
   return (
     <button disabled={disabled}
-      onClick={() => { reorderClaim({ candidateSession, claimIndex, claims, offset }) }}
+      onClick={() => void candidateSession.moveResumeClaim({ claimId: claim.id, direction })}
       type="button">
       {localization.translate(direction === 'up' ? 'resumeClaims.moveUp' : 'resumeClaims.moveDown')}
     </button>
@@ -156,25 +155,5 @@ function submitReformulation({ candidateSession, claim, reformulationRequest }: 
   return candidateSession.reformulateResumeClaim({
     claimId: claim.id,
     request: reformulationRequest,
-  })
-}
-
-function reorderClaim({
-  candidateSession,
-  claimIndex,
-  claims,
-  offset,
-}: Readonly<{
-  candidateSession: CandidateSessionController
-  claimIndex: number
-  claims: readonly ResumeClaim[]
-  offset: -1 | 1
-}>) {
-  const reorderedClaims = [...claims]
-  const [claim] = reorderedClaims.splice(claimIndex, 1)
-  if (claim === undefined) return
-  reorderedClaims.splice(claimIndex + offset, 0, claim)
-  void candidateSession.reorderResumeClaims({
-    claimIds: reorderedClaims.map(({ id }) => id),
   })
 }
