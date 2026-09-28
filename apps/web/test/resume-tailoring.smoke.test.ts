@@ -424,6 +424,49 @@ test('a Candidate reviews classified atomic Job Requirements from minimized cont
   await system.expectAtomicJobRequirementsWithSourceProvenance()
 })
 
+test('a Candidate analyzes a pasted Job Posting in one action', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+  await system.givenJobRequirementExtractionIsAvailable()
+  await system.givenMatchAnalysisIsAvailable()
+  await system.buildVerifiedSourceProfile()
+
+  await system.analyzePastedJobPostingInOneAction()
+
+  await system.expectOneActionJobPostingAnalysis()
+})
+
+test('a Candidate analyzes an uploaded PDF Job Posting through the same action', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+  await system.givenJobRequirementExtractionIsAvailable()
+  await system.givenMatchAnalysisIsAvailable()
+  await system.buildVerifiedSourceProfile()
+
+  await system.analyzeUploadedPdfJobPostingInOneAction()
+
+  await system.expectOneActionJobPostingAnalysis()
+})
+
+test('a Candidate corrects the Target Role only with exact Job Posting text', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+  await system.givenJobRequirementExtractionWithTargetRoleIsAvailable()
+  await system.givenMatchAnalysisIsAvailable()
+  await system.buildVerifiedSourceProfile()
+  await system.analyzePastedJobPostingInOneAction()
+
+  await system.correctTargetRoleFromExactJobPostingText()
+
+  await system.expectCorrectedSourceBackedTargetRole()
+})
+
 test('a delayed Job Requirement extraction reassures the Candidate and focuses its result', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
@@ -972,6 +1015,22 @@ class ResumeTailoringBrowserTestSystem {
       await route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify(jobRequirementExtractionResponse),
+      })
+    })
+  }
+
+  async givenJobRequirementExtractionWithTargetRoleIsAvailable() {
+    await this.#page.route('**/api/job-requirement-extraction', async (route) => {
+      this.#jobPostingRequestContent = readJobPostingContent(route.request().postData())
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...jobRequirementExtractionResponse,
+          value: {
+            ...jobRequirementExtractionResponse.value,
+            targetRole: { sourceExcerpt: jobPostingExcerpt, value: 'TypeScript' },
+          },
+        }),
       })
     })
   }
@@ -1779,6 +1838,42 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'job-requirements-extracted'
   }
 
+  async analyzePastedJobPostingInOneAction() {
+    await this.#page.locator('.workflow-progress').getByRole('button', { name: /Job Posting/ }).click()
+    await this.#page.getByLabel('Paste the Job Posting').fill(jobPostingExcerpt)
+    await this.#page.getByRole('button', { name: 'Analyze this Job Posting' }).click()
+    await expect(this.#page.getByRole('button', { name: /Match Analysis/ })).toContainText('33%')
+    this.#completedAction = 'match-analyzed'
+  }
+
+  async analyzeUploadedPdfJobPostingInOneAction() {
+    await this.#page.locator('.workflow-progress').getByRole('button', { name: /Job Posting/ }).click()
+    await this.#page.locator('#job-posting-file').setInputFiles({
+      name: 'job-posting.pdf',
+      mimeType: 'application/pdf',
+      buffer: createTextPdf(jobPostingExcerpt),
+    })
+    await expect(this.#page.getByRole('button', { name: /Match Analysis/ })).toContainText('33%')
+    this.#completedAction = 'match-analyzed'
+  }
+
+  async correctTargetRoleFromExactJobPostingText() {
+    await this.#page.getByRole('button', { name: /Job Posting/ }).click()
+    const targetRoleInput = this.#page.getByLabel(
+      'Correct the Target Role with exact text from the Job Posting',
+    )
+    const saveTargetRole = this.#page.getByRole('button', {
+      name: 'Save Target Role and refresh analysis',
+    })
+    await targetRoleInput.fill('Chief Technology Officer')
+    await expect(saveTargetRole).toBeDisabled()
+    await targetRoleInput.fill('Senior React Developer')
+    await expect(saveTargetRole).toBeEnabled()
+    await saveTargetRole.click()
+    await expect(this.#page.getByRole('button', { name: /Match Analysis/ })).toContainText('33%')
+    this.#completedAction = 'match-analyzed'
+  }
+
   async prepareMinimizedJobPostingForExtraction() {
     await this.#page.locator('.workflow-progress').getByRole('button', { name: /Job Posting/ }).click()
     await this.#page.getByLabel('Paste the Job Posting').fill(
@@ -2253,9 +2348,9 @@ class ResumeTailoringBrowserTestSystem {
     await expect(disclosure).not.toHaveAttribute('open', '')
     await disclosure.locator('summary').click()
     await expect(disclosure).toHaveAttribute('open', '')
-    await expect(requirementGroup.getByText('Know TypeScript', { exact: true })).toBeVisible()
+    await expect(requirementGroup.getByText('TypeScript', { exact: true })).toBeVisible()
     await expect(requirementGroup.getByText('Required', { exact: true })).toBeVisible()
-    await expect(requirementGroup.getByText('Know React', { exact: true })).toBeVisible()
+    await expect(requirementGroup.getByText('React', { exact: true })).toBeVisible()
     await expect(requirementGroup.getByText('Preferred', { exact: true })).toBeVisible()
     await expect(requirementGroup.getByText(jobPostingExcerpt, { exact: true })).toHaveCount(1)
   }
@@ -2271,11 +2366,30 @@ class ResumeTailoringBrowserTestSystem {
     })).toBeVisible()
     const evidenceDetails = this.#page.locator('.match-evidence-group details')
     await evidenceDetails.locator('summary').click()
-    await expect(this.#page.getByText('Know React', { exact: true }).last()).toBeVisible()
+    await expect(this.#page.getByText('React', { exact: true }).last()).toBeVisible()
     await expect(this.#page.getByRole('heading', {
       name: 'Uncovered required Job Requirements',
     })).toBeVisible()
-    await expect(this.#page.getByText('Know TypeScript', { exact: true }).last()).toBeVisible()
+    await expect(this.#page.getByText('TypeScript', { exact: true }).last()).toBeVisible()
+  }
+
+  async expectOneActionJobPostingAnalysis() {
+    this.#expectCompletedAction('match-analyzed')
+    expect(this.#jobPostingRequestContent).toBe(jobPostingExcerpt)
+    await this.#page.getByRole('button', { name: /Match Analysis/ }).click()
+    await expect(this.#page.getByRole('heading', { name: 'Match Analysis summary' })).toBeVisible()
+    await expect(this.#page.getByText('33%', { exact: true })).toBeVisible()
+    await this.#page.getByRole('button', { name: /Job Posting/ }).click()
+    await expect(this.#page.getByText(
+      'No unambiguous target role was found. The resume will use the localized fallback title.',
+    )).toBeVisible()
+  }
+
+  async expectCorrectedSourceBackedTargetRole() {
+    this.#expectCompletedAction('match-analyzed')
+    await this.#page.getByRole('button', { name: /Job Posting/ }).click()
+    await expect(this.#page.getByRole('region', { name: 'Target role' })
+      .locator('strong').filter({ hasText: /^Senior React Developer$/u })).toBeVisible()
   }
 
   async expectPendingJobRequirementExtractionThenFocusedResult() {
@@ -2306,7 +2420,7 @@ class ResumeTailoringBrowserTestSystem {
     await expect(summary).toContainText('eligible')
     await expect(summary).toContainText('0 / 1')
     await expect(summary).toContainText('1 / 1')
-    await expect(summary).toContainText('Know TypeScript')
+    await expect(summary).toContainText('TypeScript')
     await expect(summary.getByText(/below 50%/)).toHaveAttribute('role', 'status')
     const evidenceDisclosure = this.#page.locator('.match-evidence-group details')
     await expect(evidenceDisclosure).not.toHaveAttribute('open', '')
@@ -2935,7 +3049,7 @@ function hasCallerDerivedDocument(value: unknown) {
   return isRecord(value) && 'document' in value
 }
 
-const jobPostingExcerpt = 'You must know TypeScript and preferably React.'
+const jobPostingExcerpt = 'Role: Senior React Developer. You must know TypeScript and preferably React.'
 const detailedSourceProfileExtractionResponse = {
   ok: true,
   value: [
@@ -2985,12 +3099,12 @@ const jobRequirementExtractionResponse = {
       {
         classification: 'required',
         sourceExcerpt: jobPostingExcerpt,
-        value: 'Know TypeScript',
+        value: 'TypeScript',
       },
       {
         classification: 'preferred',
         sourceExcerpt: jobPostingExcerpt,
-        value: 'Know React',
+        value: 'React',
       },
     ],
   },

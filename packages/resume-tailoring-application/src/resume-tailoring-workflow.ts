@@ -56,6 +56,7 @@ export type ResumeTailoringCommand =
   | { readonly type: 'resolve-source-fact-conflict'; readonly selectedFactId: SourceProfileFactId }
   | { readonly type: 'review-job-posting'; readonly content: string }
   | { readonly type: 'update-job-posting-content'; readonly outgoingContent: string }
+  | { readonly type: 'update-target-role'; readonly value: string }
   | { readonly type: 'confirm-job-posting-processing-notice' }
   | { readonly type: 'extract-job-requirements' }
   | { readonly type: 'analyze-match' }

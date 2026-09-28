@@ -27,6 +27,11 @@ const jobRequirementContentSchema = z.object(jobRequirementContentShape).superRe
   if (!isAtomicValue({ value: requirement.value })) {
     context.addIssue({ code: 'custom', path: ['value'], message: 'Expected one atomic requirement' })
   }
+  if (!requirement.sourceExcerpt.includes(requirement.value)) {
+    context.addIssue({
+      code: 'custom', path: ['value'], message: 'Expected an exact Job Posting substring',
+    })
+  }
 })
 const jobRequirementContentsSchema = z.array(jobRequirementContentSchema).max(jobRequirementMaximumCount)
 
@@ -70,6 +75,11 @@ export const jobPostingReviewSchema = z.object({
     if (!isAtomicValue({ value: requirement.value })) {
       context.addIssue({ code: 'custom', path: ['value'], message: 'Expected one atomic requirement' })
     }
+    if (!requirement.sourceExcerpt.includes(requirement.value)) {
+      context.addIssue({
+        code: 'custom', path: ['value'], message: 'Expected an exact Job Posting substring',
+      })
+    }
   })).max(jobRequirementMaximumCount),
 }).superRefine((jobPosting, context) => {
   if (hasSourceBackedTargetRole({
@@ -99,7 +109,9 @@ export function hasOnlyJobPostingSourceExcerpts({
   targetRole: JobPostingTargetRole | null
 }>) {
   return hasSourceBackedTargetRole({ jobPostingContent, targetRole })
-    && requirements.every(({ sourceExcerpt }) => jobPostingContent.includes(sourceExcerpt))
+    && requirements.every(({ sourceExcerpt, value }) => (
+      jobPostingContent.includes(sourceExcerpt) && sourceExcerpt.includes(value)
+    ))
 }
 
 function isAtomicValue({ value }: Readonly<{ value: string }>) {

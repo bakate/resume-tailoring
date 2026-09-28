@@ -137,6 +137,7 @@ const extractionInstructions = [
   'Classify each one as required only when mandatory wording is explicit; otherwise use preferred.',
   'Split compound passages into indivisible requirements.',
   'Copy sourceExcerpt exactly from the Job Posting for every requirement.',
+  'Copy value as an exact atomic substring of sourceExcerpt for every requirement.',
   'Never infer or add a requirement.',
 ].join(' ')
 

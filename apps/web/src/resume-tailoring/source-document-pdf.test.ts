@@ -43,6 +43,18 @@ describe('browser Source Document reader', () => {
     expect(result).toEqual({ ok: true, value: 'Senior FullStack Developer' })
   })
 
+  it('reads a TXT file when the browser omits its media type', async () => {
+    const reader = createBrowserSourceDocumentReader()
+
+    const result = await reader.read({
+      bytes: new TextEncoder().encode('Senior FullStack Developer'),
+      mediaType: '',
+      name: 'job.txt',
+    })
+
+    expect(result).toEqual({ ok: true, value: 'Senior FullStack Developer' })
+  })
+
   it('keeps pasted text available without the native TextDecoder API', async () => {
     const textDecoderDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'TextDecoder')
     Reflect.deleteProperty(globalThis, 'TextDecoder')

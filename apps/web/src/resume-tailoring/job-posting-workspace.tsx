@@ -6,6 +6,7 @@ import {
   hasCurrentJobPostingProcessingConsent,
   jobPostingProcessingNoticeVersion,
 } from '@resume-tailoring/application/resume-tailoring-workflow'
+import { isExactTargetRoleTitle } from '@resume-tailoring/application/job-posting-target-role'
 import { useEffect, useState } from 'react'
 
 import type { Localization } from '../localization/localization'
@@ -43,12 +44,37 @@ function JobPostingInput({ candidateSession, localization }: WorkspaceProps) {
       <label htmlFor="job-posting-input">{localization.translate('jobPosting.inputLabel')}</label>
       <textarea id="job-posting-input" rows={12} value={content}
         onChange={(event) => { setContent(event.currentTarget.value) }} />
-      <button className="primary-action compact-action" disabled={content.trim().length === 0}
-        onClick={() => void candidateSession.reviewJobPosting({ content })} type="button">
-        {localization.translate('jobPosting.review')}
-      </button>
+      <JobPostingFileInput {...{ candidateSession, localization }} />
+      <JobPostingInputActions {...{ candidateSession, content, localization }} />
     </div>
   )
+}
+
+function JobPostingFileInput({ candidateSession, localization }: WorkspaceProps) {
+  return <>
+    <label htmlFor="job-posting-file">{localization.translate('jobPosting.fileLabel')}</label>
+    <input accept="application/pdf,text/plain,.pdf,.txt" id="job-posting-file"
+      disabled={candidateSession.pendingOperation !== null}
+      onChange={(event) => {
+        const [file] = event.currentTarget.files ?? []
+        if (file !== undefined) void candidateSession.analyzeJobPostingFile({ file })
+      }} type="file" />
+  </>
+}
+
+function JobPostingInputActions({ candidateSession, content, localization }:
+WorkspaceProps & Readonly<{ content: string }>) {
+  return <>
+    <button className="primary-action compact-action"
+      disabled={candidateSession.pendingOperation !== null || content.trim().length === 0}
+      onClick={() => void candidateSession.analyzeJobPosting({ content })} type="button">
+      {localization.translate('jobPosting.analyze')}
+    </button>
+    <button className="secondary-action" disabled={content.trim().length === 0}
+      onClick={() => void candidateSession.reviewJobPosting({ content })} type="button">
+      {localization.translate('jobPosting.review')}
+    </button>
+  </>
 }
 
 function JobPostingReview({ candidateSession, jobPosting, localization }: ReviewProps) {
@@ -165,13 +191,13 @@ function ExtractJobRequirementsButton({
   </button>
 }
 
-function JobRequirementReview({ jobPosting, localization }: ReviewProps) {
+function JobRequirementReview({ candidateSession, jobPosting, localization }: ReviewProps) {
   const requirementGroups = groupJobRequirements({ requirements: jobPosting.requirements })
   const requiredCount = countRequirements({ classification: 'required', requirements: jobPosting.requirements })
   const preferredCount = countRequirements({ classification: 'preferred', requirements: jobPosting.requirements })
   return (
     <div className="source-profile-card">
-      <TargetRoleReview {...{ jobPosting, localization }} />
+      <TargetRoleReview {...{ candidateSession, jobPosting, localization }} />
       <h3 id="job-requirements-title" tabIndex={-1}>
         {localization.translate('jobPosting.requirementsTitle')}
       </h3>
@@ -223,20 +249,52 @@ function countRequirements({ classification, requirements }: Readonly<{
   return requirements.filter((requirement) => requirement.classification === classification).length
 }
 
-function TargetRoleReview({ jobPosting, localization }: Omit<ReviewProps, 'candidateSession'>) {
+function TargetRoleReview({ candidateSession, jobPosting, localization }: ReviewProps) {
   const targetRole = jobPosting.targetRole
+  const [value, setValue] = useState(targetRole?.value ?? '')
+  useEffect(() => { setValue(targetRole?.value ?? '') }, [targetRole?.value])
   return <section aria-labelledby="target-role-title">
     <h3 id="target-role-title">{localization.translate('jobPosting.targetRoleTitle')}</h3>
-    {targetRole === null || targetRole === undefined
-      ? <p>{localization.translate('jobPosting.targetRoleFallback')}</p>
-      : <>
-        <strong>{targetRole.value}</strong>
-        <p className="source-excerpt">
-          <strong>{localization.translate('jobPosting.sourceExcerpt')}</strong>
-          <span>{targetRole.sourceExcerpt}</span>
-        </p>
-      </>}
+    <TargetRoleValue {...{ localization, targetRole }} />
+    <TargetRoleCorrectionForm {...{
+      candidateSession, jobPosting, localization, setValue, value,
+    }} />
   </section>
+}
+
+function TargetRoleValue({ localization, targetRole }: Readonly<{
+  localization: Localization
+  targetRole: JobPostingReview['targetRole']
+}>) {
+  if (targetRole === null || targetRole === undefined) {
+    return <p>{localization.translate('jobPosting.targetRoleFallback')}</p>
+  }
+  return <>
+    <strong>{targetRole.value}</strong>
+    <p className="source-excerpt">
+      <strong>{localization.translate('jobPosting.sourceExcerpt')}</strong>
+      <span>{targetRole.sourceExcerpt}</span>
+    </p>
+  </>
+}
+
+function TargetRoleCorrectionForm({ candidateSession, jobPosting, localization, setValue, value }:
+ReviewProps & Readonly<{ setValue: (value: string) => void; value: string }>) {
+  const updateTargetRole = () => candidateSession.updateTargetRole({ value })
+  const isValidTitle = isExactTargetRoleTitle({
+    jobPostingContent: jobPosting.outgoingContent, value,
+  })
+  return <form onSubmit={(event) => {
+    event.preventDefault()
+    void updateTargetRole()
+  }}>
+      <label htmlFor="target-role-value">{localization.translate('jobPosting.targetRoleEdit')}</label>
+      <input id="target-role-value" value={value}
+        onChange={(event) => { setValue(event.currentTarget.value) }} />
+      <button disabled={candidateSession.pendingOperation !== null || !isValidTitle} type="submit">
+        {localization.translate('jobPosting.targetRoleSave')}
+      </button>
+    </form>
 }
 
 function JobRequirementCard({ localization, requirement }: Readonly<{

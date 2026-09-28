@@ -9,6 +9,7 @@ import type {
   ResumeClaimId,
   SourceProfileFactId,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import { createJobPostingAnalysis } from '@resume-tailoring/application/job-posting-analysis'
 import { createResumeTailoringWorkflow } from '@resume-tailoring/application/resume-tailoring-workflow-composition'
 import { useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -161,18 +162,72 @@ function createSourceProfileFactActions(dependencies: CandidateSessionActionDepe
 
 function createJobPostingActions(dependencies: CandidateSessionActionDependencies) {
   const execute = (command: ResumeTailoringCommand) => executeCommand({ ...dependencies, command })
+  const analysis = createJobPostingAnalysis({ execute,
+    sourceDocumentReader: createBrowserSourceDocumentReader() })
   return {
-    reviewJobPosting: ({ content }: Readonly<{ content: string }>) => execute({
-      type: 'review-job-posting', content,
-    }),
+    analyzeJobPosting: analysis.analyzePastedJobPosting,
+    analyzeJobPostingFile: ({ file }: Readonly<{ file: File }>) =>
+      analyzeJobPostingFile({ analysis, dependencies, file }),
+    reviewJobPosting: ({ content }: Readonly<{ content: string }>) =>
+      execute({ type: 'review-job-posting', content }),
     updateJobPostingContent: ({ outgoingContent }: Readonly<{ outgoingContent: string }>) => execute({
       type: 'update-job-posting-content', outgoingContent,
     }),
-    confirmJobPostingProcessingNotice: () => execute({
-      type: 'confirm-job-posting-processing-notice',
-    }),
+    updateTargetRole: ({ value }: Readonly<{ value: string }>) =>
+      updateTargetRoleAndAnalyze({ dependencies, value }),
+    confirmJobPostingProcessingNotice: () => execute({ type: 'confirm-job-posting-processing-notice' }),
     extractJobRequirements: () => execute({ type: 'extract-job-requirements' }),
   }
+}
+
+async function analyzeJobPostingFile({ analysis, dependencies, file }: Readonly<{
+  analysis: ReturnType<typeof createJobPostingAnalysis>
+  dependencies: CandidateSessionActionDependencies
+  file: File
+}>) {
+  try {
+    const document = await readSourceDocumentFile({ file })
+    const result = await analysis.analyzeUploadedJobPosting({ document })
+    applyJobPostingDocumentFailure({ dependencies, result })
+    return result
+  } catch {
+    setJobPostingFailure({ dependencies })
+    return null
+  }
+}
+
+function applyJobPostingDocumentFailure({ dependencies, result }: Readonly<{
+  dependencies: CandidateSessionActionDependencies
+  result: Awaited<ReturnType<ReturnType<typeof createJobPostingAnalysis>['analyzeUploadedJobPosting']>>
+}>) {
+  if (result.ok || !isSourceDocumentReadFailure({ result })) return
+  setJobPostingFailure({ dependencies })
+}
+
+function setJobPostingFailure({ dependencies }: Readonly<{
+  dependencies: CandidateSessionActionDependencies
+}>) {
+  dependencies.setState((state) => ({ ...state, failureMessageKey: 'jobPosting.failure' }))
+}
+
+async function updateTargetRoleAndAnalyze({ dependencies, value }: Readonly<{
+  dependencies: CandidateSessionActionDependencies
+  value: string
+}>) {
+  const updated = await executeCommand({
+    ...dependencies,
+    command: { type: 'update-target-role', value },
+  })
+  if (!updated.ok) return updated
+  return executeCommand({ ...dependencies, command: { type: 'analyze-match' } })
+}
+
+function isSourceDocumentReadFailure({ result }: Readonly<{
+  result: ResumeTailoringResult<ResumeTailoringView>
+}>) {
+  return !result.ok && (result.error.type === 'unsupported-source-document'
+    || result.error.type === 'unreadable-source-document'
+    || result.error.type === 'incompatible-source-document-reader')
 }
 
 function createMatchAnalysisActions(dependencies: CandidateSessionActionDependencies) {
@@ -258,11 +313,19 @@ async function importSourceDocument({ file, ...dependencies }: SourceDocumentImp
 }
 
 async function createSourceDocumentImportCommand({ file }: Readonly<{ file: File }>) {
-  const bytes = new Uint8Array(await file.arrayBuffer())
+  const document = await readSourceDocumentFile({ file })
   return {
     type: 'import-source-document',
-    document: { bytes, mediaType: file.type, name: file.name },
+    document,
   } as const
+}
+
+async function readSourceDocumentFile({ file }: Readonly<{ file: File }>) {
+  return {
+    bytes: new Uint8Array(await file.arrayBuffer()),
+    mediaType: file.type,
+    name: file.name,
+  }
 }
 
 function applySourceDocumentImportFailure({ executionGeneration, operationTimeout, ...dependencies }:
@@ -431,6 +494,7 @@ function isResumeClaimCommand(command: ResumeTailoringCommand) {
 
 function isJobPostingCommand(command: ResumeTailoringCommand) {
   return command.type === 'review-job-posting'
+    || command.type === 'update-target-role'
     || command.type === 'update-job-posting-content'
     || command.type === 'confirm-job-posting-processing-notice'
     || command.type === 'extract-job-requirements'

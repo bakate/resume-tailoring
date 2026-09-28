@@ -54,4 +54,36 @@ describe('browser Job Requirement extractor contract', () => {
       error: { type: 'job-requirement-extraction-unavailable' },
     })
   })
+
+  it.each([
+    ['invented classification', {
+      classification: 'mandatory',
+      sourceExcerpt: 'TypeScript is required.',
+      value: 'Know TypeScript',
+    }],
+    ['invented source excerpt', {
+      classification: 'required',
+      sourceExcerpt: 'React is required.',
+      value: 'React',
+    }],
+    ['invented requirement value', {
+      classification: 'required',
+      sourceExcerpt: 'TypeScript is required.',
+      value: '10 years of Rust',
+    }],
+  ])('rejects an %s returned across the transport boundary', async (_caseName, requirement) => {
+    const extractor = createBrowserJobRequirementExtractor({
+      request: () => Promise.resolve(Response.json({
+        ok: true,
+        value: { targetRole: null, requirements: [requirement] },
+      })),
+    })
+
+    const result = await extractor.extract({ jobPostingContent: 'TypeScript is required.' })
+
+    expect(result).toEqual({
+      ok: false,
+      error: { type: 'job-requirement-transport-unavailable' },
+    })
+  })
 })

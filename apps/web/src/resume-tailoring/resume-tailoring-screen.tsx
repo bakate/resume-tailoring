@@ -630,6 +630,7 @@ const sourceProfileOperations = new Set<ResumeTailoringCommand['type']>([
 const jobPostingOperations = new Set<ResumeTailoringCommand['type']>([
   'review-job-posting',
   'update-job-posting-content',
+  'update-target-role',
   'confirm-job-posting-processing-notice',
   'extract-job-requirements',
 ])
