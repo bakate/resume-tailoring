@@ -1,5 +1,6 @@
 import type {
   ResumeTailoringCommand,
+  ResumeTailoringFailure,
   ResumeTailoringResult,
   ResumeTailoringView,
   ResumeTailoringWorkflow,
@@ -59,6 +60,9 @@ export type CandidateSessionFailureMessageKey =
   | 'sourceProfile.extractionFailure'
   | 'sourceProfile.failure'
   | 'sourceProfile.browserCompatibilityFailure'
+  | 'sourceProfile.encryptedPdfFailure'
+  | 'sourceProfile.invalidPdfFailure'
+  | 'sourceProfile.textEmptyPdfFailure'
   | 'sourceProfile.unreadableFailure'
   | 'sourceProfile.unsupportedFailure'
   | 'jobPosting.extractionFailure'
@@ -73,6 +77,9 @@ export function isSourceDocumentIntakeFailureMessage(
 ) {
   return messageKey === 'sourceProfile.failure'
     || messageKey === 'sourceProfile.browserCompatibilityFailure'
+    || messageKey === 'sourceProfile.encryptedPdfFailure'
+    || messageKey === 'sourceProfile.invalidPdfFailure'
+    || messageKey === 'sourceProfile.textEmptyPdfFailure'
     || messageKey === 'sourceProfile.unreadableFailure'
     || messageKey === 'sourceProfile.unsupportedFailure'
 }
@@ -510,7 +517,9 @@ function readTypedFailureMessageKey({
   if (result.error.type === 'incompatible-source-document-reader') {
     return 'sourceProfile.browserCompatibilityFailure'
   }
-  if (result.error.type === 'unreadable-source-document') return 'sourceProfile.unreadableFailure'
+  if (result.error.type === 'unreadable-source-document') {
+    return readUnreadableDocumentMessageKey({ reason: result.error.reason })
+  }
   if (result.error.type === 'source-profile-extraction-unavailable') {
     return 'sourceProfile.extractionFailure'
   }
@@ -525,6 +534,17 @@ function readTypedFailureMessageKey({
   }
   if (result.error.type === 'match-analysis-unavailable') return 'matchAnalysis.failure'
   return fallback
+}
+
+function readUnreadableDocumentMessageKey({ reason }: Readonly<{
+  reason: Extract<ResumeTailoringFailure, {
+    readonly type: 'unreadable-source-document'
+  }>['reason']
+}>): CandidateSessionFailureMessageKey {
+  if (reason === 'encrypted-pdf') return 'sourceProfile.encryptedPdfFailure'
+  if (reason === 'invalid-pdf') return 'sourceProfile.invalidPdfFailure'
+  if (reason === 'text-empty') return 'sourceProfile.textEmptyPdfFailure'
+  return 'sourceProfile.unreadableFailure'
 }
 
 const initialCandidateSessionState = {

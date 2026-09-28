@@ -2114,7 +2114,7 @@ class ResumeTailoringBrowserTestSystem {
     this.#expectCompletedAction('unreadable-source-document-rejected')
     const input = this.#page.locator('.source-document-input')
     await expect(input.getByRole('alert')).toHaveText(
-      "Ce PDF n'a pas pu être lu. Choisis un PDF texte valide ; les PDF scannés composés uniquement d'images ne sont pas pris en charge.",
+      "Ce fichier n'est pas un PDF valide. Choisis un autre fichier PDF.",
     )
     await expect(input.getByText('PDF sélectionné : scanned-resume.pdf'))
       .toHaveAttribute('aria-live', 'polite')
@@ -2150,7 +2150,7 @@ class ResumeTailoringBrowserTestSystem {
     this.#expectCompletedAction('unreadable-source-document-rejected')
     const input = this.#page.locator('.source-document-input')
     await expect(input.getByRole('alert')).toHaveText(
-      'This PDF could not be read. Choose a valid text-based PDF; scanned image-only PDFs are not supported.',
+      'This file is not a valid PDF. Choose another PDF file.',
     )
     await expect(input.getByText('Selected PDF: scanned-resume.pdf'))
       .toHaveAttribute('aria-live', 'polite')

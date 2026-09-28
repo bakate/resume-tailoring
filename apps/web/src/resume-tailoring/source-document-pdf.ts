@@ -1,10 +1,10 @@
 import type { SourceDocumentReader } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
-import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
-import type * as PdfReaderExports from 'pdfjs-dist/legacy/build/pdf.mjs'
+import type { PDFDocumentLoadingTask, PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 
 import { installPromiseWithResolvers } from './promise-with-resolvers'
+import { sourceDocumentBrowserSupportPolicy } from './source-document-browser-support'
 
-type SourceDocumentBrowserCapability = 'text-decoder' | 'worker'
+type SourceDocumentBrowserCapability = 'worker'
 type SourceDocumentBrowserEnvironment = Readonly<{
   capabilities: readonly SourceDocumentBrowserCapability[]
   userAgent: string
@@ -13,28 +13,19 @@ type SourceDocumentReaderDependencies = Readonly<{
   loadPdfReader?: () => Promise<PdfReaderLoadResult>
   readBrowserEnvironment?: () => SourceDocumentBrowserEnvironment
 }>
-type PdfReaderModule = typeof PdfReaderExports
+type PdfReaderModule = Readonly<{
+  GlobalWorkerOptions: { workerSrc: string }
+  getDocument: (parameters: Readonly<{ data: Uint8Array }>) => Pick<
+    PDFDocumentLoadingTask,
+    'destroy' | 'promise'
+  >
+}>
 type PdfReaderLoadResult =
   | Readonly<{
       ok: true
       value: Readonly<{ pdfReader: PdfReaderModule; workerUrl: string }>
     }>
   | Readonly<{ ok: false; error: { readonly type: 'pdf-reader-load-failure' } }>
-
-export const sourceDocumentBrowserSupportMatrix = {
-  chromium: {
-    minimumMajorVersion: 125,
-    variants: ['Chrome desktop', 'Chromium desktop', 'Chrome for Android'],
-  },
-  firefox: {
-    minimumMajorVersion: 140,
-    variants: ['Firefox desktop', 'Firefox for Android'],
-  },
-  webkit: {
-    minimumMajorVersion: 18,
-    variants: ['Safari for macOS', 'Safari for iOS', 'Safari for iPadOS'],
-  },
-} as const
 
 export function createBrowserSourceDocumentReader({
   loadPdfReader = loadBrowserPdfReader,
@@ -50,7 +41,7 @@ function isSupportedBrowser({ userAgent }: Readonly<{ userAgent: string }>) {
   const browserVersion = readBrowserVersion({ userAgent })
   if (browserVersion === null) return userAgent === nonBrowserTestEnvironment.userAgent
   return browserVersion.majorVersion
-    >= sourceDocumentBrowserSupportMatrix[browserVersion.family].minimumMajorVersion
+    >= sourceDocumentBrowserSupportPolicy.matrix[browserVersion.family].minimumMajorVersion
 }
 
 function readBrowserVersion({ userAgent }: Readonly<{ userAgent: string }>){
@@ -75,10 +66,7 @@ function readBrowserVersion({ userAgent }: Readonly<{ userAgent: string }>){
 function readCurrentBrowserEnvironment(): SourceDocumentBrowserEnvironment {
   if (typeof window === 'undefined') return nonBrowserTestEnvironment
   return {
-    capabilities: [
-      ...(typeof TextDecoder === 'function' ? ['text-decoder'] as const : []),
-      ...(typeof Worker === 'function' ? ['worker'] as const : []),
-    ],
+    capabilities: typeof Worker === 'function' ? ['worker'] : [],
     userAgent: navigator.userAgent,
   }
 }
@@ -101,17 +89,59 @@ async function readSourceDocument({
   if (!pdfReaderResult.ok) return incompatiblePdfReaderResult
   const { GlobalWorkerOptions, getDocument } = pdfReaderResult.value.pdfReader
   if (typeof window !== 'undefined') GlobalWorkerOptions.workerSrc = pdfReaderResult.value.workerUrl
-  const loadingTask = getDocument({ data: document.bytes.slice() })
+  const loadingTaskResult = createPdfLoadingTask({ bytes: document.bytes, getDocument })
+  if (!loadingTaskResult.ok) return incompatiblePdfReaderRuntimeResult
+  return readPdfLoadingTask({ loadingTask: loadingTaskResult.value })
+}
+
+function createPdfLoadingTask({ bytes, getDocument }: Readonly<{
+  bytes: Uint8Array
+  getDocument: PdfReaderModule['getDocument']
+}>) {
   try {
-    try {
-      const pdfDocument = await loadingTask.promise
-      const text = await readPdfText({ pdfDocument })
-      return text.length === 0 ? textEmptyResult : { ok: true, value: text }
-    } finally {
-      await loadingTask.destroy()
-    }
+    return { ok: true, value: getDocument({ data: bytes.slice() }) } as const
+  } catch {
+    return { ok: false, error: { type: 'pdf-reader-runtime-failure' } } as const
+  }
+}
+
+async function readPdfLoadingTask({ loadingTask }: Readonly<{
+  loadingTask: ReturnType<PdfReaderModule['getDocument']>
+}>) {
+  const pdfDocumentResult = await loadPdfDocument({ loadingTask })
+  const readResult = pdfDocumentResult.ok
+    ? await extractPdfText({ pdfDocument: pdfDocumentResult.value })
+    : pdfDocumentResult
+  await destroyPdfLoadingTask({ loadingTask })
+  return readResult
+}
+
+async function loadPdfDocument({ loadingTask }: Readonly<{
+  loadingTask: ReturnType<PdfReaderModule['getDocument']>
+}>) {
+  try {
+    return { ok: true, value: await loadingTask.promise } as const
   } catch (error) {
-    return readPdfDocumentFailure({ error })
+    return readPdfLoadingFailure({ error })
+  }
+}
+
+async function extractPdfText({ pdfDocument }: Readonly<{ pdfDocument: PDFDocumentProxy }>) {
+  try {
+    const text = await readPdfText({ pdfDocument })
+    return text.length === 0 ? textEmptyResult : { ok: true, value: text } as const
+  } catch {
+    return pdfReadFailureResult
+  }
+}
+
+async function destroyPdfLoadingTask({ loadingTask }: Readonly<{
+  loadingTask: ReturnType<PdfReaderModule['getDocument']>
+}>) {
+  try {
+    await loadingTask.destroy()
+  } catch {
+    return
   }
 }
 
@@ -119,7 +149,6 @@ function readCompatibilityFailure({ browserEnvironment }: Readonly<{
   browserEnvironment: SourceDocumentBrowserEnvironment
 }>) {
   if (!browserEnvironment.capabilities.includes('worker')) return incompatibleBrowserResult
-  if (!browserEnvironment.capabilities.includes('text-decoder')) return missingTextDecoderResult
   return isSupportedBrowser({ userAgent: browserEnvironment.userAgent })
     ? null
     : unsupportedBrowserVersionResult
@@ -140,14 +169,25 @@ async function loadBrowserPdfReader(): Promise<PdfReaderLoadResult> {
 function readPastedText({ document }: Readonly<{
   document: Parameters<SourceDocumentReader['read']>[0]
 }>) {
-  const text = new TextDecoder().decode(document.bytes).trim()
+  const text = decodeUtf8({ bytes: document.bytes }).trim()
   return text.length === 0 ? textEmptyResult : { ok: true, value: text } as const
 }
 
-function readPdfDocumentFailure({ error }: Readonly<{ error: unknown }>) {
+function decodeUtf8({ bytes }: Readonly<{ bytes: Uint8Array }>) {
+  const encodedBytes = bytes.reduce((encodedText, byte) => (
+    `${encodedText}%${byte.toString(16).padStart(2, '0')}`
+  ), '')
+  try {
+    return decodeURIComponent(encodedBytes)
+  } catch {
+    return ''
+  }
+}
+
+function readPdfLoadingFailure({ error }: Readonly<{ error: unknown }>) {
   if (hasErrorName({ error, name: 'PasswordException' })) return encryptedPdfResult
   if (hasErrorName({ error, name: 'InvalidPDFException' })) return invalidPdfResult
-  return pdfReadFailureResult
+  return incompatiblePdfReaderRuntimeResult
 }
 
 function hasErrorName({ error, name }: Readonly<{ error: unknown; name: string }>) {
@@ -213,14 +253,6 @@ const incompatibleBrowserResult = {
   },
 } as const
 
-const missingTextDecoderResult = {
-  ok: false,
-  error: {
-    type: 'incompatible-source-document-reader',
-    reason: 'missing-text-decoder-capability',
-  },
-} as const
-
 const unsupportedBrowserVersionResult = {
   ok: false,
   error: {
@@ -237,7 +269,15 @@ const incompatiblePdfReaderResult = {
   },
 } as const
 
+const incompatiblePdfReaderRuntimeResult = {
+  ok: false,
+  error: {
+    type: 'incompatible-source-document-reader',
+    reason: 'pdf-reader-runtime-failure',
+  },
+} as const
+
 const nonBrowserTestEnvironment = {
-  capabilities: ['text-decoder', 'worker'],
+  capabilities: ['worker'],
   userAgent: 'non-browser-test-environment',
 } as const

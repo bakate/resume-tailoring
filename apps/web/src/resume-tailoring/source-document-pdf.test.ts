@@ -6,7 +6,7 @@ describe('browser Source Document reader', () => {
   it('reports browser incompatibility when PDF reading capabilities are unavailable', async () => {
     const reader = createBrowserSourceDocumentReader({
       readBrowserEnvironment: () => ({
-        capabilities: ['text-decoder'],
+        capabilities: [],
         userAgent: supportedChromeUserAgent,
       }),
     })
@@ -29,7 +29,7 @@ describe('browser Source Document reader', () => {
   it('keeps pasted text available when PDF reading capabilities are unavailable', async () => {
     const reader = createBrowserSourceDocumentReader({
       readBrowserEnvironment: () => ({
-        capabilities: ['text-decoder'],
+        capabilities: [],
         userAgent: supportedChromeUserAgent,
       }),
     })
@@ -43,7 +43,9 @@ describe('browser Source Document reader', () => {
     expect(result).toEqual({ ok: true, value: 'Senior FullStack Developer' })
   })
 
-  it('reports browser incompatibility when text decoding is unavailable', async () => {
+  it('keeps pasted text available without the native TextDecoder API', async () => {
+    const textDecoderDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'TextDecoder')
+    Reflect.deleteProperty(globalThis, 'TextDecoder')
     const reader = createBrowserSourceDocumentReader({
       readBrowserEnvironment: () => ({
         capabilities: ['worker'],
@@ -51,25 +53,23 @@ describe('browser Source Document reader', () => {
       }),
     })
 
-    const result = await reader.read({
-      bytes: new Uint8Array([37, 80, 68, 70]),
-      mediaType: 'application/pdf',
-      name: 'resume.pdf',
-    })
+    try {
+      const result = await reader.read({
+        bytes: new Uint8Array([83, 101, 110, 105, 111, 114]),
+        mediaType: 'text/plain',
+        name: 'pasted-professional-text.txt',
+      })
 
-    expect(result).toEqual({
-      ok: false,
-      error: {
-        type: 'incompatible-source-document-reader',
-        reason: 'missing-text-decoder-capability',
-      },
-    })
+      expect(result).toEqual({ ok: true, value: 'Senior' })
+    } finally {
+      restoreGlobalProperty({ descriptor: textDecoderDescriptor, property: 'TextDecoder' })
+    }
   })
 
   it('reports browser incompatibility when WebKit is older than the supported matrix', async () => {
     const reader = createBrowserSourceDocumentReader({
       readBrowserEnvironment: () => ({
-        capabilities: ['text-decoder', 'worker'],
+        capabilities: ['worker'],
         userAgent: unsupportedIosWebKitUserAgent,
       }),
     })
@@ -94,7 +94,7 @@ describe('browser Source Document reader', () => {
     Reflect.deleteProperty(Promise, 'withResolvers')
     const reader = createBrowserSourceDocumentReader({
       readBrowserEnvironment: () => ({
-        capabilities: ['text-decoder', 'worker'],
+        capabilities: ['worker'],
         userAgent: supportedChromeUserAgent,
       }),
     })
@@ -122,7 +122,7 @@ describe('browser Source Document reader', () => {
         error: { type: 'pdf-reader-load-failure' },
       }),
       readBrowserEnvironment: () => ({
-        capabilities: ['text-decoder', 'worker'],
+        capabilities: ['worker'],
         userAgent: supportedChromeUserAgent,
       }),
     })
@@ -139,6 +139,104 @@ describe('browser Source Document reader', () => {
         type: 'incompatible-source-document-reader',
         reason: 'pdf-reader-load-failure',
       },
+    })
+  })
+
+  it('contains a synchronous PDF runtime failure as browser incompatibility', async () => {
+    const reader = createBrowserSourceDocumentReader({
+      loadPdfReader: () => Promise.resolve({
+        ok: true,
+        value: {
+          pdfReader: {
+            GlobalWorkerOptions: { workerSrc: '' },
+            getDocument: () => { throw new TypeError('Missing browser API') },
+          },
+          workerUrl: '/pdf-worker.js',
+        },
+      }),
+      readBrowserEnvironment: () => ({
+        capabilities: ['worker'],
+        userAgent: supportedChromeUserAgent,
+      }),
+    })
+
+    const result = await reader.read({
+      bytes: createTextPdf({ text: 'Senior FullStack Developer' }),
+      mediaType: 'application/pdf',
+      name: 'resume.pdf',
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'incompatible-source-document-reader',
+        reason: 'pdf-reader-runtime-failure',
+      },
+    })
+  })
+
+  it('contains an asynchronous PDF runtime failure as browser incompatibility', async () => {
+    const reader = createBrowserSourceDocumentReader({
+      loadPdfReader: () => Promise.resolve({
+        ok: true,
+        value: {
+          pdfReader: {
+            GlobalWorkerOptions: { workerSrc: '' },
+            getDocument: () => ({
+              destroy: () => Promise.resolve(),
+              promise: Promise.reject(new Error('Worker initialization failed')),
+            }),
+          },
+          workerUrl: '/pdf-worker.js',
+        },
+      }),
+      readBrowserEnvironment: () => ({
+        capabilities: ['worker'],
+        userAgent: supportedChromeUserAgent,
+      }),
+    })
+
+    const result = await reader.read({
+      bytes: createTextPdf({ text: 'Senior FullStack Developer' }),
+      mediaType: 'application/pdf',
+      name: 'resume.pdf',
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        type: 'incompatible-source-document-reader',
+        reason: 'pdf-reader-runtime-failure',
+      },
+    })
+  })
+
+  it('preserves encrypted PDFs as a document-specific failure', async () => {
+    const encryptedPdfError = new Error('Password required')
+    encryptedPdfError.name = 'PasswordException'
+    const reader = createReaderWithLoadingFailure({ error: encryptedPdfError })
+
+    const result = await reader.read(createPdfSourceDocument())
+
+    expect(result).toEqual({
+      ok: false,
+      error: { type: 'unreadable-source-document', reason: 'encrypted-pdf' },
+    })
+  })
+
+  it('preserves text-empty PDFs as a document-specific failure', async () => {
+    const reader = createBrowserSourceDocumentReader({
+      readBrowserEnvironment: readSupportedBrowserEnvironment,
+    })
+
+    const result = await reader.read({
+      ...createPdfSourceDocument(),
+      bytes: createTextPdf({ text: '' }),
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      error: { type: 'unreadable-source-document', reason: 'text-empty' },
     })
   })
 
@@ -160,6 +258,37 @@ describe('browser Source Document reader', () => {
 
 const supportedChromeUserAgent = 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36'
 const unsupportedIosWebKitUserAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_7 like Mac OS X) AppleWebKit/605.1.15 Version/17.7 Mobile/15E148 Safari/604.1'
+
+function createReaderWithLoadingFailure({ error }: Readonly<{ error: Error }>) {
+  return createBrowserSourceDocumentReader({
+    loadPdfReader: () => Promise.resolve({
+      ok: true,
+      value: {
+        pdfReader: {
+          GlobalWorkerOptions: { workerSrc: '' },
+          getDocument: () => ({
+            destroy: () => Promise.resolve(),
+            promise: Promise.reject(error),
+          }),
+        },
+        workerUrl: '/pdf-worker.js',
+      },
+    }),
+    readBrowserEnvironment: readSupportedBrowserEnvironment,
+  })
+}
+
+function createPdfSourceDocument() {
+  return {
+    bytes: createTextPdf({ text: 'Senior FullStack Developer' }),
+    mediaType: 'application/pdf',
+    name: 'resume.pdf',
+  } as const
+}
+
+function readSupportedBrowserEnvironment() {
+  return { capabilities: ['worker'], userAgent: supportedChromeUserAgent } as const
+}
 
 function createTextPdf({ text }: Readonly<{ text: string }>) {
   const escapedText = text.replaceAll('\\', '\\\\').replaceAll('(', '\\(').replaceAll(')', '\\)')
@@ -197,4 +326,12 @@ function restoreWithResolvers({ descriptor }: Readonly<{
     return
   }
   Object.defineProperty(Promise, 'withResolvers', descriptor)
+}
+
+function restoreGlobalProperty({ descriptor, property }: Readonly<{
+  descriptor: PropertyDescriptor | undefined
+  property: 'TextDecoder'
+}>) {
+  if (descriptor === undefined) return
+  Object.defineProperty(globalThis, property, descriptor)
 }

@@ -11,6 +11,7 @@
     "dev": "turbo run dev --filter=@resume-tailoring/web",
     "lint": "eslint .",
     "test": "turbo run test",
+    "test:e2e:compatibility": "pnpm --filter @resume-tailoring/web test:e2e:compatibility",
     "test:evaluation": "pnpm --filter @resume-tailoring/web test:evaluation",
     "test:e2e": "pnpm --filter @resume-tailoring/web test:e2e",
     "typecheck": "turbo run typecheck"
