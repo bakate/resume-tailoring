@@ -28,6 +28,7 @@ const translationWritingInputs = {
     requirementId: typeScriptRequirement.id,
   }],
   requirements: [typeScriptRequirement],
+  locale: 'fr',
   verifiedFacts: [verifiedBillingPlatformFact],
 } as const
 
@@ -37,6 +38,7 @@ const englishWritingInputs = {
     requirementId: englishTypeScriptRequirement.id,
   }],
   requirements: [englishTypeScriptRequirement],
+  locale: 'en',
   verifiedFacts: [verifiedBillingPlatformFact],
 } as const
 

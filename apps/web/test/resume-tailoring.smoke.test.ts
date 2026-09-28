@@ -646,9 +646,10 @@ test('a Candidate generates validated provenance-backed Resume Claims', async ({
   await system.analyzeMatch()
   await system.givenTailoredResumeStepIsOpen()
 
+  await system.selectFrenchResumeLanguage()
   await system.generateResumeClaims()
 
-  await system.expectValidatedResumeClaimsWithoutFreeEditing()
+  await system.expectValidatedResumeClaimsWithExplicitLanguageAndEditing()
 })
 
 test('eligible delayed generation prevents duplicates and focuses curated Resume Claims', async ({ page }) => {
@@ -756,6 +757,18 @@ test('a Candidate removes one Resume Claim from the compact collection', async (
   await system.removeFirstResumeClaim()
 
   await system.expectResumeClaimRemoval()
+})
+
+test('an unsupported free edit becomes a confirmed Candidate Fact', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenTailoredResumeIsStored()
+  await system.givenResumeClaimEditIsUnsupported()
+
+  await system.editFirstResumeClaimWithNewProfessionalContent()
+  await system.confirmFirstResumeClaimEditAsCandidateFact()
+
+  await system.expectConfirmedResumeClaimEditToBeUsable()
 })
 
 test('reformulation controls stay compact and keep provenance rules explicit', async ({ page }) => {
@@ -943,6 +956,7 @@ class ResumeTailoringBrowserTestSystem {
   #pendingSourceProfileExtractionCompletion: Promise<void> | undefined
   #pendingSourceProfileExtractionResponse: (() => void) | undefined
   #resumeClaimWritingRequestCount = 0
+  readonly #resumeClaimWritingLocales: string[] = []
   readonly #resumeClaimReformulationRequests: string[] = []
   #resumePdfRequest: unknown
   #sourceProfileExtractionAttemptCount = 0
@@ -1173,6 +1187,7 @@ class ResumeTailoringBrowserTestSystem {
       const writingRequest = resumeClaimWritingRequestSchema.safeParse(
         JSON.parse(route.request().postData() ?? 'null') as unknown,
       )
+      if (writingRequest.success) this.#resumeClaimWritingLocales.push(writingRequest.data.locale)
       const [verifiedFact] = writingRequest.success ? writingRequest.data.verifiedFacts : []
       const claimTexts = [
         'Built React applications at Acme',
@@ -1191,6 +1206,22 @@ class ResumeTailoringBrowserTestSystem {
       })
     })
     await this.#givenSupportedResumeClaimValidation()
+  }
+
+  async givenResumeClaimEditIsUnsupported() {
+    await this.#page.unroute('**/api/resume-claim-validation')
+    await this.#page.route('**/api/resume-claim-validation', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          value: {
+            supported: false,
+            feedback: [{ code: 'strengthened-scope', segmentIndex: 0 }],
+          },
+        }),
+      })
+    })
   }
 
   async givenResumeClaimGenerationCanBeDelayed() {
@@ -1940,8 +1971,31 @@ class ResumeTailoringBrowserTestSystem {
 
   async generateResumeClaims() {
     await this.#page.getByRole('button', { name: 'Generate Resume Claims' }).click()
-    await this.#page.getByText('Built React applications at Acme', { exact: true }).waitFor()
+    await this.#page.locator('.resume-claim-text')
+      .filter({ hasText: 'Built React applications at Acme' }).waitFor()
     this.#completedAction = 'resume-claims-generated'
+  }
+
+  async selectFrenchResumeLanguage() {
+    await expect(this.#page.getByRole('radio', { name: 'English' })).toBeChecked()
+    await this.#page.getByRole('radio', { name: 'Français' }).check()
+  }
+
+  async editFirstResumeClaimWithNewProfessionalContent() {
+    const firstClaim = this.#readFirstResumeClaim()
+    await firstClaim.getByText('Edit claim — Resume Claim 1', { exact: true }).click()
+    await firstClaim.getByLabel('Edit claim').fill('Led 20 platform migrations')
+    await firstClaim.getByRole('button', { name: 'Save edit' }).click()
+    await expect(firstClaim.getByText(/existing Candidate Facts do not support/)).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Download validated A4 PDF' }))
+      .toHaveCount(0)
+    await expect(this.#page.getByRole('alert')).toContainText(/Confirm or discard/)
+  }
+
+  async confirmFirstResumeClaimEditAsCandidateFact() {
+    await this.#readFirstResumeClaim().getByRole('button', {
+      name: 'Confirm as a new Candidate Fact',
+    }).click()
   }
 
   async generateDelayedResumeClaimsWithDoubleClick() {
@@ -1954,7 +2008,8 @@ class ResumeTailoringBrowserTestSystem {
 
   async retryResumeClaimGeneration() {
     await this.#page.getByRole('button', { name: 'Retry Tailored Resume' }).click()
-    await this.#page.getByText('Built React applications at Acme', { exact: true }).waitFor()
+    await this.#page.locator('.resume-claim-text')
+      .filter({ hasText: 'Built React applications at Acme' }).waitFor()
     this.#completedAction = 'resume-claims-retried'
   }
 
@@ -2631,17 +2686,24 @@ class ResumeTailoringBrowserTestSystem {
       .toContainText('2 Job Requirements')
   }
 
-  async expectValidatedResumeClaimsWithoutFreeEditing() {
+  async expectValidatedResumeClaimsWithExplicitLanguageAndEditing() {
     this.#expectCompletedAction('resume-claims-generated')
-    await expect(this.#page.getByText(
-      'Built React applications at Acme',
-      { exact: true },
-    )).toBeVisible()
-    await expect(this.#page.getByText(
-      'Worked as a FullStack Developer at Acme',
-      { exact: true },
-    )).toBeVisible()
-    await expect(this.#page.getByText(/Claims cannot be edited directly/).first()).toBeVisible()
+    const claims = this.#page.locator('.resume-claim-text')
+    await expect(claims.filter({ hasText: 'Built React applications at Acme' })).toBeVisible()
+    await expect(claims.filter({ hasText: 'Worked as a FullStack Developer at Acme' })).toBeVisible()
+    await expect(this.#page.getByText(/You can edit wording directly/).first()).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Regenerate Resume Claims' })).toBeVisible()
+    await expect(this.#page.locator('.resume-preview-frame')).toHaveAttribute('srcdoc', /<html lang="fr"/u)
+    expect(this.#resumeClaimWritingLocales).toEqual(['fr'])
+  }
+
+  async expectConfirmedResumeClaimEditToBeUsable() {
+    await expect(this.#readFirstResumeClaim().locator('.resume-claim-text'))
+      .toHaveText('Led 20 platform migrations')
+    await expect(this.#readFirstResumeClaim().getByText(
+      /existing Candidate Facts do not support/,
+    )).toHaveCount(0)
+    await expect(this.#page.getByRole('button', { name: 'Download validated A4 PDF' })).toBeVisible()
   }
 
   async expectPendingResumeClaimGenerationThenFocusedCollection() {
@@ -2651,7 +2713,8 @@ class ResumeTailoringBrowserTestSystem {
     expect(this.#resumeClaimWritingRequestCount).toBe(1)
     this.#releasePendingResumeClaimWriting?.()
     await expect(this.#page.getByText('Preparing the exact one-page layout…')).toBeVisible()
-    await expect(this.#page.getByText('Built React applications at Acme', { exact: true }))
+    await expect(this.#page.locator('.resume-claim-text')
+      .filter({ hasText: 'Built React applications at Acme' }))
       .toBeVisible()
     await expect(this.#page.locator('#resume-claims-list-title')).toBeFocused()
   }
@@ -2689,14 +2752,9 @@ class ResumeTailoringBrowserTestSystem {
 
   async expectTailoredResumeToBeRestored() {
     this.#expectCompletedAction('resume-claims-reloaded')
-    await expect(this.#page.getByText(
-      'Built React applications at Acme',
-      { exact: true },
-    )).toBeVisible()
-    await expect(this.#page.getByText(
-      'Worked as a FullStack Developer at Acme',
-      { exact: true },
-    )).toBeVisible()
+    const claims = this.#page.locator('.resume-claim-text')
+    await expect(claims.filter({ hasText: 'Built React applications at Acme' })).toBeVisible()
+    await expect(claims.filter({ hasText: 'Worked as a FullStack Developer at Acme' })).toBeVisible()
   }
 
   async expectResumeClaimOrderToChange() {
@@ -2715,7 +2773,8 @@ class ResumeTailoringBrowserTestSystem {
     this.#expectCompletedAction('resume-claim-removed')
     const claims = this.#readResumeClaims()
     await expect(claims.getByRole('listitem')).toHaveCount(1)
-    await expect(claims.getByText('Worked as a FullStack Developer at Acme', { exact: true }))
+    await expect(claims.locator('.resume-claim-text')
+      .filter({ hasText: 'Worked as a FullStack Developer at Acme' }))
       .toBeVisible()
   }
 
@@ -2726,7 +2785,7 @@ class ResumeTailoringBrowserTestSystem {
     await expect(claims.getByRole('button', {
       name: 'Remove claim — Resume Claim 1',
     })).toBeVisible()
-    await expect(this.#page.getByText(/Claims cannot be edited directly/)).toHaveCount(1)
+    await expect(this.#page.getByText(/You can edit wording directly/)).toHaveCount(1)
   }
 
   async expectPendingReformulationThenFocusedCollection() {
@@ -2746,10 +2805,9 @@ class ResumeTailoringBrowserTestSystem {
     }).getByRole('link', { name: 'Preview and export' })).toBeEnabled()
     expect(this.#resumeClaimWritingRequestCount).toBe(1)
     this.#releasePendingResumeClaimWriting?.()
-    await expect(claims.getByText(
-      'Built accessible React applications at Acme',
-      { exact: true },
-    )).toBeVisible()
+    await expect(claims.locator('.resume-claim-text').filter({
+      hasText: 'Built accessible React applications at Acme',
+    })).toBeVisible()
     await expect(this.#page.locator('#resume-claims-list-title')).toBeFocused()
   }
 

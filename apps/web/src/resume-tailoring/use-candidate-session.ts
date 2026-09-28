@@ -46,6 +46,7 @@ export type PendingOperation =
   | 'analyze-match'
   | 'extract-job-requirements'
   | 'extract-source-profile'
+  | 'edit-resume-claim'
   | 'generate-resume-claims'
   | 'import-source-document'
   | 'reformulate-resume-claim'
@@ -247,7 +248,9 @@ function createMatchAnalysisActions(dependencies: CandidateSessionActionDependen
 function createResumeClaimActions(dependencies: CandidateSessionActionDependencies) {
   const execute = (command: ResumeTailoringCommand) => executeCommand({ ...dependencies, command })
   return {
-    generateResumeClaims: () => execute({ type: 'generate-resume-claims' }),
+    generateResumeClaims: ({ locale }: Readonly<{ locale: 'en' | 'fr' }>) => execute({
+      type: 'generate-resume-claims', locale,
+    }),
     removeResumeClaim: ({ claimId }: Readonly<{ claimId: ResumeClaimId }>) => execute({
       type: 'remove-resume-claim', claimId,
     }),
@@ -261,6 +264,15 @@ function createResumeClaimActions(dependencies: CandidateSessionActionDependenci
       claimId: ResumeClaimId
       request: string
     }>) => execute({ type: 'reformulate-resume-claim', claimId, request }),
+    editResumeClaim: ({ claimId, texts }: Readonly<{
+      claimId: ResumeClaimId
+      texts: readonly string[]
+    }>) => execute({ type: 'edit-resume-claim', claimId, texts }),
+    confirmResumeClaimEdit: ({ claimId, kind, text }: Readonly<{
+      claimId: ResumeClaimId
+      kind: SourceProfileFactKind
+      text: string
+    }>) => execute({ type: 'confirm-resume-claim-edit', claimId, kind, text }),
   }
 }
 
@@ -495,6 +507,8 @@ function readFailureMessageKey(command: ResumeTailoringCommand): CandidateSessio
 
 function isResumeClaimCommand(command: ResumeTailoringCommand) {
   return command.type === 'generate-resume-claims'
+    || command.type === 'edit-resume-claim'
+    || command.type === 'confirm-resume-claim-edit'
     || command.type === 'remove-resume-claim'
     || command.type === 'move-resume-claim'
     || command.type === 'reformulate-resume-claim'
@@ -555,6 +569,16 @@ Readonly<{
   result: Extract<ResumeTailoringResult<ResumeTailoringView>, { readonly ok: false }>
   setState: CandidateSessionStateSetter
 }>) {
+  if (result.error.type === 'resume-claim-new-fact-confirmation-required') {
+    setState((state) => ({
+      ...state,
+      failureMessageKey: null,
+      isOperationTakingLong: false,
+      pendingOperation: null,
+      retryCommand: null,
+    }))
+    return
+  }
   setState((state) => ({
     ...state,
     failureMessageKey: readTypedFailureMessageKey({ result, fallback: failureMessageKey }),
@@ -638,6 +662,7 @@ const pendingOperations = new Set<ResumeTailoringCommand['type']>([
   'analyze-match',
   'extract-job-requirements',
   'extract-source-profile',
+  'edit-resume-claim',
   'generate-resume-claims',
   'import-source-document',
   'reformulate-resume-claim',

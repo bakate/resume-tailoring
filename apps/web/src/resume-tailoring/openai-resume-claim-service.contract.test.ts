@@ -37,6 +37,7 @@ describe('OpenAI Resume Claim service contract', () => {
       text: { format: { type: 'json_schema', name: 'resume_claims', strict: true } },
     })
     expect(JSON.stringify(requestBody)).toMatch(/causality, scope, autonomy, seniority/iu)
+    expect(JSON.stringify(requestBody)).toMatch(/exact language requested by locale/iu)
   })
 
   it('rejects claims that reference facts outside the minimized writing input', async () => {
@@ -123,6 +124,7 @@ const writingInputs = {
     requirementId: 'job-requirement-typescript',
     factIds: ['source-fact-typescript'],
   }],
+  locale: 'en',
   requirements: [{
     id: 'job-requirement-typescript',
     classification: 'required',

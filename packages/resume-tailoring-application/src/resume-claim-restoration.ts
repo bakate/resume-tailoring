@@ -16,5 +16,6 @@ export function restoreTailoredResume({ sourceFacts, tailoredResume }: Readonly<
   return {
     claims: claims.flatMap((claim) => claim.ok ? [claim.value] : []),
     exclusions: tailoredResume.exclusions,
+    locale: tailoredResume.locale,
   }
 }

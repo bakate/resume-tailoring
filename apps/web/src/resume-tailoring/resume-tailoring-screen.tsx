@@ -614,6 +614,7 @@ const pendingOperationMessageKeys = {
   'analyze-match': 'operation.analyzeMatch',
   'extract-job-requirements': 'operation.extractJobRequirements',
   'extract-source-profile': 'operation.extractSourceProfile',
+  'edit-resume-claim': 'operation.editResumeClaim',
   'generate-resume-claims': 'operation.generateResumeClaims',
   'import-source-document': 'operation.importSourceDocument',
   'reformulate-resume-claim': 'operation.reformulateResumeClaim',

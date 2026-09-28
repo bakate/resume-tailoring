@@ -24,6 +24,7 @@ type ResumeClaimGenerationDependencies = Readonly<{
 }>
 
 export type ResumeClaimSource = Readonly<{
+  locale: 'en' | 'fr'
   matchAnalysis: MatchAnalysis
   requirements: readonly JobRequirement[]
   sourceFacts: readonly SourceProfileFact[]
@@ -69,16 +70,17 @@ export function createResumeClaimGeneration(
 function createWritingInputs({ source }: Readonly<{
   source: ResumeClaimSource
 }>): ResumeClaimWritingInputs {
-  const relevantFactIds = new Set(source.matchAnalysis.relevantFactIds)
+  const evidenceFactIds = new Set(source.matchAnalysis.evidence.flatMap(({ factIds }) => factIds))
   const coveredRequirementIds = new Set(source.matchAnalysis.evidence
     .map(({ requirementId }) => requirementId))
   return {
     evidence: source.matchAnalysis.evidence,
+    locale: source.locale,
     requirements: source.requirements
       .filter(({ id }) => coveredRequirementIds.has(id))
       .map(({ classification, id, value }) => ({ classification, id, value })),
     verifiedFacts: source.sourceFacts
-      .filter((fact) => fact.status === 'verified' && relevantFactIds.has(fact.id))
+      .filter((fact) => fact.status === 'verified' && evidenceFactIds.has(fact.id))
       .map(({ id, kind, value }) => ({ id, kind, value })),
   }
 }

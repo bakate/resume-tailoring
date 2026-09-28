@@ -14,6 +14,7 @@ import type { Localization } from '../localization/localization'
 import { groupJobRequirements } from './job-requirement-groups'
 import type { JobRequirementGroup } from './job-requirement-groups'
 import type { CandidateSessionController } from './use-candidate-session'
+import { readPreferredResumeLocale } from './resume-language'
 
 type WorkspaceProps = Readonly<{
   candidateSession: CandidateSessionController
@@ -245,9 +246,15 @@ function GenerationAction({ analysis, candidateSession, localization }: Readonly
   localization: Localization
 }>) {
   if (analysis.generationEligibility !== 'eligible') return null
+  const jobPostingContent = candidateSession.view.status === 'ready'
+    ? candidateSession.view.jobPosting?.outgoingContent ?? '' : ''
+  const locale = readPreferredResumeLocale({
+    fallbackLocale: localization.locale,
+    jobPostingContent,
+  })
   return <button className="primary-action compact-action"
     disabled={candidateSession.pendingOperation !== null}
-    onClick={() => void candidateSession.generateResumeClaims()} type="button">
+    onClick={() => void candidateSession.generateResumeClaims({ locale })} type="button">
     {localization.translate('resumeClaims.generate')}
   </button>
 }
