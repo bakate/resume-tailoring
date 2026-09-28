@@ -10,7 +10,6 @@ import type {
   ResumeClaim,
   ResumeTailoringState,
   SourceProfileFact,
-  SourceProfileFactContent,
   SourceProfileFactId,
   TailoredResume,
 } from '@resume-tailoring/domain/resume-tailoring-state'
@@ -22,6 +21,7 @@ import type {
   ResumeTailoringWorkflow,
 } from './resume-tailoring-workflow'
 import { sourceProfileProcessingNoticeVersion } from './resume-tailoring-workflow'
+import { hasSourceProfileFactConflict } from './resume-tailoring-workflow'
 import { jobPostingProcessingNoticeVersion } from './resume-tailoring-workflow'
 import { jobPostingProcessingPolicy } from './resume-tailoring-workflow'
 import { hasCurrentJobPostingProcessingConsent } from './resume-tailoring-workflow'
@@ -33,6 +33,7 @@ import type {
   SourceDocumentReader,
   SourceProfileFactIdentity,
   SourceProfileExtractor,
+  SourceProfileExtractedFact,
   JobRequirementExtractor,
   JobRequirementGroupIdentity,
   JobRequirementIdentity,
@@ -103,6 +104,7 @@ type SourceProfileFactCommand = Exclude<ResumeTailoringCommand,
   | { readonly type: 'import-source-document' }
   | { readonly type: 'update-source-content' }
   | { readonly type: 'confirm-processing-notice' }
+  | { readonly type: 'confirm-processing-and-extract-source-profile' }
   | { readonly type: 'extract-source-profile' }
   | { readonly type: 'review-job-posting' }
   | { readonly type: 'update-job-posting-content' }
@@ -167,6 +169,9 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
       return this.#updateSourceContent(command)
     }
     if (command.type === 'confirm-processing-notice') return this.#confirmProcessingNotice()
+    if (command.type === 'confirm-processing-and-extract-source-profile') {
+      return this.#confirmProcessingAndExtractSourceProfile()
+    }
     if (command.type === 'extract-source-profile') return this.#extractSourceProfile()
     if (command.type === 'review-job-posting') return this.#reviewJobPosting(command)
     if (command.type === 'update-job-posting-content') {
@@ -353,6 +358,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
 
   async #analyzeMatch(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
     const currentState = await this.#readActiveState()
+    if (requiresSourceProcessingConsent(currentState)) return processingNoticeRequiredResult
     if (!hasMatchInputs(currentState)) return matchAnalysisUnavailableResult
     if (!hasCurrentMatchProcessingConsent({ state: currentState.value })) {
       return processingNoticeRequiredResult
@@ -395,9 +401,13 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (!hasReadyState(currentState) || currentState.value.jobPosting !== undefined) {
       return unavailableResult
     }
+    const jobPosting = createReviewingJobPosting({ content })
     return this.#persistJobPosting({
       currentState: currentState.value,
-      jobPosting: createReviewingJobPosting({ content }),
+      jobPosting: applyCandidateSessionConsent({
+        confirmedAt: readCurrentProcessingConsentTimestamp({ state: currentState.value }),
+        jobPosting,
+      }),
     })
   }
 
@@ -408,11 +418,15 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
   ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
     const currentState = await this.#readActiveState()
     if (!hasJobPosting(currentState)) return unavailableResult
+    const jobPosting = updateJobPosting({
+      jobPosting: currentState.value.jobPosting,
+      outgoingContent,
+    })
     return this.#persistJobPosting({
       currentState: currentState.value,
-      jobPosting: updateJobPosting({
-        jobPosting: currentState.value.jobPosting,
-        outgoingContent,
+      jobPosting: applyCandidateSessionConsent({
+        confirmedAt: readCurrentProcessingConsentTimestamp({ state: currentState.value }),
+        jobPosting,
       }),
     })
   }
@@ -489,17 +503,11 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
   }
 
   #executeSourceProfileFactCommand(command: SourceProfileFactCommand) {
-    if (command.type === 'confirm-source-fact') {
-      return this.#decideSourceProfileFacts({ factIds: [command.factId], status: 'verified' })
-    }
-    if (command.type === 'confirm-source-facts') {
-      return this.#decideSourceProfileFacts({ factIds: command.factIds, status: 'verified' })
-    }
     if (command.type === 'correct-source-fact') return this.#correctSourceProfileFact(command)
     if (command.type === 'resolve-source-fact-conflict') {
       return this.#resolveSourceProfileFactConflict(command)
     }
-    return this.#decideSourceProfileFacts({ factIds: [command.factId], status: 'rejected' })
+    return this.#rejectSourceProfileFact({ factId: command.factId })
   }
 
   async #resolveSourceProfileFactConflict({
@@ -550,19 +558,15 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     })
   }
 
-  async #decideSourceProfileFacts({
-    factIds,
-    status,
-  }: Readonly<{
-    factIds: readonly SourceProfileFactId[]
-    status: 'verified' | 'rejected'
+  async #rejectSourceProfileFact({ factId }: Readonly<{
+    factId: SourceProfileFactId
   }>): Promise<ResumeTailoringResult<ResumeTailoringView>> {
     const currentState = await this.#readActiveState()
     if (!hasReviewingFacts(currentState)) return sourceProfileFactUnavailableResult
     const transition = decideSourceProfileFacts({
       facts: currentState.value.sourceProfile.facts,
-      factIds,
-      status,
+      factIds: [factId],
+      status: 'rejected',
     })
     return this.#persistFactTransition({ currentState: currentState.value, transition })
   }
@@ -590,27 +594,56 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (!hasReviewingSourceProfile(currentState)) return unavailableResult
     if (currentState.value.sourceProfile.processingNotice?.version
       !== sourceProfileProcessingNoticeVersion) return processingNoticeRequiredResult
+    return this.#extractSourceProfileFrom({
+      currentState: currentState.value,
+      sourceProfile: currentState.value.sourceProfile,
+    })
+  }
+
+  async #confirmProcessingAndExtractSourceProfile(): Promise<
+    ResumeTailoringResult<ResumeTailoringView>
+  > {
+    const currentState = await this.#readActiveState()
+    if (!hasReviewingSourceProfile(currentState)) return unavailableResult
+    const sourceProfile = currentState.value.sourceProfile.processingNotice?.version
+      === sourceProfileProcessingNoticeVersion
+      ? currentState.value.sourceProfile
+      : {
+          ...currentState.value.sourceProfile,
+          processingNotice: {
+            version: sourceProfileProcessingNoticeVersion,
+            confirmedAt: this.#dependencies.candidateSessionClock.now(),
+          },
+        }
+    return this.#extractSourceProfileFrom({ currentState: currentState.value, sourceProfile })
+  }
+
+  async #extractSourceProfileFrom({ currentState, sourceProfile }: Readonly<{
+    currentState: ReadyResumeTailoringState
+    sourceProfile: NonNullable<ReadyResumeTailoringState['sourceProfile']>
+  }>): Promise<ResumeTailoringResult<ResumeTailoringView>> {
     const extractor = this.#dependencies.sourceProfileExtractor
     const sourceProfileFactIdentity = this.#dependencies.sourceProfileFactIdentity
     if (extractor === undefined || sourceProfileFactIdentity === undefined) return unavailableResult
 
     const extractedFacts = await extractor.extract({ professionalContent:
-      currentState.value.sourceProfile.outgoingContent })
+      sourceProfile.outgoingContent })
     if (!extractedFacts.ok) return extractedFacts
-    const facts = identifySourceProfileFacts({ factContents: extractedFacts.value,
+    const facts = identifySourceProfileFacts({ extractedFacts: extractedFacts.value,
       sourceProfileFactIdentity })
     if (facts === null) return unavailableResult
-    return this.#persistExtractedFacts({ currentState: currentState.value, facts })
+    return this.#persistExtractedFacts({ currentState, facts, sourceProfile })
   }
 
-  #persistExtractedFacts({ currentState, facts }: Readonly<{
-    currentState: ReadyResumeTailoringState & { readonly sourceProfile: NonNullable<ReadyResumeTailoringState['sourceProfile']> }
+  #persistExtractedFacts({ currentState, facts, sourceProfile }: Readonly<{
+    currentState: ReadyResumeTailoringState
     facts: readonly SourceProfileFact[]
+    sourceProfile: NonNullable<ReadyResumeTailoringState['sourceProfile']>
   }>) {
     return this.#persistSourceProfile({
       currentState,
       sourceProfile: {
-        ...currentState.sourceProfile,
+        ...sourceProfile,
         status: 'reviewing-facts',
         facts,
       },
@@ -761,10 +794,22 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     })
     if (!hasExpired) {
       this.#scheduleExpirationIfReady(persistedState.value)
-      return persistedState
+      return this.#migrateCandidateSession(persistedState)
     }
     if (persistedState.value.status !== 'ready') return persistedState
     return this.#expireSession(persistedState.value)
+  }
+
+  async #migrateCandidateSession(
+    persistedState: Readonly<{ ok: true; value: ResumeTailoringState }>,
+  ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const migration = migrateCandidateSession({ state: persistedState.value })
+    if (migration === null) return persistedState
+    const updatedState = await this.#dependencies.candidateSessionPersistence.update({
+      sessionId: migration.sessionId,
+      state: migration,
+    })
+    return updatedState.ok ? updatedState : unavailableResult
   }
 
   async #expireSession(state: ReadyResumeTailoringState) {
@@ -845,19 +890,67 @@ function addOutcomeFeedback({ event, state }: Readonly<{
 }
 
 function identifySourceProfileFacts({
-  factContents,
+  extractedFacts,
   sourceProfileFactIdentity,
 }: Readonly<{
-  factContents: readonly SourceProfileFactContent[]
+  extractedFacts: readonly SourceProfileExtractedFact[]
   sourceProfileFactIdentity: SourceProfileFactIdentity
 }>): readonly SourceProfileFact[] | null {
-  const facts = factContents.map((factContent) => {
+  const usableFacts = extractedFacts.filter((fact) => fact.assessment === 'usable')
+  const identifiedFacts = usableFacts.map((extractedFact) => {
     const identity = sourceProfileFactIdentity.create()
+    const factContent = {
+      kind: extractedFact.kind,
+      propositionKey: extractedFact.propositionKey,
+      value: extractedFact.value,
+    }
     return identity.ok
-      ? { ...factContent, id: identity.value, status: 'extracted' as const }
+      ? { ...factContent, id: identity.value, status: 'verified' as const }
       : null
   })
-  return facts.includes(null) ? null : facts.filter((fact) => fact !== null)
+  if (identifiedFacts.includes(null)) return null
+  const facts = identifiedFacts.filter((fact) => fact !== null)
+  return facts.map((fact) => ({
+    ...fact,
+    status: facts.some((candidateFact) => candidateFact.id !== fact.id
+      && candidateFact.propositionKey === fact.propositionKey
+      && candidateFact.value !== fact.value)
+      ? 'extracted' as const
+      : 'verified' as const,
+  }))
+}
+
+function migrateCandidateSession({ state }: Readonly<{
+  state: ResumeTailoringState
+}>): ReadyResumeTailoringState | null {
+  if (state.status !== 'ready' || state.sourceProfile?.status !== 'reviewing-facts') return null
+  const sourceProfile = state.sourceProfile
+  if (sourceProfile.processingNotice?.version !== sourceProfileProcessingNoticeVersion) {
+    return {
+      ...state,
+      sourceProfile: {
+        ...sourceProfile,
+        status: 'reviewing-document',
+        processingNotice: null,
+        facts: [],
+      },
+      matchAnalysis: undefined,
+      tailoredResume: undefined,
+    }
+  }
+  const facts = sourceProfile.facts.map((fact) => (
+    fact.status === 'extracted'
+      && !hasSourceProfileFactConflict({ fact, facts: sourceProfile.facts })
+      ? { ...fact, status: 'verified' as const }
+      : fact
+  ))
+  if (facts.every((fact, factIndex) => fact === sourceProfile.facts[factIndex])) return null
+  return {
+    ...state,
+    sourceProfile: { ...sourceProfile, facts },
+    matchAnalysis: undefined,
+    tailoredResume: undefined,
+  }
 }
 
 function hasReviewingSourceProfile(
@@ -1035,6 +1128,40 @@ function hasCurrentMatchProcessingConsent({ state }: Readonly<{
 }>) {
   return state.sourceProfile.processingNotice?.version === sourceProfileProcessingNoticeVersion
     && hasCurrentJobPostingProcessingConsent({ jobPosting: state.jobPosting })
+}
+
+function requiresSourceProcessingConsent(
+  result: ResumeTailoringResult<ResumeTailoringView>,
+) {
+  return result.ok
+    && result.value.status === 'ready'
+    && result.value.sourceProfile !== undefined
+    && result.value.sourceProfile.processingNotice?.version
+      !== sourceProfileProcessingNoticeVersion
+}
+
+function readCurrentProcessingConsentTimestamp({ state }: Readonly<{
+  state: ReadyResumeTailoringState
+}>) {
+  const notice = state.sourceProfile?.processingNotice
+  return notice?.version === sourceProfileProcessingNoticeVersion
+    ? notice.confirmedAt
+    : null
+}
+
+function applyCandidateSessionConsent({ confirmedAt, jobPosting }: Readonly<{
+  confirmedAt: number | null
+  jobPosting: JobPostingReview
+}>): JobPostingReview {
+  if (confirmedAt === null) return jobPosting
+  return {
+    ...jobPosting,
+    processingNotice: {
+      ...jobPostingProcessingPolicy,
+      version: jobPostingProcessingNoticeVersion,
+      confirmedAt,
+    },
+  }
 }
 
 const workflowAlreadyOpenResult = {

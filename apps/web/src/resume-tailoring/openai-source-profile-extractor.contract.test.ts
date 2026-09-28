@@ -48,6 +48,7 @@ describe('OpenAI Source Profile extractor contract', () => {
     expect(result).toEqual({
       ok: true,
       value: [{
+        assessment: 'usable',
         kind: 'skill',
         propositionKey: 'proposition-skill-candidate-typescript',
         value,
@@ -102,6 +103,7 @@ function createOpenAiResponse({ value = 'TypeScript' }: Readonly<{ value?: strin
         type: 'output_text',
         text: JSON.stringify({
           facts: [{
+            assessment: 'usable',
             kind: 'skill',
             propositionKey: 'proposition-skill-candidate-typescript',
             value,
@@ -115,6 +117,7 @@ function createOpenAiResponse({ value = 'TypeScript' }: Readonly<{ value?: strin
 const expectedExtractionResult = {
   ok: true,
   value: [{
+    assessment: 'usable',
     kind: 'skill',
     propositionKey: 'proposition-skill-candidate-typescript',
     value: 'TypeScript',

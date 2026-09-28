@@ -112,6 +112,7 @@ const extractionInstructions = [
   'Extract only explicit professional facts from the Candidate content.',
   'Each fact must contain exactly one indivisible proposition; split claims joined by conjunctions.',
   'Never infer, combine, rank, or verify.',
+  'Mark a fact as critical-ambiguity when the source supports multiple materially different readings; otherwise mark it usable.',
   'Use propositionKey format proposition-<kind>-<subject>-<attribute> in lowercase ASCII kebab-case.',
   'The key identifies the asserted property, never its value; competing values for the same property must use exactly the same key.',
 ].join(' ')
@@ -130,8 +131,13 @@ const sourceProfileResponseFormat = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['kind', 'propositionKey', 'value'],
+          required: ['assessment', 'kind', 'propositionKey', 'value'],
           properties: {
+            assessment: {
+              type: 'string',
+              enum: ['critical-ambiguity', 'usable'],
+              description: 'Whether the source supports one safe reading of this fact.',
+            },
             kind: {
               type: 'string',
               enum: sourceProfileFactKinds,

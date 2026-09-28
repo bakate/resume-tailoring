@@ -144,11 +144,15 @@ export type SourceProfileExtractor = {
   }>) => Promise<
     | {
         readonly ok: true
-        readonly value: readonly SourceProfileFactContent[]
+        readonly value: readonly SourceProfileExtractedFact[]
       }
     | { readonly ok: false; readonly error: { readonly type: 'source-profile-extraction-unavailable' } }
   >
 }
+
+export type SourceProfileExtractedFact = SourceProfileFactContent & Readonly<{
+  assessment: 'critical-ambiguity' | 'usable'
+}>
 
 export type SourceProfileFactIdentity = {
   readonly create: () => AdapterResult<SourceProfileFactId>

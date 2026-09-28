@@ -1,6 +1,6 @@
 # Resume Tailoring
 
-This context turns a candidate's verified professional facts into a resume targeted at one job posting without fabricating qualifications.
+This context turns a candidate's declared professional facts into a resume targeted at one job posting without fabricating qualifications.
 
 ## Language
 
@@ -8,26 +8,35 @@ This context turns a candidate's verified professional facts into a resume targe
 The person generating a resume from their own professional information.
 _Avoid_: User, applicant, profile owner
 
+**Candidate Session**:
+The private, browser-local workspace in which one Candidate can reuse one Source Profile for 24 hours.
+_Avoid_: Account, server profile
+
+**Processing Consent**:
+The Candidate's single confirmation, collected before the first model operation, that Source Documents and Job Postings may be processed transiently throughout the Candidate Session under the disclosed policy.
+_Avoid_: Per-document consent, per-action consent
+
 **Source Profile**:
-The structured set of professional facts approved by the Candidate after document import and manual editing.
+The structured set of Candidate Facts obtained from the Candidate's Source Document and optional corrections.
 _Avoid_: LinkedIn profile, raw profile, candidate data
 
 **Source Profile Review**:
-The transient, browser-local working state used to build a Source Profile. It contains the minimized Source Document content and immutable Source Profile Facts in extracted, verified, rejected, or superseded states.
+The Candidate's opportunity to inspect and correct a Source Profile before using it. Continuing from the review collectively attests its Candidate Facts; individual confirmation is not required.
 
-**Source Profile Fact**:
-An immutable professional proposition in the Source Profile Review. It becomes a Verified Fact only after explicit Candidate confirmation.
+**Critical Ambiguity**:
+An extraction uncertainty that makes one Candidate Fact unsafe to score or reuse without Candidate correction. It excludes only the affected fact unless no usable professional evidence remains.
+_Avoid_: Unverified fact, blocking profile error
 
 **Source Document**:
 A text-based LinkedIn PDF, existing resume, or pasted professional text supplied by the Candidate as input for the Source Profile.
 _Avoid_: Profile URL, scraped profile, raw PDF
 
-**Verified Fact**:
-Professional information extracted from a Source Document or manually added, then explicitly confirmed by the Candidate. It may describe experience, skills, education, languages, or projects.
-_Avoid_: Inferred skill, assumed qualification
+**Candidate Fact**:
+A professional proposition taken from a Candidate-supplied Source Document or explicitly added by the Candidate. Imported facts are collectively attested by continuing from Source Profile Review; contradictory propositions require targeted correction.
+_Avoid_: Verified Fact, Source Profile Fact, inferred skill, assumed qualification
 
 **Derived Fact**:
-A deterministic value calculated from Verified Facts, such as a non-overlapping duration computed from complete dates. It never assigns a qualitative level or introduces new professional information.
+A deterministic value calculated from Candidate Facts, such as a non-overlapping duration computed from complete dates. It never assigns a qualitative level or introduces new professional information.
 _Avoid_: Inference, estimate, assumed seniority
 
 **Job Posting**:
@@ -47,11 +56,11 @@ An explicit qualification or expectation extracted from a Job Posting and classi
 _Avoid_: Keyword, criterion
 
 **Match Evidence**:
-The explicit relationship between one covered Job Requirement and one or more Verified Facts that support it.
+The explicit relationship between one covered Job Requirement and one or more Candidate Facts that support it.
 _Avoid_: Keyword match, inferred match
 
 **Match Score**:
-The percentage expressing how strongly the Source Profile's Verified Facts cover the requirements of a Job Posting.
+The percentage expressing how strongly the Source Profile's Candidate Facts cover the requirements of a Job Posting.
 _Avoid_: Fit score, compatibility score
 
 **Match Analysis**:
@@ -63,7 +72,7 @@ The advisory Match Score threshold of 50%. Falling below it produces a warning a
 _Avoid_: Eligibility score, cutoff
 
 **Tailored Resume**:
-A one-page resume that selects, orders, translates, and reformulates only Verified Facts relevant to one Job Posting. It may include a Candidate-supplied photo.
+A one-page resume that selects, orders, translates, and reformulates only Candidate Facts relevant to one Job Posting. It may include a Candidate-supplied photo.
 _Avoid_: Generated CV, optimized CV
 
 **Relevant Experience**:
@@ -71,11 +80,11 @@ A dated role or project selected for its relationship to a Job Posting without i
 _Avoid_: Work history, complete experience
 
 **Resume Claim**:
-A concise statement included in a Tailored Resume and internally linked to one or more Verified Facts that support it. It may compress wording but must preserve the meaning, dates, levels, and outcomes of its supporting facts.
+A concise statement included in a Tailored Resume and internally linked to one or more Candidate Facts that support it. It may compress wording but must preserve the meaning, dates, levels, and outcomes of its supporting facts.
 _Avoid_: Generated statement, inferred claim
 
 **Gap Analysis**:
-An explanation of important Job Posting requirements that are not supported by Verified Facts.
+An explanation of important Job Posting requirements that are not supported by Candidate Facts.
 _Avoid_: Missing skills, weaknesses
 
 **Outcome Feedback**:
@@ -83,7 +92,7 @@ The Candidate's browser-local assessment of whether a Tailored Resume is faithfu
 _Avoid_: Candidate satisfaction profile, professional-history analytics
 
 **Correction Activity**:
-A privacy-safe operational count of Source Profile Fact corrections and Resume Claim removal, reordering, or reformulation. It records only the correction category and an optional Match Score band, never the corrected content.
+A privacy-safe operational count of Candidate Fact corrections and Resume Claim removal, reordering, or reformulation. It records only the correction category and an optional Match Score band, never the corrected content.
 _Avoid_: Edit history, Candidate activity log
 
 **Successful Download**:

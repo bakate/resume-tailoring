@@ -19,6 +19,9 @@ const sourceProfileFactContentSchema = z.object({
 })
 
 export const extractedSourceProfileFactContentSchema = sourceProfileFactContentSchema
+  .extend({
+    assessment: z.enum(['critical-ambiguity', 'usable']),
+  })
   .superRefine((fact, context) => {
     if (!isValidPropositionKey({ kind: fact.kind, value: fact.propositionKey })) {
       context.addIssue({ code: 'custom', path: ['propositionKey'], message: 'Invalid proposition key' })
