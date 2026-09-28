@@ -24,6 +24,8 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install Chrome for PDF integration tests
+        run: pnpm --filter @resume-tailoring/web exec puppeteer browsers install chrome
       - run: pnpm check
 
   deploy:
