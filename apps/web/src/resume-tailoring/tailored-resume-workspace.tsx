@@ -107,24 +107,26 @@ function TailoredResumeFlowNavigation({ localization }: Readonly<{
 }
 
 function GenerationAction({ candidateSession, localization }: WorkspaceProps) {
+  const [locale, setLocale] = usePreferredResumeLocale({ candidateSession, localization })
+  return <div className="source-profile-card">
+    <p>{localization.translate('resumeClaims.description')}</p>
+    <GenerationAvailability {...{ candidateSession, locale, localization, setLocale }} />
+  </div>
+}
+
+function GenerationAvailability({ candidateSession, locale, localization,
+  setLocale }: WorkspaceProps & Readonly<{
+  locale: 'en' | 'fr'; setLocale: (locale: 'en' | 'fr') => void
+}>) {
   const isEligible = candidateSession.view.status === 'ready'
     && candidateSession.view.matchAnalysis?.generationEligibility === 'eligible'
-  const [locale, setLocale] = usePreferredResumeLocale({ candidateSession, localization })
-  return (
-    <div className="source-profile-card">
-      <p>{localization.translate('resumeClaims.description')}</p>
-      {isEligible ? (
-        <ResumeGenerationControls {...{
-          candidateSession,
-          label: localization.translate('resumeClaims.generate'),
-          locale,
-          localization,
-          onGenerated: ignoreGenerated,
-          setLocale,
-        }} />
-      ) : <p className="match-warning">{localization.translate('matchAnalysis.denied')}</p>}
-    </div>
-  )
+  if (!isEligible) return <p className="match-warning">
+    {localization.translate('matchAnalysis.denied')}
+  </p>
+  return <ResumeGenerationControls {...{
+    candidateSession, label: localization.translate('resumeClaims.generate'), locale,
+    localization, onGenerated: ignoreGenerated, setLocale,
+  }} />
 }
 
 function usePreferredResumeLocale({ candidateSession, localization }: WorkspaceProps) {
@@ -188,33 +190,26 @@ type CuratedClaimsProps = WorkspaceProps & Readonly<{
   reportUnsupportedEdit: ResumeClaimCardProps['reportUnsupportedEdit']
 }>
 
-function CuratedClaims({
-  candidateSession,
-  claims,
-  exclusions,
-  localization,
-  resumeLocale,
-  clearUnsupportedEdit,
-  clearUnsupportedEdits,
-  reportUnsupportedEdit,
-}: CuratedClaimsProps) {
+function CuratedClaims(props: CuratedClaimsProps) {
+  const { exclusions, localization, resumeLocale } = props
   const [locale, setLocale] = useState(resumeLocale)
-  return (
-    <section aria-labelledby="resume-claims-list-title">
-      <ClaimsHeading {...{ exclusions, localization }} />
-      <ResumeGenerationControls {...{
-        candidateSession,
-        label: localization.translate('resumeClaims.regenerate'),
-        locale,
-        localization,
-        onGenerated: clearUnsupportedEdits,
-        setLocale,
-      }} />
-      <ClaimList {...{
-        candidateSession, claims, clearUnsupportedEdit, localization, reportUnsupportedEdit,
-      }} />
-    </section>
-  )
+  return <section aria-labelledby="resume-claims-list-title">
+    <ClaimsHeading {...{ exclusions, localization }} />
+    <CuratedGenerationControls {...{ locale, props, setLocale }} />
+    <ClaimList {...props} />
+  </section>
+}
+
+function CuratedGenerationControls({ locale, props, setLocale }: Readonly<{
+  locale: 'en' | 'fr'
+  props: CuratedClaimsProps
+  setLocale: (locale: 'en' | 'fr') => void
+}>) {
+  const { candidateSession, clearUnsupportedEdits, localization } = props
+  return <ResumeGenerationControls {...{
+    candidateSession, label: localization.translate('resumeClaims.regenerate'), locale,
+    localization, onGenerated: clearUnsupportedEdits, setLocale,
+  }} />
 }
 
 function ClaimsHeading({ exclusions, localization }: Readonly<{
