@@ -5,6 +5,7 @@ import type {
   OutcomeFeedback,
   ResumeClaimId,
   SourceProfileFact,
+  SourceProfileFactKind,
   SourceProfileFactId,
   SourceProfileReview,
   TailoredResume,
@@ -54,6 +55,11 @@ export type ResumeTailoringCommand =
       readonly correctedValue: string
     }
   | { readonly type: 'resolve-source-fact-conflict'; readonly selectedFactId: SourceProfileFactId }
+  | {
+      readonly type: 'enrich-source-profile'
+      readonly kind: SourceProfileFactKind
+      readonly value: string
+    }
   | { readonly type: 'review-job-posting'; readonly content: string }
   | { readonly type: 'update-job-posting-content'; readonly outgoingContent: string }
   | { readonly type: 'update-target-role'; readonly value: string }
@@ -122,6 +128,8 @@ export type ResumeTailoringFailure =
   | { readonly type: 'source-profile-extraction-unavailable' }
   | { readonly type: 'source-fact-unavailable' }
   | { readonly type: 'source-fact-conflict' }
+  | { readonly type: 'candidate-fact-duplicate' }
+  | { readonly type: 'candidate-fact-invalid' }
   | { readonly type: 'job-requirement-extraction-unavailable' }
   | { readonly type: 'job-requirement-transport-unavailable' }
   | { readonly type: 'match-analysis-unavailable' }

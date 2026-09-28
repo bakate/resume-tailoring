@@ -84,6 +84,7 @@ async function readSourceDocument({
   if (!isPdf({ document })) return unsupportedResult
   const compatibilityFailure = readCompatibilityFailure({ browserEnvironment })
   if (compatibilityFailure !== null) return compatibilityFailure
+  if (!hasPdfHeader({ bytes: document.bytes })) return invalidPdfResult
   installPromiseWithResolvers()
   const pdfReaderResult = await loadPdfReader()
   if (!pdfReaderResult.ok) return incompatiblePdfReaderResult
@@ -216,6 +217,10 @@ function isPdf({ document }: Readonly<{
     || document.name.toLowerCase().endsWith('.pdf')
 }
 
+function hasPdfHeader({ bytes }: Readonly<{ bytes: Uint8Array }>) {
+  return pdfHeader.every((byte, byteIndex) => bytes[byteIndex] === byte)
+}
+
 function isText({ document }: Readonly<{
   document: Parameters<SourceDocumentReader['read']>[0]
 }>) {
@@ -288,3 +293,4 @@ const nonBrowserTestEnvironment = {
   capabilities: ['worker'],
   userAgent: 'non-browser-test-environment',
 } as const
+const pdfHeader = new Uint8Array([37, 80, 68, 70, 45])

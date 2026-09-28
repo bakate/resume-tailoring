@@ -364,6 +364,48 @@ describe('Match Analysis workflow', () => {
 
     system.expectFabricatedMatchEvidenceToBeRejected()
   })
+
+  it('adds a Candidate-authored fact and refreshes Match Analysis atomically', async () => {
+    const system = createSystemUnderTest({
+      facts: [],
+      jobRequirements: [createTypeScriptRequirement({ value: 'Know TypeScript' })],
+    })
+
+    // Given
+    system.givenEnrichedExperienceCoversTypeScript()
+
+    // Action
+    await system.enrichSourceProfile()
+
+    // Then
+    system.expectCandidateFactAndRefreshedMatchAnalysis()
+  })
+
+  it('rejects duplicate Candidate Facts and preserves the previous Match Analysis', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    await system.givenAnExistingMatchAnalysis()
+
+    // Action
+    await system.enrichSourceProfileWithDuplicateFact()
+
+    // Then
+    await system.expectEnrichmentFailureToPreserveAnalysis('candidate-fact-duplicate')
+  })
+
+  it('rejects empty Candidate Facts and preserves the previous Match Analysis', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    await system.givenAnExistingMatchAnalysis()
+
+    // Action
+    await system.enrichSourceProfileWithEmptyFact()
+
+    // Then
+    await system.expectEnrichmentFailureToPreserveAnalysis('candidate-fact-invalid')
+  })
 })
 
 function expectMatchBand({ expectedBand, matchScore }: Readonly<{
@@ -429,8 +471,36 @@ class MatchAnalysisWorkflowTestSystem {
           return Promise.resolve(this.#matcherResult)
         },
       },
+      sourceProfileFactIdentity: {
+        create: () => ({ ok: true, value: 'source-fact-enrichment' }),
+      },
       telemetry: createTelemetrySpy(),
     })
+  }
+
+  givenEnrichedExperienceCoversTypeScript() {
+    this.#matcherResult = {
+      ok: true,
+      value: {
+        improvementOpportunities: [],
+        evidence: [{
+          coverage: 'covered',
+          requirementId: 'job-requirement-typescript',
+          factMatches: [{
+            factId: 'source-fact-enrichment',
+            factTerm: 'TypeScript',
+            relationship: 'exact',
+            requirementTerm: 'TypeScript',
+          }],
+        }],
+        relevantFactIds: ['source-fact-enrichment'],
+      },
+    }
+  }
+
+  async givenAnExistingMatchAnalysis() {
+    this.givenControlledSynonymsAndTranslationsEstablishCoverage()
+    await this.#workflow.execute({ type: 'analyze-match' })
   }
 
   givenOnlyAPreferredRequirementIsCovered() {
@@ -672,6 +742,68 @@ class MatchAnalysisWorkflowTestSystem {
 
   async analyzeMatch() {
     this.#actionResult = await this.#workflow.execute({ type: 'analyze-match' })
+  }
+
+  async enrichSourceProfile() {
+    this.#actionResult = await this.#workflow.execute({
+      type: 'enrich-source-profile',
+      kind: 'experience',
+      value: '  Built production APIs with TypeScript  ',
+    })
+  }
+
+  async enrichSourceProfileWithDuplicateFact() {
+    this.#actionResult = await this.#workflow.execute({
+      type: 'enrich-source-profile', kind: 'skill', value: '  TYPESCRIPT  ',
+    })
+  }
+
+  async enrichSourceProfileWithEmptyFact() {
+    this.#actionResult = await this.#workflow.execute({
+      type: 'enrich-source-profile', kind: 'experience', value: '   ',
+    })
+  }
+
+  expectCandidateFactAndRefreshedMatchAnalysis() {
+    const result = this.#readActionResult()
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.value.status !== 'ready') return
+    expect(result.value.sourceProfile?.facts.at(-1)).toEqual({
+      authorship: 'candidate',
+      id: 'source-fact-enrichment',
+      kind: 'experience',
+      propositionKey: 'proposition-experience-enrichment',
+      status: 'verified',
+      value: 'Built production APIs with TypeScript',
+    })
+    expect(result.value.matchAnalysis).toMatchObject({
+      evidence: [{
+        coverage: 'covered',
+        requirementId: 'job-requirement-typescript',
+        factIds: ['source-fact-enrichment'],
+      }],
+      matchScore: 100,
+    })
+    expect(this.#matchRequests.at(-1)?.verifiedFacts).toContainEqual({
+      id: 'source-fact-enrichment',
+      kind: 'experience',
+      value: 'Built production APIs with TypeScript',
+    })
+  }
+
+  async expectEnrichmentFailureToPreserveAnalysis(
+    expectedFailure: 'candidate-fact-duplicate' | 'candidate-fact-invalid',
+  ) {
+    expect(this.#readActionResult()).toEqual({
+      ok: false, error: { type: expectedFailure },
+    })
+    const currentView = await this.#workflow.readView()
+    expect(currentView.ok).toBe(true)
+    if (!currentView.ok || currentView.value.status !== 'ready') return
+    expect(currentView.value.matchAnalysis?.matchScore).toBe(60)
+    expect(currentView.value.matchAnalysis?.evidence.map(({ requirementId }) => requirementId))
+      .toEqual(['job-requirement-typescript', 'job-requirement-french'])
+    expect(this.#matchRequests).toHaveLength(1)
   }
 
   expectEvidenceBackedMatchAnalysis() {

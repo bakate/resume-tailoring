@@ -7,6 +7,7 @@ import type {
 } from '@resume-tailoring/application/resume-tailoring-workflow'
 import type {
   ResumeClaimId,
+  SourceProfileFactKind,
   SourceProfileFactId,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { createJobPostingAnalysis } from '@resume-tailoring/application/job-posting-analysis'
@@ -70,6 +71,8 @@ export type CandidateSessionFailureMessageKey =
   | 'jobPosting.failure'
   | 'jobPosting.transportFailure'
   | 'matchAnalysis.failure'
+  | 'matchAnalysis.enrichmentDuplicateFailure'
+  | 'matchAnalysis.enrichmentInvalidFailure'
   | 'matchAnalysis.transportFailure'
   | 'resumeClaims.failure'
 
@@ -231,11 +234,13 @@ function isSourceDocumentReadFailure({ result }: Readonly<{
 }
 
 function createMatchAnalysisActions(dependencies: CandidateSessionActionDependencies) {
+  const execute = (command: ResumeTailoringCommand) => executeCommand({ ...dependencies, command })
   return {
-    analyzeMatch: () => executeCommand({
-      ...dependencies,
-      command: { type: 'analyze-match' },
-    }),
+    analyzeMatch: () => execute({ type: 'analyze-match' }),
+    enrichSourceProfile: ({ kind, value }: Readonly<{
+      kind: SourceProfileFactKind
+      value: string
+    }>) => execute({ type: 'enrich-source-profile', kind, value }),
   }
 }
 
@@ -473,6 +478,7 @@ function readPendingOperation({ command }: Readonly<{
   if (command.type === 'confirm-processing-and-extract-source-profile') {
     return 'extract-source-profile'
   }
+  if (command.type === 'enrich-source-profile') return 'analyze-match'
   return pendingOperations.has(command.type) ? command.type as PendingOperation : null
 }
 
@@ -480,7 +486,9 @@ function readFailureMessageKey(command: ResumeTailoringCommand): CandidateSessio
   if (command.type === 'open-workflow') return 'session.openFailure'
   if (command.type === 'delete-session') return 'session.deleteFailure'
   if (isJobPostingCommand(command)) return 'jobPosting.failure'
-  if (command.type === 'analyze-match') return 'matchAnalysis.failure'
+  if (command.type === 'analyze-match' || command.type === 'enrich-source-profile') {
+    return 'matchAnalysis.failure'
+  }
   if (isResumeClaimCommand(command)) return 'resumeClaims.failure'
   return 'sourceProfile.failure'
 }
@@ -594,6 +602,12 @@ function readTypedFailureMessageKey({
   }
   if (result.error.type === 'match-analysis-transport-unavailable') {
     return 'matchAnalysis.transportFailure'
+  }
+  if (result.error.type === 'candidate-fact-duplicate') {
+    return 'matchAnalysis.enrichmentDuplicateFailure'
+  }
+  if (result.error.type === 'candidate-fact-invalid') {
+    return 'matchAnalysis.enrichmentInvalidFailure'
   }
   if (result.error.type === 'match-analysis-unavailable') return 'matchAnalysis.failure'
   return fallback

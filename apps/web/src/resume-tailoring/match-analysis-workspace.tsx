@@ -3,8 +3,12 @@ import type {
   MatchAnalysis,
   PracticalConstraint,
   SourceProfileFact,
+  SourceProfileFactKind,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import { sourceProfileFactKinds } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { readMatchBand } from '@resume-tailoring/application/match-analysis'
+import { useState } from 'react'
+import type { SyntheticEvent } from 'react'
 
 import type { Localization } from '../localization/localization'
 import { groupJobRequirements } from './job-requirement-groups'
@@ -155,6 +159,7 @@ function MatchAnalysisSummary({
     <AnalysisSupportingDetails {...{
       analysis, localization, practicalConstraints, priorityGaps, strengthRequirements,
     }} />
+    <ProfileEnrichmentPrompts {...{ analysis, candidateSession, localization, requirements }} />
   </section>
 }
 
@@ -315,6 +320,108 @@ function ImprovementOpportunities({ analysis, localization }: Readonly<{
       : <ul>{analysis.improvementOpportunities.map((opportunity) =>
         <li key={opportunity}>{opportunity}</li>)}</ul>}
   </section>
+}
+
+function ProfileEnrichmentPrompts({ analysis, candidateSession, localization, requirements }:
+Readonly<{
+  analysis: MatchAnalysis
+  candidateSession: CandidateSessionController
+  localization: Localization
+  requirements: readonly JobRequirement[]
+}>) {
+  const priorityRequirements = readProfileEnrichmentRequirements({ analysis, requirements })
+  if (priorityRequirements.length === 0) return null
+  return <section className="profile-enrichment" aria-labelledby="profile-enrichment-title">
+    <h4 id="profile-enrichment-title">{localization.translate('matchAnalysis.enrichmentTitle')}</h4>
+    <p>{localization.translate('matchAnalysis.enrichmentDescription')}</p>
+    {priorityRequirements.map((requirement) => <ProfileEnrichmentPrompt
+      key={requirement.id} {...{ candidateSession, localization, requirement }} />)}
+  </section>
+}
+
+function readProfileEnrichmentRequirements({ analysis, requirements }: Readonly<{
+  analysis: MatchAnalysis
+  requirements: readonly JobRequirement[]
+}>) {
+  const requirementById = new Map(requirements.map((requirement) => [requirement.id, requirement]))
+  const orderedIds = [
+    ...analysis.gapAnalysis.uncoveredRequiredRequirementIds,
+    ...analysis.gapAnalysis.partiallyCoveredRequiredRequirementIds,
+  ]
+  return orderedIds.flatMap((requirementId) => {
+    const requirement = requirementById.get(requirementId)
+    return requirement === undefined ? [] : [requirement]
+  }).slice(0, 3)
+}
+
+function ProfileEnrichmentPrompt({ candidateSession, localization, requirement }: Readonly<{
+  candidateSession: CandidateSessionController
+  localization: Localization
+  requirement: JobRequirement
+}>) {
+  const [isSkipped, setIsSkipped] = useState(false)
+  const form = useProfileEnrichmentForm({ candidateSession })
+  if (isSkipped) return null
+  return <form className="profile-enrichment-prompt" onSubmit={form.submit}>
+    <p>{localization.translate('matchAnalysis.enrichmentQuestion')}</p>
+    <strong>{requirement.value}</strong>
+    <ProfileEnrichmentFields kind={form.kind} localization={localization} requirement={requirement}
+      setKind={form.setKind} setValue={form.setValue} value={form.value} />
+    <ProfileEnrichmentActions candidateSession={candidateSession} localization={localization}
+      onSkip={() => { setIsSkipped(true) }} value={form.value} />
+  </form>
+}
+
+function useProfileEnrichmentForm({ candidateSession }: Readonly<{
+  candidateSession: CandidateSessionController
+}>) {
+  const [kind, setKind] = useState<SourceProfileFactKind>('experience')
+  const [value, setValue] = useState('')
+  const submit = (event: SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    void candidateSession.enrichSourceProfile({ kind, value })
+  }
+  return { kind, setKind, setValue, submit, value }
+}
+
+function ProfileEnrichmentFields({ kind, localization, requirement, setKind, setValue, value }:
+Readonly<Pick<ReturnType<typeof useProfileEnrichmentForm>,
+  'kind' | 'setKind' | 'setValue' | 'value'> & {
+  localization: Localization
+  requirement: JobRequirement
+}>) {
+  return <>
+    <label htmlFor={`enrichment-kind-${requirement.id}`}>
+      {localization.translate('matchAnalysis.enrichmentKind')}
+    </label>
+    <select id={`enrichment-kind-${requirement.id}`} value={kind} onChange={(event) => {
+      setKind(event.currentTarget.value as SourceProfileFactKind)
+    }}>{sourceProfileFactKinds.map((factKind) => <option key={factKind} value={factKind}>
+      {localization.translate(`sourceProfile.kind.${factKind}`)}
+    </option>)}</select>
+    <label htmlFor={`enrichment-value-${requirement.id}`}>
+      {localization.translate('matchAnalysis.enrichmentAnswer')}
+    </label>
+    <textarea id={`enrichment-value-${requirement.id}`} value={value}
+      onChange={(event) => { setValue(event.currentTarget.value) }} />
+  </>
+}
+
+function ProfileEnrichmentActions({ candidateSession, localization, onSkip, value }: Readonly<{
+  candidateSession: CandidateSessionController
+  localization: Localization
+  onSkip: () => void
+  value: string
+}>) {
+  const isSubmitDisabled = candidateSession.pendingOperation !== null || value.trim().length === 0
+  return <div className="profile-enrichment-actions">
+    <button className="secondary-action" onClick={onSkip} type="button">
+      {localization.translate('matchAnalysis.enrichmentSkip')}
+    </button>
+    <button className="primary-action" disabled={isSubmitDisabled} type="submit">
+      {localization.translate('matchAnalysis.enrichmentAdd')}
+    </button>
+  </div>
 }
 
 function readCoverageCount({

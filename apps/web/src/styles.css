@@ -897,6 +897,59 @@ h1 {
   grid-row: auto;
 }
 
+.profile-enrichment {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #dfe1df;
+}
+
+.profile-enrichment-prompt {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid #dfe1df;
+  background: #ffffff;
+}
+
+.profile-enrichment-prompt p,
+.profile-enrichment-prompt strong {
+  margin: 0;
+}
+
+.profile-enrichment-prompt label {
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.profile-enrichment-prompt select,
+.profile-enrichment-prompt textarea {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid #b8bdc4;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #151820;
+  font: inherit;
+}
+
+.profile-enrichment-prompt textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.profile-enrichment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.profile-enrichment-actions .primary-action,
+.profile-enrichment-actions .secondary-action {
+  margin-top: 8px;
+}
+
 .match-eligibility {
   margin: 0 0 14px;
   color: #164f3d;

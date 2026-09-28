@@ -32,6 +32,7 @@ export const extractedSourceProfileFactContentSchema = sourceProfileFactContentS
   })
 
 const sourceProfileFactSchema = sourceProfileFactContentSchema.extend({
+  authorship: z.literal('candidate').optional(),
   id: sourceProfileFactIdSchema,
   status: z.enum(sourceProfileFactStatuses),
   supersedesFactId: sourceProfileFactIdSchema.optional(),

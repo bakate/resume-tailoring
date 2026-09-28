@@ -252,11 +252,16 @@ describe('browser Source Document reader', () => {
     })
   })
 
-  it('treats a PDF extension with a generic media type as a supported but unreadable PDF', async () => {
-    const reader = createBrowserSourceDocumentReader()
+  it('rejects a mislabeled PDF before loading the PDF reader', async () => {
+    const reader = createBrowserSourceDocumentReader({
+      loadPdfReader: () => Promise.resolve({
+        ok: false,
+        error: { type: 'pdf-reader-load-failure' },
+      }),
+    })
 
     const result = await reader.read({
-      bytes: new Uint8Array([0]),
+      bytes: new TextEncoder().encode('not a readable PDF'),
       mediaType: 'application/octet-stream',
       name: 'resume.pdf',
     })
