@@ -133,6 +133,32 @@ describe('Job Requirement workflow', () => {
     system.expectSourceBackedTargetRoleToBeReviewable()
   })
 
+  it('lets the Candidate correct the Target Role with exact reviewed Job Posting text', async () => {
+    const system = createSystemUnderTest({ jobPosting: extractedTargetRoleJobPosting })
+
+    // Given
+    system.givenTheReviewedJobPostingContainsAnotherExactRoleTitle()
+
+    // Action
+    await system.correctTargetRole({ value: 'Lead Platform Engineer' })
+
+    // Then
+    system.expectCorrectedTargetRoleToRemainSourceBacked()
+  })
+
+  it('rejects a Target Role correction invented outside the reviewed Job Posting', async () => {
+    const system = createSystemUnderTest({ jobPosting: extractedTargetRoleJobPosting })
+
+    // Given
+    system.givenAnInventedTargetRoleCorrection()
+
+    // Action
+    await system.correctTargetRole({ value: 'Chief Technology Officer' })
+
+    // Then
+    system.expectInventedTargetRoleCorrectionToBeRejected()
+  })
+
   it('returns to Job Posting review when extracted content changes', async () => {
     const system = createSystemUnderTest({ jobPosting: extractedJobPosting })
 
@@ -256,6 +282,10 @@ class JobRequirementWorkflowTestSystem {
     }
   }
 
+  givenTheReviewedJobPostingContainsAnotherExactRoleTitle() {}
+
+  givenAnInventedTargetRoleCorrection() {}
+
   givenTheStructuredModelReturnsTooManyRequirements() {
     this.#extractionResult = {
       ok: true,
@@ -311,6 +341,10 @@ class JobRequirementWorkflowTestSystem {
 
   async extractJobRequirements() {
     this.#actionResult = await this.#workflow.execute({ type: 'extract-job-requirements' })
+  }
+
+  async correctTargetRole({ value }: Readonly<{ value: string }>) {
+    this.#actionResult = await this.#workflow.execute({ type: 'update-target-role', value })
   }
 
   expectExactJobPostingContentToBeReviewable() {
@@ -379,6 +413,20 @@ class JobRequirementWorkflowTestSystem {
     expect(this.#readJobPosting().targetRole).toEqual({
       sourceExcerpt: targetRoleSourceExcerpt,
       value: targetRoleSourceExcerpt,
+    })
+  }
+
+  expectCorrectedTargetRoleToRemainSourceBacked() {
+    expect(this.#readJobPosting().targetRole).toEqual({
+      sourceExcerpt: 'Lead Platform Engineer',
+      value: 'Lead Platform Engineer',
+    })
+  }
+
+  expectInventedTargetRoleCorrectionToBeRejected() {
+    expect(this.#readActionResult()).toEqual({
+      ok: false,
+      error: { type: 'candidate-session-unavailable' },
     })
   }
 
@@ -496,6 +544,16 @@ const extractedJobPosting = {
     sourceExcerpt: compoundSourceExcerpt,
     value: 'Know TypeScript',
   }],
+} as const satisfies JobPostingReview
+
+const extractedTargetRoleJobPosting = {
+  ...confirmedJobPosting,
+  status: 'reviewing-requirements',
+  outgoingContent: 'Senior FullStack Developer or Lead Platform Engineer',
+  targetRole: {
+    sourceExcerpt: 'Senior FullStack Developer',
+    value: 'Senior FullStack Developer',
+  },
 } as const satisfies JobPostingReview
 
 const changedProcessingNotices = [

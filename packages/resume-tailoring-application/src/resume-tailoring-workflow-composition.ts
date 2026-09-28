@@ -108,6 +108,7 @@ type SourceProfileFactCommand = Exclude<ResumeTailoringCommand,
   | { readonly type: 'extract-source-profile' }
   | { readonly type: 'review-job-posting' }
   | { readonly type: 'update-job-posting-content' }
+  | { readonly type: 'update-target-role' }
   | { readonly type: 'confirm-job-posting-processing-notice' }
   | { readonly type: 'extract-job-requirements' }
   | { readonly type: 'analyze-match' }
@@ -177,6 +178,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (command.type === 'update-job-posting-content') {
       return this.#updateJobPostingContent(command)
     }
+    if (command.type === 'update-target-role') return this.#updateTargetRole(command)
     if (command.type === 'confirm-job-posting-processing-notice') {
       return this.#confirmJobPostingProcessingNotice()
     }
@@ -428,6 +430,26 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
         confirmedAt: readCurrentProcessingConsentTimestamp({ state: currentState.value }),
         jobPosting,
       }),
+    })
+  }
+
+  async #updateTargetRole(
+    { value }: Extract<ResumeTailoringCommand, { readonly type: 'update-target-role' }>,
+  ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    const targetRoleValue = value.trim()
+    if (!hasJobPosting(currentState)
+      || currentState.value.jobPosting.status !== 'reviewing-requirements'
+      || targetRoleValue.length === 0
+      || !currentState.value.jobPosting.outgoingContent.includes(targetRoleValue)) {
+      return unavailableResult
+    }
+    return this.#persistJobPosting({
+      currentState: currentState.value,
+      jobPosting: {
+        ...currentState.value.jobPosting,
+        targetRole: { sourceExcerpt: targetRoleValue, value: targetRoleValue },
+      },
     })
   }
 

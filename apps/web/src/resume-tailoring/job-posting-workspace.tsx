@@ -43,7 +43,19 @@ function JobPostingInput({ candidateSession, localization }: WorkspaceProps) {
       <label htmlFor="job-posting-input">{localization.translate('jobPosting.inputLabel')}</label>
       <textarea id="job-posting-input" rows={12} value={content}
         onChange={(event) => { setContent(event.currentTarget.value) }} />
-      <button className="primary-action compact-action" disabled={content.trim().length === 0}
+      <label htmlFor="job-posting-file">{localization.translate('jobPosting.fileLabel')}</label>
+      <input accept="application/pdf,text/plain,.pdf,.txt" id="job-posting-file"
+        disabled={candidateSession.pendingOperation !== null}
+        onChange={(event) => {
+          const [file] = event.currentTarget.files ?? []
+          if (file !== undefined) void candidateSession.reviewJobPostingFile({ file })
+        }} type="file" />
+      <button className="primary-action compact-action"
+        disabled={candidateSession.pendingOperation !== null || content.trim().length === 0}
+        onClick={() => void candidateSession.analyzeJobPosting({ content })} type="button">
+        {localization.translate('jobPosting.analyze')}
+      </button>
+      <button className="secondary-action" disabled={content.trim().length === 0}
         onClick={() => void candidateSession.reviewJobPosting({ content })} type="button">
         {localization.translate('jobPosting.review')}
       </button>
@@ -165,13 +177,13 @@ function ExtractJobRequirementsButton({
   </button>
 }
 
-function JobRequirementReview({ jobPosting, localization }: ReviewProps) {
+function JobRequirementReview({ candidateSession, jobPosting, localization }: ReviewProps) {
   const requirementGroups = groupJobRequirements({ requirements: jobPosting.requirements })
   const requiredCount = countRequirements({ classification: 'required', requirements: jobPosting.requirements })
   const preferredCount = countRequirements({ classification: 'preferred', requirements: jobPosting.requirements })
   return (
     <div className="source-profile-card">
-      <TargetRoleReview {...{ jobPosting, localization }} />
+      <TargetRoleReview {...{ candidateSession, jobPosting, localization }} />
       <h3 id="job-requirements-title" tabIndex={-1}>
         {localization.translate('jobPosting.requirementsTitle')}
       </h3>
@@ -223,8 +235,10 @@ function countRequirements({ classification, requirements }: Readonly<{
   return requirements.filter((requirement) => requirement.classification === classification).length
 }
 
-function TargetRoleReview({ jobPosting, localization }: Omit<ReviewProps, 'candidateSession'>) {
+function TargetRoleReview({ candidateSession, jobPosting, localization }: ReviewProps) {
   const targetRole = jobPosting.targetRole
+  const [value, setValue] = useState(targetRole?.value ?? '')
+  useEffect(() => { setValue(targetRole?.value ?? '') }, [targetRole?.value])
   return <section aria-labelledby="target-role-title">
     <h3 id="target-role-title">{localization.translate('jobPosting.targetRoleTitle')}</h3>
     {targetRole === null || targetRole === undefined
@@ -236,6 +250,19 @@ function TargetRoleReview({ jobPosting, localization }: Omit<ReviewProps, 'candi
           <span>{targetRole.sourceExcerpt}</span>
         </p>
       </>}
+    <form onSubmit={(event) => {
+      event.preventDefault()
+      void candidateSession.updateTargetRole({ value })
+    }}>
+      <label htmlFor="target-role-value">{localization.translate('jobPosting.targetRoleEdit')}</label>
+      <input id="target-role-value" value={value}
+        onChange={(event) => { setValue(event.currentTarget.value) }} />
+      <button disabled={candidateSession.pendingOperation !== null
+        || value.trim().length === 0
+        || !jobPosting.outgoingContent.includes(value.trim())} type="submit">
+        {localization.translate('jobPosting.targetRoleSave')}
+      </button>
+    </form>
   </section>
 }
 
