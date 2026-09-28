@@ -55,6 +55,7 @@ export type SourceProfileFactContent = Readonly<{
 }>
 
 export type SourceProfileFact = SourceProfileFactContent & Readonly<{
+  authorship?: 'candidate'
   id: SourceProfileFactId
   status: SourceProfileFactStatus
   supersedesFactId?: SourceProfileFactId

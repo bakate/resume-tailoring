@@ -516,6 +516,22 @@ test('a Candidate can inspect Match Evidence after reviewing the coverage summar
   await system.expectMatchSummaryBeforeProgressiveEvidence()
 })
 
+test('a Candidate can skip optional Profile Enrichment without losing core value', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+  await system.givenJobRequirementExtractionIsAvailable()
+  await system.givenMatchAnalysisIsAvailable()
+  await system.buildVerifiedSourceProfile()
+  await system.extractRequirementsFromMinimizedJobPosting()
+  await system.analyzeMatch()
+
+  await system.skipHighestImpactProfileEnrichmentPrompt()
+
+  await system.expectAnalysisAndGenerationToRemainAvailable()
+})
+
 test('a Candidate can reopen a completed step without losing progress', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
@@ -879,6 +895,7 @@ type CompletedAction =
   | 'match-analysis-inspected'
   | 'match-analysis-retried'
   | 'match-analysis-waited'
+  | 'profile-enrichment-skipped'
   | 'source-profile-reopened'
   | 'pdf-source-document-method-selected'
   | 'pasted-source-document-reviewed'
@@ -1908,6 +1925,12 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'match-analyzed'
   }
 
+  async skipHighestImpactProfileEnrichmentPrompt() {
+    await this.#page.getByRole('button', { name: /Match Analysis/ }).click()
+    await this.#page.getByRole('button', { name: 'Skip this question' }).click()
+    this.#completedAction = 'profile-enrichment-skipped'
+  }
+
   async analyzeIneligibleMatch() {
     await this.#page.getByRole('button', { name: /Match Analysis/ }).click()
     await this.#page.getByRole('button', { name: 'Analyze the match' }).click()
@@ -2430,6 +2453,13 @@ class ResumeTailoringBrowserTestSystem {
       .toBeVisible()
   }
 
+  async expectAnalysisAndGenerationToRemainAvailable() {
+    this.#expectCompletedAction('profile-enrichment-skipped')
+    await expect(this.#page.getByText('33%', { exact: true })).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Generate Resume Claims' })).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Skip this question' })).toHaveCount(0)
+  }
+
   async expectCompletedSourceProfileToRemainIntact() {
     this.#expectCompletedAction('source-profile-reopened')
     await expect(this.#page.getByRole('heading', { name: 'Check your imported profile' })).toBeVisible()
@@ -2874,6 +2904,7 @@ function createMatchAnalysisResponse({ requestBody }: Readonly<{ requestBody: st
     ok: true,
     value: {
       evidence: createPreferredMatchEvidence({ preferredRequirement, verifiedFact }),
+      improvementOpportunities: [],
       relevantFactIds: verifiedFact === undefined ? [] : [verifiedFact.id],
     },
   }
@@ -2886,6 +2917,7 @@ function createPreferredMatchEvidence({ preferredRequirement, verifiedFact }: Re
 }>) {
   if (preferredRequirement === undefined || verifiedFact === undefined) return []
   return [{
+    coverage: 'covered' as const,
     requirementId: preferredRequirement.id,
     factMatches: [{
       factId: verifiedFact.id,
@@ -3095,6 +3127,7 @@ const jobRequirementExtractionResponse = {
   ok: true,
   value: {
     targetRole: null,
+    practicalConstraints: [],
     requirements: [
       {
         classification: 'required',

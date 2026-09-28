@@ -107,6 +107,7 @@ type SourceProfileFactCommand = Exclude<ResumeTailoringCommand,
   | { readonly type: 'confirm-processing-notice' }
   | { readonly type: 'confirm-processing-and-extract-source-profile' }
   | { readonly type: 'extract-source-profile' }
+  | { readonly type: 'enrich-source-profile' }
   | { readonly type: 'review-job-posting' }
   | { readonly type: 'update-job-posting-content' }
   | { readonly type: 'update-target-role' }
@@ -175,6 +176,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
       return this.#confirmProcessingAndExtractSourceProfile()
     }
     if (command.type === 'extract-source-profile') return this.#extractSourceProfile()
+    if (command.type === 'enrich-source-profile') return this.#enrichSourceProfile(command)
     if (command.type === 'review-job-posting') return this.#reviewJobPosting(command)
     if (command.type === 'update-job-posting-content') {
       return this.#updateJobPostingContent(command)
@@ -373,6 +375,27 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     return this.#persistMatchAnalysis({
       currentState: currentState.value, matchAnalysis: matchAnalysis.value,
     })
+  }
+
+  async #enrichSourceProfile(
+    command: Extract<ResumeTailoringCommand, { readonly type: 'enrich-source-profile' }>,
+  ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasMatchInputs(currentState)) return matchAnalysisUnavailableResult
+    if (!hasCurrentMatchProcessingConsent({ state: currentState.value })) {
+      return processingNoticeRequiredResult
+    }
+    const fact = createCandidateAuthoredFact({
+      command, facts: currentState.value.sourceProfile.facts,
+      identity: this.#dependencies.sourceProfileFactIdentity,
+    })
+    if (!fact.ok) return fact.result
+    const matcher = this.#dependencies.matchEvidenceMatcher
+    if (matcher === undefined) return matchAnalysisUnavailableResult
+    const enrichedState = appendCandidateFact({ fact: fact.value, state: currentState.value })
+    const matchAnalysis = await requestMatchAnalysis({ matcher, state: enrichedState })
+    if (!matchAnalysis.ok) return matchAnalysis
+    return this.#persistMatchAnalysis({ currentState: enrichedState, matchAnalysis: matchAnalysis.value })
   }
 
   async #persistMatchAnalysis({ currentState, matchAnalysis }: Readonly<{
@@ -1190,6 +1213,52 @@ function applyCandidateSessionConsent({ confirmedAt, jobPosting }: Readonly<{
   }
 }
 
+function createCandidateAuthoredFact({ command, facts, identity }: Readonly<{
+  command: Extract<ResumeTailoringCommand, { readonly type: 'enrich-source-profile' }>
+  facts: readonly SourceProfileFact[]
+  identity?: SourceProfileFactIdentity
+}>): Readonly<{ ok: true; value: SourceProfileFact }>
+  | Readonly<{ ok: false; result: ResumeTailoringResult<ResumeTailoringView> }> {
+  const value = command.value.trim()
+  if (value.length === 0) return { ok: false, result: candidateFactInvalidResult }
+  if (hasDuplicateCandidateFact({ facts, value })) {
+    return { ok: false, result: candidateFactDuplicateResult }
+  }
+  const factIdentity = identity?.create()
+  if (factIdentity === undefined || !factIdentity.ok) {
+    return { ok: false, result: sourceProfileFactUnavailableResult }
+  }
+  return { ok: true, value: {
+    authorship: 'candidate', id: factIdentity.value, kind: command.kind,
+    propositionKey: `proposition-${command.kind}-${factIdentity.value.replace('source-fact-', '')}`,
+    status: 'verified', value,
+  } }
+}
+
+function hasDuplicateCandidateFact({ facts, value }: Readonly<{
+  facts: readonly SourceProfileFact[]
+  value: string
+}>) {
+  const normalizedValue = normalizeCandidateFactValue(value)
+  return facts.some((fact) => fact.status !== 'rejected' && fact.status !== 'superseded'
+    && normalizeCandidateFactValue(fact.value) === normalizedValue)
+}
+
+function normalizeCandidateFactValue(value: string) {
+  return value.trim().toLowerCase().replaceAll(/\s+/g, ' ')
+}
+
+function appendCandidateFact({ fact, state }: Readonly<{
+  fact: SourceProfileFact
+  state: ReadyResumeTailoringState & Required<Pick<ReadyResumeTailoringState,
+    'jobPosting' | 'sourceProfile'>>
+}>) {
+  return {
+    ...state,
+    sourceProfile: { ...state.sourceProfile, facts: [...state.sourceProfile.facts, fact] },
+  }
+}
+
 async function requestMatchAnalysis({ matcher, state }: Readonly<{
   matcher: MatchEvidenceMatcher
   state: ReadyResumeTailoringState & Required<Pick<ReadyResumeTailoringState,
@@ -1235,6 +1304,16 @@ const sourceProfileFactUnavailableResult = {
 const sourceProfileFactConflictResult = {
   ok: false,
   error: { type: 'source-fact-conflict' },
+} as const satisfies ResumeTailoringResult<ResumeTailoringView>
+
+const candidateFactDuplicateResult = {
+  ok: false,
+  error: { type: 'candidate-fact-duplicate' },
+} as const satisfies ResumeTailoringResult<ResumeTailoringView>
+
+const candidateFactInvalidResult = {
+  ok: false,
+  error: { type: 'candidate-fact-invalid' },
 } as const satisfies ResumeTailoringResult<ResumeTailoringView>
 
 const jobRequirementExtractionUnavailableResult = {

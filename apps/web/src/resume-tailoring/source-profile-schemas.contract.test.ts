@@ -67,4 +67,24 @@ describe('Source Profile boundary schemas', () => {
 
     expect(result.success).toBe(false)
   })
+
+  it('preserves Candidate authorship when restoring a persisted fact', () => {
+    const result = sourceProfileReviewSchema.parse({
+      status: 'reviewing-facts',
+      documentName: 'resume.pdf',
+      detectedSensitiveContent: [],
+      outgoingContent: 'Built distributed TypeScript services',
+      processingNotice: null,
+      facts: [{
+        authorship: 'candidate',
+        id: 'source-fact-1',
+        kind: 'experience',
+        propositionKey: 'proposition-experience-1',
+        value: 'Built distributed TypeScript services',
+        status: 'verified',
+      }],
+    })
+
+    expect(result.facts[0]?.authorship).toBe('candidate')
+  })
 })

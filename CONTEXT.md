@@ -32,8 +32,12 @@ A text-based LinkedIn PDF, existing resume, or pasted professional text supplied
 _Avoid_: Profile URL, scraped profile, raw PDF
 
 **Candidate Fact**:
-A professional proposition taken from a Candidate-supplied Source Document or explicitly added by the Candidate. Imported facts are collectively attested by continuing from Source Profile Review; contradictory propositions require targeted correction.
+A professional proposition taken from a Candidate-supplied Source Document or explicitly added by the Candidate, including through a Profile Enrichment Prompt. Imported facts are collectively attested by continuing from Source Profile Review; Candidate-authored facts retain explicit authorship and contradictory propositions require targeted correction.
 _Avoid_: Verified Fact, Source Profile Fact, inferred skill, assumed qualification
+
+**Profile Enrichment Prompt**:
+A targeted, optional question asked after the initial Match Analysis to determine whether the Candidate has real professional evidence absent from the Source Profile but relevant to a required Job Requirement. At most three prompts surface initially, prioritized by potential Match Score impact; they never propose or create an experience for the Candidate.
+_Avoid_: Suggested experience, generated experience
 
 **Derived Fact**:
 A deterministic value calculated from Candidate Facts, such as a non-overlapping duration computed from complete dates. It never assigns a qualitative level or introduces new professional information.

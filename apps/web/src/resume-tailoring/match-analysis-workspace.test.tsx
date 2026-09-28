@@ -29,6 +29,26 @@ describe('MatchAnalysisWorkspace', () => {
     expect(gaps).toContain('matchAnalysis.coverage.partial')
     expect(gaps).toContain('matchAnalysis.coverage.uncovered')
   })
+
+  it('shows the Match Score before at most three optional highest-impact prompts', () => {
+    const html = renderToStaticMarkup(<MatchAnalysisWorkspace
+      candidateSession={createCandidateSession()}
+      localization={createLocalization()} />)
+
+    const enrichment = html.split('id="profile-enrichment-title"')[1] ?? ''
+    const promptValues = [...enrichment.matchAll(
+      /<form class="profile-enrichment-prompt">.*?<strong>(.*?)<\/strong>/g,
+    )].map((match) => match[1])
+    expect(html.indexOf('class="match-score"')).toBeLessThan(
+      html.indexOf('id="profile-enrichment-title"'),
+    )
+    expect(enrichment.match(/matchAnalysis\.enrichmentQuestion/g)).toHaveLength(3)
+    expect(promptValues).toEqual([
+      'Professional gap 2', 'Professional gap 3', 'Professional gap 4',
+    ])
+    expect(enrichment.match(/matchAnalysis\.enrichmentSkip/g)).toHaveLength(3)
+    expect(html).toContain('resumeClaims.generate')
+  })
 })
 
 function readListAfter({ html, title }: Readonly<{ html: string; title: string }>) {
