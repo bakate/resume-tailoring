@@ -5,6 +5,7 @@ import { sourceProfileFactKinds } from '@resume-tailoring/application/resume-tai
 import { z } from 'zod'
 
 import type { OpenAiReasoningEffort } from '../openai-model-configuration'
+import { createOpenAiRequester } from './openai-request'
 import { extractedSourceProfileFactsSchema } from './source-profile-schemas'
 
 type OpenAiExtractorDependencies = Readonly<{
@@ -31,24 +32,12 @@ type ExtractionRequest = OpenAiExtractorDependencies & Readonly<{ professionalCo
 
 async function requestSourceProfileExtraction(requestDetails: ExtractionRequest) {
   const { apiKey, model, professionalContent, reasoningEffort, request = fetch } = requestDetails
-  try {
-    const response = await request('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: createHeaders({ apiKey }),
-      body: JSON.stringify(createRequestBody({ model, professionalContent, reasoningEffort })),
-      signal: AbortSignal.timeout(sourceProfileExtractionTimeoutMilliseconds),
-    })
-    return response.ok ? parseOpenAiResponse({ value: await response.json() }) : unavailableResult
-  } catch {
-    return unavailableResult
-  }
-}
-
-function createHeaders({ apiKey }: Readonly<{ apiKey: string }>) {
-  return {
-    Authorization: `Bearer ${apiKey}`,
-    'Content-Type': 'application/json',
-  }
+  const requester = createOpenAiRequester({ apiKey, request })
+  const response = await requester.send({
+    body: createRequestBody({ model, professionalContent, reasoningEffort }),
+    operation: 'source-profile-extraction',
+  })
+  return response.ok ? parseOpenAiResponse({ value: response.value }) : unavailableResult
 }
 
 function createRequestBody({
@@ -179,5 +168,3 @@ const unavailableResult = {
   ok: false,
   error: { type: 'source-profile-extraction-unavailable' },
 } as const
-
-const sourceProfileExtractionTimeoutMilliseconds = 30_000

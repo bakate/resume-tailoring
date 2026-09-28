@@ -96,14 +96,42 @@ describe('OpenAI Resume Claim service contract', () => {
     })
     expect(JSON.stringify(requestBody)).toMatch(/Every referenced fact must directly support/iu)
   })
+
+  it('reuses one deadline across sequential semantic validations', async () => {
+    const requests: Request[] = []
+    const signals: (AbortSignal | null)[] = []
+    const deadlineSignal = new AbortController().signal
+    const validator = createOpenAiResumeClaimSemanticValidator({
+      apiKey: 'test-api-key',
+      deadlineSignal,
+      model: 'structured-model',
+      reasoningEffort: 'low',
+      request: createRequestSpy({
+        requests,
+        signals,
+        value: { supported: true, feedback: [] },
+      }),
+    })
+
+    await validator.validate({ claim: storedClaim, verifiedFacts: writingInputs.verifiedFacts })
+    await validator.validate({ claim: storedClaim, verifiedFacts: writingInputs.verifiedFacts })
+
+    expect(signals).toEqual([deadlineSignal, deadlineSignal])
+  })
 })
 
 function createRequestSpy({
   requests,
+  signals,
   value,
-}: Readonly<{ requests: Request[]; value: unknown }>): typeof fetch {
+}: Readonly<{
+  requests: Request[]
+  signals?: (AbortSignal | null)[]
+  value: unknown
+}>): typeof fetch {
   return (input, init) => {
     requests.push(new Request(input, init))
+    signals?.push(init?.signal ?? null)
     return Promise.resolve(Response.json({
       output: [{
         type: 'message',
