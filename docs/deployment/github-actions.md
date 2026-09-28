@@ -82,23 +82,22 @@ separate bootstrap stack.
 ### 3. Configure Cloudflare credentials
 
 Find the account ID in the Cloudflare dashboard. Add it to the `production` environment as
-the variable `CLOUDFLARE_ACCOUNT_ID`.
+the secret `CLOUDFARE_ACCOUNT_ID`.
 
 Create an API token from [Cloudflare API tokens](https://dash.cloudflare.com/profile/api-tokens).
 Use the **Edit Cloudflare Workers** template and restrict account resources to the account
 hosting `resume-studio`. No zone access is needed for the existing `workers.dev` route.
-Add the token as the environment **secret** `CLOUDFLARE_API_TOKEN`.
+Add the token as the environment **secret** `CLOUDFARE_API_TOKEN`.
 
 | GitHub environment setting | Kind | Value |
 | --- | --- | --- |
 | `AWS_DEPLOY_ROLE_ARN` | Variable | ARN printed by the bootstrap command |
-| `CLOUDFLARE_ACCOUNT_ID` | Variable | Cloudflare account ID |
-| `CLOUDFLARE_API_TOKEN` | Secret | Token authorized to deploy the Worker |
+| `CLOUDFARE_ACCOUNT_ID` | Secret | Cloudflare account ID |
+| `CLOUDFARE_API_TOKEN` | Secret | Token authorized to deploy the Worker |
 
-For compatibility with the initial GitHub configuration, the workflow also accepts
-`AWS_DEPLOY_ROLE_ARN` and `CLOUDFLARE_ACCOUNT_ID` as secrets, and the existing misspelled
-secret names `CLOUDFARE_ACCOUNT_ID` and `CLOUDFARE_API_TOKEN`. Prefer the names above for
-new configuration; no token needs to be exposed or recreated to use the existing setup.
+The workflow also accepts `AWS_DEPLOY_ROLE_ARN` as a secret. The Cloudflare secret names
+above match the existing GitHub configuration exactly. The workflow maps them to
+`CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`, the environment variables required by Wrangler.
 
 The application already has its OpenAI, Turnstile, session, and origin secrets configured.
 The workflow overrides only `ContainerImageUri`; CloudFormation retains all other existing
