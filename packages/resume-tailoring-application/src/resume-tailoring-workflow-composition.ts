@@ -367,29 +367,19 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
   ): Promise<ResumeTailoringResult<ResumeTailoringView>> {
     const currentState = await this.#readActiveState()
     if (!hasTailoredResume(currentState)) return resumeClaimUnavailableResult
-    const fact = createCandidateAuthoredFact({
-      facts: currentState.value.sourceProfile.facts,
-      identity: this.#dependencies.sourceProfileFactIdentity,
-      kind: command.kind,
-      value: command.text,
+    const preparedEdit = prepareConfirmedClaimEdit({
+      command, dependencies: this.#dependencies, state: currentState.value,
     })
-    if (!fact.ok) return fact.result
-    const transition = createConfirmedClaimEdit({
-      command,
-      fact: fact.value,
-      state: currentState.value,
-    })
-    if (transition === null) return resumeClaimUnavailableResult
+    if (!preparedEdit.ok) return preparedEdit.result
     const result = await this.#persistConfirmedClaimEdit({
       state: currentState.value,
-      ...transition,
+      ...preparedEdit.value,
     })
-    if (result.ok) {
-      await this.#recordCorrection({
-        correctionKind: 'resume-claim-edit',
-        matchAnalysis: currentState.value.matchAnalysis,
-      })
-    }
+    if (!result.ok) return result
+    await this.#recordCorrection({
+      correctionKind: 'resume-claim-edit',
+      matchAnalysis: currentState.value.matchAnalysis,
+    })
     return result
   }
 
@@ -1181,13 +1171,11 @@ function hasResumeClaimInputs(
   if (!hasMatchInputs(result) || result.value.matchAnalysis === undefined) return false
   const evidenceFactIds = new Set(result.value.matchAnalysis.evidence
     .flatMap(({ factIds }) => factIds))
-  const hasSubstantiveFact = result.value.sourceProfile.facts.some((fact) =>
-    fact.status === 'verified'
-    && evidenceFactIds.has(fact.id)
-    && (fact.kind === 'experience' || fact.kind === 'education' || fact.kind === 'project'))
+  const hasEvidenceBackedFact = result.value.sourceProfile.facts.some((fact) =>
+    fact.status === 'verified' && evidenceFactIds.has(fact.id))
   return result.value.matchAnalysis.generationEligibility === 'eligible'
     && result.value.matchAnalysis.evidence.length > 0
-    && hasSubstantiveFact
+    && hasEvidenceBackedFact
     && hasCurrentMatchProcessingConsent({ state: result.value })
 }
 
@@ -1257,10 +1245,11 @@ function createSupportedClaimEdit({ command, state }: Readonly<{
   state: ResumeClaimReadyState & { readonly tailoredResume: TailoredResume }
 }>) {
   const currentClaim = state.tailoredResume.claims.find(({ id }) => id === command.claimId)
-  const text = command.text.trim()
-  if (currentClaim === undefined || text.length === 0) return null
-  const factIds = [...new Set(currentClaim.segments.flatMap((segment) => segment.factIds))]
-  const proposal = { segments: [{ factIds, text }] }
+  if (currentClaim === undefined || command.texts.length !== currentClaim.segments.length) return null
+  const proposal = { segments: currentClaim.segments.map((segment, segmentIndex) => ({
+    factIds: segment.factIds,
+    text: command.texts[segmentIndex] ?? '',
+  })) }
   const verifiedFacts = state.sourceProfile.facts.filter(({ status }) => status === 'verified')
   const validation = validateProposedResumeClaim({
     claimId: currentClaim.id,
@@ -1296,6 +1285,24 @@ function createConfirmedClaimEdit({ command, fact, state }: Readonly<{
       tailoredResume: state.tailoredResume,
     }),
   }
+}
+
+function prepareConfirmedClaimEdit({ command, dependencies, state }: Readonly<{
+  command: Extract<ResumeTailoringCommand, { readonly type: 'confirm-resume-claim-edit' }>
+  dependencies: ResumeTailoringDependencies
+  state: ResumeClaimReadyState & { readonly tailoredResume: TailoredResume }
+}>) {
+  const fact = createCandidateAuthoredFact({
+    facts: state.sourceProfile.facts,
+    identity: dependencies.sourceProfileFactIdentity,
+    kind: command.kind,
+    value: command.text,
+  })
+  if (!fact.ok) return fact
+  const transition = createConfirmedClaimEdit({ command, fact: fact.value, state })
+  return transition === null
+    ? { ok: false, result: resumeClaimUnavailableResult } as const
+    : { ok: true, value: transition } as const
 }
 
 function moveResumeClaim({ claimId, claims, direction }: Readonly<{

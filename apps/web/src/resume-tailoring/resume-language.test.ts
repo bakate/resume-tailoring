@@ -10,6 +10,14 @@ describe('preferred Tailored Resume language', () => {
     })).toBe('fr')
   })
 
+  it('recognizes ordinary French prose without relying on a tiny keyword list', () => {
+    expect(readPreferredResumeLocale({
+      fallbackLocale: 'en',
+      jobPostingContent: 'Développeur frontend, maîtrise de TypeScript, conception '
+        + "d’interfaces accessibles et amélioration continue.",
+    })).toBe('fr')
+  })
+
   it('uses English when the Job Posting contains more English signals', () => {
     expect(readPreferredResumeLocale({
       fallbackLocale: 'fr',

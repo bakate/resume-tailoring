@@ -81,7 +81,7 @@ export type ResumeTailoringCommand =
   | {
       readonly type: 'edit-resume-claim'
       readonly claimId: ResumeClaimId
-      readonly text: string
+      readonly texts: readonly string[]
     }
   | {
       readonly type: 'confirm-resume-claim-edit'

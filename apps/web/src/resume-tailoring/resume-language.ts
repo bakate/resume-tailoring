@@ -5,9 +5,27 @@ export function readPreferredResumeLocale({
   fallbackLocale: 'en' | 'fr'
   jobPostingContent: string
 }>) {
-  const content = jobPostingContent.toLocaleLowerCase('fr')
-  const frenchSignals = content.match(/\b(?:avec|compétences|expérience|missions|poste|vous)\b/gu)
-  const englishSignals = content.match(/\b(?:experience|job|requirements|role|skills|with)\b/gu)
-  if ((frenchSignals?.length ?? 0) === (englishSignals?.length ?? 0)) return fallbackLocale
-  return (frenchSignals?.length ?? 0) > (englishSignals?.length ?? 0) ? 'fr' : 'en'
+  const scores = scoreLanguageSignals({ content: jobPostingContent })
+  if (scores.french === scores.english) return fallbackLocale
+  return scores.french > scores.english ? 'fr' : 'en'
 }
+
+function scoreLanguageSignals({ content }: Readonly<{ content: string }>) {
+  const normalizedContent = content.toLocaleLowerCase('fr')
+  const words = normalizedContent.match(/\p{Letter}+/gu) ?? []
+  return {
+    english: words.filter((word) => englishWords.has(word)).length,
+    french: words.filter((word) => frenchWords.has(word)).length
+      + (normalizedContent.match(/[àâçéèêëîïôùûüÿœ]/gu)?.length ?? 0),
+  }
+}
+
+const frenchWords = new Set([
+  'avec', 'compétences', 'conception', 'dans', 'de', 'des', 'développeur', 'du', 'et',
+  'expérience', 'la', 'le', 'les', 'maîtrise', 'missions', 'poste', 'pour', 'une', 'vous',
+])
+
+const englishWords = new Set([
+  'and', 'developer', 'experience', 'for', 'in', 'job', 'of', 'requirements', 'role', 'skills',
+  'the', 'to', 'with',
+])

@@ -46,6 +46,17 @@ describe('Resume Claim workflow', () => {
     system.expectOnlyEvidenceBackedFactsInWritingInput()
   })
 
+  it.each([
+    ['source-fact-typescript' as const],
+    ['source-fact-french' as const],
+  ])('generates when Match Evidence is backed only by %s', async (supportedFactId) => {
+    const system = createSystemUnderTest({ supportedFactIds: [supportedFactId] })
+
+    await system.generateTailoredResume()
+
+    system.expectGenerationToSucceed()
+  })
+
   it('regenerates a deterministically invalid claim once before semantic validation', async () => {
     const system = createSystemUnderTest()
 
@@ -118,6 +129,14 @@ describe('Resume Claim workflow', () => {
     system.expectSupportedEditToBePersisted()
   })
 
+  it('preserves each segment provenance when a multi-segment claim is edited', async () => {
+    const system = createSystemUnderTest({ tailoredResume: multiSegmentTailoredResume })
+
+    await system.editMultiSegmentResumeClaim()
+
+    system.expectMultiSegmentEditToPreserveProvenance()
+  })
+
   it('requests explicit Candidate Fact confirmation for an unsupported free edit', async () => {
     const system = createSystemUnderTest({ tailoredResume: existingTailoredResume })
 
@@ -137,9 +156,13 @@ describe('Resume Claim workflow', () => {
 })
 
 function createSystemUnderTest({
+  supportedFactIds,
   tailoredResume,
-}: Readonly<{ tailoredResume?: ReadyState['tailoredResume'] }> = {}) {
-  return new ResumeClaimWorkflowTestSystem({ tailoredResume })
+}: Readonly<{
+  supportedFactIds?: readonly SourceProfileFact['id'][]
+  tailoredResume?: ReadyState['tailoredResume']
+}> = {}) {
+  return new ResumeClaimWorkflowTestSystem({ supportedFactIds, tailoredResume })
 }
 
 type ReadyState = Extract<ResumeTailoringState, { readonly status: 'ready' }>
@@ -156,7 +179,10 @@ class ResumeClaimWorkflowTestSystem {
   #reformulatedClaims: ProposedResumeClaim[] = []
   #semanticResults: boolean[] = [true]
 
-  constructor({ tailoredResume }: Readonly<{ tailoredResume?: ReadyState['tailoredResume'] }>) {
+  constructor({ supportedFactIds, tailoredResume }: Readonly<{
+    supportedFactIds?: readonly SourceProfileFact['id'][]
+    tailoredResume?: ReadyState['tailoredResume']
+  }>) {
     this.#writer = {
       write: (inputs) => {
         this.#writingInputs.push(inputs)
@@ -189,7 +215,7 @@ class ResumeClaimWorkflowTestSystem {
         create: () => ({ ok: true, value: 'candidate-session-resume-claims' }),
       },
       candidateSessionPersistence: createInMemoryCandidateSessionPersistence({
-        initialState: createReadyState({ tailoredResume }),
+        initialState: createReadyState({ supportedFactIds, tailoredResume }),
       }),
       resumeClaimIdentity: {
         create: () => {
@@ -265,7 +291,15 @@ class ResumeClaimWorkflowTestSystem {
     this.#actionResult = await this.#workflow.execute({
       type: 'edit-resume-claim',
       claimId: 'resume-claim-experience',
-      text: 'Built APIs at Acme',
+      texts: ['Built APIs at Acme'],
+    })
+  }
+
+  async editMultiSegmentResumeClaim() {
+    this.#actionResult = await this.#workflow.execute({
+      type: 'edit-resume-claim',
+      claimId: 'resume-claim-experience',
+      texts: ['Built APIs at Acme', ' with TypeScript'],
     })
   }
 
@@ -324,6 +358,10 @@ class ResumeClaimWorkflowTestSystem {
     ])
   }
 
+  expectGenerationToSucceed() {
+    expect(this.#readActionResult().ok).toBe(true)
+  }
+
   expectSupportedEditToBePersisted() {
     expect(this.#readTailoredResume().claims[0]).toEqual({
       id: 'resume-claim-experience',
@@ -331,6 +369,16 @@ class ResumeClaimWorkflowTestSystem {
         factIds: ['source-fact-experience'],
         text: 'Built APIs at Acme',
       }],
+    })
+  }
+
+  expectMultiSegmentEditToPreserveProvenance() {
+    expect(this.#readTailoredResume().claims[0]).toEqual({
+      id: 'resume-claim-experience',
+      segments: [
+        { factIds: ['source-fact-experience'], text: 'Built APIs at Acme' },
+        { factIds: ['source-fact-typescript'], text: ' with TypeScript' },
+      ],
     })
   }
 
@@ -463,9 +511,14 @@ class ResumeClaimWorkflowTestSystem {
   }
 }
 
-function createReadyState({ tailoredResume }: Readonly<{
+function createReadyState({ supportedFactIds, tailoredResume }: Readonly<{
+  supportedFactIds?: readonly SourceProfileFact['id'][]
   tailoredResume?: ReadyState['tailoredResume']
 }>): ReadyState {
+  const evidenceFactIds = supportedFactIds ?? [
+    'source-fact-experience',
+    'source-fact-typescript',
+  ]
   return {
     status: 'ready',
     sessionId: 'candidate-session-resume-claims',
@@ -502,7 +555,7 @@ function createReadyState({ tailoredResume }: Readonly<{
       evidence: [{
         coverage: 'covered',
         requirementId: 'job-requirement-typescript',
-        factIds: ['source-fact-experience', 'source-fact-typescript'],
+        factIds: evidenceFactIds,
       }],
       gapAnalysis: { partiallyCoveredRequiredRequirementIds: [], uncoveredRequiredRequirementIds: [] },
       generationEligibility: 'eligible',
@@ -535,6 +588,13 @@ const verifiedFacts = [
     value: 'Used TypeScript',
   },
   {
+    id: 'source-fact-french',
+    kind: 'language',
+    propositionKey: 'proposition-language-french',
+    status: 'verified',
+    value: 'Professional French',
+  },
+  {
     id: 'source-fact-unconnected',
     kind: 'experience',
     propositionKey: 'proposition-experience-unconnected',
@@ -564,6 +624,18 @@ const existingTailoredResume = {
       segments: [{ factIds: ['source-fact-typescript'], text: 'Used TypeScript' }],
     },
   ],
+  exclusions: [],
+  locale: 'en',
+} as const satisfies ReadyState['tailoredResume']
+
+const multiSegmentTailoredResume = {
+  claims: [{
+    id: 'resume-claim-experience',
+    segments: [
+      { factIds: ['source-fact-experience'], text: 'Built APIs at Acme' },
+      { factIds: ['source-fact-typescript'], text: ' using TypeScript' },
+    ],
+  }],
   exclusions: [],
   locale: 'en',
 } as const satisfies ReadyState['tailoredResume']

@@ -32,7 +32,7 @@ export function formatResumeClaimText({ segments }: Readonly<{
 }
 
 export function TailoredResumeWorkspace({ candidateSession, localization }: WorkspaceProps) {
-  const [unsupportedEditClaimIds, setUnsupportedEditClaimIds] = useState<readonly ResumeClaim['id'][]>([])
+  const unsupportedEdits = useUnsupportedResumeEdits()
   const { view } = candidateSession
   if (view.status !== 'ready' || view.matchAnalysis === undefined) return null
   return (
@@ -41,33 +41,51 @@ export function TailoredResumeWorkspace({ candidateSession, localization }: Work
       || candidateSession.pendingOperation === 'reformulate-resume-claim'}
       className="tailored-resume-workspace" aria-labelledby="tailored-resume-title">
       <h2 id="tailored-resume-title" tabIndex={-1}>{localization.translate('resumeClaims.title')}</h2>
-      {view.tailoredResume === undefined
-        ? <GenerationAction {...{ candidateSession, localization }} />
-        : <>
-            {unsupportedEditClaimIds.length === 0
-              ? <TailoredResumeFlowNavigation localization={localization} /> : null}
-            <CuratedClaims {...{
-              candidateSession,
-              claims: view.tailoredResume.claims,
-              exclusions: view.tailoredResume.exclusions.length,
-              localization,
-              resumeLocale: view.tailoredResume.locale,
-              clearUnsupportedEdit: (claimId: ResumeClaim['id']) => {
-                setUnsupportedEditClaimIds((claimIds) => claimIds.filter((id) => id !== claimId))
-              },
-              reportUnsupportedEdit: (claimId: ResumeClaim['id']) => {
-                setUnsupportedEditClaimIds((claimIds) => claimIds.includes(claimId)
-                  ? claimIds : [...claimIds, claimId])
-              },
-            }} />
-            {unsupportedEditClaimIds.length === 0
-              ? <TailoredResumePreview {...{ candidateSession, localization }} />
-              : <p className="match-warning" role="alert">
-                {localization.translate('resumeClaims.unsupportedEditBlocksExport')}
-              </p>}
-          </>}
+      <TailoredResumeContent {...{ candidateSession, localization, unsupportedEdits }} />
     </section>
   )
+}
+
+function TailoredResumeContent({ candidateSession, localization, unsupportedEdits }: WorkspaceProps
+& Readonly<{ unsupportedEdits: ReturnType<typeof useUnsupportedResumeEdits> }>) {
+  const { view } = candidateSession
+  if (view.status !== 'ready' || view.tailoredResume === undefined) {
+    return <GenerationAction {...{ candidateSession, localization }} />
+  }
+  const exportStatus = unsupportedEdits.claimIds.length > 0 ? 'blocked' : 'ready'
+  return <>{exportStatus === 'ready' ? <TailoredResumeFlowNavigation {...{ localization }} /> : null}
+    <CuratedClaims {...{
+      candidateSession, claims: view.tailoredResume.claims,
+      exclusions: view.tailoredResume.exclusions.length, localization,
+      resumeLocale: view.tailoredResume.locale, clearUnsupportedEdit: unsupportedEdits.clear,
+      clearUnsupportedEdits: unsupportedEdits.clearAll,
+      reportUnsupportedEdit: unsupportedEdits.report,
+    }} />
+    <TailoredResumeExport {...{ candidateSession, exportStatus, localization }} />
+  </>
+}
+
+function TailoredResumeExport({ candidateSession, exportStatus, localization }: WorkspaceProps
+& Readonly<{ exportStatus: 'blocked' | 'ready' }>) {
+  if (exportStatus === 'blocked') return <p className="match-warning" role="alert">
+    {localization.translate('resumeClaims.unsupportedEditBlocksExport')}
+  </p>
+  return <TailoredResumePreview {...{ candidateSession, localization }} />
+}
+
+function useUnsupportedResumeEdits() {
+  const [claimIds, setClaimIds] = useState<readonly ResumeClaim['id'][]>([])
+  return {
+    claimIds,
+    clear: (claimId: ResumeClaim['id']) => {
+      setClaimIds((currentClaimIds) => currentClaimIds.filter((id) => id !== claimId))
+    },
+    clearAll: () => { setClaimIds([]) },
+    report: (claimId: ResumeClaim['id']) => {
+      setClaimIds((currentClaimIds) => currentClaimIds.includes(claimId)
+        ? currentClaimIds : [...currentClaimIds, claimId])
+    },
+  }
 }
 
 function TailoredResumeFlowNavigation({ localization }: Readonly<{
@@ -105,6 +123,7 @@ function GenerationAction({ candidateSession, localization }: WorkspaceProps) {
           label: localization.translate('resumeClaims.generate'),
           locale,
           localization,
+          onGenerated: ignoreGenerated,
           setLocale,
         }} />
       ) : <p className="match-warning">{localization.translate('matchAnalysis.denied')}</p>}
@@ -112,21 +131,35 @@ function GenerationAction({ candidateSession, localization }: WorkspaceProps) {
   )
 }
 
-function ResumeGenerationControls({ candidateSession, label, locale, localization, setLocale }:
+function ResumeGenerationControls({ candidateSession, label, locale, localization, onGenerated,
+  setLocale }:
 WorkspaceProps & Readonly<{
   label: string
   locale: 'en' | 'fr'
+  onGenerated: () => void
   setLocale: (locale: 'en' | 'fr') => void
 }>) {
   return <>
     <ResumeLanguageSelector {...{ locale, localization, setLocale }} />
     <button className="primary-action compact-action"
       disabled={candidateSession.pendingOperation !== null}
-      onClick={() => void candidateSession.generateResumeClaims({ locale })} type="button">
+      onClick={() => void generateResumeClaims({ candidateSession, locale, onGenerated })}
+      type="button">
       {label}
     </button>
   </>
 }
+
+export async function generateResumeClaims({ candidateSession, locale, onGenerated }: Readonly<{
+  candidateSession: Pick<CandidateSessionController, 'generateResumeClaims'>
+  locale: 'en' | 'fr'
+  onGenerated: () => void
+}>) {
+  const result = await candidateSession.generateResumeClaims({ locale })
+  if (result.ok) onGenerated()
+}
+
+function ignoreGenerated() {}
 
 function ResumeLanguageSelector({ locale, localization, setLocale }: Readonly<{
   locale: 'en' | 'fr'
@@ -149,50 +182,56 @@ function CuratedClaims({
   localization,
   resumeLocale,
   clearUnsupportedEdit,
+  clearUnsupportedEdits,
   reportUnsupportedEdit,
 }: WorkspaceProps & Readonly<{
   claims: readonly ResumeClaim[]
   exclusions: number
   resumeLocale: 'en' | 'fr'
   clearUnsupportedEdit: ResumeClaimCardProps['clearUnsupportedEdit']
+  clearUnsupportedEdits: () => void
   reportUnsupportedEdit: ResumeClaimCardProps['reportUnsupportedEdit']
 }>) {
   const [locale, setLocale] = useState(resumeLocale)
   return (
     <section aria-labelledby="resume-claims-list-title">
-      <h3 id="resume-claims-list-title" tabIndex={-1}>
-        {localization.translate('resumeClaims.collectionTitle')}
-      </h3>
-      {exclusions === 0 ? null : (
-        <p className="match-warning" role="status">
-          {localization.translate('resumeClaims.excluded')}
-        </p>
-      )}
+      <ClaimsHeading {...{ exclusions, localization }} />
       <ResumeGenerationControls {...{
         candidateSession,
         label: localization.translate('resumeClaims.regenerate'),
         locale,
         localization,
+        onGenerated: clearUnsupportedEdits,
         setLocale,
       }} />
-      <p className="claim-editing-note">{localization.translate('resumeClaims.editingNote')}</p>
-      {claims.length === 0
-        ? <p>{localization.translate('resumeClaims.empty')}</p>
-        : <ol aria-labelledby="resume-claims-list-title" className="resume-claim-list">
-          {claims.map((claim, claimIndex) => (
-            <ResumeClaimCard key={claim.id} {...{
-              candidateSession,
-              claim,
-              claimIndex,
-              claims,
-              clearUnsupportedEdit,
-              localization,
-              reportUnsupportedEdit,
-            }} />
-          ))}
-        </ol>}
+      <ClaimList {...{
+        candidateSession, claims, clearUnsupportedEdit, localization, reportUnsupportedEdit,
+      }} />
     </section>
   )
+}
+
+function ClaimsHeading({ exclusions, localization }: Readonly<{
+  exclusions: number
+  localization: Localization
+}>) {
+  return <><h3 id="resume-claims-list-title" tabIndex={-1}>
+    {localization.translate('resumeClaims.collectionTitle')}
+  </h3>{exclusions === 0 ? null : <p className="match-warning" role="status">
+    {localization.translate('resumeClaims.excluded')}
+  </p>}</>
+}
+
+function ClaimList({ candidateSession, claims, clearUnsupportedEdit, localization,
+  reportUnsupportedEdit }: Omit<ResumeClaimCardProps, 'claim' | 'claimIndex'>) {
+  if (claims.length === 0) return <p>{localization.translate('resumeClaims.empty')}</p>
+  return <><p className="claim-editing-note">{localization.translate('resumeClaims.editingNote')}</p>
+    <ol aria-labelledby="resume-claims-list-title" className="resume-claim-list">
+      {claims.map((claim, claimIndex) => <ResumeClaimCard key={claim.id} {...{
+        candidateSession, claim, claimIndex, claims, clearUnsupportedEdit,
+        localization, reportUnsupportedEdit,
+      }} />)}
+    </ol></>
 }
 
 function ResumeClaimCard(props: ResumeClaimCardProps) {
@@ -217,38 +256,44 @@ function ClaimEditForm({ candidateSession, claim, claimIndex, clearUnsupportedEd
   reportUnsupportedEdit }: ResumeClaimCardProps) {
   const [kind, setKind] = useState<SourceProfileFactKind>('experience')
   const [editStatus, setEditStatus] = useState<'ready' | 'confirmation-required'>('ready')
-  const [text, setText] = useState(formatResumeClaimText({ segments: claim.segments }))
+  const [texts, setTexts] = useState<readonly string[]>(claim.segments.map(({ text }) => text))
   return <details><summary>{createClaimActionLabel({
     action: localization.translate('resumeClaims.edit'), claimIndex, localization,
   })}</summary><form onSubmit={(event) => {
     event.preventDefault()
     void attemptClaimEdit({
       candidateSession, claim, clearUnsupportedEdit, reportUnsupportedEdit,
-      setEditStatus, text,
+      setEditStatus, texts,
     })
   }}>
-    <label htmlFor={`edit-${claim.id}`}>{localization.translate('resumeClaims.edit')}</label>
-    <textarea id={`edit-${claim.id}`} value={text}
-      onChange={(event) => { setText(event.currentTarget.value) }} />
-    <button disabled={candidateSession.pendingOperation !== null || text.trim().length === 0}
+    {texts.map((text, segmentIndex) => <label key={String(segmentIndex)}
+      htmlFor={`edit-${claim.id}-${String(segmentIndex)}`}>
+      {localization.translate('resumeClaims.edit')}
+      <textarea id={`edit-${claim.id}-${String(segmentIndex)}`} value={text}
+        onChange={(event) => { setTexts(replaceTextAt({
+          segmentIndex, text: event.currentTarget.value, texts,
+        })) }} />
+    </label>)}
+    <button disabled={candidateSession.pendingOperation !== null
+      || texts.some((text) => text.trim().length === 0)}
       type="submit">{localization.translate('resumeClaims.saveEdit')}</button>
     {editStatus === 'confirmation-required' ? <ClaimFactConfirmation {...{
       candidateSession, claim, clearUnsupportedEdit, kind, localization, setKind,
-      setEditStatus, setText, text,
+      setEditStatus, setTexts, text: texts.join(''),
     }} /> : null}
   </form></details>
 }
 
 async function attemptClaimEdit({ candidateSession, claim, clearUnsupportedEdit,
-  reportUnsupportedEdit, setEditStatus, text }: Readonly<{
+  reportUnsupportedEdit, setEditStatus, texts }: Readonly<{
   candidateSession: CandidateSessionController
   claim: ResumeClaim
   clearUnsupportedEdit: ResumeClaimCardProps['clearUnsupportedEdit']
   reportUnsupportedEdit: ResumeClaimCardProps['reportUnsupportedEdit']
   setEditStatus: (status: 'ready' | 'confirmation-required') => void
-  text: string
+  texts: readonly string[]
 }>) {
-  const result = await candidateSession.editResumeClaim({ claimId: claim.id, text })
+  const result = await candidateSession.editResumeClaim({ claimId: claim.id, texts })
   const requiresConfirmation = !result.ok
     && result.error.type === 'resume-claim-new-fact-confirmation-required'
   setEditStatus(requiresConfirmation ? 'confirmation-required' : 'ready')
@@ -257,7 +302,7 @@ async function attemptClaimEdit({ candidateSession, claim, clearUnsupportedEdit,
 }
 
 function ClaimFactConfirmation({ candidateSession, claim, clearUnsupportedEdit, kind, localization,
-  setEditStatus, setKind, setText, text }: Readonly<{
+  setEditStatus, setKind, setTexts, text }: Readonly<{
   candidateSession: CandidateSessionController
   claim: ResumeClaim
   clearUnsupportedEdit: ResumeClaimCardProps['clearUnsupportedEdit']
@@ -265,7 +310,7 @@ function ClaimFactConfirmation({ candidateSession, claim, clearUnsupportedEdit, 
   localization: Localization
   setEditStatus: (status: 'ready' | 'confirmation-required') => void
   setKind: (kind: SourceProfileFactKind) => void
-  setText: (text: string) => void
+  setTexts: (texts: readonly string[]) => void
   text: string
 }>) {
   return <fieldset><legend>{localization.translate('resumeClaims.confirmNewFact')}</legend>
@@ -281,9 +326,17 @@ function ClaimFactConfirmation({ candidateSession, claim, clearUnsupportedEdit, 
     <button onClick={() => {
       clearUnsupportedEdit(claim.id)
       setEditStatus('ready')
-      setText(formatResumeClaimText({ segments: claim.segments }))
+      setTexts(claim.segments.map((segment) => segment.text))
     }} type="button">{localization.translate('resumeClaims.discardEdit')}</button>
   </fieldset>
+}
+
+function replaceTextAt({ segmentIndex, text, texts }: Readonly<{
+  segmentIndex: number
+  text: string
+  texts: readonly string[]
+}>) {
+  return texts.map((currentText, currentIndex) => currentIndex === segmentIndex ? text : currentText)
 }
 
 async function confirmClaimEdit({ candidateSession, claim, clearUnsupportedEdit, kind,

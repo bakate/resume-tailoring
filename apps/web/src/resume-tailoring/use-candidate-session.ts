@@ -264,10 +264,10 @@ function createResumeClaimActions(dependencies: CandidateSessionActionDependenci
       claimId: ResumeClaimId
       request: string
     }>) => execute({ type: 'reformulate-resume-claim', claimId, request }),
-    editResumeClaim: ({ claimId, text }: Readonly<{
+    editResumeClaim: ({ claimId, texts }: Readonly<{
       claimId: ResumeClaimId
-      text: string
-    }>) => execute({ type: 'edit-resume-claim', claimId, text }),
+      texts: readonly string[]
+    }>) => execute({ type: 'edit-resume-claim', claimId, texts }),
     confirmResumeClaimEdit: ({ claimId, kind, text }: Readonly<{
       claimId: ResumeClaimId
       kind: SourceProfileFactKind
