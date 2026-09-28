@@ -62,12 +62,15 @@ function createRequestBody({
 }>) {
   return {
     model,
+    max_output_tokens: maximumOutputTokens,
     reasoning: { effort: reasoningEffort },
     store: false,
     input: createExtractionInput({ professionalContent }),
     text: { format: sourceProfileResponseFormat },
   }
 }
+
+const maximumOutputTokens = 12_000
 
 function createExtractionInput({ professionalContent }: Readonly<{ professionalContent: string }>) {
   return [

@@ -1,0 +1,8 @@
+name = "resume-studio"
+main = "src/worker.js"
+compatibility_date = "2026-09-27"
+workers_dev = true
+preview_urls = false
+
+[vars]
+ORIGIN_URL = "https://3wvbrcr53xhhufkizn55ln55c40jfqmc.lambda-url.eu-west-3.on.aws"

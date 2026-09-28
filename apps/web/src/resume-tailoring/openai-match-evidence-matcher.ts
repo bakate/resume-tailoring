@@ -131,6 +131,7 @@ function createRequestBody({
 }>) {
   return {
     model,
+    max_output_tokens: maximumOutputTokens,
     reasoning: { effort: reasoningEffort },
     store: false,
     input: [
@@ -143,6 +144,8 @@ function createRequestBody({
     text: { format: matchEvidenceResponseFormat },
   }
 }
+
+const maximumOutputTokens = 12_000
 
 function parseOpenAiResponse({
   matchRequest,

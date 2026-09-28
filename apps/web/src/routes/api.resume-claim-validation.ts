@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
+import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
 import { createOpenAiResumeClaimSemanticValidator } from '../resume-tailoring/openai-resume-claim-service'
 import { resumeClaimValidationRequestSchema } from '../resume-tailoring/resume-claim-schemas'
@@ -13,6 +14,8 @@ export const Route = createFileRoute('/api/resume-claim-validation')({
 })
 
 async function validateResumeClaim({ request }: Readonly<{ request: Request }>) {
+  const accessResponse = createDemoAccessGuardResponse({ request })
+  if (accessResponse !== null) return accessResponse
   const validationRequest = await readValidationRequest({ request })
   if (!validationRequest.ok) return createFailureResponse({ status: 400 })
   const environment = validateServerEnvironment({ environment: process.env })

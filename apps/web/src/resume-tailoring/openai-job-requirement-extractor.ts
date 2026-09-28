@@ -72,12 +72,15 @@ function createRequestBody({
 }>) {
   return {
     model,
+    max_output_tokens: maximumOutputTokens,
     reasoning: { effort: reasoningEffort },
     store: false,
     input: createExtractionInput({ jobPostingContent }),
     text: { format: jobRequirementResponseFormat },
   }
 }
+
+const maximumOutputTokens = 12_000
 
 function createExtractionInput({ jobPostingContent }: Readonly<{ jobPostingContent: string }>) {
   return [

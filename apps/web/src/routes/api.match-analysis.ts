@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
+import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
 import { matchAnalysisRequestSchema } from '../resume-tailoring/match-analysis-schemas'
 import { createOpenAiMatchEvidenceMatcher } from '../resume-tailoring/openai-match-evidence-matcher'
@@ -15,6 +16,8 @@ export const Route = createFileRoute('/api/match-analysis')({
 })
 
 async function analyzeMatch({ request }: Readonly<{ request: Request }>) {
+  const accessResponse = createDemoAccessGuardResponse({ request })
+  if (accessResponse !== null) return accessResponse
   const matchRequest = await readMatchRequest({ request })
   if (!matchRequest.ok) return createFailureResponse({ status: 400 })
   const environmentResult = validateServerEnvironment({ environment: process.env })

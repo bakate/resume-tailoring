@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 import type { ZodError } from 'zod'
 
+import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
 import {
   jobRequirementExtractionRequestSchema,
@@ -20,6 +21,8 @@ export const Route = createFileRoute('/api/job-requirement-extraction')({
 })
 
 async function extractJobRequirements({ request }: Readonly<{ request: Request }>) {
+  const accessResponse = createDemoAccessGuardResponse({ request })
+  if (accessResponse !== null) return accessResponse
   const contentResult = await readJobPostingContent({ request })
   if (!contentResult.ok) return createFailureResponse({ status: contentResult.status })
   const environmentResult = validateServerEnvironment({ environment: process.env })
