@@ -4,6 +4,7 @@ import type {
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { sourceProfileFactKinds } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { formatResumeClaimText as formatClaim } from '@resume-tailoring/application/tailored-resume-document'
+import type { SyntheticEvent } from 'react'
 import { useState } from 'react'
 
 import type { Localization } from '../localization/localization'
@@ -245,43 +246,62 @@ function ResumeClaimCard(props: ResumeClaimCardProps) {
           {formatResumeClaimText({ segments: claim.segments })}
         </p>
         <ClaimActions {...props} />
-        <ClaimEditForm {...props} />
+        <ClaimEditForm key={createClaimVersion({ claim })} {...props} />
         <ReformulationForm {...props} />
       </article>
     </li>
   )
 }
 
-function ClaimEditForm({ candidateSession, claim, claimIndex, clearUnsupportedEdit, localization,
-  reportUnsupportedEdit }: ResumeClaimCardProps) {
+function ClaimEditForm(props: ResumeClaimCardProps) {
+  const { claim } = props
   const [kind, setKind] = useState<SourceProfileFactKind>('experience')
   const [editStatus, setEditStatus] = useState<'ready' | 'confirmation-required'>('ready')
   const [texts, setTexts] = useState<readonly string[]>(claim.segments.map(({ text }) => text))
+  return <ClaimEditDisclosure {...{
+    ...props, editStatus, kind, setEditStatus, setKind, setTexts, texts,
+  }} />
+}
+
+type ClaimEditDisclosureProps = ResumeClaimCardProps & Readonly<{
+  editStatus: 'ready' | 'confirmation-required'
+  kind: SourceProfileFactKind
+  setEditStatus: (status: 'ready' | 'confirmation-required') => void
+  setKind: (kind: SourceProfileFactKind) => void
+  setTexts: (texts: readonly string[]) => void
+  texts: readonly string[]
+}>
+
+function ClaimEditDisclosure(props: ClaimEditDisclosureProps) {
+  const { candidateSession, claimIndex, editStatus, localization, texts } = props
   return <details><summary>{createClaimActionLabel({
     action: localization.translate('resumeClaims.edit'), claimIndex, localization,
-  })}</summary><form onSubmit={(event) => {
-    event.preventDefault()
-    void attemptClaimEdit({
-      candidateSession, claim, clearUnsupportedEdit, reportUnsupportedEdit,
-      setEditStatus, texts,
-    })
-  }}>
-    {texts.map((text, segmentIndex) => <label key={String(segmentIndex)}
-      htmlFor={`edit-${claim.id}-${String(segmentIndex)}`}>
-      {localization.translate('resumeClaims.edit')}
-      <textarea id={`edit-${claim.id}-${String(segmentIndex)}`} value={text}
-        onChange={(event) => { setTexts(replaceTextAt({
-          segmentIndex, text: event.currentTarget.value, texts,
-        })) }} />
-    </label>)}
+  })}</summary><form onSubmit={(event) => { submitClaimEdit({ event, props }) }}>
+    <ClaimTextInputs {...props} />
     <button disabled={candidateSession.pendingOperation !== null
       || texts.some((text) => text.trim().length === 0)}
       type="submit">{localization.translate('resumeClaims.saveEdit')}</button>
-    {editStatus === 'confirmation-required' ? <ClaimFactConfirmation {...{
-      candidateSession, claim, clearUnsupportedEdit, kind, localization, setKind,
-      setEditStatus, setTexts, text: texts.join(''),
-    }} /> : null}
+    {editStatus === 'confirmation-required' ? <ClaimFactConfirmation {...props} /> : null}
   </form></details>
+}
+
+function ClaimTextInputs({ claim, localization, setTexts, texts }: ClaimEditDisclosureProps) {
+  return texts.map((text, segmentIndex) => <label key={String(segmentIndex)}
+    htmlFor={`edit-${claim.id}-${String(segmentIndex)}`}>
+    {localization.translate('resumeClaims.edit')}
+    <textarea id={`edit-${claim.id}-${String(segmentIndex)}`} value={text}
+      onChange={(event) => { setTexts(replaceTextAt({
+        segmentIndex, text: event.currentTarget.value, texts,
+      })) }} />
+  </label>)
+}
+
+function submitClaimEdit({ event, props }: Readonly<{
+  event: SyntheticEvent<HTMLFormElement>
+  props: ClaimEditDisclosureProps
+}>) {
+  event.preventDefault()
+  void attemptClaimEdit(props)
 }
 
 async function attemptClaimEdit({ candidateSession, claim, clearUnsupportedEdit,
@@ -301,34 +321,45 @@ async function attemptClaimEdit({ candidateSession, claim, clearUnsupportedEdit,
   else clearUnsupportedEdit(claim.id)
 }
 
-function ClaimFactConfirmation({ candidateSession, claim, clearUnsupportedEdit, kind, localization,
-  setEditStatus, setKind, setTexts, text }: Readonly<{
-  candidateSession: CandidateSessionController
-  claim: ResumeClaim
-  clearUnsupportedEdit: ResumeClaimCardProps['clearUnsupportedEdit']
-  kind: SourceProfileFactKind
-  localization: Localization
-  setEditStatus: (status: 'ready' | 'confirmation-required') => void
-  setKind: (kind: SourceProfileFactKind) => void
-  setTexts: (texts: readonly string[]) => void
-  text: string
-}>) {
+function ClaimFactConfirmation(props: ClaimEditDisclosureProps) {
+  const { candidateSession, claim, clearUnsupportedEdit, kind, localization, setEditStatus } = props
+  const text = formatEditedClaimText({ claim, texts: props.texts })
   return <fieldset><legend>{localization.translate('resumeClaims.confirmNewFact')}</legend>
-    <label htmlFor={`fact-kind-${claim.id}`}>{localization.translate('resumeClaims.factKind')}</label>
-    <select id={`fact-kind-${claim.id}`} value={kind} onChange={(event) => {
-      setKind(event.currentTarget.value as SourceProfileFactKind)
-    }}>{sourceProfileFactKinds.map((factKind) => <option key={factKind} value={factKind}>
-      {localization.translate(`sourceProfile.kind.${factKind}`)}
-    </option>)}</select>
+    <FactKindSelector {...props} />
     <button onClick={() => { void confirmClaimEdit({
       candidateSession, claim, clearUnsupportedEdit, kind, setEditStatus, text,
     }) }} type="button">{localization.translate('resumeClaims.confirmAndSave')}</button>
-    <button onClick={() => {
-      clearUnsupportedEdit(claim.id)
-      setEditStatus('ready')
-      setTexts(claim.segments.map((segment) => segment.text))
-    }} type="button">{localization.translate('resumeClaims.discardEdit')}</button>
+    <button onClick={() => { discardClaimEdit(props) }} type="button">
+      {localization.translate('resumeClaims.discardEdit')}
+    </button>
   </fieldset>
+}
+
+function FactKindSelector({ claim, kind, localization, setKind }: ClaimEditDisclosureProps) {
+  return <><label htmlFor={`fact-kind-${claim.id}`}>
+    {localization.translate('resumeClaims.factKind')}
+  </label><select id={`fact-kind-${claim.id}`} value={kind} onChange={(event) => {
+    setKind(event.currentTarget.value as SourceProfileFactKind)
+  }}>{sourceProfileFactKinds.map((factKind) => <option key={factKind} value={factKind}>
+    {localization.translate(`sourceProfile.kind.${factKind}`)}
+  </option>)}</select></>
+}
+
+function discardClaimEdit({ claim, clearUnsupportedEdit, setEditStatus,
+  setTexts }: ClaimEditDisclosureProps) {
+  clearUnsupportedEdit(claim.id)
+  setEditStatus('ready')
+  setTexts(claim.segments.map((segment) => segment.text))
+}
+
+export function formatEditedClaimText({ claim, texts }: Readonly<{
+  claim: ResumeClaim
+  texts: readonly string[]
+}>) {
+  const segments = claim.segments.map((segment, segmentIndex) => ({
+    ...segment, text: texts[segmentIndex] ?? '',
+  }))
+  return formatResumeClaimText({ segments })
 }
 
 function replaceTextAt({ segmentIndex, text, texts }: Readonly<{
@@ -337,6 +368,10 @@ function replaceTextAt({ segmentIndex, text, texts }: Readonly<{
   texts: readonly string[]
 }>) {
   return texts.map((currentText, currentIndex) => currentIndex === segmentIndex ? text : currentText)
+}
+
+export function createClaimVersion({ claim }: Readonly<{ claim: ResumeClaim }>) {
+  return claim.segments.map(({ factIds, text }) => `${factIds.join(',')}:${text}`).join('|')
 }
 
 async function confirmClaimEdit({ candidateSession, claim, clearUnsupportedEdit, kind,

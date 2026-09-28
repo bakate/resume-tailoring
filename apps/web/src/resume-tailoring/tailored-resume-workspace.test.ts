@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  createClaimVersion,
+  formatEditedClaimText,
   formatResumeClaimText,
   generateResumeClaims,
   submitReformulation,
@@ -16,6 +18,25 @@ describe('formatResumeClaimText', () => {
         { factIds: ['source-fact-typescript'], text: '.' },
       ],
     })).toBe('Built APIs with TypeScript.')
+  })
+})
+
+describe('multi-segment claim editing', () => {
+  it('formats confirmed Candidate Fact text without joining words', () => {
+    expect(formatEditedClaimText({
+      claim: multiSegmentClaim,
+      texts: ['Built APIs', 'Led teams'],
+    })).toBe('Built APIs Led teams')
+  })
+
+  it('changes the form version when persisted claim segments change', () => {
+    const replacementClaim = {
+      ...multiSegmentClaim,
+      segments: [{ factIds: ['source-fact-experience'], text: 'Led teams' }],
+    } as const
+
+    expect(createClaimVersion({ claim: replacementClaim }))
+      .not.toBe(createClaimVersion({ claim: multiSegmentClaim }))
   })
 })
 
@@ -93,6 +114,14 @@ function createGenerationController({ result }: Readonly<{
 const resumeClaim = {
   id: 'resume-claim-experience',
   segments: [{ factIds: ['source-fact-experience'], text: 'Built APIs' }],
+} as const
+
+const multiSegmentClaim = {
+  id: 'resume-claim-experience',
+  segments: [
+    { factIds: ['source-fact-experience'], text: 'Built APIs' },
+    { factIds: ['source-fact-leadership'], text: 'Led teams' },
+  ],
 } as const
 
 const readyView = {
