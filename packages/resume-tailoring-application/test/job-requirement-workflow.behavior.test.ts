@@ -559,7 +559,7 @@ const extractedJobPosting = {
 const extractedTargetRoleJobPosting = {
   ...confirmedJobPosting,
   status: 'reviewing-requirements',
-  outgoingContent: 'Senior FullStack Developer\nRole: Lead Platform Engineer\nTypeScript is required.',
+  outgoingContent: 'Senior FullStack Developer\nRole: Lead Platform Engineer\nTypeScript',
   targetRole: {
     sourceExcerpt: 'Senior FullStack Developer',
     value: 'Senior FullStack Developer',

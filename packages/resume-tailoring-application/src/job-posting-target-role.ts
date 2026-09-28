@@ -13,7 +13,5 @@ export function isExactTargetRoleTitle({ jobPostingContent, value }: Readonly<{
 
 function readTargetRoleTitle({ line }: Readonly<{ line: string }>) {
   const trimmedLine = line.trim()
-  const labelledTitle = trimmedLine.match(targetRoleLabel)?.[1]?.trim()
-  if (labelledTitle !== undefined) return labelledTitle
-  return trimmedLine.replace(/[.!?]+$/u, '').trim()
+  return trimmedLine.match(targetRoleLabel)?.[1]?.trim() ?? null
 }
