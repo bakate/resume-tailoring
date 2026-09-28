@@ -6,7 +6,27 @@ deploys the Cloudflare Worker, and checks availability and API access protection
 Manual runs are supported on `main` only. Deployment jobs are serialized and are never
 cancelled midway by a newer push. Actions are pinned to commit SHAs.
 
+The deployment job installs the pnpm version declared in the root `packageManager` field.
+It runs the pinned Wrangler version through `pnpm dlx`, which installs the CLI in an isolated
+environment without installing or changing the application workspace dependencies.
+The CLI uses the Worker configuration and Cloudflare credentials from environment variables.
+
 ## One-time setup
+
+### Local toolchain
+
+`.nvmrc` selects Node.js 24 for local development and both CI jobs. It tracks the major
+version rather than pinning a patch release. `package.json` defines the exact pnpm version
+in `packageManager`, read by Corepack locally and `pnpm/action-setup` in CI.
+
+With nvm and Corepack installed, run from the repository root:
+
+```sh
+nvm install
+nvm use
+corepack enable
+pnpm --version
+```
 
 Complete these steps before pushing the workflow to `main`.
 
@@ -19,6 +39,12 @@ Leave required reviewers disabled if every successful push should deploy automat
 
 The AWS trust policy accepts only this repository's `production` environment. Its branch
 restriction is essential: the environment name replaces the branch in the OIDC subject.
+
+This repository uses GitHub's immutable OIDC subject format. The AWS trust policy must match
+`repo:bakate@38812007/resume-tailoring@1389399266:environment:production` exactly. A name-only
+subject such as `repo:bakate/resume-tailoring:environment:production` will be rejected by AWS.
+Verify the prefix with `gh api repos/bakate/resume-tailoring/actions/oidc/customization/sub`.
+For another repository, configure `GitHubOidcSubjectPrefix` from its `sub_claim_prefix`.
 
 ### 2. Bootstrap AWS access
 
@@ -46,26 +72,32 @@ CloudFormation service role. Verify these assumptions if the stack was changed m
 The script can be rerun: it preserves the existing bootstrap stack's parameters so OIDC
 provider ownership stays unchanged.
 
+To fix an existing bootstrap stack created with the old name-only subject, obtain this
+updated template and rerun `bash scripts/bootstrap-github-actions.sh` while authenticated
+to AWS. The new `GitHubOidcSubjectPrefix` parameter uses the immutable prefix above by
+default. The role ARN stays unchanged, so no GitHub secret replacement is required. Then
+rerun the failed deployment job. Merging a template change alone does not update this
+separate bootstrap stack.
+
 ### 3. Configure Cloudflare credentials
 
 Find the account ID in the Cloudflare dashboard. Add it to the `production` environment as
-the variable `CLOUDFLARE_ACCOUNT_ID`.
+the secret `CLOUDFARE_ACCOUNT_ID`.
 
 Create an API token from [Cloudflare API tokens](https://dash.cloudflare.com/profile/api-tokens).
 Use the **Edit Cloudflare Workers** template and restrict account resources to the account
 hosting `resume-studio`. No zone access is needed for the existing `workers.dev` route.
-Add the token as the environment **secret** `CLOUDFLARE_API_TOKEN`.
+Add the token as the environment **secret** `CLOUDFARE_API_TOKEN`.
 
 | GitHub environment setting | Kind | Value |
 | --- | --- | --- |
 | `AWS_DEPLOY_ROLE_ARN` | Variable | ARN printed by the bootstrap command |
-| `CLOUDFLARE_ACCOUNT_ID` | Variable | Cloudflare account ID |
-| `CLOUDFLARE_API_TOKEN` | Secret | Token authorized to deploy the Worker |
+| `CLOUDFARE_ACCOUNT_ID` | Secret | Cloudflare account ID |
+| `CLOUDFARE_API_TOKEN` | Secret | Token authorized to deploy the Worker |
 
-For compatibility with the initial GitHub configuration, the workflow also accepts
-`AWS_DEPLOY_ROLE_ARN` and `CLOUDFLARE_ACCOUNT_ID` as secrets, and the existing misspelled
-secret names `CLOUDFARE_ACCOUNT_ID` and `CLOUDFARE_API_TOKEN`. Prefer the names above for
-new configuration; no token needs to be exposed or recreated to use the existing setup.
+The workflow also accepts `AWS_DEPLOY_ROLE_ARN` as a secret. The Cloudflare secret names
+above match the existing GitHub configuration exactly. The workflow maps them to
+`CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`, the environment variables required by Wrangler.
 
 The application already has its OpenAI, Turnstile, session, and origin secrets configured.
 The workflow overrides only `ContainerImageUri`; CloudFormation retains all other existing

@@ -2,9 +2,10 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: GitHub Actions OIDC access to the existing Resume Studio demo
 
 Parameters:
-  GitHubRepository:
+  GitHubOidcSubjectPrefix:
     Type: String
-    Default: bakate/resume-tailoring
+    Default: repo:bakate@38812007/resume-tailoring@1389399266
+    Description: Exact sub_claim_prefix returned by the repository GitHub OIDC customization API
   ApplicationName:
     Type: String
     Default: honest-resume-demo
@@ -40,7 +41,7 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubRepository}:environment:production
+                token.actions.githubusercontent.com:sub: !Sub ${GitHubOidcSubjectPrefix}:environment:production
       Policies:
         - PolicyName: DeployExistingDemo
           PolicyDocument:
