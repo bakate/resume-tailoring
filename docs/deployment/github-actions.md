@@ -6,6 +6,11 @@ deploys the Cloudflare Worker, and checks availability and API access protection
 Manual runs are supported on `main` only. Deployment jobs are serialized and are never
 cancelled midway by a newer push. Actions are pinned to commit SHAs.
 
+Wrangler is installed at a pinned version in the runner's temporary directory, outside
+the pnpm workspace. This prevents npm from resolving the application's `catalog:` dependencies.
+Its CLI runs against the Worker configuration with the Cloudflare credentials provided as
+environment variables.
+
 ## One-time setup
 
 Complete these steps before pushing the workflow to `main`.

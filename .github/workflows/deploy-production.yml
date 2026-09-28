@@ -97,14 +97,15 @@ jobs:
             --query 'Stacks[0].Outputs[?OutputKey==`DemoUrl`].OutputValue | [0]' --output text)
           [[ "$origin_url" == https://*.lambda-url.eu-west-3.on.aws/ ]]
           printf 'url=%s\n' "$origin_url" >> "$GITHUB_OUTPUT"
+      - name: Install Wrangler outside the pnpm workspace
+        run: npm install --prefix "$RUNNER_TEMP/resume-studio-wrangler" --no-audit --no-fund wrangler@4.142.0
       - name: Deploy the public Worker
-        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFARE_API_TOKEN }}
-          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFARE_ACCOUNT_ID }}
-          workingDirectory: infrastructure/cloudflare-worker
-          wranglerVersion: '4.142.0'
-          command: deploy --var ORIGIN_URL:${{ steps.origin.outputs.url }}
+        working-directory: infrastructure/cloudflare-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFARE_ACCOUNT_ID }}
+          ORIGIN_URL: ${{ steps.origin.outputs.url }}
+        run: '"$RUNNER_TEMP/resume-studio-wrangler/node_modules/.bin/wrangler" deploy --var "ORIGIN_URL:$ORIGIN_URL"'
       - name: Check availability and access protection without calling OpenAI
         env:
           ORIGIN_URL: ${{ steps.origin.outputs.url }}
