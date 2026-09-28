@@ -1,5 +1,7 @@
 # AWS Lambda deployment
 
+For automatic updates after a push to `main`, see [GitHub Actions setup](github-actions.md).
+
 The application runs as one public ARM64 AWS Lambda container behind a Cloudflare Worker. The
 Worker exposes `resume-studio.bakateba.workers.dev` and forwards requests to the
 Lambda Function URL with a shared origin secret. The container includes Chromium for PDF rendering
