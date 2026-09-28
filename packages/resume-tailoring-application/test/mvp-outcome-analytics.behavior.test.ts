@@ -236,6 +236,6 @@ function createReadyState({ matchScore, outcomeFeedback }: Readonly<{
       relevantFactIds: [],
       warning: null,
     },
-    tailoredResume: { claims: [], exclusions: [] },
+    tailoredResume: { claims: [], exclusions: [], locale: 'en' },
   }
 }

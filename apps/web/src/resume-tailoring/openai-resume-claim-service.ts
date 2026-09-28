@@ -199,7 +199,8 @@ function readOutputText({ output }: Readonly<{ output: readonly unknown[] }>) {
 }
 
 const writingInstructions = [
-  'Write concise Tailored Resume claims only from the supplied Verified Facts.',
+  'Write concise Tailored Resume claims only from the supplied Candidate Facts.',
+  'Write every claim in the exact language requested by locale: en means English and fr means French.',
   'Split every claim into the smallest semantic segments and link each segment to every exact fact that supports it.',
   'You may compress, translate, change voice, or omit detail.',
   'Never add or strengthen causality, scope, autonomy, seniority, duration, frequency, quantity, or outcome.',
@@ -208,7 +209,7 @@ const writingInstructions = [
 ].join(' ')
 
 const validationInstructions = [
-  'Decide whether every Resume Claim segment is fully supported by its referenced Verified Facts.',
+  'Decide whether every Resume Claim segment is fully supported by its referenced Candidate Facts.',
   'Every referenced fact must directly support that segment; reject unrelated or redundant fact references as inexact-fact-reference.',
   'Reject additions or strengthening of causality, scope, autonomy, seniority, duration, frequency, quantity, or outcome.',
   'Faithful compression, translation, voice changes, and omission are supported.',

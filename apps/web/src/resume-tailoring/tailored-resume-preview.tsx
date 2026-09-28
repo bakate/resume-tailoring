@@ -36,12 +36,16 @@ type OutcomeQuestionProps<TAssessment extends string> = Readonly<{
 
 export function TailoredResumePreview({ candidateSession, localization }: PreviewProps) {
   const [photo, setPhoto] = useState<PhotoState>({ status: 'empty' })
+  const resumeLocale = readTailoredResumeLocale({
+    candidateSession,
+    fallbackLocale: localization.locale,
+  })
   const [exportState, setExportState] = useState<ExportState>({ status: 'idle' })
   const [previewState, setPreviewState] = useState<PreviewState>({ status: 'preparing' })
   useEffect(() => {
     const abortController = new AbortController()
     setPreviewState({ status: 'preparing' })
-    void preparePreview({ locale: localization.locale, photo, view: candidateSession.view })
+    void preparePreview({ locale: resumeLocale, photo, view: candidateSession.view })
       .then((preview) => {
         if (abortController.signal.aborted) return
         setPreviewState(preview === null
@@ -49,7 +53,7 @@ export function TailoredResumePreview({ candidateSession, localization }: Previe
           : { status: 'ready', value: preview })
       })
     return () => { abortController.abort() }
-  }, [candidateSession.view, localization.locale, photo])
+  }, [candidateSession.view, photo, resumeLocale])
   if (previewState.status === 'preparing') {
     return <p role="status">{localization.translate('resumePreview.preparing')}</p>
   }
@@ -71,6 +75,14 @@ export function TailoredResumePreview({ candidateSession, localization }: Previe
       }} />
     </section>
   )
+}
+
+function readTailoredResumeLocale({ candidateSession, fallbackLocale }: Readonly<{
+  candidateSession: CandidateSessionController
+  fallbackLocale: Localization['locale']
+}>) {
+  if (candidateSession.view.status !== 'ready') return fallbackLocale
+  return candidateSession.view.tailoredResume?.locale ?? fallbackLocale
 }
 
 function OutcomeFeedback({ candidateSession, localization }: PreviewProps) {

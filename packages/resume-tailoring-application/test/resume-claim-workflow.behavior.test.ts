@@ -4,6 +4,7 @@ import type {
   ProposedResumeClaim,
   ResumeClaim,
   ResumeClaimSemanticValidator,
+  ResumeClaimWritingInputs,
   ResumeClaimWriter,
   ResumeTailoringState,
   SourceProfileFact,
@@ -27,6 +28,22 @@ describe('Resume Claim workflow', () => {
     await system.generateTailoredResume()
 
     system.expectAProvenanceBackedClaim()
+  })
+
+  it('writes Resume Claims in the Candidate-selected language', async () => {
+    const system = createSystemUnderTest()
+
+    await system.generateFrenchTailoredResume()
+
+    system.expectFrenchWritingInput()
+  })
+
+  it('selects only Candidate Facts connected to Match Evidence', async () => {
+    const system = createSystemUnderTest()
+
+    await system.generateTailoredResume()
+
+    system.expectOnlyEvidenceBackedFactsInWritingInput()
   })
 
   it('regenerates a deterministically invalid claim once before semantic validation', async () => {
@@ -92,6 +109,31 @@ describe('Resume Claim workflow', () => {
 
     await system.expectReformulationToBeRejectedWithoutChangingTheResume()
   })
+
+  it('accepts a free edit supported by existing Candidate Facts', async () => {
+    const system = createSystemUnderTest({ tailoredResume: existingTailoredResume })
+
+    await system.editResumeClaim()
+
+    system.expectSupportedEditToBePersisted()
+  })
+
+  it('requests explicit Candidate Fact confirmation for an unsupported free edit', async () => {
+    const system = createSystemUnderTest({ tailoredResume: existingTailoredResume })
+
+    system.givenAnUnsupportedFreeEdit()
+    await system.editResumeClaim()
+
+    system.expectNewFactConfirmationToBeRequired()
+  })
+
+  it('turns an explicitly confirmed new Resume Claim into a Candidate Fact', async () => {
+    const system = createSystemUnderTest({ tailoredResume: existingTailoredResume })
+
+    await system.confirmNewResumeClaimFact()
+
+    system.expectConfirmedEditToCreateCandidateFact()
+  })
 })
 
 function createSystemUnderTest({
@@ -105,6 +147,7 @@ type ReadyState = Extract<ResumeTailoringState, { readonly status: 'ready' }>
 class ResumeClaimWorkflowTestSystem {
   readonly #semanticValidationRequests: ResumeClaim[] = []
   readonly #reformulationFactIds: string[][] = []
+  readonly #writingInputs: ResumeClaimWritingInputs[] = []
   readonly #writer: ResumeClaimWriter
   readonly #workflow: ResumeTailoringWorkflow
   readonly #telemetry = createTelemetrySpy()
@@ -115,7 +158,10 @@ class ResumeClaimWorkflowTestSystem {
 
   constructor({ tailoredResume }: Readonly<{ tailoredResume?: ReadyState['tailoredResume'] }>) {
     this.#writer = {
-      write: () => Promise.resolve({ ok: true, value: this.#generatedClaims }),
+      write: (inputs) => {
+        this.#writingInputs.push(inputs)
+        return Promise.resolve({ ok: true, value: this.#generatedClaims })
+      },
       reformulate: ({ verifiedFacts }) => {
         this.#reformulationFactIds.push(verifiedFacts.map(({ id }) => id))
         return Promise.resolve({
@@ -154,6 +200,9 @@ class ResumeClaimWorkflowTestSystem {
       },
       resumeClaimSemanticValidator: semanticValidator,
       resumeClaimWriter: this.#writer,
+      sourceProfileFactIdentity: {
+        create: () => ({ ok: true, value: 'source-fact-candidate-edit' }),
+      },
       telemetry: this.#telemetry,
     })
   }
@@ -194,8 +243,39 @@ class ResumeClaimWorkflowTestSystem {
     this.#semanticResults = [false, false]
   }
 
+  givenAnUnsupportedFreeEdit() {
+    this.#semanticResults = [false]
+  }
+
   async generateTailoredResume() {
-    this.#actionResult = await this.#workflow.execute({ type: 'generate-resume-claims' })
+    this.#actionResult = await this.#workflow.execute({
+      type: 'generate-resume-claims',
+      locale: 'en',
+    })
+  }
+
+  async generateFrenchTailoredResume() {
+    this.#actionResult = await this.#workflow.execute({
+      type: 'generate-resume-claims',
+      locale: 'fr',
+    })
+  }
+
+  async editResumeClaim() {
+    this.#actionResult = await this.#workflow.execute({
+      type: 'edit-resume-claim',
+      claimId: 'resume-claim-experience',
+      text: 'Built APIs at Acme',
+    })
+  }
+
+  async confirmNewResumeClaimFact() {
+    this.#actionResult = await this.#workflow.execute({
+      type: 'confirm-resume-claim-edit',
+      claimId: 'resume-claim-experience',
+      kind: 'experience',
+      text: 'Led a platform migration',
+    })
   }
 
   async moveResumeClaimUp() {
@@ -229,6 +309,57 @@ class ResumeClaimWorkflowTestSystem {
         { factIds: ['source-fact-typescript'], text: ' using TypeScript' },
       ],
     }])
+  }
+
+  expectFrenchWritingInput() {
+    expect(this.#readTailoredResume().locale).toBe('fr')
+    expect(this.#writingInputs).toHaveLength(1)
+    expect(this.#writingInputs[0]?.locale).toBe('fr')
+  }
+
+  expectOnlyEvidenceBackedFactsInWritingInput() {
+    expect(this.#writingInputs[0]?.verifiedFacts.map(({ id }) => id)).toEqual([
+      'source-fact-experience',
+      'source-fact-typescript',
+    ])
+  }
+
+  expectSupportedEditToBePersisted() {
+    expect(this.#readTailoredResume().claims[0]).toEqual({
+      id: 'resume-claim-experience',
+      segments: [{
+        factIds: ['source-fact-experience'],
+        text: 'Built APIs at Acme',
+      }],
+    })
+  }
+
+  expectNewFactConfirmationToBeRequired() {
+    expect(this.#readActionResult()).toEqual({
+      ok: false,
+      error: { type: 'resume-claim-new-fact-confirmation-required' },
+    })
+  }
+
+  expectConfirmedEditToCreateCandidateFact() {
+    const result = this.#readActionResult()
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.value.status !== 'ready') return
+    expect(result.value.sourceProfile?.facts).toContainEqual({
+      authorship: 'candidate',
+      id: 'source-fact-candidate-edit',
+      kind: 'experience',
+      propositionKey: 'proposition-experience-candidate-edit',
+      status: 'verified',
+      value: 'Led a platform migration',
+    })
+    expect(result.value.tailoredResume?.claims[0]).toEqual({
+      id: 'resume-claim-experience',
+      segments: [{
+        factIds: ['source-fact-candidate-edit'],
+        text: 'Led a platform migration',
+      }],
+    })
   }
 
   expectOnlyTheRegeneratedClaimToReachSemanticValidation() {
@@ -313,6 +444,13 @@ class ResumeClaimWorkflowTestSystem {
     ])
   }
 
+  #readActionResult() {
+    expect(this.#actionResult, 'Expected a Resume Claim action before reading its result')
+      .toBeDefined()
+    assert(this.#actionResult !== undefined)
+    return this.#actionResult
+  }
+
   #readTailoredResume() {
     expect(this.#actionResult, 'Expected a Resume Claim action before reading its result')
       .toBeDefined()
@@ -364,13 +502,17 @@ function createReadyState({ tailoredResume }: Readonly<{
       evidence: [{
         coverage: 'covered',
         requirementId: 'job-requirement-typescript',
-        factIds: ['source-fact-typescript'],
+        factIds: ['source-fact-experience', 'source-fact-typescript'],
       }],
       gapAnalysis: { partiallyCoveredRequiredRequirementIds: [], uncoveredRequiredRequirementIds: [] },
       generationEligibility: 'eligible',
       improvementOpportunities: [],
       matchScore: 100 as NonNullable<ReadyState['matchAnalysis']>['matchScore'],
-      relevantFactIds: ['source-fact-experience', 'source-fact-typescript'],
+      relevantFactIds: [
+        'source-fact-experience',
+        'source-fact-typescript',
+        'source-fact-unconnected',
+      ],
       warning: null,
     },
     ...(tailoredResume === undefined ? {} : { tailoredResume }),
@@ -391,6 +533,13 @@ const verifiedFacts = [
     propositionKey: 'proposition-skill-typescript',
     status: 'verified',
     value: 'Used TypeScript',
+  },
+  {
+    id: 'source-fact-unconnected',
+    kind: 'experience',
+    propositionKey: 'proposition-experience-unconnected',
+    status: 'verified',
+    value: 'Worked on an unrelated legacy migration',
   },
 ] as const satisfies readonly SourceProfileFact[]
 
@@ -416,6 +565,7 @@ const existingTailoredResume = {
     },
   ],
   exclusions: [],
+  locale: 'en',
 } as const satisfies ReadyState['tailoredResume']
 
 const tailoredResumeWithExistingExclusion = {

@@ -108,6 +108,7 @@ export const correctionKinds = [
   'resume-claim-removal',
   'resume-claim-reorder',
   'resume-claim-reformulation',
+  'resume-claim-edit',
 ] as const
 
 export type MatchScoreBand = typeof matchScoreBands[number]
@@ -279,6 +280,7 @@ export type ResumeClaimWritingInputs = Readonly<{
     factIds: readonly SourceProfileFactId[]
   }>[]
   requirements: readonly Pick<JobRequirement, 'classification' | 'id' | 'value'>[]
+  locale: 'en' | 'fr'
   verifiedFacts: readonly Pick<SourceProfileFact, 'id' | 'kind' | 'value'>[]
 }>
 

@@ -139,6 +139,7 @@ export type TailoredResume = Readonly<{
   exclusions: readonly Readonly<{
     reason: 'unsupported-after-regeneration'
   }>[]
+  locale: 'en' | 'fr'
 }>
 
 export const fidelityAssessments = ['faithful', 'needs-correction'] as const

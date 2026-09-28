@@ -66,7 +66,7 @@ export type ResumeTailoringCommand =
   | { readonly type: 'confirm-job-posting-processing-notice' }
   | { readonly type: 'extract-job-requirements' }
   | { readonly type: 'analyze-match' }
-  | { readonly type: 'generate-resume-claims' }
+  | { readonly type: 'generate-resume-claims'; readonly locale: 'en' | 'fr' }
   | { readonly type: 'remove-resume-claim'; readonly claimId: ResumeClaimId }
   | {
       readonly type: 'move-resume-claim'
@@ -77,6 +77,17 @@ export type ResumeTailoringCommand =
       readonly type: 'reformulate-resume-claim'
       readonly claimId: ResumeClaimId
       readonly request: string
+    }
+  | {
+      readonly type: 'edit-resume-claim'
+      readonly claimId: ResumeClaimId
+      readonly text: string
+    }
+  | {
+      readonly type: 'confirm-resume-claim-edit'
+      readonly claimId: ResumeClaimId
+      readonly kind: SourceProfileFactKind
+      readonly text: string
     }
   | {
       readonly type: 'rate-tailored-resume-fidelity'
@@ -136,6 +147,7 @@ export type ResumeTailoringFailure =
   | { readonly type: 'match-analysis-transport-unavailable' }
   | { readonly type: 'resume-claim-writing-unavailable' }
   | { readonly type: 'resume-claim-validation-unavailable' }
+  | { readonly type: 'resume-claim-new-fact-confirmation-required' }
   | { readonly type: 'resume-claim-unavailable' }
 
 export type ResumeTailoringResult<TValue> =

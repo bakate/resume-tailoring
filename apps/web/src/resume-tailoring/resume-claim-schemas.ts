@@ -35,6 +35,7 @@ const resumeClaimWritingInputsSchema = z.object({
     factIds: z.array(sourceProfileFactIdSchema).min(1)
       .max(resumeClaimContractLimits.referenceCount),
   })).max(resumeClaimContractLimits.claimCount),
+  locale: z.enum(['en', 'fr']),
   requirements: z.array(z.object({
     id: jobRequirementIdSchema,
     classification: z.enum(jobRequirementClassifications),
@@ -107,6 +108,7 @@ export const storedTailoredResumeSchema = z.object({
   exclusions: z.array(z.object({
     reason: z.literal('unsupported-after-regeneration'),
   })).max(resumeClaimContractLimits.claimCount),
+  locale: z.enum(['en', 'fr']).default('en'),
 })
 
 export function hasOnlyResumeClaimInputReferences({
