@@ -13,6 +13,21 @@ The CLI uses the Worker configuration and Cloudflare credentials from environmen
 
 ## One-time setup
 
+### Local toolchain
+
+`.nvmrc` selects Node.js 24 for local development and both CI jobs. It tracks the major
+version rather than pinning a patch release. `package.json` defines the exact pnpm version
+in `packageManager`, read by Corepack locally and `pnpm/action-setup` in CI.
+
+With nvm and Corepack installed, run from the repository root:
+
+```sh
+nvm install
+nvm use
+corepack enable
+pnpm --version
+```
+
 Complete these steps before pushing the workflow to `main`.
 
 ### 1. Create the GitHub environment
