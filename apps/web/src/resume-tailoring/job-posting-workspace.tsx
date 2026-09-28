@@ -6,6 +6,7 @@ import {
   hasCurrentJobPostingProcessingConsent,
   jobPostingProcessingNoticeVersion,
 } from '@resume-tailoring/application/resume-tailoring-workflow'
+import { isExactTargetRoleTitle } from '@resume-tailoring/application/job-posting-target-role'
 import { useEffect, useState } from 'react'
 
 import type { Localization } from '../localization/localization'
@@ -280,6 +281,9 @@ function TargetRoleValue({ localization, targetRole }: Readonly<{
 function TargetRoleCorrectionForm({ candidateSession, jobPosting, localization, setValue, value }:
 ReviewProps & Readonly<{ setValue: (value: string) => void; value: string }>) {
   const updateTargetRole = () => candidateSession.updateTargetRole({ value })
+  const isValidTitle = isExactTargetRoleTitle({
+    jobPostingContent: jobPosting.outgoingContent, value,
+  })
   return <form onSubmit={(event) => {
     event.preventDefault()
     void updateTargetRole()
@@ -287,9 +291,7 @@ ReviewProps & Readonly<{ setValue: (value: string) => void; value: string }>) {
       <label htmlFor="target-role-value">{localization.translate('jobPosting.targetRoleEdit')}</label>
       <input id="target-role-value" value={value}
         onChange={(event) => { setValue(event.currentTarget.value) }} />
-      <button disabled={candidateSession.pendingOperation !== null
-        || value.trim().length === 0
-        || !jobPosting.outgoingContent.includes(value.trim())} type="submit">
+      <button disabled={candidateSession.pendingOperation !== null || !isValidTitle} type="submit">
         {localization.translate('jobPosting.targetRoleSave')}
       </button>
     </form>

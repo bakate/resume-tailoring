@@ -162,25 +162,20 @@ function createSourceProfileFactActions(dependencies: CandidateSessionActionDepe
 
 function createJobPostingActions(dependencies: CandidateSessionActionDependencies) {
   const execute = (command: ResumeTailoringCommand) => executeCommand({ ...dependencies, command })
-  const analysis = createJobPostingAnalysis({
-    execute,
-    sourceDocumentReader: createBrowserSourceDocumentReader(),
-  })
+  const analysis = createJobPostingAnalysis({ execute,
+    sourceDocumentReader: createBrowserSourceDocumentReader() })
   return {
     analyzeJobPosting: analysis.analyzePastedJobPosting,
     analyzeJobPostingFile: ({ file }: Readonly<{ file: File }>) =>
       analyzeJobPostingFile({ analysis, dependencies, file }),
-    reviewJobPosting: ({ content }: Readonly<{ content: string }>) => execute({
-      type: 'review-job-posting', content,
-    }),
+    reviewJobPosting: ({ content }: Readonly<{ content: string }>) =>
+      execute({ type: 'review-job-posting', content }),
     updateJobPostingContent: ({ outgoingContent }: Readonly<{ outgoingContent: string }>) => execute({
       type: 'update-job-posting-content', outgoingContent,
     }),
     updateTargetRole: ({ value }: Readonly<{ value: string }>) =>
       updateTargetRoleAndAnalyze({ dependencies, value }),
-    confirmJobPostingProcessingNotice: () => execute({
-      type: 'confirm-job-posting-processing-notice',
-    }),
+    confirmJobPostingProcessingNotice: () => execute({ type: 'confirm-job-posting-processing-notice' }),
     extractJobRequirements: () => execute({ type: 'extract-job-requirements' }),
   }
 }

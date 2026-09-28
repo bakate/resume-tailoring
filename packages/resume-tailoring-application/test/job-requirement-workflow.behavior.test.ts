@@ -159,6 +159,16 @@ describe('Job Requirement workflow', () => {
     system.expectInventedTargetRoleCorrectionToBeRejected()
   })
 
+  it('rejects a Job Posting keyword as a Target Role correction', async () => {
+    const system = createSystemUnderTest({ jobPosting: extractedTargetRoleJobPosting })
+
+    // Action
+    await system.correctTargetRole({ value: 'TypeScript' })
+
+    // Then
+    system.expectInventedTargetRoleCorrectionToBeRejected()
+  })
+
   it('returns to Job Posting review when extracted content changes', async () => {
     const system = createSystemUnderTest({ jobPosting: extractedJobPosting })
 
@@ -549,7 +559,7 @@ const extractedJobPosting = {
 const extractedTargetRoleJobPosting = {
   ...confirmedJobPosting,
   status: 'reviewing-requirements',
-  outgoingContent: 'Senior FullStack Developer or Lead Platform Engineer',
+  outgoingContent: 'Senior FullStack Developer\nRole: Lead Platform Engineer\nTypeScript is required.',
   targetRole: {
     sourceExcerpt: 'Senior FullStack Developer',
     value: 'Senior FullStack Developer',

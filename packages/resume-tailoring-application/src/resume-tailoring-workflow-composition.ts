@@ -20,6 +20,7 @@ import type {
   ResumeTailoringView,
   ResumeTailoringWorkflow,
 } from './resume-tailoring-workflow'
+import { isExactTargetRoleTitle } from './job-posting-target-role'
 import { sourceProfileProcessingNoticeVersion } from './resume-tailoring-workflow'
 import { hasSourceProfileFactConflict } from './resume-tailoring-workflow'
 import { jobPostingProcessingNoticeVersion } from './resume-tailoring-workflow'
@@ -440,8 +441,10 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     const targetRoleValue = value.trim()
     if (!hasJobPosting(currentState)
       || currentState.value.jobPosting.status !== 'reviewing-requirements'
-      || targetRoleValue.length === 0
-      || !currentState.value.jobPosting.outgoingContent.includes(targetRoleValue)) {
+      || !isExactTargetRoleTitle({
+        jobPostingContent: currentState.value.jobPosting.outgoingContent,
+        value: targetRoleValue,
+      })) {
       return unavailableResult
     }
     return this.#persistJobPosting({

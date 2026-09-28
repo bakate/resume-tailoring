@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     "./job-posting-analysis": "./src/job-posting-analysis.ts",
+    "./job-posting-target-role": "./src/job-posting-target-role.ts",
     "./resume-tailoring-workflow": "./src/resume-tailoring-workflow.ts",
     "./resume-tailoring-workflow-composition": "./src/resume-tailoring-workflow-composition.ts",
     "./match-analysis": "./src/match-analysis.ts",
