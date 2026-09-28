@@ -10,17 +10,19 @@ describe('privacy-safe browser analytics', () => {
     const telemetry = createPrivacySafeBrowserTelemetry({ request })
 
     const result = await telemetry.record({
-      name: 'resume-relevance-rated',
-      assessment: 'relevant',
+      name: 'resume-usefulness-rated',
+      hasComment: true,
       matchScoreBand: '75-100',
+      useful: true,
     })
 
     expect(result).toEqual({ ok: true, value: undefined })
     expect(request).toHaveBeenCalledWith('/api/analytics', {
       body: JSON.stringify({
-        name: 'resume-relevance-rated',
-        assessment: 'relevant',
+        name: 'resume-usefulness-rated',
+        hasComment: true,
         matchScoreBand: '75-100',
+        useful: true,
       }),
       cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },

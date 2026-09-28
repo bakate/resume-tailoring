@@ -142,12 +142,16 @@ export type TailoredResume = Readonly<{
   locale: 'en' | 'fr'
 }>
 
-export const fidelityAssessments = ['faithful', 'needs-correction'] as const
-export const relevanceAssessments = ['relevant', 'needs-improvement'] as const
+export type JobPostingHistoryItem = Readonly<{
+  id: `job-posting-${string}`
+  matchScore: MatchScore
+  status: 'analyzed' | 'draft-generated' | 'pdf-downloaded'
+  targetRole?: string
+}>
 
 export type OutcomeFeedback = Readonly<{
-  fidelity?: typeof fidelityAssessments[number]
-  relevance?: typeof relevanceAssessments[number]
+  comment?: string
+  useful: boolean
 }>
 
 export type JobPostingReview = Readonly<{
@@ -172,6 +176,8 @@ export type ResumeTailoringState =
       readonly status: 'ready'
       readonly sessionId: CandidateSessionId
       readonly expiresAt: number
+      readonly currentJobPostingStatus?: JobPostingHistoryItem['status']
+      readonly jobPostingHistory?: readonly JobPostingHistoryItem[]
       readonly sourceProfile?: SourceProfileReview
       readonly jobPosting?: JobPostingReview
       readonly matchAnalysis?: MatchAnalysis

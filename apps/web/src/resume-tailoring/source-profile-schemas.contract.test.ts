@@ -49,6 +49,49 @@ describe('Source Profile boundary schemas', () => {
     expect(result.success).toBe(false)
   })
 
+  it('migrates a legacy downloaded Job Posting to its produced status', () => {
+    const result = storedCandidateSessionSchema.parse({
+      status: 'ready',
+      sessionId: 'candidate-session-legacy-download',
+      expiresAt: Date.now(),
+      currentJobPostingDownloaded: true,
+    })
+
+    expect(result.currentJobPostingStatus).toBe('pdf-downloaded')
+  })
+
+  it('drops legacy feedback instead of treating it as Outcome Feedback', () => {
+    const result = storedCandidateSessionSchema.parse({
+      status: 'ready',
+      sessionId: 'candidate-session-legacy-feedback',
+      expiresAt: Date.now(),
+      outcomeFeedback: { fidelity: 'faithful', relevance: 'relevant' },
+    })
+
+    expect(result.outcomeFeedback).toBeUndefined()
+  })
+
+  it('restores only the minimal browser-local Job Posting history', () => {
+    const result = storedCandidateSessionSchema.parse({
+      status: 'ready',
+      sessionId: 'candidate-session-history',
+      expiresAt: Date.now(),
+      jobPostingHistory: [{
+        id: 'job-posting-1',
+        matchScore: 75,
+        status: 'pdf-downloaded',
+        targetRole: 'Senior TypeScript Developer',
+      }],
+    })
+
+    expect(result.jobPostingHistory).toEqual([{
+      id: 'job-posting-1',
+      matchScore: 75,
+      status: 'pdf-downloaded',
+      targetRole: 'Senior TypeScript Developer',
+    }])
+  })
+
   it('rejects malformed nested Source Profile data', () => {
     const result = sourceProfileReviewSchema.safeParse({
       status: 'reviewing-facts',

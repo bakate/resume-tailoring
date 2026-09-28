@@ -227,6 +227,11 @@ function MatchDecision({ analysis, candidateSession, localization }: MatchDecisi
     <LowScoreWarning {...{ analysis, localization }} />
     <p className="match-eligibility-description">{localization.translate(eligibilityKey)}</p>
     <GenerationAction {...{ analysis, candidateSession, localization }} />
+    <button className="secondary-action compact-action"
+      disabled={candidateSession.pendingOperation !== null}
+      onClick={() => void candidateSession.startNewJobPosting()} type="button">
+      {localization.translate('jobPosting.newAnalysis')}
+    </button>
   </>
 }
 

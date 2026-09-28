@@ -14,7 +14,8 @@ describe('renderTailoredResumeHtml', () => {
       },
     })
 
-    expect(html).toContain('<main class="resume-page"')
+    expect(html).toContain('<body class="resume-body-1">')
+    expect(html).toContain('<main class="resume-page resume-page-1"')
     expect(html).toContain('<h1 id="resume-title">Senior FullStack Developer</h1>')
     expect(html).toContain('<address class="resume-contact">candidate@example.com</address>')
     expect(html).toContain('<section aria-labelledby="highlights-title">')
@@ -22,6 +23,18 @@ describe('renderTailoredResumeHtml', () => {
     expect(html.indexOf('Delivered 30% faster releases'))
       .toBeLessThan(html.indexOf('Used TypeScript'))
     expect(html).not.toContain('<img')
+  })
+
+  it('marks a justified two-page preview for responsive sizing', () => {
+    const html = renderTailoredResumeHtml({
+      contactItems: [],
+      document: { ...tailoredResumeDocument, pageCount: 2 },
+      locale: 'en',
+      targetRole: null,
+    })
+
+    expect(html).toContain('<body class="resume-body-2">')
+    expect(html).toContain('<main class="resume-page resume-page-2"')
   })
 
   it('includes an optional decorative photo only when supplied explicitly', () => {
@@ -71,5 +84,6 @@ const tailoredResumeDocument = {
     },
   ],
   omittedClaimCount: 0,
+  pageCount: 1,
   typography: 'comfortable',
 } as const

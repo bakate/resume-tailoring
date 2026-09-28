@@ -6,8 +6,11 @@ import type {
   ResumeTailoringWorkflow,
 } from '@resume-tailoring/application/resume-tailoring-workflow'
 import { createResumeTailoringWorkflow } from '@resume-tailoring/application/resume-tailoring-workflow-composition'
-import type { MatchScore, ResumeTailoringState } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
-import type { OutcomeFeedback } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type {
+  MatchScore,
+  OutcomeFeedback,
+  ResumeTailoringState,
+} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import {
   createControllableCandidateSessionClock,
   createInMemoryCandidateSessionPersistence,
@@ -15,17 +18,32 @@ import {
 } from '@resume-tailoring/application/resume-tailoring-workflow-testing'
 
 describe('MVP outcome analytics', () => {
-  it('records perceived fidelity with a Match Score band and no Candidate content', async () => {
+  it('records usefulness with a Match Score band and no Candidate content', async () => {
+    const system = createSystemUnderTest({
+      currentJobPostingStatus: 'pdf-downloaded', matchScore: 62,
+    })
+
+    // Given
+    system.givenTheCandidateConsidersTheDownloadedResumeUseful()
+
+    // Action
+    await system.rateTailoredResumeUsefulness()
+
+    // Then
+    system.expectOnlyPrivacySafeUsefulnessToBeRecorded()
+  })
+
+  it('does not accept Outcome Feedback before a Successful Download', async () => {
     const system = createSystemUnderTest({ matchScore: 62 })
 
     // Given
-    system.givenTheCandidateConsidersTheResumeFaithful()
+    system.givenTheTailoredResumeHasNotBeenDownloaded()
 
     // Action
-    await system.rateTailoredResumeFidelity()
+    await system.rateTailoredResumeUsefulness()
 
     // Then
-    system.expectOnlyPrivacySafeFidelityToBeRecorded()
+    system.expectUsefulnessToRemainUnavailable()
   })
 
   it('records correction activity without the corrected Candidate content', async () => {
@@ -41,20 +59,7 @@ describe('MVP outcome analytics', () => {
     system.expectOnlyPrivacySafeCorrectionActivityToBeRecorded()
   })
 
-  it('records perceived relevance separately from fidelity', async () => {
-    const system = createSystemUnderTest({ matchScore: 49 })
-
-    // Given
-    system.givenTheCandidateConsidersTheResumeRelevant()
-
-    // Action
-    await system.rateTailoredResumeRelevance()
-
-    // Then
-    system.expectOnlyPrivacySafeRelevanceToBeRecorded()
-  })
-
-  it('records a successful download after validated export', async () => {
+  it('records a Successful Download and globally approves the current draft', async () => {
     const system = createSystemUnderTest({ matchScore: 75 })
 
     // Given
@@ -64,31 +69,46 @@ describe('MVP outcome analytics', () => {
     await system.recordTailoredResumeDownload()
 
     // Then
-    system.expectOnlyPrivacySafeDownloadToBeRecorded()
+    system.expectDownloadToApproveTheCurrentDraft()
   })
 
-  it('does not count a fidelity assessment twice in one Candidate session', async () => {
+  it('does not count usefulness twice in one Candidate Session', async () => {
     const system = createSystemUnderTest({
+      currentJobPostingStatus: 'pdf-downloaded',
       matchScore: 62,
-      outcomeFeedback: { fidelity: 'faithful' },
+      outcomeFeedback: { useful: true },
     })
 
     // Given
-    system.givenFidelityWasAlreadyRecorded()
+    system.givenUsefulnessWasAlreadyRecorded()
 
     // Action
-    await system.rateTailoredResumeFidelity()
+    await system.rateTailoredResumeUsefulness()
 
     // Then
-    system.expectNoDuplicateFidelityToBeRecorded()
+    system.expectNoDuplicateUsefulnessToBeRecorded()
+  })
+
+  it('archives a minimal summary before reusing the Source Profile for another Job Posting', async () => {
+    const system = createSystemUnderTest({
+      currentJobPostingStatus: 'pdf-downloaded', matchScore: 75,
+      outcomeFeedback: { useful: true },
+    })
+
+    // Action
+    await system.startNewJobPosting()
+
+    // Then
+    system.expectDownloadedAnalysisToBeArchived()
   })
 })
 
-function createSystemUnderTest({ matchScore, outcomeFeedback }: Readonly<{
+function createSystemUnderTest({ currentJobPostingStatus, matchScore, outcomeFeedback }: Readonly<{
+  currentJobPostingStatus?: 'pdf-downloaded'
   matchScore: number
   outcomeFeedback?: OutcomeFeedback
 }>) {
-  return new MvpOutcomeAnalyticsTestSystem({ matchScore, outcomeFeedback })
+  return new MvpOutcomeAnalyticsTestSystem({ currentJobPostingStatus, matchScore, outcomeFeedback })
 }
 
 class MvpOutcomeAnalyticsTestSystem {
@@ -96,7 +116,8 @@ class MvpOutcomeAnalyticsTestSystem {
   readonly #workflow: ResumeTailoringWorkflow
   #actionResult: ResumeTailoringResult<ResumeTailoringView> | undefined
 
-  constructor({ matchScore, outcomeFeedback }: Readonly<{
+  constructor({ currentJobPostingStatus, matchScore, outcomeFeedback }: Readonly<{
+    currentJobPostingStatus?: 'pdf-downloaded'
     matchScore: number
     outcomeFeedback?: OutcomeFeedback
   }>) {
@@ -106,7 +127,7 @@ class MvpOutcomeAnalyticsTestSystem {
         create: () => ({ ok: true, value: 'candidate-session-analytics' }),
       },
       candidateSessionPersistence: createInMemoryCandidateSessionPersistence({
-        initialState: createReadyState({ matchScore, outcomeFeedback }),
+        initialState: createReadyState({ currentJobPostingStatus, matchScore, outcomeFeedback }),
       }),
       sourceProfileFactIdentity: {
         create: () => ({ ok: true, value: 'source-fact-corrected' }),
@@ -115,20 +136,21 @@ class MvpOutcomeAnalyticsTestSystem {
     })
   }
 
-  givenTheCandidateConsidersTheResumeFaithful() {}
+  givenTheCandidateConsidersTheDownloadedResumeUseful() {}
+
+  givenTheTailoredResumeHasNotBeenDownloaded() {}
 
   givenASourceProfileFactNeedsCorrection() {}
 
-  givenTheCandidateConsidersTheResumeRelevant() {}
-
   givenAValidatedTailoredResumeWasDownloaded() {}
 
-  givenFidelityWasAlreadyRecorded() {}
+  givenUsefulnessWasAlreadyRecorded() {}
 
-  async rateTailoredResumeFidelity() {
+  async rateTailoredResumeUsefulness() {
     this.#actionResult = await this.#workflow.execute({
-      type: 'rate-tailored-resume-fidelity',
-      assessment: 'faithful',
+      type: 'rate-tailored-resume-usefulness',
+      useful: true,
+      comment: 'Private Candidate feedback',
     })
   }
 
@@ -140,26 +162,32 @@ class MvpOutcomeAnalyticsTestSystem {
     })
   }
 
-  async rateTailoredResumeRelevance() {
-    this.#actionResult = await this.#workflow.execute({
-      type: 'rate-tailored-resume-relevance',
-      assessment: 'relevant',
-    })
-  }
-
   async recordTailoredResumeDownload() {
     this.#actionResult = await this.#workflow.execute({
       type: 'record-tailored-resume-download',
     })
   }
 
-  expectOnlyPrivacySafeFidelityToBeRecorded() {
-    expect(this.#readActionResult().ok).toBe(true)
+  async startNewJobPosting() {
+    this.#actionResult = await this.#workflow.execute({ type: 'start-new-job-posting' })
+  }
+
+  expectOnlyPrivacySafeUsefulnessToBeRecorded() {
+    expect(this.#readActionResult()).toMatchObject({
+      ok: true,
+      value: { outcomeFeedback: { comment: 'Private Candidate feedback', useful: true } },
+    })
     expect(this.#telemetry.recordedEvents()).toEqual([{
-      name: 'resume-fidelity-rated',
-      assessment: 'faithful',
+      name: 'resume-usefulness-rated',
+      hasComment: true,
       matchScoreBand: '50-74',
+      useful: true,
     }])
+  }
+
+  expectUsefulnessToRemainUnavailable() {
+    expect(this.#readActionResult().ok).toBe(false)
+    expect(this.#telemetry.recordedEvents()).toEqual([])
   }
 
   expectOnlyPrivacySafeCorrectionActivityToBeRecorded() {
@@ -171,40 +199,58 @@ class MvpOutcomeAnalyticsTestSystem {
     }])
   }
 
-  expectOnlyPrivacySafeRelevanceToBeRecorded() {
-    expect(this.#readActionResult().ok).toBe(true)
-    expect(this.#telemetry.recordedEvents()).toEqual([{
-      name: 'resume-relevance-rated',
-      assessment: 'relevant',
-      matchScoreBand: '25-49',
-    }])
-  }
-
-  expectOnlyPrivacySafeDownloadToBeRecorded() {
-    expect(this.#readActionResult().ok).toBe(true)
+  expectDownloadToApproveTheCurrentDraft() {
+    expect(this.#readActionResult()).toMatchObject({
+      ok: true,
+      value: { currentJobPostingStatus: 'pdf-downloaded' },
+    })
     expect(this.#telemetry.recordedEvents()).toEqual([{
       name: 'resume-downloaded',
       matchScoreBand: '75-100',
     }])
   }
 
-  expectNoDuplicateFidelityToBeRecorded() {
+  expectNoDuplicateUsefulnessToBeRecorded() {
     expect(this.#readActionResult()).toMatchObject({
       ok: true,
-      value: { outcomeFeedback: { fidelity: 'faithful' } },
+      value: { outcomeFeedback: { useful: true } },
     })
     expect(this.#telemetry.recordedEvents()).toEqual([])
   }
 
+  expectDownloadedAnalysisToBeArchived() {
+    const result = this.#readActionResult()
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        jobPostingHistory: [{
+          id: 'job-posting-1',
+          matchScore: 75,
+          status: 'pdf-downloaded',
+          targetRole: 'Senior TypeScript Developer',
+        }],
+        sourceProfile: { status: 'reviewing-facts' },
+      },
+    })
+    if (!result.ok) return
+    expect(result.value).toMatchObject({
+      jobPosting: undefined,
+      matchAnalysis: undefined,
+      outcomeFeedback: { useful: true },
+      tailoredResume: undefined,
+    })
+  }
+
   #readActionResult() {
     if (this.#actionResult === undefined) {
-      throw new Error('Rate Tailored Resume fidelity before reading its outcome')
+      throw new Error('Execute an MVP outcome action before reading its outcome')
     }
     return this.#actionResult
   }
 }
 
-function createReadyState({ matchScore, outcomeFeedback }: Readonly<{
+function createReadyState({ currentJobPostingStatus, matchScore, outcomeFeedback }: Readonly<{
+  currentJobPostingStatus?: 'pdf-downloaded'
   matchScore: number
   outcomeFeedback?: OutcomeFeedback
 }>): ResumeTailoringState {
@@ -212,6 +258,7 @@ function createReadyState({ matchScore, outcomeFeedback }: Readonly<{
     status: 'ready',
     sessionId: 'candidate-session-analytics',
     expiresAt: 100_000,
+    ...(currentJobPostingStatus === undefined ? {} : { currentJobPostingStatus }),
     ...(outcomeFeedback === undefined ? {} : { outcomeFeedback }),
     sourceProfile: {
       status: 'reviewing-facts',
@@ -227,9 +274,24 @@ function createReadyState({ matchScore, outcomeFeedback }: Readonly<{
         value: 'Private original Candidate content',
       }],
     },
+    jobPosting: {
+      status: 'reviewing-requirements',
+      detectedSensitiveContent: [],
+      outgoingContent: 'Senior TypeScript Developer',
+      processingNotice: null,
+      practicalConstraints: [],
+      requirements: [],
+      targetRole: {
+        sourceExcerpt: 'Senior TypeScript Developer',
+        value: 'Senior TypeScript Developer',
+      },
+    },
     matchAnalysis: {
       evidence: [],
-      gapAnalysis: { partiallyCoveredRequiredRequirementIds: [], uncoveredRequiredRequirementIds: [] },
+      gapAnalysis: {
+        partiallyCoveredRequiredRequirementIds: [],
+        uncoveredRequiredRequirementIds: [],
+      },
       generationEligibility: 'eligible',
       improvementOpportunities: [],
       matchScore: matchScore as MatchScore,

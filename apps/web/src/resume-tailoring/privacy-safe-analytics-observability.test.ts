@@ -42,18 +42,20 @@ describe('privacy-safe analytics observability', () => {
 
   it('produces counters operators can aggregate by outcome and Match Score band', () => {
     const metric = createPrivacySafeAggregateMetric({
-      name: 'resume-fidelity-rated',
-      assessment: 'needs-correction',
+      name: 'resume-usefulness-rated',
+      hasComment: false,
       matchScoreBand: '25-49',
+      useful: false,
     })
 
     expect(metric).toEqual({
       category: 'privacy-safe-mvp-analytics',
-      metric: 'resume-fidelity-rated',
+      metric: 'resume-usefulness-rated',
       value: 1,
       dimensions: {
-        assessment: 'needs-correction',
+        hasComment: false,
         matchScoreBand: '25-49',
+        useful: false,
       },
     })
     expect(metric.dimensions).not.toHaveProperty('candidateId')

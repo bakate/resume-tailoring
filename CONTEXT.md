@@ -96,7 +96,7 @@ The advisory Match Score threshold of 50%. Falling below it produces a warning a
 _Avoid_: Eligibility score, cutoff
 
 **Tailored Resume**:
-A one-page resume that selects, orders, translates, and reformulates only Candidate Facts relevant to one Job Posting. It may include a Candidate-supplied photo.
+A one-page-by-default resume that selects, orders, translates, and reformulates only Candidate Facts relevant to one Job Posting. It may extend to two pages when required evidence or at least two preferred claims would otherwise be lost, and may include a Candidate-supplied photo.
 _Avoid_: Generated CV, optimized CV
 
 **Relevant Experience**:
@@ -112,7 +112,7 @@ An explanation of important Job Posting requirements that are only partially sup
 _Avoid_: Missing skills, weaknesses
 
 **Outcome Feedback**:
-The Candidate's browser-local assessment of whether a Tailored Resume is faithful to their professional history and relevant to the target role. Each assessment is recorded at most once per Candidate session for aggregate MVP measurement.
+The Candidate's browser-local yes/no assessment of whether a downloaded Tailored Resume was useful, with an optional comment. It is recorded at most once per Candidate session for aggregate MVP measurement.
 _Avoid_: Candidate satisfaction profile, professional-history analytics
 
 **Correction Activity**:

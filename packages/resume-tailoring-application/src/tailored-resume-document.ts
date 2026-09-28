@@ -22,6 +22,7 @@ export type TailoredResumeDocumentItem = Readonly<{
 export type TailoredResumeDocument = Readonly<{
   items: readonly TailoredResumeDocumentItem[]
   omittedClaimCount: number
+  pageCount: 1 | 2
   typography: TailoredResumeTypography
 }>
 
@@ -43,6 +44,7 @@ export type TailoredResumeLayoutMeasurer = Readonly<{
 }>
 
 export type TailoredResumePreparationFailureType =
+  | 'tailored-resume-content-overflow'
   | 'tailored-resume-layout-unavailable'
   | 'tailored-resume-provenance-invalid'
   | 'tailored-resume-required-content-overflow'
@@ -62,13 +64,13 @@ type VerifiedResumeFact = Readonly<{
 }>
 
 type RankedItem = TailoredResumeDocumentItem & Readonly<{
+  classification: JobRequirement['classification'] | null
   estimatedLines: number
   originalIndex: number
   priority: number
 }>
 
 const approximateCharactersPerLine = 88
-const maximumContentLines = 30
 const demonstratedImpactPattern = /(?:\b\d+(?:[.,]\d+)?\s*%|[$€£]\s*\d|\b(?:achieved|amélioré|augmenté|delivered|économisé|géré|grew|improved|increased|livré|managed|réduit|reduced|saved)\b)/iu
 
 export async function prepareTailoredResumeDocument({
@@ -162,14 +164,16 @@ function createRankedItemValue({
   supportingFacts: readonly VerifiedResumeFact[]
   text: string
 }>): RankedItem {
+  const classification = readRequirementClassification({ classificationByFactId, supportingFacts })
   return {
     claimId: claim.id,
+    classification,
     factIds: [...new Set(supportingFactIds)],
     kind: supportingFacts[0]?.kind ?? 'experience',
     text,
     estimatedLines: Math.max(1, Math.ceil(text.length / approximateCharactersPerLine)) + 1,
     originalIndex,
-    priority: readEditorialPriority({ classificationByFactId, supportingFacts, text }),
+    priority: readEditorialPriority({ classification, supportingFacts, text }),
   }
 }
 
@@ -183,19 +187,26 @@ function readSupportingFacts({ factById, supportingFactIds }: Readonly<{
   })
 }
 
-function readEditorialPriority({
-  classificationByFactId,
-  supportingFacts,
-  text,
-}: Readonly<{
+function readRequirementClassification({ classificationByFactId, supportingFacts }: Readonly<{
   classificationByFactId: ReadonlyMap<SourceProfileFactId, JobRequirement['classification']>
+  supportingFacts: readonly VerifiedResumeFact[]
+}>) {
+  if (supportingFacts.some(({ id }) => classificationByFactId.get(id) === 'required')) {
+    return 'required' as const
+  }
+  return supportingFacts.some(({ id }) => classificationByFactId.get(id) === 'preferred')
+    ? 'preferred' as const : null
+}
+
+function readEditorialPriority({ classification, supportingFacts, text }: Readonly<{
+  classification: JobRequirement['classification'] | null
   supportingFacts: readonly VerifiedResumeFact[]
   text: string
 }>) {
-  if (supportingFacts.some(({ id }) => classificationByFactId.get(id) === 'required')) return 0
+  if (classification === 'required') return 0
   if (demonstratedImpactPattern.test(text)
     || supportingFacts.some(({ value }) => demonstratedImpactPattern.test(value))) return 1
-  if (supportingFacts.some(({ id }) => classificationByFactId.get(id) === 'preferred')) return 2
+  if (classification === 'preferred') return 2
   return 3
 }
 
@@ -204,44 +215,49 @@ async function fitRankedItems({ layoutMeasurer, rankedItems }: Readonly<{
   rankedItems: readonly RankedItem[]
 }>): Promise<TailoredResumePreparationResult> {
   const prioritizedItems = [...rankedItems].sort(compareEditorialPriority)
-  const retainedItems = retainWithinEstimatedBudget({ prioritizedItems })
-  return removeOverflowingItems({ layoutMeasurer, rankedItems, retainedItems })
-}
-
-function retainWithinEstimatedBudget({ prioritizedItems }: Readonly<{
-  prioritizedItems: readonly RankedItem[]
-}>) {
-  const retainedItems: RankedItem[] = []
-  let usedLines = 0
-  for (const item of prioritizedItems) {
-    if (item.priority !== 0 && usedLines + item.estimatedLines > maximumContentLines) continue
-    retainedItems.push(item)
-    usedLines += item.estimatedLines
+  const onePageResult = await removeOverflowingItems({
+    layoutMeasurer, pageCount: 1, rankedItems, retainedItems: prioritizedItems,
+  })
+  if (!onePageResult.ok) {
+    if (onePageResult.error.type !== 'tailored-resume-required-content-overflow') {
+      return onePageResult
+    }
+    return removeOverflowingItems({
+      layoutMeasurer, pageCount: 2, rankedItems, retainedItems: prioritizedItems,
+    })
   }
-  return retainedItems
+  if (!shouldUseSecondPage({ document: onePageResult.value, rankedItems })) return onePageResult
+  const twoPageResult = await removeOverflowingItems({
+    layoutMeasurer, pageCount: 2, rankedItems, retainedItems: prioritizedItems,
+  })
+  return twoPageResult
 }
 
 async function removeOverflowingItems({
-  layoutMeasurer, rankedItems, retainedItems: initialItems,
+  layoutMeasurer, pageCount, rankedItems, retainedItems: initialItems,
 }: Readonly<{
   layoutMeasurer: TailoredResumeLayoutMeasurer
+  pageCount: 1 | 2
   rankedItems: readonly RankedItem[]
   retainedItems: readonly RankedItem[]
 }>): Promise<TailoredResumePreparationResult> {
   let retainedItems = initialItems
   while (retainedItems.length > 0) {
-    const fit = await measureItems({ layoutMeasurer, rankedItems, retainedItems })
+    const fit = await measureItems({ layoutMeasurer, pageCount, rankedItems, retainedItems })
     if (!fit.ok) return fit
-    if (fit.value) return { ok: true, value: createDocument({ rankedItems, retainedItems }) }
+    if (fit.value) {
+      return { ok: true, value: createDocument({ pageCount, rankedItems, retainedItems }) }
+    }
     const removableItem = [...retainedItems].reverse().find(({ priority }) => priority !== 0)
     if (removableItem === undefined) return requiredContentOverflowResult
     retainedItems = retainedItems.filter(({ claimId }) => claimId !== removableItem.claimId)
   }
-  return provenanceInvalidResult
+  return contentOverflowResult
 }
 
-async function measureItems({ layoutMeasurer, rankedItems, retainedItems }: Readonly<{
+async function measureItems({ layoutMeasurer, pageCount, rankedItems, retainedItems }: Readonly<{
   layoutMeasurer: TailoredResumeLayoutMeasurer
+  pageCount: 1 | 2
   rankedItems: readonly RankedItem[]
   retainedItems: readonly RankedItem[]
 }>): Promise<
@@ -249,20 +265,32 @@ async function measureItems({ layoutMeasurer, rankedItems, retainedItems }: Read
   | Extract<TailoredResumePreparationResult, { readonly ok: false }>
 > {
   const result = await layoutMeasurer.fits({
-    document: createDocument({ rankedItems, retainedItems }),
+    document: createDocument({ pageCount, rankedItems, retainedItems }),
   })
   return result.ok ? result : layoutUnavailableResult
 }
 
-function createDocument({ rankedItems, retainedItems }: Readonly<{
+function createDocument({ pageCount, rankedItems, retainedItems }: Readonly<{
+  pageCount: 1 | 2
   rankedItems: readonly RankedItem[]
   retainedItems: readonly RankedItem[]
 }>): TailoredResumeDocument {
   return {
     items: restoreCandidateOrder({ items: retainedItems }),
     omittedClaimCount: rankedItems.length - retainedItems.length,
+    pageCount,
     typography: selectTypography({ retainedItems }),
   }
+}
+
+function shouldUseSecondPage({ document, rankedItems }: Readonly<{
+  document: TailoredResumeDocument
+  rankedItems: readonly RankedItem[]
+}>) {
+  const retainedClaimIds = new Set(document.items.map(({ claimId }) => claimId))
+  const omittedItems = rankedItems.filter(({ claimId }) => !retainedClaimIds.has(claimId))
+  return omittedItems.some(({ classification }) => classification === 'required')
+    || omittedItems.filter(({ classification }) => classification === 'preferred').length >= 2
 }
 
 function compareEditorialPriority(leftItem: RankedItem, rightItem: RankedItem) {
@@ -332,6 +360,10 @@ async function validateRetainedClaim({ claim, inputs, semanticValidator }: Reado
 const layoutUnavailableResult = {
   ok: false,
   error: { type: 'tailored-resume-layout-unavailable' },
+} as const satisfies TailoredResumePreparationResult
+const contentOverflowResult = {
+  ok: false,
+  error: { type: 'tailored-resume-content-overflow' },
 } as const satisfies TailoredResumePreparationResult
 const provenanceInvalidResult = {
   ok: false,
