@@ -170,11 +170,12 @@ const verifiedFacts = [
 
 const matchAnalysis = {
   evidence: [
-    { requirementId: 'job-requirement-required', factIds: ['source-fact-required'] },
-    { requirementId: 'job-requirement-preferred', factIds: ['source-fact-preferred'] },
+    { coverage: 'covered', requirementId: 'job-requirement-required', factIds: ['source-fact-required'] },
+    { coverage: 'covered', requirementId: 'job-requirement-preferred', factIds: ['source-fact-preferred'] },
   ],
-  gapAnalysis: { uncoveredRequiredRequirementIds: [] },
+  gapAnalysis: { partiallyCoveredRequiredRequirementIds: [], uncoveredRequiredRequirementIds: [] },
   generationEligibility: 'eligible',
+  improvementOpportunities: [],
   matchScore: 100 as MatchAnalysis['matchScore'],
   relevantFactIds: verifiedFacts.map(({ id }) => id),
   warning: null,

@@ -6,6 +6,7 @@ import type {
 import {
   jobRequirementClassifications,
   jobRequirementMaximumCount,
+  requirementCoverages,
   sourceProfileFactKinds,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { z } from 'zod'
@@ -22,22 +23,26 @@ const proposedFactMatchSchema = z.object({
 })
 
 const proposedMatchEvidenceSchema = z.object({
+  coverage: z.enum(requirementCoverages),
   requirementId: jobRequirementIdSchema,
   factMatches: z.array(proposedFactMatchSchema).min(1).max(sourceProfileFactMaximumCount),
 })
 
 export const extractedMatchEvidenceSchema = z.object({
   evidence: z.array(proposedMatchEvidenceSchema).max(jobRequirementMaximumCount),
+  improvementOpportunities: z.array(z.string().min(1).max(300)).max(3),
   relevantFactIds: z.array(sourceProfileFactIdSchema).max(sourceProfileFactMaximumCount),
 })
 
 const storedMatchEvidenceSchema = z.object({
+  coverage: z.enum(requirementCoverages).default('covered'),
   requirementId: jobRequirementIdSchema,
   factIds: z.array(sourceProfileFactIdSchema).min(1).max(sourceProfileFactMaximumCount),
 })
 
 export const storedMatchAnalysisSchema = z.object({
   evidence: z.array(storedMatchEvidenceSchema).max(jobRequirementMaximumCount),
+  improvementOpportunities: z.array(z.string().min(1).max(300)).max(3).default([]),
   relevantFactIds: z.array(sourceProfileFactIdSchema).max(sourceProfileFactMaximumCount),
 })
 

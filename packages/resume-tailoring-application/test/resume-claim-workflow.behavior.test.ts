@@ -344,6 +344,7 @@ function createReadyState({ tailoredResume }: Readonly<{
       status: 'reviewing-requirements',
       detectedSensitiveContent: [],
       outgoingContent: 'TypeScript role',
+      practicalConstraints: [],
       processingNotice: {
         version: '2026-09-26',
         confirmedAt: 900,
@@ -361,11 +362,13 @@ function createReadyState({ tailoredResume }: Readonly<{
     },
     matchAnalysis: {
       evidence: [{
+        coverage: 'covered',
         requirementId: 'job-requirement-typescript',
         factIds: ['source-fact-typescript'],
       }],
-      gapAnalysis: { uncoveredRequiredRequirementIds: [] },
+      gapAnalysis: { partiallyCoveredRequiredRequirementIds: [], uncoveredRequiredRequirementIds: [] },
       generationEligibility: 'eligible',
+      improvementOpportunities: [],
       matchScore: 100 as NonNullable<ReadyState['matchAnalysis']>['matchScore'],
       relevantFactIds: ['source-fact-experience', 'source-fact-typescript'],
       warning: null,

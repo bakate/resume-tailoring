@@ -13,13 +13,21 @@ import type {
 
 export const generationThreshold = 50
 
+export function readMatchBand({ matchScore }: Readonly<{ matchScore: number }>) {
+  if (matchScore >= 75) return 'strong' as const
+  if (matchScore >= generationThreshold) return 'credible' as const
+  return 'ambitious' as const
+}
+
 export function createMatchAnalysis({
+  improvementOpportunities,
   proposedEvidence,
   relevantFactIds,
   requirements,
   verifiedFacts,
 }: Readonly<{
   proposedEvidence: readonly ProposedMatchEvidence[]
+  improvementOpportunities: readonly string[]
   relevantFactIds: readonly SourceProfileFact['id'][]
   requirements: readonly JobRequirement[]
   verifiedFacts: readonly SourceProfileFact[]
@@ -27,41 +35,63 @@ export function createMatchAnalysis({
   const evidence = validateMatchEvidence({ proposedEvidence, requirements, verifiedFacts })
   if (evidence === null
     || !hasValidRelevantFacts({ evidence, relevantFactIds, verifiedFacts })) return null
-  return createAnalysisFromEvidence({ evidence, relevantFactIds, requirements })
+  return createAnalysisFromEvidence({
+    evidence, improvementOpportunities, relevantFactIds, requirements,
+  })
 }
 
 export function restoreMatchAnalysis({
-  evidence, relevantFactIds, requirements, verifiedFacts,
+  evidence, improvementOpportunities = [], relevantFactIds, requirements, verifiedFacts,
 }: Readonly<{
   evidence: readonly MatchEvidence[]
+  improvementOpportunities?: readonly string[]
   relevantFactIds: readonly SourceProfileFact['id'][]
   requirements: readonly JobRequirement[]
   verifiedFacts: readonly SourceProfileFact[]
 }>): MatchAnalysis | null {
   if (!hasValidStoredEvidence({ evidence, requirements, verifiedFacts })) return null
   if (!hasValidRelevantFacts({ evidence, relevantFactIds, verifiedFacts })) return null
-  return createAnalysisFromEvidence({ evidence, relevantFactIds, requirements })
+  return createAnalysisFromEvidence({
+    evidence, improvementOpportunities, relevantFactIds, requirements,
+  })
 }
 
-function createAnalysisFromEvidence({ evidence, relevantFactIds, requirements }: Readonly<{
+function createAnalysisFromEvidence({
+  evidence,
+  improvementOpportunities,
+  relevantFactIds,
+  requirements,
+}: Readonly<{
   evidence: readonly MatchEvidence[]
+  improvementOpportunities: readonly string[]
   relevantFactIds: readonly SourceProfileFact['id'][]
   requirements: readonly JobRequirement[]
 }>): MatchAnalysis {
-  const coveredRequirementIds = new Set(evidence.map(({ requirementId }) => requirementId))
-  const matchScore = calculateMatchScore({ coveredRequirementIds, requirements })
+  const evidenceByRequirementId = new Map(evidence.map((item) => [item.requirementId, item]))
+  const matchScore = calculateMatchScore({ evidenceByRequirementId, requirements })
   return {
     evidence,
-    gapAnalysis: {
-      uncoveredRequiredRequirementIds: findUncoveredRequiredRequirementIds({
-        coveredRequirementIds,
-        requirements,
-      }),
-    },
+    gapAnalysis: createGapAnalysis({ evidenceByRequirementId, requirements }),
     generationEligibility: relevantFactIds.length > 0 ? 'eligible' : 'denied',
+    improvementOpportunities: improvementOpportunities.slice(0, 3),
     matchScore,
     relevantFactIds,
     warning: matchScore < generationThreshold ? 'below-generation-threshold' : null,
+  }
+}
+
+function createGapAnalysis({ evidenceByRequirementId, requirements }: Readonly<{
+  evidenceByRequirementId: ReadonlyMap<JobRequirementId, MatchEvidence>
+  requirements: readonly JobRequirement[]
+}>) {
+  return {
+    partiallyCoveredRequiredRequirementIds: requirements
+      .filter((requirement) => requirement.classification === 'required'
+        && evidenceByRequirementId.get(requirement.id)?.coverage === 'partially-covered')
+      .map(({ id }) => id),
+    uncoveredRequiredRequirementIds: findUncoveredRequiredRequirementIds({
+      evidenceByRequirementId, requirements,
+    }),
   }
 }
 
@@ -95,15 +125,15 @@ function hasValidStoredEvidence({ evidence, requirements, verifiedFacts }: Reado
 }
 
 function findUncoveredRequiredRequirementIds({
-  coveredRequirementIds,
+  evidenceByRequirementId,
   requirements,
 }: Readonly<{
-  coveredRequirementIds: ReadonlySet<JobRequirementId>
+  evidenceByRequirementId: ReadonlyMap<JobRequirementId, MatchEvidence>
   requirements: readonly JobRequirement[]
 }>) {
   return requirements
     .filter((requirement) => requirement.classification === 'required'
-      && !coveredRequirementIds.has(requirement.id))
+      && !evidenceByRequirementId.has(requirement.id))
     .map(({ id }) => id)
 }
 
@@ -126,28 +156,33 @@ function validateMatchEvidence({
   return proposedEvidence.length > 0 && validEvidence.length === 0 ? null : validEvidence
 }
 
-function validateEvidenceProposal({
-  proposal,
-  referencedRequirementIds,
-  requirementById,
-  verifiedFactById,
-}: Readonly<{
+type EvidenceProposalValidation = Readonly<{
   proposal: ProposedMatchEvidence
   referencedRequirementIds: Set<JobRequirementId>
   requirementById: ReadonlyMap<JobRequirementId, JobRequirement>
   verifiedFactById: ReadonlyMap<SourceProfileFact['id'], SourceProfileFact>
-}>): MatchEvidence | null {
+}>
+
+function validateEvidenceProposal({
+  proposal, referencedRequirementIds, requirementById, verifiedFactById,
+}: EvidenceProposalValidation): MatchEvidence | null {
   const requirement = requirementById.get(proposal.requirementId)
   if (requirement === undefined || referencedRequirementIds.has(proposal.requirementId)) return null
   referencedRequirementIds.add(proposal.requirementId)
-  if (!hasValidFactMatches({ factMatches: proposal.factMatches, requirement, verifiedFactById })) {
+  if (!hasValidFactMatches({
+    coverage: proposal.coverage,
+    factMatches: proposal.factMatches,
+    requirement,
+    verifiedFactById,
+  })) {
     return null
   }
-  return { requirementId: proposal.requirementId,
+  return { coverage: proposal.coverage, requirementId: proposal.requirementId,
     factIds: proposal.factMatches.map(({ factId }) => factId) }
 }
 
-function hasValidFactMatches({ factMatches, requirement, verifiedFactById }: Readonly<{
+function hasValidFactMatches({ coverage, factMatches, requirement, verifiedFactById }: Readonly<{
+  coverage: ProposedMatchEvidence['coverage']
   factMatches: readonly ProposedFactMatch[]
   requirement: JobRequirement
   verifiedFactById: ReadonlyMap<SourceProfileFact['id'], SourceProfileFact>
@@ -157,28 +192,45 @@ function hasValidFactMatches({ factMatches, requirement, verifiedFactById }: Rea
   if (factIds.size !== factMatches.length) return false
   return factMatches.every((factMatch) => {
     const fact = verifiedFactById.get(factMatch.factId)
-    return fact !== undefined && provesRequirement({ factMatch, fact, requirement })
+    return fact !== undefined && provesRequirement({ coverage, factMatch, fact, requirement })
   })
 }
 
-function provesRequirement({ fact, factMatch, requirement }: Readonly<{
+type RequirementProof = Readonly<{
+  coverage: ProposedMatchEvidence['coverage']
   fact: SourceProfileFact
   factMatch: ProposedFactMatch
   requirement: JobRequirement
-}>) {
+}>
+
+function provesRequirement({ coverage, fact, factMatch, requirement }: RequirementProof) {
   if (!containsTerm({ content: fact.value, term: factMatch.factTerm })
     || !containsTerm({ content: requirement.value, term: factMatch.requirementTerm })) return false
   const factTerm = normalizeTerm({ value: factMatch.factTerm })
   const requirementTerm = normalizeTerm({ value: factMatch.requirementTerm })
   if (nonEvidenceTerms.has(factTerm) || hasNegatedEvidence({ fact })) return false
-  if (fact.kind === 'experience' && looksLikeRoleTitle({ value: fact.value })) return false
+  if (fact.kind === 'experience' && isRoleTitleOnlyEvidence({
+    factTerm: factMatch.factTerm, value: fact.value,
+  })) return false
   if (!representsCompleteRequirementConcept({ requirement, requirementTerm })) return false
-  if (!satisfiesRequirementConstraints({ fact, factTerm: factMatch.factTerm,
-    requirement, requirementTerm: factMatch.requirementTerm })) return false
-  if (factTerm === requirementTerm) return true
-  return controlledTermGroups.some((termGroup) => hasTermsFromGroup({
-    factTerm, requirementTerm, termGroup,
-  }))
+  if (!hasEquivalentEvidenceTerms({ factTerm, requirementTerm })) return false
+  const satisfiesConstraints = satisfiesRequirementConstraints({
+    fact,
+    factTerm: factMatch.factTerm,
+    requirement,
+    requirementTerm: factMatch.requirementTerm,
+  })
+  return coverage === 'covered' ? satisfiesConstraints : !satisfiesConstraints
+}
+
+function hasEquivalentEvidenceTerms({ factTerm, requirementTerm }: Readonly<{
+  factTerm: string
+  requirementTerm: string
+}>) {
+  return factTerm === requirementTerm
+    || controlledTermGroups.some((termGroup) => hasTermsFromGroup({
+      factTerm, requirementTerm, termGroup,
+    }))
 }
 
 function representsCompleteRequirementConcept({ requirement, requirementTerm }: Readonly<{
@@ -204,8 +256,9 @@ function hasTermsFromGroup({ factTerm, requirementTerm, termGroup }: Readonly<{
 }
 
 function canonicalizeControlledTerm({ value }: Readonly<{ value: string }>) {
-  return normalizeTerm({ value }).replaceAll(durationPattern, ' ').split(' ')
-    .filter((term) => !isConstraintContextTerm({ term })).join(' ')
+  const valueWithoutScales = normalizeScaleText({ value }).replaceAll(scalePattern, ' ')
+  return normalizeTerm({ value: valueWithoutScales }).replaceAll(durationPattern, ' ').split(' ')
+    .filter((term) => term.length > 0 && !isConstraintContextTerm({ term })).join(' ')
 }
 
 function isConstraintContextTerm({ term }: Readonly<{ term: string }>) {
@@ -229,12 +282,34 @@ function satisfiesRequirementConstraints({ fact, factTerm, requirement, requirem
   const factClause = readTermClause({ term: factTerm, value: fact.value })
   const requirementClause = readTermClause({ term: requirementTerm, value: requirement.value })
   if (factClause === null || requirementClause === null) return false
-  const hasQualifiers = qualitativeRequirementTerms.every((qualifier) =>
-    !containsTerm({ content: requirementClause, term: qualifier })
-    || containsTerm({ content: factClause, term: qualifier }))
+  const hasQualifiers = satisfiesQualitativeConstraints({ factClause, requirementClause })
   return hasQualifiers && satisfiesDurationConstraint({
     factTerm, factValue: factClause, requirementTerm, requirementValue: requirementClause,
+  }) && satisfiesScaleConstraint({
+    factTerm, factValue: factClause, requirementTerm, requirementValue: requirementClause,
   })
+}
+
+function satisfiesQualitativeConstraints({ factClause, requirementClause }: Readonly<{
+  factClause: string
+  requirementClause: string
+}>) {
+  return qualitativeRequirementTerms.every((qualifier) =>
+    !containsTerm({ content: requirementClause, term: qualifier })
+    || containsTerm({ content: factClause, term: qualifier })
+    || satisfiesLevelConstraint({ factClause, requiredLevel: qualifier }))
+}
+
+function satisfiesLevelConstraint({ factClause, requiredLevel }: Readonly<{
+  factClause: string
+  requiredLevel: string
+}>) {
+  const requiredRank = careerLevelRanks.get(requiredLevel)
+  if (requiredRank === undefined) return false
+  const factRank = careerLevelTerms.reduce((highestRank, level) =>
+    containsTerm({ content: factClause, term: level })
+      ? Math.max(highestRank, careerLevelRanks.get(level) ?? 0) : highestRank, 0)
+  return factRank >= requiredRank
 }
 
 function satisfiesDurationConstraint({
@@ -275,6 +350,106 @@ function readDurations({ value }: Readonly<{ value: string }>) {
   })
 }
 
+function satisfiesScaleConstraint({
+  factTerm, factValue, requirementTerm, requirementValue,
+}: Readonly<{
+  factTerm: string
+  factValue: string
+  requirementTerm: string
+  requirementValue: string
+}>) {
+  const requiredScale = readNearestScale({ term: requirementTerm, value: requirementValue })
+  if (requiredScale === null) return true
+  const factScale = readNearestScale({ term: factTerm, value: factValue })
+  return factScale !== null && factScale.unit === requiredScale.unit
+    && factScale.amount >= requiredScale.amount
+}
+
+function readNearestScale({ term, value }: Readonly<{ term: string; value: string }>) {
+  const normalizedValue = normalizeScaleText({ value })
+  const termIndex = normalizedValue.indexOf(normalizeTerm({ value: term }))
+  if (termIndex < 0) return null
+  return readScales({ value: normalizedValue }).toSorted((left, right) =>
+    Math.abs(left.index - termIndex) - Math.abs(right.index - termIndex))[0] ?? null
+}
+
+function readScales({ value }: Readonly<{ value: string }>) {
+  return [...value.matchAll(scalePattern)].flatMap((match) => {
+    const baseAmount = match[1] === undefined ? Number.NaN : Number(match[1])
+    const magnitude = match[2]
+    const unit = match[3]
+    if (!Number.isFinite(baseAmount) || unit === undefined) return []
+    return [{ amount: baseAmount * readScaleMultiplier({ magnitude }), index: match.index,
+      unit: normalizeScaleUnit({ unit }) }]
+  })
+}
+
+function normalizeScaleUnit({ unit }: Readonly<{ unit: string }>) {
+  return unit.endsWith('s') ? unit.slice(0, -1) : unit
+}
+
+function normalizeScaleText({ value }: Readonly<{ value: string }>) {
+  return value.normalize('NFD').replaceAll(/\p{Diacritic}/gu, '')
+    .toLocaleLowerCase('en').replaceAll(/(\d),(\d)/gu, '$1.$2')
+    .replaceAll(/[^a-z0-9+#.]+/gu, ' ').trim()
+}
+
+function isRoleTitleOnlyEvidence({ factTerm, value }: Readonly<{
+  factTerm: string
+  value: string
+}>) {
+  const factClause = readTermClause({ term: factTerm, value })
+  return factClause !== null && (hasRoleTitlePhrase({ factTerm, value: factClause })
+    || looksLikeRoleTitle({ value: factClause }))
+}
+
+function hasRoleTitlePhrase({ factTerm, value }: Readonly<{
+  factTerm: string
+  value: string
+}>) {
+  const normalizedTerm = normalizeTerm({ value: factTerm })
+  const normalizedValue = normalizeTerm({ value })
+  const termIndex = normalizedValue.indexOf(normalizedTerm)
+  if (termIndex < 0) return false
+  const precedingContent = normalizedValue.slice(0, termIndex)
+  const followingContent = normalizedValue.slice(termIndex + normalizedTerm.length)
+  return hasTrailingTitleRole({ followingContent, precedingContent })
+    || hasUngovernedLeadingRole({ precedingContent })
+}
+
+function hasTrailingTitleRole({ followingContent, precedingContent }: Readonly<{
+  followingContent: string
+  precedingContent: string
+}>) {
+  if (hasEvidenceVerb({ content: precedingContent })
+    && !containsTerm({ content: precedingContent, term: 'as' })) return false
+  const followingTerms = followingContent.trim().split(' ')
+  return roleTerms.some((roleTerm) => {
+    const roleIndex = followingTerms.indexOf(roleTerm)
+    if (roleIndex < 0) return false
+    return !followingTerms.slice(0, roleIndex).includes('as')
+  })
+}
+
+function hasUngovernedLeadingRole({ precedingContent }: Readonly<{ precedingContent: string }>) {
+  const precedingTerms = precedingContent.trim().split(' ')
+  return roleTerms.some((roleTerm) => {
+    const roleIndex = precedingTerms.lastIndexOf(roleTerm)
+    if (roleIndex < 0) return false
+    return !hasEvidenceVerb({ content: precedingTerms.slice(roleIndex + 1).join(' ') })
+  })
+}
+
+function hasEvidenceVerb({ content }: Readonly<{ content: string }>) {
+  return evidenceVerbs.some((verb) => containsTerm({ content, term: verb }))
+}
+
+function readScaleMultiplier({ magnitude }: Readonly<{ magnitude: string | undefined }>) {
+  if (magnitude === 'm' || magnitude?.startsWith('million') === true) return 1_000_000
+  if (magnitude === 'k' || magnitude?.startsWith('thousand') === true) return 1_000
+  return 1
+}
+
 function looksLikeRoleTitle({ value }: Readonly<{ value: string }>) {
   const normalizedValue = normalizeTerm({ value })
   const hasRoleWord = roleTerms.some((roleTerm) => normalizedValue.includes(roleTerm))
@@ -304,8 +479,9 @@ const controlledTermGroups = [
 const controlledContextTerms = new Set([
   'a', 'appliquer', 'assurer', 'au', 'aux', 'avoir', 'connaitre', 'courant', 'courante',
   'dans', 'de', 'des', 'disposer', 'du', 'en', 'etre', 'experience', 'faire', 'fluent',
-  'in', 'know', 'knowledge', 'la', 'language', 'le', 'les', 'maitrise', 'maitriser',
-  'of', 'pour', 'proficiency', 'speak', 'spoken', 'sur', 'un', 'une', 'used', 'using', 'with',
+  'in', 'know', 'knowledge', 'la', 'language', 'le', 'les', 'level', 'maitrise', 'maitriser',
+  'for', 'of', 'pour', 'proficiency', 'speak', 'spoken', 'sur', 'un', 'une', 'use', 'used',
+  'using', 'with',
 ])
 
 const nonEvidenceTerms = new Set([
@@ -313,10 +489,17 @@ const nonEvidenceTerms = new Set([
 ])
 const negativeTerms = ['aucun', 'jamais', 'no', 'not', 'never', 'pas', 'sans', 'without'] as const
 const qualitativeRequirementTerms = [
-  'advanced', 'expert', 'lead', 'principal', 'production', 'senior', 'staff',
+  'advanced', 'expert', 'junior', 'lead', 'mid', 'middle', 'principal', 'production', 'senior',
+  'staff',
 ] as const
+const careerLevelTerms = ['junior', 'mid', 'middle', 'senior', 'lead', 'staff', 'principal'] as const
+const careerLevelRanks = new Map<string, number>([
+  ['junior', 1], ['mid', 2], ['middle', 2], ['senior', 3],
+  ['lead', 4], ['staff', 4], ['principal', 5],
+])
 const clauseSeparatorPattern = /[,;\n]|[.!?](?:\s+|$)|\b(?:and|et)\b/iu
 const durationPattern = /\b(\d+)\s*\+?\s*(years?|yrs?|ans?|months?|mois)\b/gu
+const scalePattern = /\b(\d+(?:[.,]\d+)?)\s*(k|m|millions?|thousands?)?\s*(users?|requests?|transactions?|people|engineers?|developers?)\b/gu
 const roleTerms = ['developer', 'engineer', 'manager', 'architect', 'consultant'] as const
 const evidenceVerbs = [
   'built', 'created', 'delivered', 'designed', 'developed', 'implemented', 'used', 'using',
@@ -324,20 +507,27 @@ const evidenceVerbs = [
 ] as const
 
 function calculateMatchScore({
-  coveredRequirementIds,
+  evidenceByRequirementId,
   requirements,
 }: Readonly<{
-  coveredRequirementIds: ReadonlySet<JobRequirementId>
+  evidenceByRequirementId: ReadonlyMap<JobRequirementId, MatchEvidence>
   requirements: readonly JobRequirement[]
 }>) {
   const totalWeight = requirements.reduce(sumRequirementWeight, 0)
   if (totalWeight === 0) return 0 as MatchScore
-  const coveredWeight = requirements
-    .filter(({ id }) => coveredRequirementIds.has(id))
-    .reduce(sumRequirementWeight, 0)
+  const coveredWeight = requirements.reduce((total, requirement) => {
+    const evidence = evidenceByRequirementId.get(requirement.id)
+    if (evidence === undefined) return total
+    const coverageMultiplier = evidence.coverage === 'covered' ? 1 : 0.5
+    return total + readRequirementWeight({ requirement }) * coverageMultiplier
+  }, 0)
   return Math.round((coveredWeight / totalWeight) * 100) as MatchScore
 }
 
 function sumRequirementWeight(total: number, requirement: JobRequirement) {
-  return total + (requirement.classification === 'required' ? 2 : 1)
+  return total + readRequirementWeight({ requirement })
+}
+
+function readRequirementWeight({ requirement }: Readonly<{ requirement: JobRequirement }>) {
+  return requirement.classification === 'required' ? 2 : 1
 }

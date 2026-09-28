@@ -55,17 +55,37 @@ _Avoid_: Inferred title, desired role, generated headline
 An explicit qualification or expectation extracted from a Job Posting and classified as required or preferred.
 _Avoid_: Keyword, criterion
 
+**Requirement Coverage**:
+The evidence-backed assessment of a Job Requirement as covered, partially covered, or not covered. These states contribute respectively all, half, or none of the requirement's weight to the Match Score.
+_Avoid_: Model confidence, match probability
+
 **Match Evidence**:
-The explicit relationship between one covered Job Requirement and one or more Candidate Facts that support it.
+The explicit relationship between one covered or partially covered Job Requirement and one or more Candidate Facts that support it.
 _Avoid_: Keyword match, inferred match
 
 **Match Score**:
-The percentage expressing how strongly the Source Profile's Candidate Facts cover the requirements of a Job Posting.
+The percentage expressing how strongly the Source Profile's Candidate Facts cover the explicit professional requirements of a Job Posting. Required requirements have twice the weight of preferred requirements, and Requirement Coverage contributes all, half, or none of that weight; the score does not estimate hiring probability.
 _Avoid_: Fit score, compatibility score
+
+**Improvement Opportunity**:
+An unscored observation about an implicit convention, keyword, or possible profile improvement that is not an explicit Job Requirement. It remains separate from the Match Score.
+_Avoid_: Hidden requirement, inferred requirement
+
+**Practical Constraint**:
+An explicit condition such as location, remote-work policy, work authorization, availability, or compensation that may affect whether an application is viable without measuring professional evidence coverage. It is reported separately and never changes the Match Score or Generation Eligibility.
+_Avoid_: Job Requirement, score penalty
 
 **Match Analysis**:
 The evidence-backed result combining Match Evidence, the deterministic Match Score, Generation Eligibility, and the Gap Analysis for one Source Profile and Job Posting.
 _Avoid_: Model score, suitability decision
+
+**Match Band**:
+The advisory interpretation of a Match Score: strong from 75 to 100, credible from 50 to 74, and ambitious from 0 to 49. A Match Band communicates evidence coverage rather than hiring probability.
+_Avoid_: Hiring likelihood, application verdict
+
+**Generation Eligibility**:
+The ability to create a Tailored Resume when at least one Candidate Fact provides explicit evidence relevant to the Job Posting. A low Match Score produces a warning but never removes eligibility.
+_Avoid_: Application eligibility, hiring eligibility
 
 **Generation Threshold**:
 The advisory Match Score threshold of 50%. Falling below it produces a warning and never decides Generation Eligibility.
@@ -84,7 +104,7 @@ A concise statement included in a Tailored Resume and internally linked to one o
 _Avoid_: Generated statement, inferred claim
 
 **Gap Analysis**:
-An explanation of important Job Posting requirements that are not supported by Candidate Facts.
+An explanation of important Job Posting requirements that are only partially supported or not supported by Candidate Facts.
 _Avoid_: Missing skills, weaknesses
 
 **Outcome Feedback**:

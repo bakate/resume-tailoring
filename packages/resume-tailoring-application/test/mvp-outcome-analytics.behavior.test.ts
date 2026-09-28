@@ -229,8 +229,9 @@ function createReadyState({ matchScore, outcomeFeedback }: Readonly<{
     },
     matchAnalysis: {
       evidence: [],
-      gapAnalysis: { uncoveredRequiredRequirementIds: [] },
+      gapAnalysis: { partiallyCoveredRequiredRequirementIds: [], uncoveredRequiredRequirementIds: [] },
       generationEligibility: 'eligible',
+      improvementOpportunities: [],
       matchScore: matchScore as MatchScore,
       relevantFactIds: [],
       warning: null,

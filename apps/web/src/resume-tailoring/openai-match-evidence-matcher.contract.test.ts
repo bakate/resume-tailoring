@@ -57,6 +57,7 @@ describe('OpenAI Match Evidence matcher contract', () => {
       reasoningEffort: 'low',
       request: () => Promise.resolve(Response.json(createOpenAiResponse({ analysis: {
         evidence: [{
+          coverage: 'covered',
           requirementId: 'job-requirement-invented',
           factMatches: [{
             factId: 'source-fact-invented',
@@ -65,6 +66,7 @@ describe('OpenAI Match Evidence matcher contract', () => {
             requirementTerm: 'TypeScript',
           }],
         }],
+        improvementOpportunities: [],
         relevantFactIds: ['source-fact-invented'],
       } }))),
     })
@@ -142,6 +144,7 @@ function createAnalysis({ requirements: inputRequirements }: Readonly<{
 }>) {
   return {
     evidence: inputRequirements.map(({ id }) => ({
+      coverage: 'covered' as const,
       requirementId: id,
       factMatches: [{
         factId: 'source-fact-typescript' as const,
@@ -150,6 +153,7 @@ function createAnalysis({ requirements: inputRequirements }: Readonly<{
         requirementTerm: 'TypeScript',
       }],
     })),
+    improvementOpportunities: [],
     relevantFactIds: ['source-fact-typescript' as const],
   }
 }
@@ -174,6 +178,7 @@ const requirements = [{
 
 const expectedAnalysis = {
   evidence: [{
+    coverage: 'covered',
     requirementId: 'job-requirement-typescript',
     factMatches: [{
       factId: 'source-fact-typescript',
@@ -182,6 +187,7 @@ const expectedAnalysis = {
       requirementTerm: 'TS',
     }],
   }],
+  improvementOpportunities: [],
   relevantFactIds: ['source-fact-typescript'],
 } as const
 
