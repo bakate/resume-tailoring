@@ -99,7 +99,22 @@ export type ResumeTailoringFailure =
   | { readonly type: 'workflow-already-open' }
   | { readonly type: 'candidate-session-unavailable' }
   | { readonly type: 'unsupported-source-document' }
-  | { readonly type: 'unreadable-source-document' }
+  | {
+      readonly type: 'unreadable-source-document'
+      readonly reason:
+        | 'encrypted-pdf'
+        | 'invalid-pdf'
+        | 'pdf-read-failure'
+        | 'text-empty'
+    }
+  | {
+      readonly type: 'incompatible-source-document-reader'
+      readonly reason:
+        | 'missing-worker-capability'
+        | 'missing-text-decoder-capability'
+        | 'pdf-reader-load-failure'
+        | 'unsupported-browser-version'
+    }
   | { readonly type: 'processing-notice-required' }
   | { readonly type: 'source-profile-extraction-unavailable' }
   | { readonly type: 'source-fact-unavailable' }

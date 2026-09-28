@@ -58,6 +58,7 @@ export type CandidateSessionFailureMessageKey =
   | 'session.openFailure'
   | 'sourceProfile.extractionFailure'
   | 'sourceProfile.failure'
+  | 'sourceProfile.browserCompatibilityFailure'
   | 'sourceProfile.unreadableFailure'
   | 'sourceProfile.unsupportedFailure'
   | 'jobPosting.extractionFailure'
@@ -71,6 +72,7 @@ export function isSourceDocumentIntakeFailureMessage(
   messageKey: CandidateSessionFailureMessageKey | null,
 ) {
   return messageKey === 'sourceProfile.failure'
+    || messageKey === 'sourceProfile.browserCompatibilityFailure'
     || messageKey === 'sourceProfile.unreadableFailure'
     || messageKey === 'sourceProfile.unsupportedFailure'
 }
@@ -504,6 +506,9 @@ function readTypedFailureMessageKey({
 }>): CandidateSessionFailureMessageKey {
   if (result.error.type === 'unsupported-source-document') {
     return 'sourceProfile.unsupportedFailure'
+  }
+  if (result.error.type === 'incompatible-source-document-reader') {
+    return 'sourceProfile.browserCompatibilityFailure'
   }
   if (result.error.type === 'unreadable-source-document') return 'sourceProfile.unreadableFailure'
   if (result.error.type === 'source-profile-extraction-unavailable') {

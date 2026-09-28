@@ -136,7 +136,24 @@ export type SourceDocumentReader = {
     | { readonly ok: true; readonly value: string }
     | {
         readonly ok: false
-        readonly error: { readonly type: 'unsupported-source-document' | 'unreadable-source-document' }
+        readonly error:
+          | { readonly type: 'unsupported-source-document' }
+          | {
+              readonly type: 'unreadable-source-document'
+              readonly reason:
+                | 'encrypted-pdf'
+                | 'invalid-pdf'
+                | 'pdf-read-failure'
+                | 'text-empty'
+            }
+          | {
+              readonly type: 'incompatible-source-document-reader'
+              readonly reason:
+                | 'missing-worker-capability'
+                | 'missing-text-decoder-capability'
+                | 'pdf-reader-load-failure'
+                | 'unsupported-browser-version'
+            }
       }
   >
 }
