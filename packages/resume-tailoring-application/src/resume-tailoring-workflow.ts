@@ -95,11 +95,29 @@ export type ResumeTailoringView =
       readonly tailoredResume?: TailoredResume
     }
 
+export type SourceDocumentReadFailure =
+  | { readonly type: 'unsupported-source-document' }
+  | {
+      readonly type: 'unreadable-source-document'
+      readonly reason:
+        | 'encrypted-pdf'
+        | 'invalid-pdf'
+        | 'pdf-read-failure'
+        | 'text-empty'
+    }
+  | {
+      readonly type: 'incompatible-source-document-reader'
+      readonly reason:
+        | 'missing-worker-capability'
+        | 'pdf-reader-load-failure'
+        | 'pdf-reader-runtime-failure'
+        | 'unsupported-browser-version'
+    }
+
 export type ResumeTailoringFailure =
   | { readonly type: 'workflow-already-open' }
   | { readonly type: 'candidate-session-unavailable' }
-  | { readonly type: 'unsupported-source-document' }
-  | { readonly type: 'unreadable-source-document' }
+  | SourceDocumentReadFailure
   | { readonly type: 'processing-notice-required' }
   | { readonly type: 'source-profile-extraction-unavailable' }
   | { readonly type: 'source-fact-unavailable' }

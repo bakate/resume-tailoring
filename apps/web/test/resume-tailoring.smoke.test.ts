@@ -268,6 +268,18 @@ test('French unreadable PDF feedback localizes its filename announcement and err
   await system.expectLocalizedFrenchUnreadablePdfFeedback()
 })
 
+test('French browser compatibility feedback preserves pasted-text recovery', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenPdfReaderWorkerIsUnavailable()
+  await system.givenCandidateSessionIsActive()
+  await system.switchResumeTailoringToFrench()
+
+  await system.uploadReadablePdfWithIncompatibleReader()
+
+  await system.expectLocalizedBrowserCompatibilityRecovery()
+})
+
 test('pasted professional text enters the shared outgoing Source Document review', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
@@ -322,6 +334,18 @@ test('switching Source Document methods does not start review or extraction', as
 test('a Candidate builds a Verified Source Profile from minimized PDF content', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
+  await system.givenCandidateSessionIsActive()
+  await system.givenStructuredExtractionIsAvailable()
+
+  await system.buildVerifiedSourceProfile()
+
+  await system.expectVerifiedSourceProfileBuiltFromMinimizedContent()
+})
+
+test('a Candidate imports a valid PDF without native Promise.withResolvers', async ({ page }) => {
+  const system = createSystemUnderTest({ page })
+
+  await system.givenPromiseWithResolversIsUnavailable()
   await system.givenCandidateSessionIsActive()
   await system.givenStructuredExtractionIsAvailable()
 
@@ -817,6 +841,7 @@ type CompletedAction =
   | 'pasted-source-document-reviewed'
   | 'unreadable-source-document-rejected'
   | 'unreadable-source-document-recovered'
+  | 'incompatible-source-document-reader-rejected'
   | 'empty-pasted-source-document-reviewed'
   | 'source-document-method-switched'
   | 'resume-tailoring-opened'
@@ -877,6 +902,21 @@ class ResumeTailoringBrowserTestSystem {
     await this.#page.goto('/')
     await this.#page.getByRole('button', { name: 'Start tailoring' }).click()
     await this.#page.getByText('Workflow opened').waitFor()
+  }
+
+  async givenPdfReaderWorkerIsUnavailable() {
+    await this.#page.addInitScript(() => {
+      Object.defineProperty(globalThis, 'Worker', {
+        configurable: true,
+        value: undefined,
+      })
+    })
+  }
+
+  async givenPromiseWithResolversIsUnavailable() {
+    await this.#page.addInitScript(() => {
+      Reflect.deleteProperty(Promise, 'withResolvers')
+    })
   }
 
   async givenStructuredExtractionIsAvailable() {
@@ -1500,6 +1540,15 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'unreadable-source-document-rejected'
   }
 
+  async uploadReadablePdfWithIncompatibleReader() {
+    await this.#page.locator('#source-document-pdf').setInputFiles({
+      name: 'resume.pdf',
+      mimeType: 'application/pdf',
+      buffer: createTextPdf('Senior FullStack Developer using React at Acme'),
+    })
+    this.#completedAction = 'incompatible-source-document-reader-rejected'
+  }
+
   async retryWithReadablePdf() {
     await this.#page.locator('#source-document-pdf').setInputFiles({
       name: 'resume.pdf',
@@ -2065,11 +2114,21 @@ class ResumeTailoringBrowserTestSystem {
     this.#expectCompletedAction('unreadable-source-document-rejected')
     const input = this.#page.locator('.source-document-input')
     await expect(input.getByRole('alert')).toHaveText(
-      "Ce PDF n'a pas pu être lu. Choisis un PDF texte valide ; les PDF scannés composés uniquement d'images ne sont pas pris en charge.",
+      "Ce fichier n'est pas un PDF valide. Choisis un autre fichier PDF.",
     )
     await expect(input.getByText('PDF sélectionné : scanned-resume.pdf'))
       .toHaveAttribute('aria-live', 'polite')
     await expect(this.#page.getByRole('alert')).toHaveCount(1)
+  }
+
+  async expectLocalizedBrowserCompatibilityRecovery() {
+    this.#expectCompletedAction('incompatible-source-document-reader-rejected')
+    const input = this.#page.locator('.source-document-input')
+    await expect(input.getByRole('alert')).toHaveText(
+      "Ce navigateur ne peut pas lire les PDF de manière fiable. Mets à jour Safari, Chrome ou Firefox, ou colle plutôt ton texte professionnel.",
+    )
+    await expect(this.#page.getByRole('radio', { name: 'Coller du texte professionnel' }))
+      .toBeVisible()
   }
 
   async expectPastedTextInSharedSourceDocumentReview() {
@@ -2091,7 +2150,7 @@ class ResumeTailoringBrowserTestSystem {
     this.#expectCompletedAction('unreadable-source-document-rejected')
     const input = this.#page.locator('.source-document-input')
     await expect(input.getByRole('alert')).toHaveText(
-      'This PDF could not be read. Choose a valid text-based PDF; scanned image-only PDFs are not supported.',
+      'This file is not a valid PDF. Choose another PDF file.',
     )
     await expect(input.getByText('Selected PDF: scanned-resume.pdf'))
       .toHaveAttribute('aria-live', 'polite')
