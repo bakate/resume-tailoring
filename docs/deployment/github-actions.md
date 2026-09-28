@@ -6,6 +6,13 @@ deploys the Cloudflare Worker, and checks availability and API access protection
 Manual runs are supported on `main` only. Deployment jobs are serialized and are never
 cancelled midway by a newer push. Actions are pinned to commit SHAs.
 
+Dependabot checks GitHub Actions versions every Monday and groups available version updates
+into one pull request, including repeated references across jobs. Review and merge that PR
+after checks pass; updates are not merged automatically. Action releases have independent
+version numbers and runtimes, so they cannot share one version variable. `.nvmrc` controls
+the application Node version, not the runtime embedded in third-party actions.
+This Dependabot group covers action references only, not the Wrangler CLI or Docker base images.
+
 The deployment job installs the pnpm version declared in the root `packageManager` field.
 It runs the pinned Wrangler version through `pnpm dlx`, which installs the CLI in an isolated
 environment without installing or changing the application workspace dependencies.
