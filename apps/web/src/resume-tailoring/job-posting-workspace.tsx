@@ -1,4 +1,5 @@
 import type {
+  JobPostingHistoryItem,
   JobPostingReview,
   JobRequirement,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
@@ -41,6 +42,7 @@ function JobPostingInput({ candidateSession, localization }: WorkspaceProps) {
   const [content, setContent] = useState('')
   return (
     <div className="source-profile-card source-profile-review">
+      <JobPostingHistory {...{ candidateSession, localization }} />
       <label htmlFor="job-posting-input">{localization.translate('jobPosting.inputLabel')}</label>
       <textarea id="job-posting-input" rows={12} value={content}
         onChange={(event) => { setContent(event.currentTarget.value) }} />
@@ -48,6 +50,27 @@ function JobPostingInput({ candidateSession, localization }: WorkspaceProps) {
       <JobPostingInputActions {...{ candidateSession, content, localization }} />
     </div>
   )
+}
+
+function JobPostingHistory({ candidateSession, localization }: WorkspaceProps) {
+  const history = candidateSession.view.status === 'ready'
+    ? candidateSession.view.jobPostingHistory ?? [] : []
+  if (history.length === 0) return null
+  return <section aria-labelledby="job-posting-history-title">
+    <h3 id="job-posting-history-title">{localization.translate('jobPosting.historyTitle')}</h3>
+    <ul>{history.map((item) => <JobPostingHistoryEntry key={item.id}
+      {...{ item, localization }} />)}</ul>
+  </section>
+}
+
+function JobPostingHistoryEntry({ item, localization }: Readonly<{
+  item: JobPostingHistoryItem
+  localization: Localization
+}>) {
+  const targetRole = item.targetRole ?? localization.translate('jobPosting.targetRoleFallbackShort')
+  return <li><strong>{targetRole}</strong>{` · ${localization.translate(
+    'jobPosting.historyScore')} ${String(item.matchScore)}% · ${localization.translate(
+    `jobPosting.historyStatus.${item.status}`)}`}</li>
 }
 
 function JobPostingFileInput({ candidateSession, localization }: WorkspaceProps) {

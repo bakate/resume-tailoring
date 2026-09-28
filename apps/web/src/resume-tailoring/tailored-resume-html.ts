@@ -65,8 +65,8 @@ function renderDocumentBody({ inputs, title }: Readonly<{
   title: string
 }>) {
   const escapedTitle = escapeHtml(title)
-  return `<body>
-  <main class="resume-page" aria-labelledby="resume-title">
+  return `<body class="resume-body-${String(inputs.document.pageCount)}">
+  <main class="resume-page resume-page-${String(inputs.document.pageCount)}" aria-labelledby="resume-title">
     <header class="resume-header">
       <div>
         <h1 id="resume-title">${escapedTitle}</h1>
@@ -127,6 +127,9 @@ body { color: #151820; font-family: 'Resume Inter', sans-serif; }
   overflow: hidden;
   background: #fff;
 }
+.resume-page-2 { height: 594mm; }
+.resume-page-2 section { break-inside: auto; }
+.resume-page-2 li { break-inside: avoid; }
 .resume-header {
   display: flex;
   align-items: flex-start;
@@ -158,9 +161,10 @@ html[data-typography='dense'] li { margin-top: 1.3mm; font-size: 9.5pt; line-hei
 }
 @media screen and (max-width: 793.7px) {
   body { width: 100vw; height: calc(100vw * 1.4143); padding: 0; overflow: hidden; }
+  .resume-body-2 { height: calc(100vw * 2.8286); }
   .resume-page { margin: 0; zoom: calc(100vw / 793.7px); }
 }
 @media print {
-  html, body { width: 210mm; height: 297mm; background: #fff; }
+  html, body { width: 210mm; min-height: 297mm; background: #fff; }
 }`
 }

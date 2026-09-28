@@ -54,7 +54,8 @@ function TailoredResumeContent({ candidateSession, localization, unsupportedEdit
     return <GenerationAction {...{ candidateSession, localization }} />
   }
   const exportStatus = unsupportedEdits.claimIds.length > 0 ? 'blocked' : 'ready'
-  return <>{exportStatus === 'ready' ? <TailoredResumeFlowNavigation {...{ localization }} /> : null}
+  return <>{exportStatus === 'ready'
+    ? <TailoredResumeFlowNavigation {...{ candidateSession, localization }} /> : null}
     <CuratedClaims {...{
       candidateSession, claims: view.tailoredResume.claims,
       exclusions: view.tailoredResume.exclusions.length, localization,
@@ -89,9 +90,9 @@ function useUnsupportedResumeEdits() {
   }
 }
 
-function TailoredResumeFlowNavigation({ localization }: Readonly<{
-  localization: Localization
-}>) {
+function TailoredResumeFlowNavigation({ candidateSession, localization }: WorkspaceProps) {
+  const feedbackAvailable = candidateSession.view.status === 'ready'
+    && candidateSession.view.currentJobPostingStatus === 'pdf-downloaded'
   return (
     <nav aria-label={localization.translate('resumeClaims.flowNavigation')}
       className="tailored-resume-flow-navigation">
@@ -100,8 +101,10 @@ function TailoredResumeFlowNavigation({ localization }: Readonly<{
       </a>
       <a href="#resume-preview-title">{localization.translate('resumePreview.title')}</a>
       <a href="#resume-photo-title">{localization.translate('resumePreview.photoSection')}</a>
-      <a href="#resume-outcome-title">{localization.translate('resumePreview.outcomeSection')}</a>
       <a href="#resume-export-title">{localization.translate('resumePreview.exportSection')}</a>
+      {feedbackAvailable
+        ? <a href="#resume-outcome-title">{localization.translate('resumePreview.outcomeSection')}</a>
+        : null}
     </nav>
   )
 }

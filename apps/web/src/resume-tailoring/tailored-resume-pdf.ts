@@ -170,6 +170,7 @@ async function hasPageOverflow({ page }: Readonly<{ page: Page }>) {
 
 function mapPreparationFailure(type: TailoredResumePreparationFailureType): ResumePdfResult {
   if (type === 'tailored-resume-provenance-invalid') return provenanceInvalidResult
+  if (type === 'tailored-resume-content-overflow') return overflowResult
   if (type === 'tailored-resume-required-content-overflow') return overflowResult
   if (type === 'tailored-resume-validation-unavailable') return validationUnavailableResult
   return renderingUnavailableResult
@@ -205,10 +206,16 @@ async function validatePdfPage({ inputs, pdfDocument, pdfTextReader }: Readonly<
   pdfDocument: Awaited<ReturnType<typeof getDocument>['promise']>
   pdfTextReader: PdfTextReader
 }>): Promise<ResumePdfResult | typeof validLayoutResult> {
-  if (pdfDocument.numPages !== 1) return invalidPageCountResult
-  const pdfPage = await pdfDocument.getPage(1)
-  if (!hasA4Dimensions({ view: pdfPage.view })) return invalidPageCountResult
-  const extractedTextItems = await pdfTextReader.read({ pdfPage })
+  if (pdfDocument.numPages !== inputs.document.pageCount) return invalidPageCountResult
+  const pdfPages = await Promise.all(Array.from(
+    { length: pdfDocument.numPages },
+    (_unusedValue, pageIndex) => pdfDocument.getPage(pageIndex + 1),
+  ))
+  if (pdfPages.some((pdfPage) => !hasA4Dimensions({ view: pdfPage.view }))) {
+    return invalidPageCountResult
+  }
+  const extractedTextItems = (await Promise.all(pdfPages.map((pdfPage) =>
+    pdfTextReader.read({ pdfPage })))).flat()
   return hasExpectedReadingOrder({ inputs, extractedTextItems })
     ? validLayoutResult
     : contentMismatchResult

@@ -2,9 +2,7 @@ import { z } from 'zod'
 
 import {
   correctionKinds,
-  fidelityAssessments,
   matchScoreBands,
-  relevanceAssessments,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 
@@ -15,14 +13,10 @@ export const privacySafeAnalyticsEventSchema = z.discriminatedUnion('name', [
   z.strictObject({ name: z.literal('candidate-session-deleted') }),
   z.strictObject({ name: z.literal('candidate-session-expired') }),
   z.strictObject({
-    name: z.literal('resume-fidelity-rated'),
-    assessment: z.enum(fidelityAssessments),
+    name: z.literal('resume-usefulness-rated'),
+    hasComment: z.boolean(),
     matchScoreBand: matchScoreBandSchema,
-  }),
-  z.strictObject({
-    name: z.literal('resume-relevance-rated'),
-    assessment: z.enum(relevanceAssessments),
-    matchScoreBand: matchScoreBandSchema,
+    useful: z.boolean(),
   }),
   z.strictObject({
     name: z.literal('resume-correction-recorded'),

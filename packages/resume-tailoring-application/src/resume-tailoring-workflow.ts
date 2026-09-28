@@ -1,5 +1,6 @@
 import type {
   CandidateSessionId,
+  JobPostingHistoryItem,
   JobPostingReview,
   MatchAnalysis,
   OutcomeFeedback,
@@ -61,6 +62,7 @@ export type ResumeTailoringCommand =
       readonly value: string
     }
   | { readonly type: 'review-job-posting'; readonly content: string }
+  | { readonly type: 'start-new-job-posting' }
   | { readonly type: 'update-job-posting-content'; readonly outgoingContent: string }
   | { readonly type: 'update-target-role'; readonly value: string }
   | { readonly type: 'confirm-job-posting-processing-notice' }
@@ -90,12 +92,9 @@ export type ResumeTailoringCommand =
       readonly text: string
     }
   | {
-      readonly type: 'rate-tailored-resume-fidelity'
-      readonly assessment: 'faithful' | 'needs-correction'
-    }
-  | {
-      readonly type: 'rate-tailored-resume-relevance'
-      readonly assessment: 'relevant' | 'needs-improvement'
+      readonly type: 'rate-tailored-resume-usefulness'
+      readonly comment?: string
+      readonly useful: boolean
     }
   | { readonly type: 'record-tailored-resume-download' }
 
@@ -105,6 +104,8 @@ export type ResumeTailoringView =
       readonly status: 'ready'
       readonly sessionId: CandidateSessionId
       readonly expiresAt: number
+      readonly currentJobPostingStatus?: JobPostingHistoryItem['status']
+      readonly jobPostingHistory?: readonly JobPostingHistoryItem[]
       readonly sourceProfile?: SourceProfileReview
       readonly jobPosting?: JobPostingReview
       readonly matchAnalysis?: MatchAnalysis

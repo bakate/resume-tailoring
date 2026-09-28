@@ -794,6 +794,10 @@ h1 {
   background: #eef0ed;
 }
 
+.resume-preview-frame-2 {
+  aspect-ratio: 210 / 594;
+}
+
 .resume-photo-controls {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, auto);

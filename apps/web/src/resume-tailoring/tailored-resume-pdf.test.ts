@@ -13,6 +13,20 @@ describe('createTailoredResumePdf', () => {
     expect(result.ok ? new TextDecoder().decode(result.value.slice(0, 5)) : '').toBe('%PDF-')
   }, 20_000)
 
+  it('creates two validated A4 pages when one page would remove two preferred claims', async () => {
+    const result = await createTailoredResumePdf({
+      inputs: {
+        ...inputs,
+        contactItems: [{ kind: 'address', value: 'Paris, France '.repeat(30) }],
+        source: createTwoPagePreferredSource(),
+      },
+      semanticValidator,
+    })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) await expectPdfPageCount({ expectedPageCount: 2, pdfBytes: result.value })
+  }, 20_000)
+
   it('derives the document server-side instead of accepting caller-selected items', () => {
     const parsedRequest = resumePdfRequestSchema.safeParse({
       ...inputs,
@@ -38,6 +52,15 @@ describe('createTailoredResumePdf', () => {
   it('returns an actionable typed failure when required content cannot fit', async () => {
     const result = await createTailoredResumePdf({
       inputs: { ...inputs, source: createOverflowingRequiredSource() },
+      semanticValidator,
+    })
+
+    expect(result).toEqual({ ok: false, error: { type: 'resume-pdf-overflow' } })
+  }, 20_000)
+
+  it('reports overflow instead of invalid provenance when optional content cannot fit', async () => {
+    const result = await createTailoredResumePdf({
+      inputs: { ...inputs, source: createOverflowingOptionalSource() },
       semanticValidator,
     })
 
@@ -202,11 +225,51 @@ function createOverflowingRequiredSource(): TailoredResumePdfInputs['source'] {
       id: `resume-claim-required-${String(claimIndex)}` as const,
       segments: [{
         factIds: ['source-fact-required'] as const,
-        text: `Required experience ${'content '.repeat(55)}`.trim(),
+        text: `Required experience ${'content '.repeat(120)}`.trim(),
       }],
     }
   })
   return { ...inputs.source, claims }
+}
+
+function createOverflowingOptionalSource(): TailoredResumePdfInputs['source'] {
+  return {
+    claims: [{
+      id: 'resume-claim-oversized-optional',
+      segments: [{
+        factIds: ['source-fact-required'],
+        text: `Optional experience ${'content '.repeat(1_200)}`.trim(),
+      }],
+    }],
+    evidence: [{
+      factIds: ['source-fact-required'],
+      requirementId: 'job-requirement-preferred',
+    }],
+    requirements: [{ classification: 'preferred', id: 'job-requirement-preferred' }],
+    verifiedFacts,
+  }
+}
+
+function createTwoPagePreferredSource(): TailoredResumePdfInputs['source'] {
+  const claims = Array.from({ length: 12 }, (unusedValue, claimIndex) => {
+    void unusedValue
+    return {
+      id: `resume-claim-preferred-${String(claimIndex)}` as const,
+      segments: [{
+        factIds: ['source-fact-required'] as const,
+        text: `Preferred experience ${'relevant content '.repeat(30)}`.trim(),
+      }],
+    }
+  })
+  return {
+    claims,
+    evidence: [{
+      factIds: ['source-fact-required'],
+      requirementId: 'job-requirement-preferred',
+    }],
+    requirements: [{ classification: 'preferred', id: 'job-requirement-preferred' }],
+    verifiedFacts,
+  }
 }
 
 function createFrenchInputs({ photoDataUrl }: Readonly<{
@@ -304,6 +367,19 @@ async function expectFrenchSelectableText({ pdfBytes }: Readonly<{ pdfBytes: Uin
     expect(selectableText).toContain('synthetic-candidate@example.invalid')
     expect(selectableText).toContain('Connaissance de HTML5.')
     expect(selectableText).toContain('Maîtrise de RxJS, utilisé pour la gestion d')
+  } finally {
+    await loadingTask.destroy()
+  }
+}
+
+async function expectPdfPageCount({ expectedPageCount, pdfBytes }: Readonly<{
+  expectedPageCount: number
+  pdfBytes: Uint8Array
+}>) {
+  const loadingTask = getDocument({ data: pdfBytes.slice(), useSystemFonts: false })
+  try {
+    const pdfDocument = await loadingTask.promise
+    expect(pdfDocument.numPages).toBe(expectedPageCount)
   } finally {
     await loadingTask.destroy()
   }

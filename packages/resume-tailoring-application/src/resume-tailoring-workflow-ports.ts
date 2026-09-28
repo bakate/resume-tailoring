@@ -9,7 +9,6 @@ import type {
   JobRequirement,
   JobPostingTargetRole,
   MatchEvidence,
-  OutcomeFeedback,
   PracticalConstraint,
   SourceProfileFact,
   ResumeClaim,
@@ -28,8 +27,6 @@ export {
   jobRequirementClassifications,
   jobRequirementMaximumCount,
   requirementCoverages,
-  fidelityAssessments,
-  relevanceAssessments,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
 export type {
@@ -44,6 +41,7 @@ export type {
   SourceProfileReview,
   SourceProfileReviewStatus,
   JobPostingReview,
+  JobPostingHistoryItem,
   JobRequirement,
   JobPostingTargetRole,
   JobRequirementClassification,
@@ -118,14 +116,10 @@ export type PrivacySafeTelemetryEvent =
   | Readonly<{ name: 'candidate-session-deleted' }>
   | Readonly<{ name: 'candidate-session-expired' }>
   | Readonly<{
-      name: 'resume-fidelity-rated'
-      assessment: NonNullable<OutcomeFeedback['fidelity']>
+      name: 'resume-usefulness-rated'
+      hasComment: boolean
       matchScoreBand: MatchScoreBand
-    }>
-  | Readonly<{
-      name: 'resume-relevance-rated'
-      assessment: NonNullable<OutcomeFeedback['relevance']>
-      matchScoreBand: MatchScoreBand
+      useful: boolean
     }>
   | Readonly<{
       name: 'resume-correction-recorded'

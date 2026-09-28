@@ -174,6 +174,7 @@ function createJobPostingActions(dependencies: CandidateSessionActionDependencie
       analyzeJobPostingFile({ analysis, dependencies, file }),
     reviewJobPosting: ({ content }: Readonly<{ content: string }>) =>
       execute({ type: 'review-job-posting', content }),
+    startNewJobPosting: () => execute({ type: 'start-new-job-posting' }),
     updateJobPostingContent: ({ outgoingContent }: Readonly<{ outgoingContent: string }>) => execute({
       type: 'update-job-posting-content', outgoingContent,
     }),
@@ -279,12 +280,10 @@ function createResumeClaimActions(dependencies: CandidateSessionActionDependenci
 function createMvpOutcomeActions(dependencies: CandidateSessionActionDependencies) {
   const execute = (command: ResumeTailoringCommand) => executeCommand({ ...dependencies, command })
   return {
-    rateTailoredResumeFidelity: ({ assessment }: Readonly<{
-      assessment: 'faithful' | 'needs-correction'
-    }>) => execute({ type: 'rate-tailored-resume-fidelity', assessment }),
-    rateTailoredResumeRelevance: ({ assessment }: Readonly<{
-      assessment: 'relevant' | 'needs-improvement'
-    }>) => execute({ type: 'rate-tailored-resume-relevance', assessment }),
+    rateTailoredResumeUsefulness: ({ comment, useful }: Readonly<{
+      comment?: string
+      useful: boolean
+    }>) => execute({ type: 'rate-tailored-resume-usefulness', comment, useful }),
     recordTailoredResumeDownload: () => execute({ type: 'record-tailored-resume-download' }),
   }
 }
@@ -393,8 +392,10 @@ Readonly<{
 
 async function executeCommand({ command, operationGeneration, operationTracker, setState, workflow }:
 CandidateSessionActionDependencies & Readonly<{ command: ResumeTailoringCommand }>) {
-  if (operationTracker.current !== null && !concurrentSafeCommands.has(command.type)) {
-    return duplicateOperationResult
+  if (operationTracker.current !== null) {
+    return concurrentSafeCommands.has(command.type)
+      ? executeConcurrentCommand({ command, operationGeneration, setState, workflow })
+      : duplicateOperationResult
   }
   const execution = prepareCommandExecution({
     command, operationGeneration, operationTracker, setState,
@@ -405,6 +406,18 @@ CandidateSessionActionDependencies & Readonly<{ command: ResumeTailoringCommand 
     command, executionGeneration, operationGeneration, operationTimeout, operationTracker,
     pendingOperation, setState, workflow,
   })
+}
+
+async function executeConcurrentCommand({ command, operationGeneration, setState, workflow }:
+Pick<CandidateSessionActionDependencies, 'operationGeneration' | 'setState' | 'workflow'>
+& Readonly<{ command: ResumeTailoringCommand }>) {
+  const executionGeneration = operationGeneration.current
+  const failureMessageKey = readFailureMessageKey(command)
+  const result = await workflow.execute(command)
+  if (executionGeneration === operationGeneration.current) {
+    applyResult({ result, setState, failureMessageKey })
+  }
+  return result
 }
 
 function prepareCommandExecution({ command, operationGeneration, operationTracker, setState }:
@@ -669,8 +682,7 @@ const pendingOperations = new Set<ResumeTailoringCommand['type']>([
 ])
 const concurrentSafeCommands = new Set<ResumeTailoringCommand['type']>([
   'delete-session',
-  'rate-tailored-resume-fidelity',
-  'rate-tailored-resume-relevance',
+  'rate-tailored-resume-usefulness',
 ])
 const pendingOperationReassuranceDelay = 10_000
 const duplicateOperationResult = {

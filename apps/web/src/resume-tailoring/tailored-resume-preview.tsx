@@ -1,7 +1,7 @@
 import { prepareTailoredResumeDocument } from '@resume-tailoring/application/tailored-resume-document'
 import type { TailoredResumeDocument } from '@resume-tailoring/application/tailored-resume-document'
 import { useEffect, useState } from 'react'
-import type { ChangeEvent } from 'react'
+import type { ChangeEvent, SyntheticEvent } from 'react'
 
 import type { Localization } from '../localization/localization'
 import { createBrowserLayoutMeasurer } from './tailored-resume-browser-layout'
@@ -26,13 +26,6 @@ type PreviewState =
   | Readonly<{ status: 'failed' }>
   | Readonly<{ status: 'ready'; value: PreparedPreview }>
 type PreparedPreview = NonNullable<Awaited<ReturnType<typeof preparePreview>>>
-type OutcomeQuestionProps<TAssessment extends string> = Readonly<{
-  choices: readonly (readonly [TAssessment, Parameters<Localization['translate']>[0]])[]
-  localization: Localization
-  onSelect: (assessment: TAssessment) => void
-  question: string
-  selected: TAssessment | null
-}>
 
 export function TailoredResumePreview({ candidateSession, localization }: PreviewProps) {
   const [photo, setPhoto] = useState<PhotoState>({ status: 'empty' })
@@ -64,15 +57,18 @@ export function TailoredResumePreview({ candidateSession, localization }: Previe
   return (
     <section className="resume-preview-panel" aria-labelledby="resume-preview-title">
       <ResumePreviewHeader localization={localization} omittedClaimCount={preview.omittedClaimCount} />
-      <iframe className="resume-preview-frame" srcDoc={preview.html}
+      <iframe className={`resume-preview-frame resume-preview-frame-${String(preview.pageCount)}`}
+        srcDoc={preview.html}
         title={localization.translate('resumePreview.frameTitle')} />
       <PhotoControls {...{
         localization, photo, setPhoto,
       }} />
-      <OutcomeFeedback {...{ candidateSession, localization }} />
       <ExportControls {...{ exportState, localization }} onExport={() => {
         void exportPreview({ candidateSession, preview, setExportState })
       }} />
+      {hasDownloadedCurrentResume({ candidateSession, exportState })
+        ? <OutcomeFeedback {...{ candidateSession, localization }} />
+        : null}
     </section>
   )
 }
@@ -86,35 +82,67 @@ function readTailoredResumeLocale({ candidateSession, fallbackLocale }: Readonly
 }
 
 function OutcomeFeedback({ candidateSession, localization }: PreviewProps) {
+  const [comment, setComment] = useState('')
+  const [useful, setUseful] = useState<boolean | null>(null)
+  const outcomeFeedback = readOutcomeFeedback({ candidateSession })
   return (
     <section aria-labelledby="resume-outcome-title" className="resume-outcome-panel">
       <h4 id="resume-outcome-title" tabIndex={-1}>
         {localization.translate('resumePreview.outcomeSection')}
       </h4>
-      <div className="resume-outcome-feedback">
-        <FidelityQuestion {...{ candidateSession, localization }} />
-        <RelevanceQuestion {...{ candidateSession, localization }} />
-      </div>
+      {outcomeFeedback === undefined
+        ? <OutcomeFeedbackForm {...{
+          candidateSession, comment, localization, setComment, setUseful, useful,
+        }} />
+        : <p>{localization.translate('resumePreview.feedbackRecorded')}</p>}
     </section>
   )
 }
 
-function FidelityQuestion({ candidateSession, localization }: PreviewProps) {
-  const fidelity = readOutcomeFeedback({ candidateSession })?.fidelity ?? null
-  return <OutcomeQuestion choices={fidelityChoices}
-    question={localization.translate('resumePreview.fidelityQuestion')}
-    selected={fidelity} onSelect={(assessment) => {
-      void candidateSession.rateTailoredResumeFidelity({ assessment })
-    }} localization={localization} />
+function OutcomeFeedbackForm({ candidateSession, comment, localization, setComment, setUseful,
+  useful }: PreviewProps & Readonly<{
+  comment: string
+  setComment: (comment: string) => void
+  setUseful: (useful: boolean) => void
+  useful: boolean | null
+}>) {
+  return <form className="resume-outcome-feedback" onSubmit={(event) => {
+    submitOutcomeFeedback({ candidateSession, comment, event, useful })
+  }}><UsefulnessChoices {...{ localization, setUseful, useful }} />
+    <label>{localization.translate('resumePreview.commentLabel')}
+      <textarea maxLength={1_000} value={comment}
+        onChange={(event) => { setComment(event.currentTarget.value) }} />
+    </label>
+    <button disabled={useful === null} type="submit">
+      {localization.translate('resumePreview.feedbackSubmit')}
+    </button>
+  </form>
 }
 
-function RelevanceQuestion({ candidateSession, localization }: PreviewProps) {
-  const relevance = readOutcomeFeedback({ candidateSession })?.relevance ?? null
-  return <OutcomeQuestion choices={relevanceChoices}
-    question={localization.translate('resumePreview.relevanceQuestion')}
-    selected={relevance} onSelect={(assessment) => {
-      void candidateSession.rateTailoredResumeRelevance({ assessment })
-    }} localization={localization} />
+function UsefulnessChoices({ localization, setUseful, useful }: Readonly<{
+  localization: Localization
+  setUseful: (useful: boolean) => void
+  useful: boolean | null
+}>) {
+  return <fieldset><legend>{localization.translate('resumePreview.usefulnessQuestion')}</legend>
+    <FeedbackChoice label={localization.translate('resumePreview.yes')}
+      onSelect={() => { setUseful(true) }} selected={useful === true} />
+    <FeedbackChoice label={localization.translate('resumePreview.no')}
+      onSelect={() => { setUseful(false) }} selected={useful === false} />
+  </fieldset>
+}
+
+function submitOutcomeFeedback({ candidateSession, comment, event, useful }: Readonly<{
+  candidateSession: CandidateSessionController
+  comment: string
+  event: SyntheticEvent<HTMLFormElement>
+  useful: boolean | null
+}>) {
+  event.preventDefault()
+  if (useful === null) return
+  void candidateSession.rateTailoredResumeUsefulness({
+    ...(comment.trim().length === 0 ? {} : { comment: comment.trim() }), useful,
+  })
 }
 
 function readOutcomeFeedback({ candidateSession }: Readonly<{
@@ -124,25 +152,21 @@ function readOutcomeFeedback({ candidateSession }: Readonly<{
     ? candidateSession.view.outcomeFeedback : undefined
 }
 
-function OutcomeQuestion<TAssessment extends string>({
-  choices,
-  localization,
-  onSelect,
-  question,
-  selected,
-}: OutcomeQuestionProps<TAssessment>) {
-  return (
-    <fieldset>
-      <legend>{question}</legend>
-      {choices.map(([assessment, label]) => (
-        <button aria-pressed={selected === assessment}
-          disabled={selected !== null} key={assessment}
-          onClick={() => { onSelect(assessment) }} type="button">
-          {localization.translate(label)}
-        </button>
-      ))}
-    </fieldset>
-  )
+function hasDownloadedCurrentResume({ candidateSession, exportState }: Readonly<{
+  candidateSession: CandidateSessionController
+  exportState: ExportState
+}>) {
+  if (exportState.status === 'downloaded') return true
+  return candidateSession.view.status === 'ready'
+    && candidateSession.view.currentJobPostingStatus === 'pdf-downloaded'
+}
+
+function FeedbackChoice({ label, onSelect, selected }: Readonly<{
+  label: string
+  onSelect: () => void
+  selected: boolean
+}>) {
+  return <button aria-pressed={selected} onClick={onSelect} type="button">{label}</button>
 }
 
 async function preparePreview({ locale, photo, view }: Readonly<{
@@ -209,6 +233,7 @@ function createPreview({ document, presentation, previewSource }: Readonly<{
     },
     html: renderTailoredResumeHtml({ ...presentation, document }),
     omittedClaimCount: document.omittedClaimCount,
+    pageCount: document.pageCount,
   }
 }
 
@@ -414,11 +439,3 @@ type BrowserResumePdfFailureType = Exclude<
 
 const allowedPhotoTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const maximumPhotoBytes = 2_000_000
-const fidelityChoices = [
-  ['faithful', 'resumePreview.fidelityFaithful'],
-  ['needs-correction', 'resumePreview.fidelityCorrection'],
-] as const
-const relevanceChoices = [
-  ['relevant', 'resumePreview.relevanceRelevant'],
-  ['needs-improvement', 'resumePreview.relevanceImprovement'],
-] as const

@@ -1,11 +1,10 @@
 import {
   sensitiveContentKinds,
-  fidelityAssessments,
-  relevanceAssessments,
   sourceProfileFactKinds,
   sourceProfileFactStatuses,
   sourceProfileReviewStatuses,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type { MatchScore } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { z } from 'zod'
 
 const candidateSessionIdSchema = z.templateLiteral(['candidate-session-', z.string().min(1)])
@@ -57,20 +56,43 @@ export const sourceProfileReviewSchema = z.object({
 })
 
 export const outcomeFeedbackSchema = z.object({
-  fidelity: z.enum(fidelityAssessments).optional(),
-  relevance: z.enum(relevanceAssessments).optional(),
+  comment: z.string().max(1_000).optional(),
+  useful: z.boolean(),
+})
+
+const storedOutcomeFeedbackSchema = z.union([
+  outcomeFeedbackSchema,
+  z.object({
+    fidelity: z.enum(['faithful', 'needs-correction']).optional(),
+    relevance: z.enum(['relevant', 'needs-improvement']).optional(),
+  }),
+]).transform((feedback) => 'useful' in feedback ? feedback : undefined)
+
+const jobPostingHistoryItemSchema = z.object({
+  id: z.templateLiteral(['job-posting-', z.string().min(1)]),
+  matchScore: z.custom<MatchScore>((value) =>
+    typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 100),
+  status: z.enum(['analyzed', 'draft-generated', 'pdf-downloaded']),
+  targetRole: z.string().min(1).optional(),
 })
 
 export const storedCandidateSessionSchema = z.object({
   status: z.literal('ready'),
   sessionId: candidateSessionIdSchema,
   expiresAt: z.number(),
+  currentJobPostingDownloaded: z.boolean().optional(),
+  currentJobPostingStatus: z.enum(['analyzed', 'draft-generated', 'pdf-downloaded']).optional(),
+  jobPostingHistory: z.array(jobPostingHistoryItemSchema).optional(),
   sourceProfile: z.unknown().optional(),
   jobPosting: z.unknown().optional(),
   matchAnalysis: z.unknown().optional(),
-  outcomeFeedback: outcomeFeedbackSchema.optional(),
+  outcomeFeedback: storedOutcomeFeedbackSchema.optional(),
   tailoredResume: z.unknown().optional(),
-})
+}).transform(({ currentJobPostingDownloaded, ...session }) => ({
+  ...session,
+  currentJobPostingStatus: session.currentJobPostingStatus
+    ?? (currentJobPostingDownloaded === true ? 'pdf-downloaded' as const : undefined),
+}))
 
 export const sourceProfileExtractionSuccessSchema = z.object({
   ok: z.literal(true),

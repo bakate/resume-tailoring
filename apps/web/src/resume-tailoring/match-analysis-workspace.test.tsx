@@ -48,6 +48,7 @@ describe('MatchAnalysisWorkspace', () => {
     ])
     expect(enrichment.match(/matchAnalysis\.enrichmentSkip/g)).toHaveLength(3)
     expect(html).toContain('resumeClaims.generate')
+    expect(html).toContain('jobPosting.newAnalysis')
   })
 })
 

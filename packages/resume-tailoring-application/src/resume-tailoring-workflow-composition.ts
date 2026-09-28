@@ -4,6 +4,7 @@ import {
 } from '@resume-tailoring/domain/resume-tailoring-state'
 import type {
   CandidateSessionId,
+  JobPostingHistoryItem,
   JobPostingReview,
   JobRequirement,
   MatchAnalysis,
@@ -88,12 +89,9 @@ type OutcomeReadyState = ReadyResumeTailoringState & {
 }
 type OutcomeEventWithoutMatchScore =
   | Readonly<{
-      name: 'resume-fidelity-rated'
-      assessment: 'faithful' | 'needs-correction'
-    }>
-  | Readonly<{
-      name: 'resume-relevance-rated'
-      assessment: 'relevant' | 'needs-improvement'
+      name: 'resume-usefulness-rated'
+      comment?: string
+      useful: boolean
     }>
   | Readonly<{ name: 'resume-downloaded' }>
 type CorrectionKind = Extract<
@@ -110,6 +108,7 @@ type SourceProfileFactCommand = Exclude<ResumeTailoringCommand,
   | { readonly type: 'extract-source-profile' }
   | { readonly type: 'enrich-source-profile' }
   | { readonly type: 'review-job-posting' }
+  | { readonly type: 'start-new-job-posting' }
   | { readonly type: 'update-job-posting-content' }
   | { readonly type: 'update-target-role' }
   | { readonly type: 'confirm-job-posting-processing-notice' }
@@ -121,8 +120,7 @@ type SourceProfileFactCommand = Exclude<ResumeTailoringCommand,
   | { readonly type: 'reformulate-resume-claim' }
   | { readonly type: 'edit-resume-claim' }
   | { readonly type: 'confirm-resume-claim-edit' }
-  | { readonly type: 'rate-tailored-resume-fidelity' }
-  | { readonly type: 'rate-tailored-resume-relevance' }
+  | { readonly type: 'rate-tailored-resume-usefulness' }
   | { readonly type: 'record-tailored-resume-download' }
 >
 
@@ -181,6 +179,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (command.type === 'extract-source-profile') return this.#extractSourceProfile()
     if (command.type === 'enrich-source-profile') return this.#enrichSourceProfile(command)
     if (command.type === 'review-job-posting') return this.#reviewJobPosting(command)
+    if (command.type === 'start-new-job-posting') return this.#startNewJobPosting()
     if (command.type === 'update-job-posting-content') {
       return this.#updateJobPostingContent(command)
     }
@@ -200,15 +199,8 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (command.type === 'confirm-resume-claim-edit') {
       return this.#confirmResumeClaimEdit(command)
     }
-    if (command.type === 'rate-tailored-resume-fidelity') {
-      return this.#recordTailoredResumeOutcome({
-        name: 'resume-fidelity-rated', assessment: command.assessment,
-      })
-    }
-    if (command.type === 'rate-tailored-resume-relevance') {
-      return this.#recordTailoredResumeOutcome({
-        name: 'resume-relevance-rated', assessment: command.assessment,
-      })
+    if (command.type === 'rate-tailored-resume-usefulness') {
+      return this.#recordTailoredResumeOutcome({ ...command, name: 'resume-usefulness-rated' })
     }
     if (command.type === 'record-tailored-resume-download') {
       return this.#recordTailoredResumeOutcome({ name: 'resume-downloaded' })
@@ -221,9 +213,38 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (!hasOutcomeInputs(currentState)) return resumeClaimUnavailableResult
     if (event.name === 'resume-downloaded') {
       await this.#recordOutcomeWithMatchScore({ event, state: currentState.value })
-      return currentState
+      return this.#persistCurrentJobPostingDownload(currentState.value)
+    }
+    if (currentState.value.currentJobPostingStatus !== 'pdf-downloaded') {
+      return resumeClaimUnavailableResult
     }
     return this.#persistOutcomeFeedback({ event, state: currentState.value })
+  }
+
+  async #persistCurrentJobPostingDownload(state: OutcomeReadyState) {
+    const persistedState = await this.#dependencies.candidateSessionPersistence.update({
+      sessionId: state.sessionId,
+      state: { ...state, currentJobPostingStatus: 'pdf-downloaded' },
+    })
+    return persistedState.ok ? persistedState : unavailableResult
+  }
+
+  async #startNewJobPosting(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
+    const currentState = await this.#readActiveState()
+    if (!hasCompletedMatchAnalysis(currentState)) return matchAnalysisUnavailableResult
+    const historyItem = createJobPostingHistoryItem({ state: currentState.value })
+    const persistedState = await this.#dependencies.candidateSessionPersistence.update({
+      sessionId: currentState.value.sessionId,
+      state: {
+        ...currentState.value,
+        currentJobPostingStatus: undefined,
+        jobPosting: undefined,
+        jobPostingHistory: [...(currentState.value.jobPostingHistory ?? []), historyItem],
+        matchAnalysis: undefined,
+        tailoredResume: undefined,
+      },
+    })
+    return persistedState.ok ? persistedState : unavailableResult
   }
 
   async #persistOutcomeFeedback({ event, state }: Readonly<{
@@ -244,6 +265,14 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     event: OutcomeEventWithoutMatchScore
     state: OutcomeReadyState
   }>) {
+    if (event.name === 'resume-usefulness-rated') {
+      return this.#dependencies.telemetry.record({
+        name: event.name,
+        hasComment: event.comment?.trim().length !== 0 && event.comment !== undefined,
+        matchScoreBand: readMatchScoreBand(state.matchAnalysis.matchScore),
+        useful: event.useful,
+      })
+    }
     return this.#dependencies.telemetry.record({
       ...event, matchScoreBand: readMatchScoreBand(state.matchAnalysis.matchScore),
     })
@@ -445,9 +474,17 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     locale?: TailoredResume['locale']
   }>) {
     const tailoredResumeLocale = locale ?? currentState.tailoredResume?.locale ?? 'en'
+    const latestState = await this.#readActiveState()
+    const concurrentOutcome = readConcurrentOutcome({ currentState, latestState })
     const persistedState = await this.#dependencies.candidateSessionPersistence.update({
       sessionId: currentState.sessionId,
-      state: { ...currentState, tailoredResume: { claims, exclusions, locale: tailoredResumeLocale } },
+      state: {
+        ...currentState,
+        ...concurrentOutcome,
+        currentJobPostingStatus: concurrentOutcome.currentJobPostingStatus === 'pdf-downloaded'
+          ? 'pdf-downloaded' : 'draft-generated',
+        tailoredResume: { claims, exclusions, locale: tailoredResumeLocale },
+      },
     })
     return persistedState.ok ? persistedState : unavailableResult
   }
@@ -497,7 +534,12 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
   }>) {
     const persistedState = await this.#dependencies.candidateSessionPersistence.update({
       sessionId: currentState.sessionId,
-      state: { ...currentState, matchAnalysis, tailoredResume: undefined },
+      state: {
+        ...currentState,
+        currentJobPostingStatus: 'analyzed',
+        matchAnalysis,
+        tailoredResume: undefined,
+      },
     })
     return persistedState.ok ? persistedState : unavailableResult
   }
@@ -889,6 +931,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
       sessionId: currentState.sessionId,
       state: {
         ...currentState,
+        currentJobPostingStatus: undefined,
         sourceProfile,
         matchAnalysis: undefined,
         tailoredResume: undefined,
@@ -905,6 +948,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
       sessionId: currentState.sessionId,
       state: {
         ...currentState,
+        currentJobPostingStatus: undefined,
         jobPosting,
         matchAnalysis: undefined,
         tailoredResume: undefined,
@@ -1007,6 +1051,23 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
   }
 }
 
+function readConcurrentOutcome({ currentState, latestState }: Readonly<{
+  currentState: ReadyResumeTailoringState
+  latestState: ResumeTailoringResult<ResumeTailoringView>
+}>): Pick<ReadyResumeTailoringState, 'currentJobPostingStatus' | 'outcomeFeedback'> {
+  if (!latestState.ok || latestState.value.status !== 'ready'
+    || latestState.value.sessionId !== currentState.sessionId) {
+    return {
+      currentJobPostingStatus: currentState.currentJobPostingStatus,
+      outcomeFeedback: currentState.outcomeFeedback,
+    }
+  }
+  return {
+    currentJobPostingStatus: latestState.value.currentJobPostingStatus,
+    outcomeFeedback: latestState.value.outcomeFeedback,
+  }
+}
+
 function ignoreResult(): undefined {
   return undefined
 }
@@ -1022,13 +1083,12 @@ function addOutcomeFeedback({ event, state }: Readonly<{
   event: Exclude<OutcomeEventWithoutMatchScore, { readonly name: 'resume-downloaded' }>
   state: OutcomeReadyState
 }>): NonNullable<ReadyResumeTailoringState['outcomeFeedback']> | null {
-  const currentFeedback = state.outcomeFeedback ?? {}
-  if (event.name === 'resume-fidelity-rated') {
-    return currentFeedback.fidelity === undefined
-      ? { ...currentFeedback, fidelity: event.assessment } : null
+  if (state.outcomeFeedback !== undefined) return null
+  const comment = event.comment?.trim()
+  return {
+    ...(comment === undefined || comment.length === 0 ? {} : { comment }),
+    useful: event.useful,
   }
-  return currentFeedback.relevance === undefined
-    ? { ...currentFeedback, relevance: event.assessment } : null
 }
 
 function identifySourceProfileFacts({
@@ -1157,6 +1217,19 @@ function hasMatchInputs(
   return hasReadyState(result)
     && result.value.jobPosting?.status === 'reviewing-requirements'
     && result.value.sourceProfile?.status === 'reviewing-facts'
+}
+
+function hasCompletedMatchAnalysis(
+  result: ResumeTailoringResult<ResumeTailoringView>,
+): result is Readonly<{
+  ok: true
+  value: ReadyResumeTailoringState & {
+    readonly jobPosting: JobPostingReview & { readonly status: 'reviewing-requirements' }
+    readonly matchAnalysis: MatchAnalysis
+    readonly sourceProfile: NonNullable<ReadyResumeTailoringState['sourceProfile']>
+  }
+}> {
+  return hasMatchInputs(result) && result.value.matchAnalysis !== undefined
 }
 
 type ResumeClaimReadyState = ReadyResumeTailoringState & {
@@ -1440,6 +1513,23 @@ async function requestMatchAnalysis({ matcher, state }: Readonly<{
     verifiedFacts,
   })
   return matchAnalysis === null ? matchAnalysisUnavailableResult : { ok: true, value: matchAnalysis }
+}
+
+function createJobPostingHistoryItem({ state }: Readonly<{
+  state: ReadyResumeTailoringState & {
+    readonly jobPosting: JobPostingReview
+    readonly matchAnalysis: MatchAnalysis
+  }
+}>): JobPostingHistoryItem {
+  const itemNumber = (state.jobPostingHistory?.length ?? 0) + 1
+  return {
+    id: `job-posting-${String(itemNumber)}`,
+    matchScore: state.matchAnalysis.matchScore,
+    status: state.currentJobPostingStatus ?? 'analyzed',
+    ...(state.jobPosting.targetRole === null || state.jobPosting.targetRole === undefined
+      ? {}
+      : { targetRole: state.jobPosting.targetRole.value }),
+  }
 }
 
 const workflowAlreadyOpenResult = {

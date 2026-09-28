@@ -188,6 +188,8 @@ function parseCandidateSession(value: unknown): ResumeTailoringState {
       status: 'ready',
       sessionId: result.data.sessionId,
       expiresAt: result.data.expiresAt,
+      currentJobPostingStatus: result.data.currentJobPostingStatus,
+      jobPostingHistory: result.data.jobPostingHistory,
     },
     storedJobPosting: result.data.jobPosting,
     storedMatchAnalysis: result.data.matchAnalysis,

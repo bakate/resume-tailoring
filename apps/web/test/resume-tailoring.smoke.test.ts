@@ -796,11 +796,14 @@ test('Outcome Feedback remains usable while a Resume Claim is reformulated', asy
   const system = createSystemUnderTest({ page })
 
   await system.givenTailoredResumeIsStored()
+  await system.givenValidatedResumePdfExportIsAvailable()
+  await system.navigateToTailoredResumeExport()
+  await system.downloadTailoredResumePdf()
   await system.givenResumeClaimReformulationIsPending()
 
-  await system.rateTailoredResumeFidelityDuringReformulation()
+  await system.rateTailoredResumeUsefulnessDuringReformulation()
 
-  await system.expectConcurrentFidelityRatingToBeRecorded()
+  await system.expectConcurrentUsefulnessRatingToBeRecorded()
 })
 
 test('a Candidate retries failed reformulation without losing their request', async ({ page }) => {
@@ -825,18 +828,17 @@ test('curation and preview preparation stay continuous on mobile', async ({ page
   await system.expectContinuousTailoredResumeFlowOnMobile()
 })
 
-test('a Candidate previews and downloads the same validated one-page resume', async ({ page }) => {
+test('a Candidate previews and downloads the same validated resume', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
   await system.givenTailoredResumeIsStored()
   await system.givenValidatedResumePdfExportIsAvailable()
   await system.givenPrivacySafeAnalyticsIsAvailable()
 
+  await system.downloadTailoredResumePdf()
   await system.rateTailoredResumeOutcomes()
   await system.reloadTailoredResumeOutcomeFeedback()
   await system.expectTailoredResumeOutcomeFeedbackToRemainRecorded()
-
-  await system.downloadTailoredResumePdf()
 
   await system.expectPreviewAndPdfToUseTheSameRetainedClaims()
   system.expectPrivacySafeMvpOutcomesToBeRecorded()
@@ -928,7 +930,7 @@ type CompletedAction =
   | 'resume-claims-retried'
   | 'resume-claim-reformulation-requested'
   | 'resume-claim-reformulation-retried'
-  | 'resume-fidelity-rated-during-reformulation'
+  | 'resume-usefulness-rated-during-reformulation'
   | 'resume-preview-navigated'
   | 'resume-pdf-downloaded'
   | 'source-profile-built'
@@ -1847,9 +1849,10 @@ class ResumeTailoringBrowserTestSystem {
     this.#completedAction = 'resume-claim-reformulation-retried'
   }
 
-  async rateTailoredResumeFidelityDuringReformulation() {
-    await this.#page.getByRole('button', { name: 'Faithful' }).click()
-    this.#completedAction = 'resume-fidelity-rated-during-reformulation'
+  async rateTailoredResumeUsefulnessDuringReformulation() {
+    await this.#page.getByRole('button', { name: 'Yes' }).click()
+    await this.#page.getByRole('button', { name: 'Send feedback' }).click()
+    this.#completedAction = 'resume-usefulness-rated-during-reformulation'
   }
 
   async navigateToTailoredResumeExport() {
@@ -1869,10 +1872,11 @@ class ResumeTailoringBrowserTestSystem {
   }
 
   async rateTailoredResumeOutcomes() {
-    await this.#page.getByRole('button', { name: 'Faithful' }).click()
-    await expect(this.#page.getByRole('button', { name: 'Faithful' })).toBeDisabled()
-    await this.#page.getByRole('button', { name: 'Relevant' }).click()
-    await expect(this.#page.getByRole('button', { name: 'Relevant' })).toBeDisabled()
+    await this.#page.getByRole('button', { name: 'Yes' }).click()
+    await this.#page.getByRole('textbox', { name: 'Optional comment' })
+      .fill('Useful generated resume')
+    await this.#page.getByRole('button', { name: 'Send feedback' }).click()
+    await expect(this.#page.getByText('Thanks — your feedback was recorded.')).toBeVisible()
   }
 
   async reloadTailoredResumeOutcomeFeedback() {
@@ -1906,7 +1910,8 @@ class ResumeTailoringBrowserTestSystem {
   }
 
   async correctTargetRoleFromExactJobPostingText() {
-    await this.#page.getByRole('button', { name: /Job Posting/ }).click()
+    await this.#page.locator('.workflow-progress')
+      .getByRole('button', { name: /Job Posting/ }).click()
     const targetRoleInput = this.#page.getByLabel(
       'Correct the Target Role with exact text from the Job Posting',
     )
@@ -2418,7 +2423,8 @@ class ResumeTailoringBrowserTestSystem {
     this.#expectCompletedAction('job-requirements-extracted')
     expect(this.#jobPostingRequestContent).toBe(jobPostingExcerpt)
     expect(this.#jobPostingRequestContent).not.toContain('jobs@example.com')
-    await this.#page.getByRole('button', { name: /Job Posting/ }).click()
+    await this.#page.locator('.workflow-progress')
+      .getByRole('button', { name: /Job Posting/ }).click()
     const requirementGroup = this.#page.locator('.job-requirement-group')
     await expect(requirementGroup).toContainText('1 required · 1 preferred')
     await expect(requirementGroup).toHaveCount(1)
@@ -2457,7 +2463,8 @@ class ResumeTailoringBrowserTestSystem {
     await this.#page.getByRole('button', { name: /Match Analysis/ }).click()
     await expect(this.#page.getByRole('heading', { name: 'Match Analysis summary' })).toBeVisible()
     await expect(this.#page.getByText('33%', { exact: true })).toBeVisible()
-    await this.#page.getByRole('button', { name: /Job Posting/ }).click()
+    await this.#page.locator('.workflow-progress')
+      .getByRole('button', { name: /Job Posting/ }).click()
     await expect(this.#page.getByText(
       'No unambiguous target role was found. The resume will use the localized fallback title.',
     )).toBeVisible()
@@ -2465,7 +2472,8 @@ class ResumeTailoringBrowserTestSystem {
 
   async expectCorrectedSourceBackedTargetRole() {
     this.#expectCompletedAction('match-analyzed')
-    await this.#page.getByRole('button', { name: /Job Posting/ }).click()
+    await this.#page.locator('.workflow-progress')
+      .getByRole('button', { name: /Job Posting/ }).click()
     await expect(this.#page.getByRole('region', { name: 'Target role' })
       .locator('strong').filter({ hasText: /^Senior React Developer$/u })).toBeVisible()
   }
@@ -2526,7 +2534,8 @@ class ResumeTailoringBrowserTestSystem {
       'aria-expanded',
       'true',
     )
-    await expect(this.#page.getByRole('button', { name: /Job Posting/ })).toHaveAttribute(
+    await expect(this.#page.locator('.workflow-progress')
+      .getByRole('button', { name: /Job Posting/ })).toHaveAttribute(
       'aria-current',
       'step',
     )
@@ -2682,7 +2691,8 @@ class ResumeTailoringBrowserTestSystem {
     await expect(this.#page.getByRole('button', { name: /Match Analysis/ })).toContainText('33%')
     await expect(this.#page.getByRole('button', { name: /Source Profile/ }))
       .toContainText('1 verified fact')
-    await expect(this.#page.getByRole('button', { name: /Job Posting/ }))
+    await expect(this.#page.locator('.workflow-progress')
+      .getByRole('button', { name: /Job Posting/ }))
       .toContainText('2 Job Requirements')
   }
 
@@ -2712,7 +2722,7 @@ class ResumeTailoringBrowserTestSystem {
     await expect(this.#page.getByRole('button', { name: 'Generate Resume Claims' })).toBeDisabled()
     expect(this.#resumeClaimWritingRequestCount).toBe(1)
     this.#releasePendingResumeClaimWriting?.()
-    await expect(this.#page.getByText('Preparing the exact one-page layout…')).toBeVisible()
+    await expect(this.#page.getByText('Preparing the exact PDF layout…')).toBeVisible()
     await expect(this.#page.locator('.resume-claim-text')
       .filter({ hasText: 'Built React applications at Acme' }))
       .toBeVisible()
@@ -2821,17 +2831,17 @@ class ResumeTailoringBrowserTestSystem {
     await expect(this.#page.locator('#resume-claims-list-title')).toBeFocused()
   }
 
-  async expectConcurrentFidelityRatingToBeRecorded() {
-    this.#expectCompletedAction('resume-fidelity-rated-during-reformulation')
-    await expect(this.#page.getByRole('button', { name: 'Faithful' })).toBeEnabled()
+  async expectConcurrentUsefulnessRatingToBeRecorded() {
+    this.#expectCompletedAction('resume-usefulness-rated-during-reformulation')
+    await expect(this.#page.getByRole('button', { name: 'Send feedback' })).toBeEnabled()
     await expect(this.#page.getByText('Reformulating your Resume Claim…')).toBeVisible()
     expect(this.#resumeClaimWritingRequestCount).toBe(1)
     this.#releasePendingResumeClaimWriting?.()
-    await expect(this.#page.getByText(
+    await expect(this.#page.locator('.resume-claim-text').getByText(
       'Built accessible React applications at Acme',
       { exact: true },
     )).toBeVisible()
-    await expect(this.#page.getByRole('button', { name: 'Faithful' })).toBeDisabled()
+    await expect(this.#page.getByText('Thanks — your feedback was recorded.')).toBeVisible()
   }
 
   async expectContinuousTailoredResumeFlowOnMobile() {
@@ -2844,7 +2854,6 @@ class ResumeTailoringBrowserTestSystem {
       'Retained Resume Claims',
       'Preview and export',
       'Photo',
-      'Outcome Feedback',
       'PDF export',
     ])
     await expect(this.#page.getByRole('heading', { name: 'PDF export' })).toBeInViewport()
@@ -2853,7 +2862,7 @@ class ResumeTailoringBrowserTestSystem {
 
   async expectPreviewAndPdfToUseTheSameRetainedClaims() {
     this.#expectCompletedAction('resume-pdf-downloaded')
-    const preview = this.#page.frameLocator('iframe[title="Tailored Resume one-page preview"]')
+    const preview = this.#page.frameLocator('iframe[title="Tailored Resume preview"]')
     await expect(preview.getByText('Built React applications at Acme')).toBeVisible()
     await expect(preview.getByText('Worked as a FullStack Developer at Acme')).toBeVisible()
     await expect(this.#page.getByText(/After download, this PDF is under your control/))
@@ -2868,22 +2877,18 @@ class ResumeTailoringBrowserTestSystem {
 
   expectPrivacySafeMvpOutcomesToBeRecorded() {
     expect(this.#analyticsEvents).toEqual([{
-      name: 'resume-fidelity-rated',
-      assessment: 'faithful',
-      matchScoreBand: '25-49',
-    }, {
-      name: 'resume-relevance-rated',
-      assessment: 'relevant',
-      matchScoreBand: '25-49',
-    }, {
       name: 'resume-downloaded',
       matchScoreBand: '25-49',
+    }, {
+      name: 'resume-usefulness-rated',
+      hasComment: true,
+      matchScoreBand: '25-49',
+      useful: true,
     }])
   }
 
   async expectTailoredResumeOutcomeFeedbackToRemainRecorded() {
-    await expect(this.#page.getByRole('button', { name: 'Faithful' })).toBeDisabled()
-    await expect(this.#page.getByRole('button', { name: 'Relevant' })).toBeDisabled()
+    await expect(this.#page.getByText('Thanks — your feedback was recorded.')).toBeVisible()
     expect(this.#analyticsEvents).toHaveLength(2)
   }
 

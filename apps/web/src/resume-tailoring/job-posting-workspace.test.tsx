@@ -16,6 +16,17 @@ describe('JobPostingWorkspace', () => {
     expect(html).toContain('accept="application/pdf,text/plain,.pdf,.txt"')
   })
 
+  it('shows the minimal local history when starting another Job Posting', () => {
+    const html = renderToStaticMarkup(<JobPostingWorkspace
+      candidateSession={createCandidateSessionWithHistory()}
+      localization={createLocalization()} />)
+
+    expect(html).toContain('jobPosting.historyTitle')
+    expect(html).toContain('Senior FullStack Developer')
+    expect(html).toContain('78%')
+    expect(html).toContain('jobPosting.historyStatus.pdf-downloaded')
+  })
+
   it('shows the extracted target role with its exact source excerpt', () => {
     const html = renderToStaticMarkup(<JobPostingWorkspace
       candidateSession={createCandidateSession()}
@@ -42,6 +53,22 @@ function createCandidateSessionWithoutJobPosting() {
       status: 'ready',
       sessionId: 'candidate-session-test',
       expiresAt: 1,
+    },
+  } as unknown as CandidateSessionController
+}
+
+function createCandidateSessionWithHistory() {
+  return {
+    view: {
+      status: 'ready',
+      sessionId: 'candidate-session-test',
+      expiresAt: 1,
+      jobPostingHistory: [{
+        id: 'job-posting-1',
+        matchScore: 78,
+        status: 'pdf-downloaded',
+        targetRole: 'Senior FullStack Developer',
+      }],
     },
   } as unknown as CandidateSessionController
 }
