@@ -64,7 +64,12 @@ describe('browser Job Requirement extractor contract', () => {
     ['invented source excerpt', {
       classification: 'required',
       sourceExcerpt: 'React is required.',
-      value: 'Know React',
+      value: 'React',
+    }],
+    ['invented requirement value', {
+      classification: 'required',
+      sourceExcerpt: 'TypeScript is required.',
+      value: '10 years of Rust',
     }],
   ])('rejects an %s returned across the transport boundary', async (_caseName, requirement) => {
     const extractor = createBrowserJobRequirementExtractor({

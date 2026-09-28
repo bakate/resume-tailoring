@@ -3,10 +3,8 @@ import type {
   ResumeTailoringView,
   ResumeTailoringWorkflow,
   SourceDocument,
-} from '@resume-tailoring/application/resume-tailoring-workflow'
-import type {
-  SourceDocumentReader,
-} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+} from './resume-tailoring-workflow'
+import type { SourceDocumentReader } from './resume-tailoring-workflow-ports'
 
 type JobPostingAnalysisDependencies = Readonly<{
   execute: ResumeTailoringWorkflow['execute']

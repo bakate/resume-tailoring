@@ -43,24 +43,37 @@ function JobPostingInput({ candidateSession, localization }: WorkspaceProps) {
       <label htmlFor="job-posting-input">{localization.translate('jobPosting.inputLabel')}</label>
       <textarea id="job-posting-input" rows={12} value={content}
         onChange={(event) => { setContent(event.currentTarget.value) }} />
-      <label htmlFor="job-posting-file">{localization.translate('jobPosting.fileLabel')}</label>
-      <input accept="application/pdf,text/plain,.pdf,.txt" id="job-posting-file"
-        disabled={candidateSession.pendingOperation !== null}
-        onChange={(event) => {
-          const [file] = event.currentTarget.files ?? []
-          if (file !== undefined) void candidateSession.reviewJobPostingFile({ file })
-        }} type="file" />
-      <button className="primary-action compact-action"
-        disabled={candidateSession.pendingOperation !== null || content.trim().length === 0}
-        onClick={() => void candidateSession.analyzeJobPosting({ content })} type="button">
-        {localization.translate('jobPosting.analyze')}
-      </button>
-      <button className="secondary-action" disabled={content.trim().length === 0}
-        onClick={() => void candidateSession.reviewJobPosting({ content })} type="button">
-        {localization.translate('jobPosting.review')}
-      </button>
+      <JobPostingFileInput {...{ candidateSession, localization }} />
+      <JobPostingInputActions {...{ candidateSession, content, localization }} />
     </div>
   )
+}
+
+function JobPostingFileInput({ candidateSession, localization }: WorkspaceProps) {
+  return <>
+    <label htmlFor="job-posting-file">{localization.translate('jobPosting.fileLabel')}</label>
+    <input accept="application/pdf,text/plain,.pdf,.txt" id="job-posting-file"
+      disabled={candidateSession.pendingOperation !== null}
+      onChange={(event) => {
+        const [file] = event.currentTarget.files ?? []
+        if (file !== undefined) void candidateSession.analyzeJobPostingFile({ file })
+      }} type="file" />
+  </>
+}
+
+function JobPostingInputActions({ candidateSession, content, localization }:
+WorkspaceProps & Readonly<{ content: string }>) {
+  return <>
+    <button className="primary-action compact-action"
+      disabled={candidateSession.pendingOperation !== null || content.trim().length === 0}
+      onClick={() => void candidateSession.analyzeJobPosting({ content })} type="button">
+      {localization.translate('jobPosting.analyze')}
+    </button>
+    <button className="secondary-action" disabled={content.trim().length === 0}
+      onClick={() => void candidateSession.reviewJobPosting({ content })} type="button">
+      {localization.translate('jobPosting.review')}
+    </button>
+  </>
 }
 
 function JobPostingReview({ candidateSession, jobPosting, localization }: ReviewProps) {
@@ -241,19 +254,36 @@ function TargetRoleReview({ candidateSession, jobPosting, localization }: Review
   useEffect(() => { setValue(targetRole?.value ?? '') }, [targetRole?.value])
   return <section aria-labelledby="target-role-title">
     <h3 id="target-role-title">{localization.translate('jobPosting.targetRoleTitle')}</h3>
-    {targetRole === null || targetRole === undefined
-      ? <p>{localization.translate('jobPosting.targetRoleFallback')}</p>
-      : <>
-        <strong>{targetRole.value}</strong>
-        <p className="source-excerpt">
-          <strong>{localization.translate('jobPosting.sourceExcerpt')}</strong>
-          <span>{targetRole.sourceExcerpt}</span>
-        </p>
-      </>}
-    <form onSubmit={(event) => {
-      event.preventDefault()
-      void candidateSession.updateTargetRole({ value })
-    }}>
+    <TargetRoleValue {...{ localization, targetRole }} />
+    <TargetRoleCorrectionForm {...{
+      candidateSession, jobPosting, localization, setValue, value,
+    }} />
+  </section>
+}
+
+function TargetRoleValue({ localization, targetRole }: Readonly<{
+  localization: Localization
+  targetRole: JobPostingReview['targetRole']
+}>) {
+  if (targetRole === null || targetRole === undefined) {
+    return <p>{localization.translate('jobPosting.targetRoleFallback')}</p>
+  }
+  return <>
+    <strong>{targetRole.value}</strong>
+    <p className="source-excerpt">
+      <strong>{localization.translate('jobPosting.sourceExcerpt')}</strong>
+      <span>{targetRole.sourceExcerpt}</span>
+    </p>
+  </>
+}
+
+function TargetRoleCorrectionForm({ candidateSession, jobPosting, localization, setValue, value }:
+ReviewProps & Readonly<{ setValue: (value: string) => void; value: string }>) {
+  const updateTargetRole = () => candidateSession.updateTargetRole({ value })
+  return <form onSubmit={(event) => {
+    event.preventDefault()
+    void updateTargetRole()
+  }}>
       <label htmlFor="target-role-value">{localization.translate('jobPosting.targetRoleEdit')}</label>
       <input id="target-role-value" value={value}
         onChange={(event) => { setValue(event.currentTarget.value) }} />
@@ -263,7 +293,6 @@ function TargetRoleReview({ candidateSession, jobPosting, localization }: Review
         {localization.translate('jobPosting.targetRoleSave')}
       </button>
     </form>
-  </section>
 }
 
 function JobRequirementCard({ localization, requirement }: Readonly<{

@@ -80,7 +80,7 @@ async function readSourceDocument({
   document: Parameters<SourceDocumentReader['read']>[0]
   loadPdfReader: () => Promise<PdfReaderLoadResult>
 }>): ReturnType<SourceDocumentReader['read']> {
-  if (document.mediaType === 'text/plain') return readPastedText({ document })
+  if (isText({ document })) return readPastedText({ document })
   if (!isPdf({ document })) return unsupportedResult
   const compatibilityFailure = readCompatibilityFailure({ browserEnvironment })
   if (compatibilityFailure !== null) return compatibilityFailure
@@ -214,6 +214,13 @@ function isPdf({ document }: Readonly<{
 }>) {
   return document.mediaType === 'application/pdf'
     || document.name.toLowerCase().endsWith('.pdf')
+}
+
+function isText({ document }: Readonly<{
+  document: Parameters<SourceDocumentReader['read']>[0]
+}>) {
+  return document.mediaType === 'text/plain'
+    || document.name.toLowerCase().endsWith('.txt')
 }
 
 function createPageNumbers({ pageCount }: Readonly<{ pageCount: number }>) {

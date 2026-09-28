@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./job-posting-analysis": "./src/job-posting-analysis.ts",
     "./resume-tailoring-workflow": "./src/resume-tailoring-workflow.ts",
     "./resume-tailoring-workflow-composition": "./src/resume-tailoring-workflow-composition.ts",
     "./match-analysis": "./src/match-analysis.ts",

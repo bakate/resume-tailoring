@@ -9,6 +9,7 @@ import type {
   ResumeClaimId,
   SourceProfileFactId,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import { createJobPostingAnalysis } from '@resume-tailoring/application/job-posting-analysis'
 import { createResumeTailoringWorkflow } from '@resume-tailoring/application/resume-tailoring-workflow-composition'
 import { useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
@@ -29,7 +30,6 @@ import {
   createBrowserSourceProfileExtractor,
   createPrivacySafeBrowserTelemetry,
 } from './browser-adapters'
-import { createJobPostingAnalysis } from './job-posting-analysis'
 
 type CandidateSessionState = Readonly<{
   completedOperation: CompletedOperation | null
@@ -168,7 +168,7 @@ function createJobPostingActions(dependencies: CandidateSessionActionDependencie
   })
   return {
     analyzeJobPosting: analysis.analyzePastedJobPosting,
-    reviewJobPostingFile: ({ file }: Readonly<{ file: File }>) =>
+    analyzeJobPostingFile: ({ file }: Readonly<{ file: File }>) =>
       analyzeJobPostingFile({ analysis, dependencies, file }),
     reviewJobPosting: ({ content }: Readonly<{ content: string }>) => execute({
       type: 'review-job-posting', content,
@@ -193,14 +193,26 @@ async function analyzeJobPostingFile({ analysis, dependencies, file }: Readonly<
   try {
     const document = await readSourceDocumentFile({ file })
     const result = await analysis.analyzeUploadedJobPosting({ document })
-    if (!result.ok && isSourceDocumentReadFailure({ result })) {
-      dependencies.setState((state) => ({ ...state, failureMessageKey: 'jobPosting.failure' }))
-    }
+    applyJobPostingDocumentFailure({ dependencies, result })
     return result
   } catch {
-    dependencies.setState((state) => ({ ...state, failureMessageKey: 'jobPosting.failure' }))
+    setJobPostingFailure({ dependencies })
     return null
   }
+}
+
+function applyJobPostingDocumentFailure({ dependencies, result }: Readonly<{
+  dependencies: CandidateSessionActionDependencies
+  result: Awaited<ReturnType<ReturnType<typeof createJobPostingAnalysis>['analyzeUploadedJobPosting']>>
+}>) {
+  if (result.ok || !isSourceDocumentReadFailure({ result })) return
+  setJobPostingFailure({ dependencies })
+}
+
+function setJobPostingFailure({ dependencies }: Readonly<{
+  dependencies: CandidateSessionActionDependencies
+}>) {
+  dependencies.setState((state) => ({ ...state, failureMessageKey: 'jobPosting.failure' }))
 }
 
 async function updateTargetRoleAndAnalyze({ dependencies, value }: Readonly<{

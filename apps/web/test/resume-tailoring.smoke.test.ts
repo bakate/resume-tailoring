@@ -1867,7 +1867,7 @@ class ResumeTailoringBrowserTestSystem {
     })
     await targetRoleInput.fill('Chief Technology Officer')
     await expect(saveTargetRole).toBeDisabled()
-    await targetRoleInput.fill('React')
+    await targetRoleInput.fill('Senior React Developer')
     await expect(saveTargetRole).toBeEnabled()
     await saveTargetRole.click()
     await expect(this.#page.getByRole('button', { name: /Match Analysis/ })).toContainText('33%')
@@ -2348,9 +2348,9 @@ class ResumeTailoringBrowserTestSystem {
     await expect(disclosure).not.toHaveAttribute('open', '')
     await disclosure.locator('summary').click()
     await expect(disclosure).toHaveAttribute('open', '')
-    await expect(requirementGroup.getByText('Know TypeScript', { exact: true })).toBeVisible()
+    await expect(requirementGroup.getByText('TypeScript', { exact: true })).toBeVisible()
     await expect(requirementGroup.getByText('Required', { exact: true })).toBeVisible()
-    await expect(requirementGroup.getByText('Know React', { exact: true })).toBeVisible()
+    await expect(requirementGroup.getByText('React', { exact: true })).toBeVisible()
     await expect(requirementGroup.getByText('Preferred', { exact: true })).toBeVisible()
     await expect(requirementGroup.getByText(jobPostingExcerpt, { exact: true })).toHaveCount(1)
   }
@@ -2366,11 +2366,11 @@ class ResumeTailoringBrowserTestSystem {
     })).toBeVisible()
     const evidenceDetails = this.#page.locator('.match-evidence-group details')
     await evidenceDetails.locator('summary').click()
-    await expect(this.#page.getByText('Know React', { exact: true }).last()).toBeVisible()
+    await expect(this.#page.getByText('React', { exact: true }).last()).toBeVisible()
     await expect(this.#page.getByRole('heading', {
       name: 'Uncovered required Job Requirements',
     })).toBeVisible()
-    await expect(this.#page.getByText('Know TypeScript', { exact: true }).last()).toBeVisible()
+    await expect(this.#page.getByText('TypeScript', { exact: true }).last()).toBeVisible()
   }
 
   async expectOneActionJobPostingAnalysis() {
@@ -2389,7 +2389,7 @@ class ResumeTailoringBrowserTestSystem {
     this.#expectCompletedAction('match-analyzed')
     await this.#page.getByRole('button', { name: /Job Posting/ }).click()
     await expect(this.#page.getByRole('region', { name: 'Target role' })
-      .locator('strong').filter({ hasText: /^React$/u })).toBeVisible()
+      .locator('strong').filter({ hasText: /^Senior React Developer$/u })).toBeVisible()
   }
 
   async expectPendingJobRequirementExtractionThenFocusedResult() {
@@ -2420,7 +2420,7 @@ class ResumeTailoringBrowserTestSystem {
     await expect(summary).toContainText('eligible')
     await expect(summary).toContainText('0 / 1')
     await expect(summary).toContainText('1 / 1')
-    await expect(summary).toContainText('Know TypeScript')
+    await expect(summary).toContainText('TypeScript')
     await expect(summary.getByText(/below 50%/)).toHaveAttribute('role', 'status')
     const evidenceDisclosure = this.#page.locator('.match-evidence-group details')
     await expect(evidenceDisclosure).not.toHaveAttribute('open', '')
@@ -3049,7 +3049,7 @@ function hasCallerDerivedDocument(value: unknown) {
   return isRecord(value) && 'document' in value
 }
 
-const jobPostingExcerpt = 'You must know TypeScript and preferably React.'
+const jobPostingExcerpt = 'Role: Senior React Developer. You must know TypeScript and preferably React.'
 const detailedSourceProfileExtractionResponse = {
   ok: true,
   value: [
@@ -3099,12 +3099,12 @@ const jobRequirementExtractionResponse = {
       {
         classification: 'required',
         sourceExcerpt: jobPostingExcerpt,
-        value: 'Know TypeScript',
+        value: 'TypeScript',
       },
       {
         classification: 'preferred',
         sourceExcerpt: jobPostingExcerpt,
-        value: 'Know React',
+        value: 'React',
       },
     ],
   },

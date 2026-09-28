@@ -219,12 +219,12 @@ const expectedExtractionResult = {
       {
         classification: 'required',
         sourceExcerpt: jobPostingContent,
-        value: 'Know TypeScript',
+        value: 'TypeScript',
       },
       {
         classification: 'preferred',
         sourceExcerpt: jobPostingContent,
-        value: 'Know React',
+        value: 'React',
       },
     ],
   },
