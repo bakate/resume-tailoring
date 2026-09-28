@@ -3,7 +3,7 @@ import viteReact from '@vitejs/plugin-react'
 import { nitro } from 'nitro/vite'
 import { defineConfig, loadEnv } from 'vite'
 
-import { sourceDocumentBrowserSupportPolicy } from './src/resume-tailoring/source-document-browser-support'
+import { sourceDocumentBrowserSupportPolicy } from './src/resume-tailoring/source-document-browser-support.js'
 
 export default defineConfig(({ mode }) => {
   Object.assign(process.env, loadEnv(mode, '../..', 'OPENAI_'))

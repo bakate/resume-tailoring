@@ -13,7 +13,7 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: `pnpm exec vite dev --host 127.0.0.1 --port ${testPort}`,
+    command: `pnpm build && PORT=${testPort} HOST=127.0.0.1 pnpm start`,
     reuseExistingServer: true,
     url: testBaseUrl,
   },
