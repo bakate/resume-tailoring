@@ -94,7 +94,6 @@ type CandidateSessionActionDependencies = Readonly<{
 type OperationTracker = { current: PendingOperation | null }
 type OperationGeneration = { current: number }
 type FactIdentifier = Readonly<{ factId: SourceProfileFactId }>
-type FactIdentifiers = Readonly<{ factIds: readonly SourceProfileFactId[] }>
 type FactCorrection = FactIdentifier & Readonly<{ correctedValue: string }>
 type ConflictResolution = Readonly<{ selectedFactId: SourceProfileFactId }>
 type SourceDocumentImport = CandidateSessionActionDependencies & Readonly<{ file: File }>
@@ -140,6 +139,9 @@ function createSourceDocumentActions(dependencies: CandidateSessionActionDepende
       type: 'update-source-content', outgoingContent,
     }),
     confirmProcessingNotice: () => execute({ type: 'confirm-processing-notice' }),
+    confirmProcessingAndExtractSourceProfile: () => execute({
+      type: 'confirm-processing-and-extract-source-profile',
+    }),
     extractSourceProfile: () => execute({ type: 'extract-source-profile' }),
   }
 }
@@ -147,12 +149,6 @@ function createSourceDocumentActions(dependencies: CandidateSessionActionDepende
 function createSourceProfileFactActions(dependencies: CandidateSessionActionDependencies) {
   const execute = (command: ResumeTailoringCommand) => executeCommand({ ...dependencies, command })
   return {
-    confirmSourceProfileFact: ({ factId }: FactIdentifier) => execute({
-      type: 'confirm-source-fact', factId,
-    }),
-    confirmSourceProfileFacts: ({ factIds }: FactIdentifiers) => execute({
-      type: 'confirm-source-facts', factIds,
-    }),
     rejectSourceProfileFact: ({ factId }: FactIdentifier) => execute({ type: 'reject-source-fact', factId }),
     correctSourceProfileFact: ({ factId, correctedValue }: FactCorrection) => execute({
       type: 'correct-source-fact', factId, correctedValue,
@@ -411,6 +407,9 @@ function waitForPendingPresentation() {
 function readPendingOperation({ command }: Readonly<{
   command: ResumeTailoringCommand
 }>): PendingOperation | null {
+  if (command.type === 'confirm-processing-and-extract-source-profile') {
+    return 'extract-source-profile'
+  }
   return pendingOperations.has(command.type) ? command.type as PendingOperation : null
 }
 

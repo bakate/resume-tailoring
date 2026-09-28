@@ -225,7 +225,7 @@ function createSystemUnderTest({
   facts = verifiedFacts,
   jobRequirements = requirements,
   jobNoticeVersion = '2026-09-26',
-  sourceNoticeVersion = '2026-09-26',
+  sourceNoticeVersion = '2026-09-28',
 }: Readonly<{
   facts?: readonly SourceProfileFact[]
   jobRequirements?: readonly JobRequirement[]
@@ -584,7 +584,7 @@ const verifiedFacts = [
     id: 'source-fact-unverified-leadership',
     kind: 'experience',
     propositionKey: 'proposition-experience-leadership',
-    status: 'extracted',
+    status: 'rejected',
     value: 'Led a team',
   },
   {

@@ -332,6 +332,7 @@ function isStepCompleted({ id, view }: Readonly<{
 }>) {
   if (view.status !== 'ready') return false
   if (id === 'source-profile') return view.sourceProfile?.status === 'reviewing-facts'
+    && view.sourceProfile.facts.some((fact) => fact.status === 'verified')
     && view.sourceProfile.facts.every((fact) => fact.status !== 'extracted')
   if (id === 'job-posting') return view.jobPosting?.status === 'reviewing-requirements'
   if (id === 'match-analysis') return view.matchAnalysis !== undefined
@@ -419,7 +420,10 @@ function focusElementById({ elementId }: Readonly<{ elementId: string }>) {
 function readRetryOperationMessageKey({ type }: Readonly<{
   type: ResumeTailoringCommand['type']
 }>) {
-  if (type === 'extract-source-profile') return 'operation.retrySourceProfile' as const
+  if (type === 'extract-source-profile'
+    || type === 'confirm-processing-and-extract-source-profile') {
+    return 'operation.retrySourceProfile' as const
+  }
   if (type === 'extract-job-requirements') return 'operation.retryJobPosting' as const
   if (type === 'analyze-match') return 'operation.retryMatchAnalysis' as const
   if (type === 'generate-resume-claims') return 'operation.retryTailoredResume' as const
@@ -619,8 +623,6 @@ const sourceProfileOperations = new Set<ResumeTailoringCommand['type']>([
   'update-source-content',
   'confirm-processing-notice',
   'extract-source-profile',
-  'confirm-source-fact',
-  'confirm-source-facts',
   'reject-source-fact',
   'correct-source-fact',
   'resolve-source-fact-conflict',

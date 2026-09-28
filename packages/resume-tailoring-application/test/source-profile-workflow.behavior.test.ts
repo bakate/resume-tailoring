@@ -97,56 +97,73 @@ describe('Source Profile workflow', () => {
     system.expectVersionedProcessingNoticeToBeConfirmed()
   })
 
-  it('extracts atomic facts from only the approved professional content', async () => {
-    const system = createSystemUnderTest({ sourceProfile: confirmedSourceProfile })
+  it('collectively attests Candidate Facts from the approved professional content', async () => {
+    const system = createSystemUnderTest({ sourceProfile: reviewingSourceProfile })
 
     // Given
     system.givenTheStructuredModelFindsAtomicFacts()
 
     // Action
+    await system.confirmProcessingAndExtractSourceProfile()
+
+    // Then
+    system.expectOnlyApprovedContentToProduceCollectivelyAttestedFacts()
+  })
+
+  it('isolates conflicting propositions without withholding unrelated Candidate Facts', async () => {
+    const system = createSystemUnderTest({ sourceProfile: confirmedSourceProfile })
+
+    // Given
+    system.givenTheStructuredModelFindsAConflictAndAnUnrelatedFact()
+
+    // Action
     await system.extractSourceProfile()
 
     // Then
-    system.expectOnlyApprovedContentToProduceExtractedFacts()
+    system.expectOnlyTheConflictingFactsToRequireCorrection()
   })
 
-  it('confirms one visible extracted fact', async () => {
-    const system = createSystemUnderTest({ sourceProfile: reviewingFactsSourceProfile })
+  it('excludes only a critically ambiguous fact from collective attestation', async () => {
+    const system = createSystemUnderTest({ sourceProfile: confirmedSourceProfile })
 
     // Given
-    system.givenAnExtractedFactIsVisible()
+    system.givenTheStructuredModelFindsAUsableAndCriticallyAmbiguousFact()
 
     // Action
-    await system.confirmSourceProfileFact()
+    await system.extractSourceProfile()
 
     // Then
-    system.expectOnlyTheSelectedFactToBeVerified()
+    system.expectOnlyTheUsableFactToRemain()
   })
 
-  it('confirms a transparent batch of visible extracted facts', async () => {
-    const system = createSystemUnderTest({ sourceProfile: reviewingFactsSourceProfile })
-
-    // Given
-    system.givenTwoExtractedFactsAreSelected()
+  it('reuses the current Processing Consent for later model operations', async () => {
+    const system = createSystemUnderTest({ sourceProfile: confirmedSourceProfile })
 
     // Action
-    await system.confirmSelectedSourceProfileFacts()
+    await system.reviewJobPosting()
 
     // Then
-    system.expectEverySelectedFactToBeVerified()
+    system.expectJobPostingProcessingToReuseCandidateSessionConsent()
   })
 
-  it('rejects one visible extracted fact', async () => {
-    const system = createSystemUnderTest({ sourceProfile: reviewingFactsSourceProfile })
-
-    // Given
-    system.givenAnExtractedFactIsVisible()
+  it('does not reuse Processing Consent from an earlier notice version', async () => {
+    const system = createSystemUnderTest({ sourceProfile: previousConsentFactsSourceProfile })
 
     // Action
-    await system.rejectSourceProfileFact()
+    await system.reviewJobPosting()
 
     // Then
-    system.expectOnlyTheSelectedFactToBeRejected()
+    system.expectJobPostingProcessingToRequireCurrentConsent()
+  })
+
+  it('collectively attests non-conflicting facts restored from an interrupted session', async () => {
+    const system = createSystemUnderTest({ sourceProfile: reviewingFactsSourceProfile })
+
+    // Action
+    await system.readSourceProfile()
+
+    // Then
+    await system.expectEveryRestoredFactToBeCollectivelyAttestedAndPersisted()
   })
 
   it('creates an immutable correction that supersedes an earlier fact', async () => {
@@ -185,18 +202,6 @@ describe('Source Profile workflow', () => {
     system.expectConflictToBeResolvedAndUnrelatedFactToRemainUsable()
   })
 
-  it('requires explicit resolution before a conflicting fact can be confirmed', async () => {
-    const system = createSystemUnderTest({ sourceProfile: conflictingFactsSourceProfile })
-
-    // Given
-    system.givenTwoFactsConflictAndAnotherFactIsVerified()
-
-    // Action
-    await system.confirmSourceProfileFact()
-
-    // Then
-    system.expectConflictingFactConfirmationToRequireResolution()
-  })
 })
 
 function createSystemUnderTest({
@@ -208,6 +213,7 @@ function createSystemUnderTest({
 class SourceProfileWorkflowTestSystem {
   readonly #telemetry = createTelemetrySpy()
   readonly #modelRequests: string[] = []
+  readonly #persistence: ReturnType<typeof createInMemoryCandidateSessionPersistence>
   readonly #workflow: ResumeTailoringWorkflow
   #actionResult: ResumeTailoringResult<ResumeTailoringView> | undefined
   #documentReadCount = 0
@@ -230,10 +236,11 @@ class SourceProfileWorkflowTestSystem {
   }
 
   constructor(sourceProfile: SourceProfileReview | undefined) {
+    this.#persistence = createSourceProfileTestPersistence({ sourceProfile })
     this.#workflow = createResumeTailoringWorkflow({
       candidateSessionClock: createControllableCandidateSessionClock({ now: sessionStartedAt }),
       candidateSessionIdentity: { create: () => ({ ok: true, value: sessionIdentifier }) },
-      candidateSessionPersistence: createSourceProfileTestPersistence({ sourceProfile }),
+      candidateSessionPersistence: this.#persistence,
       sourceDocumentReader: { read: () => {
         this.#documentReadCount += 1
         return Promise.resolve(this.#documentReadResult)
@@ -287,11 +294,13 @@ class SourceProfileWorkflowTestSystem {
       ok: true,
       value: [
         {
+          assessment: 'usable',
           kind: 'experience',
           propositionKey: 'proposition-experience-acme-role',
           value: 'Senior FullStack Developer at Acme',
         },
         {
+          assessment: 'usable',
           kind: 'skill',
           propositionKey: 'proposition-skill-candidate-typescript',
           value: 'TypeScript',
@@ -300,9 +309,51 @@ class SourceProfileWorkflowTestSystem {
     }
   }
 
-  givenAnExtractedFactIsVisible() {}
+  givenTheStructuredModelFindsAConflictAndAnUnrelatedFact() {
+    this.#extractionResult = {
+      ok: true,
+      value: [
+        {
+          assessment: 'usable',
+          kind: 'experience',
+          propositionKey: 'proposition-experience-acme-start-date',
+          value: '2021',
+        },
+        {
+          assessment: 'usable',
+          kind: 'experience',
+          propositionKey: 'proposition-experience-acme-start-date',
+          value: '2022',
+        },
+        {
+          assessment: 'usable',
+          kind: 'skill',
+          propositionKey: 'proposition-skill-candidate-typescript',
+          value: 'TypeScript',
+        },
+      ],
+    }
+  }
 
-  givenTwoExtractedFactsAreSelected() {}
+  givenTheStructuredModelFindsAUsableAndCriticallyAmbiguousFact() {
+    this.#extractionResult = {
+      ok: true,
+      value: [
+        {
+          assessment: 'critical-ambiguity',
+          kind: 'experience',
+          propositionKey: 'proposition-experience-acme-start-date',
+          value: 'Started at Acme around 2021 or 2022',
+        },
+        {
+          assessment: 'usable',
+          kind: 'skill',
+          propositionKey: 'proposition-skill-candidate-typescript',
+          value: 'TypeScript',
+        },
+      ],
+    }
+  }
 
   givenAVerifiedFactNeedsCorrection() {}
 
@@ -334,25 +385,21 @@ class SourceProfileWorkflowTestSystem {
     this.#actionResult = await this.#workflow.execute({ type: 'extract-source-profile' })
   }
 
-  async confirmSourceProfileFact() {
+  async confirmProcessingAndExtractSourceProfile() {
     this.#actionResult = await this.#workflow.execute({
-      type: 'confirm-source-fact',
-      factId: 'source-fact-1',
+      type: 'confirm-processing-and-extract-source-profile',
     })
   }
 
-  async confirmSelectedSourceProfileFacts() {
+  async reviewJobPosting() {
     this.#actionResult = await this.#workflow.execute({
-      type: 'confirm-source-facts',
-      factIds: ['source-fact-1', 'source-fact-2'],
+      type: 'review-job-posting',
+      content: 'Senior TypeScript Developer in Paris',
     })
   }
 
-  async rejectSourceProfileFact() {
-    this.#actionResult = await this.#workflow.execute({
-      type: 'reject-source-fact',
-      factId: 'source-fact-1',
-    })
+  async readSourceProfile() {
+    this.#actionResult = await this.#workflow.readView()
   }
 
   async correctSourceProfileFact() {
@@ -423,35 +470,71 @@ class SourceProfileWorkflowTestSystem {
 
   expectVersionedProcessingNoticeToBeConfirmed() {
     expect(this.#readReadySourceProfile().processingNotice).toEqual({
-      version: '2026-09-26',
+      version: '2026-09-28',
       confirmedAt: sessionStartedAt,
     })
     expect(this.#modelRequests).toEqual([])
   }
 
-  expectOnlyApprovedContentToProduceExtractedFacts() {
-    expect(this.#modelRequests).toEqual([confirmedSourceProfile.outgoingContent])
+  expectOnlyApprovedContentToProduceCollectivelyAttestedFacts() {
+    expect(this.#modelRequests).toEqual([reviewingSourceProfile.outgoingContent])
     expect(this.#readReadySourceProfile()).toMatchObject(expectedExtractedSourceProfile)
+    expect(this.#readReadySourceProfile().processingNotice).toEqual({
+      version: '2026-09-28',
+      confirmedAt: sessionStartedAt,
+    })
   }
 
-  expectOnlyTheSelectedFactToBeVerified() {
+  expectOnlyTheConflictingFactsToRequireCorrection() {
     expect(this.#readReadySourceProfile().facts).toMatchObject([
-      { id: 'source-fact-1', status: 'verified' },
+      { id: 'source-fact-1', status: 'extracted' },
       { id: 'source-fact-2', status: 'extracted' },
+      { id: 'source-fact-3', status: 'verified' },
     ])
   }
 
-  expectEverySelectedFactToBeVerified() {
+  expectOnlyTheUsableFactToRemain() {
+    expect(this.#readReadySourceProfile().facts).toMatchObject([
+      { kind: 'skill', status: 'verified', value: 'TypeScript' },
+    ])
+  }
+
+  expectJobPostingProcessingToReuseCandidateSessionConsent() {
+    const result = this.#readActionResult()
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.value.status !== 'ready') return
+    expect(result.value.jobPosting?.processingNotice).toEqual({
+      provider: 'OpenAI',
+      transmittedDataCategories: ['job-posting-content'],
+      retentionPolicy: 'standard-abuse-monitoring',
+      version: '2026-09-26',
+      confirmedAt: sessionStartedAt,
+    })
+  }
+
+  expectJobPostingProcessingToRequireCurrentConsent() {
+    const result = this.#readActionResult()
+    expect(result.ok).toBe(true)
+    if (!result.ok || result.value.status !== 'ready') return
+    expect(result.value.sourceProfile).toMatchObject({
+      status: 'reviewing-document',
+      processingNotice: null,
+      facts: [],
+    })
+    expect(result.value.jobPosting?.processingNotice).toBeNull()
+  }
+
+  async expectEveryRestoredFactToBeCollectivelyAttestedAndPersisted() {
     expect(this.#readReadySourceProfile().facts).toMatchObject([
       { id: 'source-fact-1', status: 'verified' },
       { id: 'source-fact-2', status: 'verified' },
     ])
-  }
-
-  expectOnlyTheSelectedFactToBeRejected() {
-    expect(this.#readReadySourceProfile().facts).toMatchObject([
-      { id: 'source-fact-1', status: 'rejected' },
-      { id: 'source-fact-2', status: 'extracted' },
+    const persistedState = await this.#persistence.read()
+    expect(persistedState.ok).toBe(true)
+    if (!persistedState.ok || persistedState.value.status !== 'ready') return
+    expect(persistedState.value.sourceProfile?.facts).toMatchObject([
+      { id: 'source-fact-1', status: 'verified' },
+      { id: 'source-fact-2', status: 'verified' },
     ])
   }
 
@@ -485,13 +568,6 @@ class SourceProfileWorkflowTestSystem {
       { id: 'source-fact-2', status: 'verified' },
       { id: 'source-fact-3', status: 'verified' },
     ])
-  }
-
-  expectConflictingFactConfirmationToRequireResolution() {
-    expect(this.#readActionResult()).toEqual({
-      ok: false,
-      error: { type: 'source-fact-conflict' },
-    })
   }
 
   #readReadySourceProfile() {
@@ -552,12 +628,12 @@ const expectedExtractedSourceProfile = {
     {
       id: 'source-fact-1', kind: 'experience',
       propositionKey: 'proposition-experience-acme-role',
-      value: 'Senior FullStack Developer at Acme', status: 'extracted',
+      value: 'Senior FullStack Developer at Acme', status: 'verified',
     },
     {
       id: 'source-fact-2', kind: 'skill',
       propositionKey: 'proposition-skill-candidate-typescript',
-      value: 'TypeScript', status: 'extracted',
+      value: 'TypeScript', status: 'verified',
     },
   ],
 } as const
@@ -576,6 +652,14 @@ const reviewingSourceProfile = {
 
 const confirmedSourceProfile = {
   ...reviewingSourceProfile,
+  processingNotice: {
+    version: '2026-09-28',
+    confirmedAt: sessionStartedAt,
+  },
+} as const satisfies SourceProfileReview
+
+const previousConsentSourceProfile = {
+  ...confirmedSourceProfile,
   processingNotice: {
     version: '2026-09-26',
     confirmedAt: sessionStartedAt,
@@ -622,6 +706,11 @@ const verifiedFactsSourceProfile = {
     ...fact,
     status: 'verified' as const,
   })),
+} as const satisfies SourceProfileReview
+
+const previousConsentFactsSourceProfile = {
+  ...verifiedFactsSourceProfile,
+  processingNotice: previousConsentSourceProfile.processingNotice,
 } as const satisfies SourceProfileReview
 
 const correctionConflictSourceProfile = {

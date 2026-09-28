@@ -218,7 +218,7 @@ function createReadyState({ matchScore, outcomeFeedback }: Readonly<{
       documentName: 'private-resume.pdf',
       detectedSensitiveContent: [],
       outgoingContent: 'Private Candidate content',
-      processingNotice: null,
+      processingNotice: { version: '2026-09-28', confirmedAt: 1 },
       facts: [{
         id: 'source-fact-original',
         kind: 'experience',

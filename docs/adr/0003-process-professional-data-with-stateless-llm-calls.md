@@ -4,4 +4,4 @@ The MVP may send only the professional facts needed for tailoring and the Job Po
 
 ## Consequences
 
-The application must disclose the processor and retention limits before processing, obtain the Candidate's confirmation, and give the Candidate a chance to remove detected sensitive content. The LLM sits behind an application port so regional or retention requirements can be tightened before public launch without changing the domain workflow.
+The application must disclose the processor, transmitted data categories, and retention limits before processing, obtain one Processing Consent before the first model operation in a Candidate Session, and give the Candidate a chance to remove detected sensitive content. The LLM sits behind an application port so regional or retention requirements can be tightened before public launch without changing the domain workflow.

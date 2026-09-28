@@ -337,7 +337,7 @@ function createReadyState({ tailoredResume }: Readonly<{
       documentName: 'resume.pdf',
       detectedSensitiveContent: [],
       outgoingContent: 'professional content',
-      processingNotice: { version: '2026-09-26', confirmedAt: 900 },
+      processingNotice: { version: '2026-09-28', confirmedAt: 900 },
       facts: verifiedFacts,
     },
     jobPosting: {

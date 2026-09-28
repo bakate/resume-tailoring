@@ -9,6 +9,7 @@ import {
 describe('Source Profile boundary schemas', () => {
   it('accepts a valid atomic extracted fact', () => {
     const result = extractedSourceProfileFactContentSchema.safeParse({
+      assessment: 'usable',
       kind: 'skill',
       propositionKey: 'proposition-skill-candidate-typescript',
       value: 'TypeScript',
@@ -21,7 +22,19 @@ describe('Source Profile boundary schemas', () => {
     ['a mismatched proposition kind', 'experience', 'proposition-skill-candidate-typescript', 'TypeScript'],
     ['multiple facts in one value', 'skill', 'proposition-skill-candidate-typescript', 'TypeScript\nReact'],
   ])('rejects %s', (_caseName, kind, propositionKey, value) => {
-    const result = extractedSourceProfileFactContentSchema.safeParse({ kind, propositionKey, value })
+    const result = extractedSourceProfileFactContentSchema.safeParse({
+      assessment: 'usable', kind, propositionKey, value,
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects an extracted fact without an ambiguity assessment', () => {
+    const result = extractedSourceProfileFactContentSchema.safeParse({
+      kind: 'skill',
+      propositionKey: 'proposition-skill-candidate-typescript',
+      value: 'TypeScript',
+    })
 
     expect(result.success).toBe(false)
   })

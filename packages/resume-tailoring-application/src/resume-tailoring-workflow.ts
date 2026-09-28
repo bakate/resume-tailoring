@@ -16,7 +16,7 @@ export type SourceDocument = Readonly<{
   name: string
 }>
 
-export const sourceProfileProcessingNoticeVersion = '2026-09-26'
+export const sourceProfileProcessingNoticeVersion = '2026-09-28'
 export const jobPostingProcessingNoticeVersion = '2026-09-26'
 export const jobPostingProcessingPolicy = {
   provider: 'OpenAI',
@@ -45,9 +45,8 @@ export type ResumeTailoringCommand =
   | { readonly type: 'import-source-document'; readonly document: SourceDocument }
   | { readonly type: 'update-source-content'; readonly outgoingContent: string }
   | { readonly type: 'confirm-processing-notice' }
+  | { readonly type: 'confirm-processing-and-extract-source-profile' }
   | { readonly type: 'extract-source-profile' }
-  | { readonly type: 'confirm-source-fact'; readonly factId: SourceProfileFactId }
-  | { readonly type: 'confirm-source-facts'; readonly factIds: readonly SourceProfileFactId[] }
   | { readonly type: 'reject-source-fact'; readonly factId: SourceProfileFactId }
   | {
       readonly type: 'correct-source-fact'

@@ -376,16 +376,16 @@ test('Source Profile extraction exposes pending, success, and recoverable failur
   await system.expectRetriedSourceProfileExtractionToSucceed()
 })
 
-test('a Candidate confirms only selected visible facts in one domain group', async ({ page }) => {
+test('a Candidate collectively attests non-conflicting imported Candidate Facts', async ({ page }) => {
   const system = createSystemUnderTest({ page })
 
   await system.givenCandidateSessionIsActive()
   await system.givenDetailedSourceProfileExtractionIsAvailable()
   await system.extractDetailedSourceProfileFacts()
 
-  await system.selectAndConfirmVisibleExperienceFacts()
+  system.inspectCollectivelyAttestedFacts()
 
-  await system.expectOnlyEligibleExperienceFactsToBeBatchConfirmed()
+  await system.expectNonConflictingFactsToBeImmediatelyUsable()
 })
 
 test('conflict resolution and immutable correction remain in the facts review', async ({ page }) => {
@@ -860,7 +860,7 @@ type CompletedAction =
   | 'resume-pdf-downloaded'
   | 'source-profile-built'
   | 'source-document-reviewed'
-  | 'source-profile-batch-confirmed'
+  | 'source-profile-facts-inspected'
   | 'source-profile-extraction-retried'
   | 'source-profile-extraction-started'
   | 'source-profile-facts-corrected'
@@ -927,9 +927,15 @@ class ResumeTailoringBrowserTestSystem {
         body: JSON.stringify({
           ok: true,
           value: [{
+            assessment: 'usable',
             kind: 'experience',
-              propositionKey: 'proposition-experience-acme-role',
+            propositionKey: 'proposition-experience-acme-role',
             value: 'Senior FullStack Developer using React at Acme',
+          }, {
+            assessment: 'critical-ambiguity',
+            kind: 'experience',
+            propositionKey: 'proposition-experience-acme-start-date',
+            value: 'Started at Acme in 2021 or 2022',
           }],
         }),
       })
@@ -1282,7 +1288,8 @@ class ResumeTailoringBrowserTestSystem {
     await this.givenCandidateSessionIsActive()
     await this.givenStructuredExtractionIsAvailable()
     await this.buildVerifiedSourceProfile()
-    await this.#page.getByRole('button', { name: /Job Posting/ }).click()
+    await this.#page.locator('.workflow-progress')
+      .getByRole('button', { name: /Job Posting/ }).click()
   }
 
   async givenTailoredResumeIsStored() {
@@ -1590,10 +1597,9 @@ class ResumeTailoringBrowserTestSystem {
       ),
     })
     await this.#page.getByLabel('Exact content that will be sent for extraction').waitFor()
-    await this.#page.getByRole('button', { name: 'Confirm this processing notice' }).click()
-    await this.#page.getByRole('button', { name: 'Extract professional facts' }).click()
-    await this.#page.getByRole('button', { name: 'Confirm fact' }).click()
+    await this.#page.getByRole('button', { name: 'Continue and analyze my resume' }).click()
     await this.#page.getByRole('button', { name: /Source Profile 1 verified fact/ }).waitFor()
+    await expect(this.#page.getByText('Started at Acme in 2021 or 2022')).toHaveCount(0)
     this.#completedAction = 'source-profile-built'
   }
 
@@ -1604,14 +1610,13 @@ class ResumeTailoringBrowserTestSystem {
 
   async startSourceProfileExtraction() {
     await this.#uploadSourceDocument()
-    await this.#page.getByRole('button', { name: 'Confirm this processing notice' }).click()
-    await this.#page.getByRole('button', { name: 'Extract professional facts' }).click()
+    await this.#page.getByRole('button', { name: 'Continue and analyze my resume' }).click()
     this.#completedAction = 'source-profile-extraction-started'
   }
 
   async restartWithRecoverableSourceProfileExtractionFailure() {
     this.#releasePendingSourceProfileExtraction()
-    await this.#page.getByRole('heading', { name: 'Review extracted facts' }).waitFor()
+    await this.#page.getByRole('heading', { name: 'Check your imported profile' }).waitFor()
     await this.#restartCandidateSession()
     await this.#givenRecoverableSourceProfileExtractionFailure()
     await this.startSourceProfileExtraction()
@@ -1656,74 +1661,32 @@ class ResumeTailoringBrowserTestSystem {
 
   async extractDetailedSourceProfileFacts() {
     await this.#uploadSourceDocument()
-    await this.#page.getByRole('button', { name: 'Confirm this processing notice' }).click()
-    await this.#page.getByRole('button', { name: 'Extract professional facts' }).click()
-    await this.#page.getByRole('heading', { name: 'Review extracted facts' }).waitFor()
+    await this.#page.getByRole('button', { name: 'Continue and analyze my resume' }).click()
+    await this.#page.getByRole('heading', { name: 'Check your imported profile' }).waitFor()
     this.#completedAction = 'source-profile-facts-extracted'
   }
 
-  async selectAndConfirmVisibleExperienceFacts() {
-    const experienceGroup = this.#page.getByRole('region', { name: 'Experience' })
-    const skillGroup = this.#page.getByRole('region', { name: 'Skill' })
-    await this.#selectVisibleFacts({ experienceGroup, skillGroup })
-    await this.#rejectSelectedExperienceFact({ experienceGroup })
-    await this.#confirmExperienceBatch({ experienceGroup })
-    this.#completedAction = 'source-profile-batch-confirmed'
-  }
-
-  async #selectVisibleFacts({ experienceGroup, skillGroup }: Readonly<{
-    experienceGroup: Locator
-    skillGroup: Locator
-  }>) {
-    const groupSelection = experienceGroup.getByRole('checkbox', {
-      name: 'Select visible facts in this group: Experience',
-    })
-    await groupSelection.focus()
-    await this.#page.keyboard.press('Space')
-    await expect(groupSelection).toBeChecked()
-    await skillGroup.getByRole('checkbox', { name: 'Select TypeScript' }).check()
-    await expect(experienceGroup.getByText('3 selected facts', { exact: true })).toBeVisible()
-  }
-
-  async #rejectSelectedExperienceFact({ experienceGroup }: Readonly<{ experienceGroup: Locator }>) {
-    const rejectedFact = readFactCard({
-      group: experienceGroup, page: this.#page, value: 'Built backend APIs at Acme',
-    })
-    await rejectedFact.getByRole('button', { name: 'Reject fact' }).click()
-    await expect(experienceGroup.getByText('2 selected facts', { exact: true })).toBeVisible()
-    await expect(this.#readFactReviewStatus()).toContainText('1 Rejected')
-  }
-
-  async #confirmExperienceBatch({ experienceGroup }: Readonly<{ experienceGroup: Locator }>) {
-    const batchReview = experienceGroup.locator('.fact-batch')
-    await expect(batchReview.getByText('Senior FullStack Developer at Acme')).toBeVisible()
-    await expect(batchReview.getByText('Led a platform migration at Acme')).toBeVisible()
-    await expect(batchReview.getByText('Built backend APIs at Acme')).toHaveCount(0)
-    await expect(batchReview.getByText('TypeScript')).toHaveCount(0)
-    await batchReview.getByRole('button', { name: 'Confirm 2 selected facts' }).click()
-    await expect(this.#readFactReviewStatus()).toContainText('2 Verified')
+  inspectCollectivelyAttestedFacts() {
+    this.#completedAction = 'source-profile-facts-inspected'
   }
 
   async resolveVisibleEducationConflict() {
     const conflictReview = this.#page.getByRole('region', { name: 'Conflicts requiring resolution' })
     await expect(conflictReview.getByRole('checkbox')).toHaveCount(0)
-    await expect(this.#readFactReviewStatus())
-      .toContainText('2 conflicting facts requiring resolution')
     const selectedFact = readFactCard({
       group: conflictReview, page: this.#page, value: 'Computer Science degree in 2018',
     })
     await selectedFact.getByRole('button', {
       name: 'Keep this fact and resolve the conflict',
     }).click()
-    await expect(this.#readFactReviewStatus())
-      .toContainText('0 conflicting facts requiring resolution')
+    await expect(this.#page.getByRole('region', { name: 'Conflicts requiring resolution' }))
+      .toHaveCount(0)
   }
 
   async correctVisibleSkillFact() {
     const skillGroup = this.#page.getByRole('region', { name: 'Skill' })
-    await skillGroup.getByRole('button', { name: 'Confirm fact' }).click()
-    await skillGroup.locator('summary').getByText('Correct this verified fact').click()
-    await skillGroup.getByLabel('Correct this verified fact').fill('Advanced TypeScript')
+    await skillGroup.locator('summary').getByText('Correct this information').click()
+    await skillGroup.getByLabel('Correct this information').fill('Advanced TypeScript')
     await skillGroup.getByRole('button', { name: 'Create correction' }).click()
     this.#completedAction = 'source-profile-facts-corrected'
   }
@@ -1817,7 +1780,7 @@ class ResumeTailoringBrowserTestSystem {
   }
 
   async prepareMinimizedJobPostingForExtraction() {
-    await this.#page.getByRole('button', { name: /Job Posting/ }).click()
+    await this.#page.locator('.workflow-progress').getByRole('button', { name: /Job Posting/ }).click()
     await this.#page.getByLabel('Paste the Job Posting').fill(
       `${jobPostingExcerpt}\nContact jobs@example.com\nSalary: competitive`,
     )
@@ -1825,7 +1788,6 @@ class ResumeTailoringBrowserTestSystem {
     const editor = this.#page.getByLabel('Exact Job Posting content sent for extraction')
     await editor.fill(jobPostingExcerpt)
     await this.#page.getByRole('button', { name: 'Save minimized Job Posting' }).click()
-    await this.#page.getByRole('button', { name: 'Confirm Job Posting processing' }).click()
   }
 
   async retryFailedJobRequirementExtraction() {
@@ -2136,8 +2098,7 @@ class ResumeTailoringBrowserTestSystem {
     const review = this.#page.getByRole('region', { name: 'Review outgoing Source Document' })
     await expect(review.getByLabel('Exact content that will be sent for extraction'))
       .toHaveValue(pastedProfessionalText)
-    await expect(review.getByRole('button', { name: 'Confirm this processing notice' })).toBeEnabled()
-    await expect(review.getByRole('button', { name: 'Extract professional facts' })).toBeDisabled()
+    await expect(review.getByRole('button', { name: 'Continue and analyze my resume' })).toBeEnabled()
   }
 
   async expectUnreadablePdfRecoveryToKeepSessionActive() {
@@ -2181,28 +2142,23 @@ class ResumeTailoringBrowserTestSystem {
     const review = this.#page.getByRole('region', { name: 'Review outgoing Source Document' })
     await expect(review.getByLabel('Exact content that will be sent for extraction')).toBeVisible()
     await expect(review.getByRole('heading', { name: 'Removed before processing' })).toBeVisible()
-    const confirm = review.getByRole('button', { name: 'Confirm this processing notice' })
-    const extract = review.getByRole('button', { name: 'Extract professional facts' })
-    await this.#expectDesktopSourceDocumentReviewLayout({ confirm, extract, review })
-    await expect(confirm).toBeEnabled()
-    await expect(extract).toBeDisabled()
-    await confirm.click()
-    await expect(extract).toBeEnabled()
+    const continueButton = review.getByRole('button', { name: 'Continue and analyze my resume' })
+    await this.#expectDesktopSourceDocumentReviewLayout({ continueButton, review })
+    await expect(continueButton).toBeEnabled()
     await this.#expectMobileSourceDocumentReviewLayout({ review })
   }
 
-  async #expectDesktopSourceDocumentReviewLayout({ confirm, extract, review }: Readonly<{
-    confirm: Locator
-    extract: Locator
+  async #expectDesktopSourceDocumentReviewLayout({ continueButton, review }: Readonly<{
+    continueButton: Locator
     review: Locator
   }>) {
     const [sensitivePanel, outgoingPanel] = await review.locator('.source-document-panel').all()
-    const [sensitiveBox, outgoingBox, confirmBox, extractBox] = await Promise.all([
-      sensitivePanel?.boundingBox(), outgoingPanel?.boundingBox(), confirm.boundingBox(), extract.boundingBox(),
+    const [sensitiveBox, outgoingBox, continueButtonBox] = await Promise.all([
+      sensitivePanel?.boundingBox(), outgoingPanel?.boundingBox(), continueButton.boundingBox(),
     ])
     const horizontalGap = (outgoingBox?.x ?? 0) - ((sensitiveBox?.x ?? 0) + (sensitiveBox?.width ?? 0))
     expect(horizontalGap).toBeGreaterThanOrEqual(20)
-    expect(confirmBox?.y ?? 0).toBeLessThan(extractBox?.y ?? 0)
+    expect(continueButtonBox).not.toBeNull()
   }
 
   async #expectMobileSourceDocumentReviewLayout({ review }: Readonly<{ review: Locator }>) {
@@ -2221,50 +2177,33 @@ class ResumeTailoringBrowserTestSystem {
     this.#expectCompletedAction('source-profile-extraction-started')
     await expect(this.#page.getByText('Extracting professional facts…')).toBeVisible()
     await expect(this.#page.locator('.source-profile-workspace')).toHaveAttribute('aria-busy', 'true')
-    await expect(this.#page.getByRole('button', { name: 'Extract professional facts' })).toBeDisabled()
+    await expect(this.#page.getByRole('button', { name: 'Continue and analyze my resume' }))
+      .toBeDisabled()
     await expect.poll(() => this.#pendingSourceProfileExtractionResponse !== undefined).toBe(true)
   }
 
   async expectRetriedSourceProfileExtractionToSucceed() {
     this.#expectCompletedAction('source-profile-extraction-retried')
-    await expect(this.#page.getByRole('heading', { name: 'Review extracted facts' })).toBeVisible()
+    await expect(this.#page.getByRole('heading', { name: 'Check your imported profile' })).toBeVisible()
     await expect(this.#page.getByRole('region', { name: 'Experience' })).toBeVisible()
     expect(this.#sourceProfileExtractionAttemptCount).toBe(2)
   }
 
-  async expectOnlyEligibleExperienceFactsToBeBatchConfirmed() {
-    this.#expectCompletedAction('source-profile-batch-confirmed')
+  async expectNonConflictingFactsToBeImmediatelyUsable() {
+    this.#expectCompletedAction('source-profile-facts-inspected')
     const experienceGroup = this.#page.getByRole('region', { name: 'Experience' })
-    await this.#expectExperienceFactStates({ experienceGroup })
-    await this.#expectOtherGroupsExcludedFromExperienceBatch()
-  }
-
-  async #expectExperienceFactStates({ experienceGroup }: Readonly<{ experienceGroup: Locator }>) {
+    const skillGroup = this.#page.getByRole('region', { name: 'Skill' })
+    await expect(experienceGroup.getByRole('checkbox')).toHaveCount(0)
+    await expect(experienceGroup.getByRole('button', { name: 'Confirm fact' })).toHaveCount(0)
+    await expect(skillGroup.getByRole('checkbox')).toHaveCount(0)
+    await expect(skillGroup.getByRole('button', { name: 'Confirm fact' })).toHaveCount(0)
     await expect(readFactCard({
       group: experienceGroup, page: this.#page, value: 'Senior FullStack Developer at Acme',
-    }))
-      .toContainText('Verified')
-    await expect(readFactCard({
-      group: experienceGroup, page: this.#page, value: 'Built backend APIs at Acme',
-    }))
-      .toContainText('Rejected')
-    await expect(readFactCard({
-      group: experienceGroup, page: this.#page, value: 'Led a platform migration at Acme',
-    }))
-      .toContainText('Verified')
-  }
-
-  async #expectOtherGroupsExcludedFromExperienceBatch() {
-    const skillGroup = this.#page.getByRole('region', { name: 'Skill' })
-    await expect(skillGroup.getByRole('checkbox', { name: 'Select TypeScript' })).toBeChecked()
+    })).toContainText('From your resume')
     await expect(readFactCard({ group: skillGroup, page: this.#page, value: 'TypeScript' }))
-      .toContainText('Needs review')
+      .toContainText('From your resume')
     await expect(this.#page.getByRole('region', { name: 'Conflicts requiring resolution' }))
       .toBeVisible()
-    await this.#page.getByRole('button', { name: 'Français' }).click()
-    await expect(this.#page.getByRole('checkbox', {
-      name: 'Sélectionner les faits visibles de ce groupe: Compétence',
-    })).toBeVisible()
   }
 
   async expectConflictResolutionAndImmutableCorrection() {
@@ -2278,30 +2217,28 @@ class ResumeTailoringBrowserTestSystem {
     await expect(readFactCard({
       group: educationGroup, page: this.#page, value: 'Computer Science degree in 2018',
     }))
-      .toContainText('Verified')
+      .toContainText('From your resume')
     await expect(readFactCard({
       group: educationGroup, page: this.#page, value: 'Computer Science degree in 2019',
-    }))
-      .toContainText('Rejected')
+    })).toHaveCount(0)
   }
 
   async #expectImmutableSkillCorrection() {
     const skillGroup = this.#page.getByRole('region', { name: 'Skill' })
     await expect(readFactCard({ group: skillGroup, page: this.#page, value: 'TypeScript' }))
-      .toContainText('Superseded')
+      .toHaveCount(0)
     await expect(readFactCard({
       group: skillGroup, page: this.#page, value: 'Advanced TypeScript',
     }))
-      .toContainText('Verified')
-    await expect(this.#readFactReviewStatus()).toContainText('1 Superseded')
+      .toContainText('From your resume')
   }
 
   async expectVerifiedSourceProfileToBeRestored() {
     this.#expectCompletedAction('source-profile-reloaded')
     await this.#page.getByRole('button', { name: /Source Profile/ }).click()
-    await expect(this.#page.getByRole('heading', { name: 'Review extracted facts' })).toBeVisible()
+    await expect(this.#page.getByRole('heading', { name: 'Check your imported profile' })).toBeVisible()
     await expect(this.#page.getByText('Senior FullStack Developer using React at Acme')).toBeVisible()
-    await expect(this.#page.getByText('Verified', { exact: true })).toBeVisible()
+    await expect(this.#page.getByText('From your resume', { exact: true })).toBeVisible()
   }
 
   async expectAtomicJobRequirementsWithSourceProvenance() {
@@ -2381,7 +2318,7 @@ class ResumeTailoringBrowserTestSystem {
 
   async expectCompletedSourceProfileToRemainIntact() {
     this.#expectCompletedAction('source-profile-reopened')
-    await expect(this.#page.getByRole('heading', { name: 'Review extracted facts' })).toBeVisible()
+    await expect(this.#page.getByRole('heading', { name: 'Check your imported profile' })).toBeVisible()
     await expect(this.#page.getByText(
       'Senior FullStack Developer using React at Acme',
       { exact: true },
@@ -2773,10 +2710,6 @@ class ResumeTailoringBrowserTestSystem {
     ).toBe(false)
   }
 
-  #readFactReviewStatus() {
-    return this.#page.locator('.facts-review-card').getByRole('status')
-  }
-
   #readResumeClaims() {
     return this.#page.getByRole('list', { name: 'Retained Resume Claims' })
   }
@@ -3007,31 +2940,37 @@ const detailedSourceProfileExtractionResponse = {
   ok: true,
   value: [
     {
+      assessment: 'usable',
       kind: 'experience',
       propositionKey: 'proposition-experience-acme-role',
       value: 'Senior FullStack Developer at Acme',
     },
     {
+      assessment: 'usable',
       kind: 'experience',
       propositionKey: 'proposition-experience-acme-backend',
       value: 'Built backend APIs at Acme',
     },
     {
+      assessment: 'usable',
       kind: 'experience',
       propositionKey: 'proposition-experience-acme-migration',
       value: 'Led a platform migration at Acme',
     },
     {
+      assessment: 'usable',
       kind: 'skill',
       propositionKey: 'proposition-skill-typescript',
       value: 'TypeScript',
     },
     {
+      assessment: 'usable',
       kind: 'education',
       propositionKey: 'proposition-education-computer-science-year',
       value: 'Computer Science degree in 2018',
     },
     {
+      assessment: 'usable',
       kind: 'education',
       propositionKey: 'proposition-education-computer-science-year',
       value: 'Computer Science degree in 2019',
