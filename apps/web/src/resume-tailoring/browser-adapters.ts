@@ -302,6 +302,7 @@ function parseJobRequirementExtractionResult({
   if (!result.data.ok) return result.data
   return hasOnlyJobPostingSourceExcerpts({
     jobPostingContent,
+    practicalConstraints: result.data.value.practicalConstraints,
     requirements: result.data.value.requirements,
     targetRole: result.data.value.targetRole,
   }) ? result.data : requirementTransportUnavailableResult

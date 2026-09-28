@@ -21,6 +21,7 @@ export function createReviewingJobPosting({ content }: Readonly<{
     ...minimizedContent,
     processingNotice: null,
     targetRole: null,
+    practicalConstraints: [],
     requirements: [],
   }
 }
@@ -36,6 +37,7 @@ export function updateJobPosting({
     ...minimizeSensitiveContent({ content: outgoingContent }),
     processingNotice: null,
     targetRole: null,
+    practicalConstraints: [],
     requirements: [],
   }
 }

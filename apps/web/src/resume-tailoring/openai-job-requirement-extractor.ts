@@ -124,6 +124,7 @@ function parseRequirements({
   if (!result.success) return extractionUnavailableResult
   if (!hasOnlyJobPostingSourceExcerpts({
     jobPostingContent,
+    practicalConstraints: result.data.practicalConstraints,
     requirements: result.data.requirements,
     targetRole: result.data.targetRole,
   })) return extractionUnavailableResult
@@ -133,7 +134,8 @@ function parseRequirements({
 const extractionInstructions = [
   'Extract targetRole only when the Job Posting states one unambiguous role; otherwise return null.',
   'Copy targetRole.sourceExcerpt exactly from the Job Posting and copy targetRole.value as an exact substring of that excerpt.',
-  'Extract every explicit qualification or expectation from the Job Posting.',
+  'Return explicit professional qualifications and expectations in requirements.',
+  'Return explicit location, remote-work policy, work authorization, availability, and compensation conditions in practicalConstraints.',
   'Classify each one as required only when mandatory wording is explicit; otherwise use preferred.',
   'Split compound passages into indivisible requirements.',
   'Copy sourceExcerpt exactly from the Job Posting for every requirement.',
@@ -148,7 +150,7 @@ const jobRequirementResponseFormat = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['targetRole', 'requirements'],
+    required: ['targetRole', 'practicalConstraints', 'requirements'],
     properties: {
       targetRole: {
         anyOf: [
@@ -177,6 +179,27 @@ const jobRequirementResponseFormat = {
           required: ['classification', 'sourceExcerpt', 'value'],
           properties: {
             classification: { type: 'string', enum: jobRequirementClassifications },
+            sourceExcerpt: {
+              type: 'string',
+              minLength: 1,
+              maxLength: jobRequirementSourceExcerptMaximumCharacters,
+            },
+            value: {
+              type: 'string',
+              minLength: 1,
+              maxLength: jobRequirementValueMaximumCharacters,
+            },
+          },
+        },
+      },
+      practicalConstraints: {
+        type: 'array',
+        maxItems: jobRequirementMaximumCount,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['sourceExcerpt', 'value'],
+          properties: {
             sourceExcerpt: {
               type: 'string',
               minLength: 1,

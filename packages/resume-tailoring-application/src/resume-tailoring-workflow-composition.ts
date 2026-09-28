@@ -368,22 +368,11 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     }
     const matcher = this.#dependencies.matchEvidenceMatcher
     if (matcher === undefined) return matchAnalysisUnavailableResult
-    const verifiedFacts = currentState.value.sourceProfile.facts
-      .filter((fact) => fact.status === 'verified')
-    const matchResult = await matcher.match({
-      requirements: currentState.value.jobPosting.requirements.map(({ classification, id, value }) =>
-        ({ classification, id, value })),
-      verifiedFacts: verifiedFacts.map(({ id, kind, value }) => ({ id, kind, value })),
+    const matchAnalysis = await requestMatchAnalysis({ matcher, state: currentState.value })
+    if (!matchAnalysis.ok) return matchAnalysis
+    return this.#persistMatchAnalysis({
+      currentState: currentState.value, matchAnalysis: matchAnalysis.value,
     })
-    if (!matchResult.ok) return matchResult
-    const matchAnalysis = createMatchAnalysis({
-      proposedEvidence: matchResult.value.evidence,
-      relevantFactIds: matchResult.value.relevantFactIds,
-      requirements: currentState.value.jobPosting.requirements,
-      verifiedFacts,
-    })
-    if (matchAnalysis === null) return matchAnalysisUnavailableResult
-    return this.#persistMatchAnalysis({ currentState: currentState.value, matchAnalysis })
   }
 
   async #persistMatchAnalysis({ currentState, matchAnalysis }: Readonly<{
@@ -484,6 +473,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     if (!extraction.ok) return extraction
     return this.#persistExtractedJobRequirements({
       currentState: currentState.value,
+      practicalConstraints: extraction.value.practicalConstraints,
       requirements: extraction.value.requirements,
       targetRole: extraction.value.targetRole,
     })
@@ -507,12 +497,22 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
       ? jobRequirementExtractionUnavailableResult
       : {
           ok: true,
-          value: { requirements, targetRole: extraction.value.targetRole },
+          value: {
+            practicalConstraints: extraction.value.practicalConstraints,
+            requirements,
+            targetRole: extraction.value.targetRole,
+          },
         } as const
   }
 
-  #persistExtractedJobRequirements({ currentState, requirements, targetRole }: Readonly<{
+  #persistExtractedJobRequirements({
+    currentState,
+    practicalConstraints,
+    requirements,
+    targetRole,
+  }: Readonly<{
     currentState: ReadyResumeTailoringState & { readonly jobPosting: JobPostingReview }
+    practicalConstraints: JobPostingReview['practicalConstraints']
     requirements: readonly JobRequirement[]
     targetRole: JobPostingReview['targetRole']
   }>) {
@@ -521,6 +521,7 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
       jobPosting: {
         ...currentState.jobPosting,
         status: 'reviewing-requirements',
+        practicalConstraints,
         requirements,
         targetRole,
       },
@@ -1187,6 +1188,28 @@ function applyCandidateSessionConsent({ confirmedAt, jobPosting }: Readonly<{
       confirmedAt,
     },
   }
+}
+
+async function requestMatchAnalysis({ matcher, state }: Readonly<{
+  matcher: MatchEvidenceMatcher
+  state: ReadyResumeTailoringState & Required<Pick<ReadyResumeTailoringState,
+    'jobPosting' | 'sourceProfile'>>
+}>): Promise<ResumeTailoringResult<MatchAnalysis>> {
+  const verifiedFacts = state.sourceProfile.facts.filter((fact) => fact.status === 'verified')
+  const matchResult = await matcher.match({
+    requirements: state.jobPosting.requirements
+      .map(({ classification, id, value }) => ({ classification, id, value })),
+    verifiedFacts: verifiedFacts.map(({ id, kind, value }) => ({ id, kind, value })),
+  })
+  if (!matchResult.ok) return matchResult
+  const matchAnalysis = createMatchAnalysis({
+    improvementOpportunities: matchResult.value.improvementOpportunities,
+    proposedEvidence: matchResult.value.evidence,
+    relevantFactIds: matchResult.value.relevantFactIds,
+    requirements: state.jobPosting.requirements,
+    verifiedFacts,
+  })
+  return matchAnalysis === null ? matchAnalysisUnavailableResult : { ok: true, value: matchAnalysis }
 }
 
 const workflowAlreadyOpenResult = {

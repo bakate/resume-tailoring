@@ -56,6 +56,7 @@ function createCandidateSession() {
         status: 'reviewing-requirements',
         detectedSensitiveContent: [],
         outgoingContent: 'Role: Senior FullStack Developer',
+        practicalConstraints: [],
         processingNotice: null,
         targetRole: {
           sourceExcerpt: 'Role: Senior FullStack Developer',

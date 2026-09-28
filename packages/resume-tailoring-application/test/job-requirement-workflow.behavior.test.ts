@@ -107,7 +107,7 @@ describe('Job Requirement workflow', () => {
     },
   )
 
-  it('extracts classified atomic Job Requirements with source provenance', async () => {
+  it('extracts requirements and keeps Practical Constraints separate', async () => {
     const system = createSystemUnderTest({ jobPosting: confirmedJobPosting })
 
     // Given
@@ -231,7 +231,7 @@ class JobRequirementWorkflowTestSystem {
   #actionResult: ResumeTailoringResult<ResumeTailoringView> | undefined
   #extractionResult: Awaited<ReturnType<JobRequirementExtractor['extract']>> = {
     ok: true,
-    value: { requirements: [], targetRole: null },
+    value: { practicalConstraints: [], requirements: [], targetRole: null },
   }
 
   constructor(jobPosting: JobPostingReview | undefined) {
@@ -264,7 +264,10 @@ class JobRequirementWorkflowTestSystem {
   givenTheStructuredModelDecomposesACompoundPassage() {
     this.#extractionResult = {
       ok: true,
-      value: { targetRole: null, requirements: [
+      value: { practicalConstraints: [{
+        sourceExcerpt: 'Salary: competitive',
+        value: 'Salary: competitive',
+      }], targetRole: null, requirements: [
         {
           classification: 'required',
           sourceExcerpt: compoundSourceExcerpt,
@@ -283,6 +286,7 @@ class JobRequirementWorkflowTestSystem {
     this.#extractionResult = {
       ok: true,
       value: {
+        practicalConstraints: [],
         targetRole: {
           sourceExcerpt: targetRoleSourceExcerpt,
           value: targetRoleSourceExcerpt,
@@ -299,7 +303,7 @@ class JobRequirementWorkflowTestSystem {
   givenTheStructuredModelReturnsTooManyRequirements() {
     this.#extractionResult = {
       ok: true,
-      value: { targetRole: null, requirements: Array.from({ length: 201 }, (_unusedValue, requirementIndex) => ({
+      value: { practicalConstraints: [], targetRole: null, requirements: Array.from({ length: 201 }, (_unusedValue, requirementIndex) => ({
         classification: 'required',
         sourceExcerpt: compoundSourceExcerpt,
         value: `Know technology ${String(requirementIndex)}`,
@@ -398,6 +402,10 @@ class JobRequirementWorkflowTestSystem {
 
   expectAtomicRequirementsToShareTheirSourceGroup() {
     expect(this.#readJobPosting()).toMatchObject({
+      practicalConstraints: [{
+        sourceExcerpt: 'Salary: competitive',
+        value: 'Salary: competitive',
+      }],
       status: 'reviewing-requirements',
       requirements: [
         {
@@ -527,6 +535,7 @@ const reviewingJobPosting = {
   detectedSensitiveContent: [],
   outgoingContent: `${compoundSourceExcerpt}\nSalary: competitive`,
   processingNotice: null,
+  practicalConstraints: [],
   targetRole: null,
   requirements: [],
 } as const satisfies JobPostingReview

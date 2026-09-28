@@ -34,6 +34,7 @@ describe('OpenAI Job Requirement extractor contract', () => {
     expect(result).toEqual({
       ok: true,
       value: {
+        practicalConstraints: [],
         targetRole: { sourceExcerpt: targetRole, value: targetRole },
         requirements: [],
       },
@@ -125,6 +126,7 @@ describe('OpenAI Job Requirement extractor contract', () => {
     expect(result).toEqual({
       ok: true,
       value: {
+        practicalConstraints: [],
         targetRole: null,
         requirements: [{
           classification: 'required',
@@ -132,6 +134,27 @@ describe('OpenAI Job Requirement extractor contract', () => {
           value: 'Build robust and reusable libraries with JavaScript / Vanilla JS.',
         }],
       },
+    })
+  })
+
+  it('preserves an explicit Practical Constraint outside professional coverage', async () => {
+    const sourceExcerpt = 'Hybrid work in Paris three days per week.'
+    const extractor = createOpenAiJobRequirementExtractor({
+      apiKey: 'test-api-key',
+      model: 'structured-model',
+      reasoningEffort: 'low',
+      request: () => Promise.resolve(Response.json(createOpenAiResponse({
+        practicalConstraints: [{ sourceExcerpt, value: sourceExcerpt }],
+        targetRole: null,
+        requirements: [],
+      }))),
+    })
+
+    const result = await extractor.extract({ jobPostingContent: sourceExcerpt })
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { practicalConstraints: [{ sourceExcerpt, value: sourceExcerpt }] },
     })
   })
 
@@ -145,7 +168,9 @@ describe('OpenAI Job Requirement extractor contract', () => {
       apiKey: 'test-api-key',
       model: 'structured-model',
       reasoningEffort: 'low',
-      request: () => Promise.resolve(Response.json(createOpenAiResponse({ targetRole: null, requirements }))),
+      request: () => Promise.resolve(Response.json(createOpenAiResponse({
+        practicalConstraints: [], targetRole: null, requirements,
+      }))),
     })
 
     const result = await extractor.extract({ jobPostingContent })
@@ -190,9 +215,11 @@ async function readRequestBody(requests: readonly Request[]) {
 }
 
 function createOpenAiResponse({
+  practicalConstraints = expectedExtractionResult.value.practicalConstraints,
   targetRole = expectedExtractionResult.value.targetRole,
   requirements = expectedExtractionResult.value.requirements,
 }: Readonly<{
+  practicalConstraints?: readonly Readonly<{ sourceExcerpt: string; value: string }>[]
   targetRole?: Readonly<{ sourceExcerpt: string; value: string }> | null
   requirements?: readonly Readonly<{
     classification: string
@@ -205,7 +232,7 @@ function createOpenAiResponse({
       type: 'message',
       content: [{
         type: 'output_text',
-        text: JSON.stringify({ requirements, targetRole }),
+        text: JSON.stringify({ practicalConstraints, requirements, targetRole }),
       }],
     }],
   }
@@ -215,6 +242,7 @@ const expectedExtractionResult = {
   ok: true,
   value: {
     targetRole: null,
+    practicalConstraints: [],
     requirements: [
       {
         classification: 'required',
@@ -244,8 +272,19 @@ const expectedRequestBody = {
       name: 'job_requirements',
       strict: true,
       schema: {
-        required: ['targetRole', 'requirements'],
-        properties: { requirements: { maxItems: 200 } },
+        required: ['targetRole', 'practicalConstraints', 'requirements'],
+        properties: {
+          requirements: {
+            maxItems: 200,
+            items: {
+              required: ['classification', 'sourceExcerpt', 'value'],
+            },
+          },
+          practicalConstraints: {
+            maxItems: 200,
+            items: { required: ['sourceExcerpt', 'value'] },
+          },
+        },
       },
     },
   },

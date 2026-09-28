@@ -8,7 +8,9 @@ import type {
   JobRequirementContent,
   JobRequirement,
   JobPostingTargetRole,
+  MatchEvidence,
   OutcomeFeedback,
+  PracticalConstraint,
   SourceProfileFact,
   ResumeClaim,
   ResumeClaimId,
@@ -25,6 +27,7 @@ export {
   sourceProfileReviewStatuses,
   jobRequirementClassifications,
   jobRequirementMaximumCount,
+  requirementCoverages,
   fidelityAssessments,
   relevanceAssessments,
 } from '@resume-tailoring/domain/resume-tailoring-state'
@@ -51,6 +54,8 @@ export type {
   MatchEvidence,
   MatchScore,
   OutcomeFeedback,
+  PracticalConstraint,
+  RequirementCoverage,
   ResumeClaim,
   ResumeClaimId,
   ResumeClaimSegment,
@@ -166,6 +171,7 @@ export type JobRequirementExtractor = {
         readonly ok: true
         readonly value: Readonly<{
           targetRole: JobPostingTargetRole | null
+          practicalConstraints: readonly PracticalConstraint[]
           requirements: readonly JobRequirementContent[]
         }>
       }
@@ -208,12 +214,14 @@ export type ProposedFactMatch = Readonly<{
 }>
 
 export type ProposedMatchEvidence = Readonly<{
+  coverage: MatchEvidence['coverage']
   requirementId: JobRequirementId
   factMatches: readonly ProposedFactMatch[]
 }>
 
 export type ProposedMatchAnalysis = Readonly<{
   evidence: readonly ProposedMatchEvidence[]
+  improvementOpportunities: readonly string[]
   relevantFactIds: readonly SourceProfileFactId[]
 }>
 

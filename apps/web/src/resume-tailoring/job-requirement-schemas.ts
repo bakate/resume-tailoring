@@ -23,20 +23,17 @@ const jobRequirementContentShape = {
   value: z.string().min(1).max(jobRequirementValueMaximumCharacters),
 } as const
 
-const jobRequirementContentSchema = z.object(jobRequirementContentShape).superRefine((requirement, context) => {
-  if (!isAtomicValue({ value: requirement.value })) {
-    context.addIssue({ code: 'custom', path: ['value'], message: 'Expected one atomic requirement' })
-  }
-  if (!requirement.sourceExcerpt.includes(requirement.value)) {
-    context.addIssue({
-      code: 'custom', path: ['value'], message: 'Expected an exact Job Posting substring',
-    })
-  }
-})
+const jobRequirementContentSchema = z.object(jobRequirementContentShape)
+  .superRefine(validateAtomicSourceBackedValue)
 const jobRequirementContentsSchema = z.array(jobRequirementContentSchema).max(jobRequirementMaximumCount)
+const practicalConstraintSchema = z.object({
+  sourceExcerpt: jobRequirementContentShape.sourceExcerpt,
+  value: jobRequirementContentShape.value,
+}).superRefine(validateAtomicSourceBackedValue)
 
 export const extractedJobRequirementsSchema = z.object({
   targetRole: jobPostingTargetRoleSchema.nullable(),
+  practicalConstraints: z.array(practicalConstraintSchema).max(jobRequirementMaximumCount),
   requirements: jobRequirementContentsSchema,
 })
 
@@ -65,22 +62,14 @@ export const jobPostingReviewSchema = z.object({
     transmittedDataCategories: z.array(z.string()),
   }).nullable(),
   targetRole: jobPostingTargetRoleSchema.nullable().optional(),
+  practicalConstraints: z.array(practicalConstraintSchema).max(jobRequirementMaximumCount).default([]),
   requirements: z.array(z.object({
     classification: jobRequirementContentShape.classification,
     sourceExcerpt: jobRequirementContentShape.sourceExcerpt,
     value: jobRequirementContentShape.value,
     id: z.templateLiteral(['job-requirement-', z.string().min(1)]),
     groupId: z.templateLiteral(['job-requirement-group-', z.string().min(1)]),
-  }).superRefine((requirement, context) => {
-    if (!isAtomicValue({ value: requirement.value })) {
-      context.addIssue({ code: 'custom', path: ['value'], message: 'Expected one atomic requirement' })
-    }
-    if (!requirement.sourceExcerpt.includes(requirement.value)) {
-      context.addIssue({
-        code: 'custom', path: ['value'], message: 'Expected an exact Job Posting substring',
-      })
-    }
-  })).max(jobRequirementMaximumCount),
+  }).superRefine(validateAtomicSourceBackedValue)).max(jobRequirementMaximumCount),
 }).superRefine((jobPosting, context) => {
   if (hasSourceBackedTargetRole({
     jobPostingContent: jobPosting.outgoingContent,
@@ -101,17 +90,33 @@ export const jobRequirementExtractionRequestSchema = z.object({
 
 export function hasOnlyJobPostingSourceExcerpts({
   jobPostingContent,
+  practicalConstraints,
   requirements,
   targetRole,
 }: Readonly<{
   jobPostingContent: string
+  practicalConstraints: readonly Readonly<{ sourceExcerpt: string; value: string }>[]
   requirements: readonly JobRequirementContent[]
   targetRole: JobPostingTargetRole | null
 }>) {
   return hasSourceBackedTargetRole({ jobPostingContent, targetRole })
-    && requirements.every(({ sourceExcerpt, value }) => (
+    && [...requirements, ...practicalConstraints].every(({ sourceExcerpt, value }) => (
       jobPostingContent.includes(sourceExcerpt) && sourceExcerpt.includes(value)
     ))
+}
+
+function validateAtomicSourceBackedValue(
+  item: Readonly<{ sourceExcerpt: string; value: string }>,
+  context: z.RefinementCtx,
+) {
+  if (!isAtomicValue({ value: item.value })) {
+    context.addIssue({ code: 'custom', path: ['value'], message: 'Expected one atomic value' })
+  }
+  if (!item.sourceExcerpt.includes(item.value)) {
+    context.addIssue({
+      code: 'custom', path: ['value'], message: 'Expected an exact Job Posting substring',
+    })
+  }
 }
 
 function isAtomicValue({ value }: Readonly<{ value: string }>) {

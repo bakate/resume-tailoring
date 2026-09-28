@@ -3,6 +3,7 @@ import type {
   MatchInputs,
   ProposedMatchAnalysis,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import { requirementCoverages } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { z } from 'zod'
 
 import {
@@ -105,10 +106,13 @@ function combineMatchAnalyses({ analyses, matchRequest }: Readonly<{
   matchRequest: MatchRequest
 }>) {
   const relevantFactIds = new Set(analyses.flatMap((analysis) => analysis.relevantFactIds))
+  const improvementOpportunities = [...new Set(analyses.flatMap((analysis) =>
+    analysis.improvementOpportunities))].slice(0, 3)
   return {
     ok: true,
     value: {
       evidence: analyses.flatMap((analysis) => analysis.evidence),
+      improvementOpportunities,
       relevantFactIds: matchRequest.verifiedFacts
         .filter(({ id }) => relevantFactIds.has(id))
         .map(({ id }) => id),
@@ -187,14 +191,17 @@ function parseMatchEvidence({
 }
 
 const matchingInstructions = [
-  'Return evidence only when one or more Verified Facts explicitly prove a Job Requirement.',
-  'Coverage is binary; omit every uncovered requirement.',
+  'Return evidence only when one or more Candidate Facts explicitly support a Job Requirement.',
+  'Use covered when the evidence satisfies the complete requirement, including duration and qualitative constraints.',
+  'Use partially-covered when the evidence proves the same concrete skill or concept but falls short of an explicit duration, level, scale, or qualitative constraint.',
+  'Omit every unsupported requirement; never award partial coverage for a merely adjacent or transferable skill.',
   'You may recognize controlled synonyms and translations with the same concrete meaning.',
   'For each fact link, quote the shortest exact contiguous requirementTerm and factTerm that name the same skill or concept; never quote a full sentence when a shorter term exists.',
   'Use exact only when the normalized quoted terms are identical; otherwise use controlled.',
-  'Do not calculate or combine employment date ranges to prove a duration; omit duration coverage unless one Verified Fact explicitly states enough duration.',
-  'Return relevantFactIds only for Verified Facts relevant enough to support an honest Tailored Resume.',
-  'Return no relevantFactIds when the verified material cannot support an honest Tailored Resume.',
+  'Do not calculate or combine employment date ranges to prove a duration; omit duration coverage unless one Candidate Fact explicitly states enough duration.',
+  'Return relevantFactIds only for Candidate Facts relevant enough to support an honest Tailored Resume.',
+  'Return no relevantFactIds when the declared material cannot support an honest Tailored Resume.',
+  'Return at most three concise improvementOpportunities for useful keywords or conventions that are not explicit requirements; these observations never affect evidence.',
   'Do not treat a role, a transferable skill, or qualitative seniority as implicit proof.',
   'Never invent identifiers, qualifications, facts, or partial credit.',
 ].join(' ')
@@ -206,7 +213,7 @@ const matchEvidenceResponseFormat = {
   schema: {
     type: 'object',
     additionalProperties: false,
-    required: ['evidence', 'relevantFactIds'],
+    required: ['evidence', 'improvementOpportunities', 'relevantFactIds'],
     properties: {
       evidence: {
         type: 'array',
@@ -214,8 +221,12 @@ const matchEvidenceResponseFormat = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['requirementId', 'factMatches'],
+          required: ['coverage', 'requirementId', 'factMatches'],
           properties: {
+            coverage: {
+              type: 'string',
+              enum: requirementCoverages,
+            },
             requirementId: { type: 'string', pattern: '^job-requirement-.+$' },
             factMatches: {
               type: 'array',
@@ -235,6 +246,11 @@ const matchEvidenceResponseFormat = {
             },
           },
         },
+      },
+      improvementOpportunities: {
+        type: 'array',
+        maxItems: 3,
+        items: { type: 'string', minLength: 1, maxLength: 300 },
       },
       relevantFactIds: {
         type: 'array',

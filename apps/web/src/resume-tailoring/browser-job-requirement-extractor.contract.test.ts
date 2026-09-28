@@ -10,6 +10,7 @@ describe('browser Job Requirement extractor contract', () => {
         ok: true,
         value: {
           targetRole: { sourceExcerpt: targetRole, value: targetRole },
+          practicalConstraints: [],
           requirements: [],
         },
       })),
@@ -21,6 +22,7 @@ describe('browser Job Requirement extractor contract', () => {
       ok: true,
       value: {
         targetRole: { sourceExcerpt: targetRole, value: targetRole },
+        practicalConstraints: [],
         requirements: [],
       },
     })
@@ -75,7 +77,7 @@ describe('browser Job Requirement extractor contract', () => {
     const extractor = createBrowserJobRequirementExtractor({
       request: () => Promise.resolve(Response.json({
         ok: true,
-        value: { targetRole: null, requirements: [requirement] },
+        value: { targetRole: null, practicalConstraints: [], requirements: [requirement] },
       })),
     })
 

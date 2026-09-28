@@ -83,6 +83,11 @@ export type JobRequirementContent = Readonly<{
   value: string
 }>
 
+export type PracticalConstraint = Readonly<{
+  sourceExcerpt: string
+  value: string
+}>
+
 export type JobPostingTargetRole = Readonly<{
   sourceExcerpt: string
   value: string
@@ -93,7 +98,11 @@ export type JobRequirement = JobRequirementContent & Readonly<{
   groupId: JobRequirementGroupId
 }>
 
+export const requirementCoverages = ['covered', 'partially-covered'] as const
+export type RequirementCoverage = typeof requirementCoverages[number]
+
 export type MatchEvidence = Readonly<{
+  coverage: RequirementCoverage
   requirementId: JobRequirementId
   factIds: readonly SourceProfileFactId[]
 }>
@@ -104,9 +113,11 @@ export type MatchScore = number & Readonly<{ [matchScoreBrand]: true }>
 export type MatchAnalysis = Readonly<{
   evidence: readonly MatchEvidence[]
   gapAnalysis: Readonly<{
+    partiallyCoveredRequiredRequirementIds: readonly JobRequirementId[]
     uncoveredRequiredRequirementIds: readonly JobRequirementId[]
   }>
   generationEligibility: 'eligible' | 'denied'
+  improvementOpportunities: readonly string[]
   matchScore: MatchScore
   relevantFactIds: readonly SourceProfileFactId[]
   warning: 'below-generation-threshold' | null
@@ -149,6 +160,7 @@ export type JobPostingReview = Readonly<{
     transmittedDataCategories: readonly string[]
   }> | null
   targetRole?: JobPostingTargetRole | null
+  practicalConstraints: readonly PracticalConstraint[]
   requirements: readonly JobRequirement[]
 }>
 

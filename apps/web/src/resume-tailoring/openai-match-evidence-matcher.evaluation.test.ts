@@ -43,6 +43,7 @@ function readCoveredRequirementIds({ evaluation, fixture }: Readonly<{
 }>) {
   if (!evaluation.result.ok) return []
   const analysis = createMatchAnalysis({
+    improvementOpportunities: evaluation.result.value.improvementOpportunities,
     proposedEvidence: evaluation.result.value.evidence,
     relevantFactIds: evaluation.result.value.relevantFactIds,
     requirements: fixture.requirements,
