@@ -2805,10 +2805,9 @@ class ResumeTailoringBrowserTestSystem {
     }).getByRole('link', { name: 'Preview and export' })).toBeEnabled()
     expect(this.#resumeClaimWritingRequestCount).toBe(1)
     this.#releasePendingResumeClaimWriting?.()
-    await expect(claims.getByText(
-      'Built accessible React applications at Acme',
-      { exact: true },
-    )).toBeVisible()
+    await expect(claims.locator('.resume-claim-text').filter({
+      hasText: 'Built accessible React applications at Acme',
+    })).toBeVisible()
     await expect(this.#page.locator('#resume-claims-list-title')).toBeFocused()
   }
 

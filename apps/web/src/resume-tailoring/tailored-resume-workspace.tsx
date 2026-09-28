@@ -109,12 +109,7 @@ function TailoredResumeFlowNavigation({ localization }: Readonly<{
 function GenerationAction({ candidateSession, localization }: WorkspaceProps) {
   const isEligible = candidateSession.view.status === 'ready'
     && candidateSession.view.matchAnalysis?.generationEligibility === 'eligible'
-  const jobPostingContent = candidateSession.view.status === 'ready'
-    ? candidateSession.view.jobPosting?.outgoingContent ?? '' : ''
-  const [locale, setLocale] = useState(() => readPreferredResumeLocale({
-    fallbackLocale: localization.locale,
-    jobPostingContent,
-  }))
+  const [locale, setLocale] = usePreferredResumeLocale({ candidateSession, localization })
   return (
     <div className="source-profile-card">
       <p>{localization.translate('resumeClaims.description')}</p>
@@ -130,6 +125,14 @@ function GenerationAction({ candidateSession, localization }: WorkspaceProps) {
       ) : <p className="match-warning">{localization.translate('matchAnalysis.denied')}</p>}
     </div>
   )
+}
+
+function usePreferredResumeLocale({ candidateSession, localization }: WorkspaceProps) {
+  const jobPostingContent = candidateSession.view.status === 'ready'
+    ? candidateSession.view.jobPosting?.outgoingContent ?? '' : ''
+  return useState(() => readPreferredResumeLocale({
+    fallbackLocale: localization.locale, jobPostingContent,
+  }))
 }
 
 function ResumeGenerationControls({ candidateSession, label, locale, localization, onGenerated,
@@ -176,6 +179,15 @@ function ResumeLanguageSelector({ locale, localization, setLocale }: Readonly<{
   </fieldset>
 }
 
+type CuratedClaimsProps = WorkspaceProps & Readonly<{
+  claims: readonly ResumeClaim[]
+  exclusions: number
+  resumeLocale: 'en' | 'fr'
+  clearUnsupportedEdit: ResumeClaimCardProps['clearUnsupportedEdit']
+  clearUnsupportedEdits: () => void
+  reportUnsupportedEdit: ResumeClaimCardProps['reportUnsupportedEdit']
+}>
+
 function CuratedClaims({
   candidateSession,
   claims,
@@ -185,14 +197,7 @@ function CuratedClaims({
   clearUnsupportedEdit,
   clearUnsupportedEdits,
   reportUnsupportedEdit,
-}: WorkspaceProps & Readonly<{
-  claims: readonly ResumeClaim[]
-  exclusions: number
-  resumeLocale: 'en' | 'fr'
-  clearUnsupportedEdit: ResumeClaimCardProps['clearUnsupportedEdit']
-  clearUnsupportedEdits: () => void
-  reportUnsupportedEdit: ResumeClaimCardProps['reportUnsupportedEdit']
-}>) {
+}: CuratedClaimsProps) {
   const [locale, setLocale] = useState(resumeLocale)
   return (
     <section aria-labelledby="resume-claims-list-title">
@@ -442,8 +447,9 @@ function ReformulationForm({
   candidateSession,
   claim,
   claimIndex,
+  clearUnsupportedEdit,
   localization,
-}: WorkspaceProps & Readonly<{ claim: ResumeClaim; claimIndex: number }>) {
+}: ResumeClaimCardProps) {
   const [reformulationRequest, setReformulationRequest] = useState('')
   return (
     <details className="reformulation-disclosure">
@@ -457,7 +463,10 @@ function ReformulationForm({
         void submitReformulation({
           candidateSession,
           claim,
-          clearRequest: () => { setReformulationRequest('') },
+          clearRequest: () => {
+            clearUnsupportedEdit(claim.id)
+            setReformulationRequest('')
+          },
           reformulationRequest,
         })
       }}>
