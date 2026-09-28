@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { createOpenAiSourceProfileExtractor } from './openai-source-profile-extractor'
 
@@ -70,6 +70,21 @@ describe('OpenAI Source Profile extractor contract', () => {
       ok: false,
       error: { type: 'source-profile-extraction-unavailable' },
     })
+  })
+
+  it('allows a complete source profile extraction before the Lambda response deadline', async () => {
+    const timeout = vi.spyOn(AbortSignal, 'timeout')
+    const extractor = createOpenAiSourceProfileExtractor({
+      apiKey: 'test-api-key',
+      model: 'structured-model',
+      reasoningEffort: 'low',
+      request: () => Promise.resolve(Response.json(createOpenAiResponse())),
+    })
+
+    await extractor.extract({ professionalContent: 'TypeScript' })
+
+    expect(timeout).toHaveBeenCalledWith(90_000)
+    timeout.mockRestore()
   })
 })
 

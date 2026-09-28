@@ -3,6 +3,7 @@ import { createCsrfMiddleware } from '@tanstack/react-start'
 
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
+import { createOpenAiRequestDeadline } from '../resume-tailoring/openai-request'
 import { createOpenAiResumeClaimSemanticValidator } from '../resume-tailoring/openai-resume-claim-service'
 import { createTailoredResumePdf } from '../resume-tailoring/tailored-resume-pdf'
 import { resumePdfRequestSchema } from '../resume-tailoring/tailored-resume-schemas'
@@ -23,7 +24,9 @@ async function exportTailoredResumePdf({ request }: Readonly<{ request: Request 
   if (!environment.ok) return createUnavailableResponse()
   const semanticValidator = createOpenAiResumeClaimSemanticValidator({
     apiKey: environment.value.openAiApiKey,
+    deadlineSignal: createOpenAiRequestDeadline(),
     model: environment.value.openAiStructuredModel,
+    operation: 'tailored-resume-pdf-validation',
     reasoningEffort: environment.value.openAiStructuredReasoningEffort,
   })
   const result = await createTailoredResumePdf({ inputs: parsedRequest.value, semanticValidator })

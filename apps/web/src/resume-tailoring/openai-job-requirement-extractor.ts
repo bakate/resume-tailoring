@@ -8,6 +8,7 @@ import {
 import { z } from 'zod'
 
 import type { OpenAiReasoningEffort } from '../openai-model-configuration'
+import { createOpenAiRequester } from './openai-request'
 import {
   extractedJobRequirementsSchema,
   hasOnlyJobPostingSourceExcerpts,
@@ -43,22 +44,14 @@ type ExtractionRequest = OpenAiExtractorDependencies & Readonly<{ jobPostingCont
 
 async function requestJobRequirementExtraction(requestDetails: ExtractionRequest) {
   const { apiKey, jobPostingContent, model, reasoningEffort, request = fetch } = requestDetails
-  try {
-    const response = await request('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: createHeaders({ apiKey }),
-      body: JSON.stringify(createRequestBody({ jobPostingContent, model, reasoningEffort })),
-      signal: AbortSignal.timeout(jobRequirementExtractionTimeoutMilliseconds),
-    })
-    if (!response.ok) return extractionUnavailableResult
-    return parseOpenAiResponse({ jobPostingContent, value: await response.json() })
-  } catch {
-    return extractionUnavailableResult
-  }
-}
-
-function createHeaders({ apiKey }: Readonly<{ apiKey: string }>) {
-  return { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+  const requester = createOpenAiRequester({ apiKey, request })
+  const response = await requester.send({
+    body: createRequestBody({ jobPostingContent, model, reasoningEffort }),
+    operation: 'job-requirement-extraction',
+  })
+  return response.ok
+    ? parseOpenAiResponse({ jobPostingContent, value: response.value })
+    : extractionUnavailableResult
 }
 
 function createRequestBody({
@@ -225,5 +218,3 @@ const extractionUnavailableResult = {
   ok: false,
   error: { type: 'job-requirement-extraction-unavailable' },
 } as const
-
-const jobRequirementExtractionTimeoutMilliseconds = 30_000

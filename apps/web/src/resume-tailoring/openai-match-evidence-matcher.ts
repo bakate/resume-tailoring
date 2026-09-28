@@ -11,6 +11,7 @@ import {
   hasOnlyMatchInputReferences,
   sourceProfileFactMaximumCount,
 } from './match-analysis-schemas'
+import { createOpenAiRequester, createOpenAiRequestDeadline } from './openai-request'
 
 type OpenAiMatcherDependencies = Readonly<{
   apiKey: string
@@ -28,30 +29,30 @@ export function createOpenAiMatchEvidenceMatcher({
   reasoningEffort,
   request = fetch,
 }: OpenAiMatcherDependencies): MatchEvidenceMatcher {
+  const requester = createOpenAiRequester({ apiKey, request })
   return {
     match: (matchRequest) => requestMatchEvidence({
-      apiKey, matchRequest, model, reasoningEffort, request,
+      matchRequest, model, reasoningEffort, requester,
     }),
   }
 }
 
 async function requestMatchEvidence({
-  apiKey,
   matchRequest,
   model,
   reasoningEffort,
-  request,
+  requester,
 }: Readonly<{
-  apiKey: string
   matchRequest: MatchRequest
   model: string
   reasoningEffort: OpenAiMatcherDependencies['reasoningEffort']
-  request: typeof fetch
+  requester: ReturnType<typeof createOpenAiRequester>
 }>) {
   const analyses = []
+  const deadlineSignal = createOpenAiRequestDeadline()
   for (const batchRequest of createMatchRequestBatches({ matchRequest })) {
     const result = await requestMatchEvidenceBatch({
-      apiKey, matchRequest: batchRequest, model, reasoningEffort, request,
+      deadlineSignal, matchRequest: batchRequest, model, reasoningEffort, requester,
     })
     if (!result.ok) return result
     analyses.push(result.value)
@@ -60,30 +61,26 @@ async function requestMatchEvidence({
 }
 
 async function requestMatchEvidenceBatch({
-  apiKey,
+  deadlineSignal,
   matchRequest,
   model,
   reasoningEffort,
-  request,
+  requester,
 }: Readonly<{
-  apiKey: string
+  deadlineSignal: AbortSignal
   matchRequest: MatchRequest
   model: string
   reasoningEffort: OpenAiMatcherDependencies['reasoningEffort']
-  request: typeof fetch
+  requester: ReturnType<typeof createOpenAiRequester>
 }>) {
-  try {
-    const response = await request('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: createHeaders({ apiKey }),
-      body: JSON.stringify(createRequestBody({ matchRequest, model, reasoningEffort })),
-      signal: AbortSignal.timeout(matchAnalysisTimeoutMilliseconds),
-    })
-    if (!response.ok) return matchAnalysisUnavailableResult
-    return parseOpenAiResponse({ matchRequest, value: await response.json() })
-  } catch {
-    return matchAnalysisUnavailableResult
-  }
+  const response = await requester.send({
+    body: createRequestBody({ matchRequest, model, reasoningEffort }),
+    deadlineSignal,
+    operation: 'match-analysis',
+  })
+  return response.ok
+    ? parseOpenAiResponse({ matchRequest, value: response.value })
+    : matchAnalysisUnavailableResult
 }
 
 function createMatchRequestBatches({ matchRequest }: Readonly<{ matchRequest: MatchRequest }>) {
@@ -118,10 +115,6 @@ function combineMatchAnalyses({ analyses, matchRequest }: Readonly<{
         .map(({ id }) => id),
     },
   } as const
-}
-
-function createHeaders({ apiKey }: Readonly<{ apiKey: string }>) {
-  return { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
 }
 
 function createRequestBody({
@@ -269,5 +262,3 @@ const matchAnalysisUnavailableResult = {
   ok: false,
   error: { type: 'match-analysis-unavailable' },
 } as const
-
-const matchAnalysisTimeoutMilliseconds = 30_000

@@ -78,6 +78,7 @@ describe('OpenAI Match Evidence matcher contract', () => {
 
   it('matches large Job Requirement sets in bounded requests and combines the evidence', async () => {
     const requests: Request[] = []
+    const signals: (AbortSignal | null)[] = []
     const largeRequirements = createRequirements({ count: 26 })
     const matcher = createOpenAiMatchEvidenceMatcher({
       apiKey: 'test-api-key',
@@ -85,6 +86,7 @@ describe('OpenAI Match Evidence matcher contract', () => {
       reasoningEffort: 'low',
       request: (input, init) => {
         requests.push(new Request(input, init))
+        signals.push(init?.signal ?? null)
         const offset = requests.length === 1 ? 0 : 25
         const batchRequirements = largeRequirements.slice(offset, offset + 25)
         return Promise.resolve(Response.json(createOpenAiResponse({
@@ -100,6 +102,7 @@ describe('OpenAI Match Evidence matcher contract', () => {
       value: createAnalysis({ requirements: largeRequirements }),
     })
     expect(await readRequirementCounts(requests)).toEqual([25, 1])
+    expect(signals).toEqual([expect.any(AbortSignal), signals[0]])
   })
 })
 
