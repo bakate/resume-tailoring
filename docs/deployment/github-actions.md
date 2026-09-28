@@ -20,6 +20,12 @@ Leave required reviewers disabled if every successful push should deploy automat
 The AWS trust policy accepts only this repository's `production` environment. Its branch
 restriction is essential: the environment name replaces the branch in the OIDC subject.
 
+This repository uses GitHub's immutable OIDC subject format. The AWS trust policy must match
+`repo:bakate@38812007/resume-tailoring@1389399266:environment:production` exactly. A name-only
+subject such as `repo:bakate/resume-tailoring:environment:production` will be rejected by AWS.
+Verify the prefix with `gh api repos/bakate/resume-tailoring/actions/oidc/customization/sub`.
+For another repository, configure `GitHubOidcSubjectPrefix` from its `sub_claim_prefix`.
+
 ### 2. Bootstrap AWS access
 
 From the repository root:
@@ -45,6 +51,13 @@ CloudFormation service role. Verify these assumptions if the stack was changed m
 
 The script can be rerun: it preserves the existing bootstrap stack's parameters so OIDC
 provider ownership stays unchanged.
+
+To fix an existing bootstrap stack created with the old name-only subject, obtain this
+updated template and rerun `bash scripts/bootstrap-github-actions.sh` while authenticated
+to AWS. The new `GitHubOidcSubjectPrefix` parameter uses the immutable prefix above by
+default. The role ARN stays unchanged, so no GitHub secret replacement is required. Then
+rerun the failed deployment job. Merging a template change alone does not update this
+separate bootstrap stack.
 
 ### 3. Configure Cloudflare credentials
 
