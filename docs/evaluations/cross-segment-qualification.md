@@ -2,7 +2,9 @@
 
 The deterministic qualification corpus is `cross-segment-qualification-v1` in
 `apps/web/src/model-evaluation/cross-segment-corpus.ts`. It contains 70 reviewed
-Candidate/Job Posting pairs: 30 technology, 20 general-management, and 20 sales.
+Candidate/Job Posting pairs: 30 technology, 20 general-management, and 20
+reviewed sales and commercial scenarios sourced from
+`apps/web/src/model-evaluation/sales-commercial-corpus.ts`.
 Each fixture records the Source Document, Job Posting, expected Job Requirements and
 importance, Match Evidence proposals, prohibited fact/requirement relationships, the
 Critical Requirement Reserve, an acceptable Match Score range, and deterministic
