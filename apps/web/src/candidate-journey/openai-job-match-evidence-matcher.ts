@@ -33,6 +33,13 @@ export type OpenAiMatchEvidenceFailure = Readonly<{
   maximumCharacterCount?: number
 }> | OpenAiRequestFailure
 
+type InvalidModelOutputCause =
+  | 'invalid-json'
+  | 'invalid-response-shape'
+  | 'invalid-schema'
+  | 'missing-output-text'
+  | 'unknown-reference'
+
 export async function requestOpenAiJobMatchEvidence({
   apiKey, matchRequest, model, reasoningEffort, request = fetch,
 }: Readonly<{
@@ -95,17 +102,30 @@ function parseResponse({ matchRequest, value }: Readonly<{
   matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
   value: unknown
 }>) {
-  const outputText = readOutputText({ value })
-  if (outputText === null) return invalidModelOutputResult
+  const outputTextResult = readOutputText({ value })
+  if (!outputTextResult.ok) return createInvalidModelOutputResult({ cause: outputTextResult.error })
+  let parsedValue: unknown
   try {
-    const proposal = matchEvidenceProposalSchema.safeParse(JSON.parse(outputText))
-    if (!proposal.success || !hasKnownReferences({ matchRequest, proposal: proposal.data })) {
-      return invalidModelOutputResult
-    }
-    return { ok: true, value: proposal.data } as const
+    parsedValue = JSON.parse(outputTextResult.value) as unknown
   } catch {
-    return invalidModelOutputResult
+    return createInvalidModelOutputResult({ cause: 'invalid-json' })
   }
+  const proposal = matchEvidenceProposalSchema.safeParse(parsedValue)
+  if (!proposal.success) return createInvalidModelOutputResult({ cause: 'invalid-schema' })
+  if (!hasKnownReferences({ matchRequest, proposal: proposal.data })) {
+    return createInvalidModelOutputResult({ cause: 'unknown-reference' })
+  }
+  return { ok: true, value: proposal.data } as const
+}
+
+function createInvalidModelOutputResult({ cause }: Readonly<{ cause: InvalidModelOutputCause }>) {
+  console.info(JSON.stringify({
+    category: 'privacy-safe-openai-request',
+    metric: 'rejected',
+    value: 1,
+    dimensions: { cause, operation: 'explainable-match-evidence' },
+  }))
+  return invalidModelOutputResult
 }
 
 function hasKnownReferences({ matchRequest, proposal }: Readonly<{
@@ -123,16 +143,19 @@ function hasKnownReferences({ matchRequest, proposal }: Readonly<{
 
 function readOutputText({ value }: Readonly<{ value: unknown }>) {
   const response = openAiResponseSchema.safeParse(value)
-  if (!response.success) return null
+  if (!response.success) return { ok: false, error: 'invalid-response-shape' } as const
+  if (typeof response.data.output_text === 'string') {
+    return { ok: true, value: response.data.output_text } as const
+  }
   for (const item of response.data.output) {
     const parsedItem = openAiOutputItemSchema.safeParse(item)
     if (!parsedItem.success) continue
     for (const content of parsedItem.data.content) {
       const parsedContent = openAiOutputTextSchema.safeParse(content)
-      if (parsedContent.success) return parsedContent.data.text
+      if (parsedContent.success) return { ok: true, value: parsedContent.data.text } as const
     }
   }
-  return null
+  return { ok: false, error: 'missing-output-text' } as const
 }
 
 const matchingInstructions = [
@@ -147,7 +170,10 @@ const matchingInstructions = [
   'Never invent identifiers, facts, requirements, or evidence.',
 ].join(' ')
 
-const openAiResponseSchema = z.object({ output: z.array(z.unknown()) })
+const openAiResponseSchema = z.object({
+  output: z.array(z.unknown()).default([]),
+  output_text: z.string().optional(),
+})
 const openAiOutputItemSchema = z.object({ content: z.array(z.unknown()) })
 const openAiOutputTextSchema = z.object({ type: z.literal('output_text'), text: z.string() })
 const unavailableResult = { ok: false, error: 'match-evidence-unavailable' } as const
