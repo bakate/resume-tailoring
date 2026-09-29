@@ -1,4 +1,6 @@
 type OpenAiOperation =
+  | 'explainable-job-posting-extraction'
+  | 'explainable-match-evidence'
   | 'job-requirement-extraction'
   | 'match-analysis'
   | 'resume-claim-validation'

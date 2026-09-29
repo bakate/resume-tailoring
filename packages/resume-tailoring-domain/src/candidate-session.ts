@@ -1,5 +1,6 @@
 import type { ProcessingConsent } from './processing-policy'
 import type { SourceIntake } from './source-intake'
+import type { JobMatch } from './job-match'
 
 export const candidateJourneyPhases = [
   'source-intake',
@@ -10,11 +11,12 @@ export const candidateJourneyPhases = [
 export type CandidateJourneyPhase = typeof candidateJourneyPhases[number]
 export type CandidateSessionId = `candidate-session-${string}`
 
-export const candidateSessionStorageVersion = 3
+export const candidateSessionStorageVersion = 4
 export const candidateSessionDurationMilliseconds = 24 * 60 * 60 * 1_000
 
 export type CandidateSession = Readonly<{
   expiresAt: number
+  jobMatch: JobMatch | null
   phase: CandidateJourneyPhase
   processingConsent: ProcessingConsent | null
   sessionId: CandidateSessionId

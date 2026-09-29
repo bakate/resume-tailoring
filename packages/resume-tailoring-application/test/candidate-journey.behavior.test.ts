@@ -160,7 +160,19 @@ class CandidateJourneyTestSystem {
     this.#candidateJourney = createCandidateJourney({
       dependencies: {
         createSessionId: () => '00000000-0000-4000-8000-000000000039',
+        jobPostingDocumentReader: { read: () => Promise.resolve({
+          ok: false,
+          error: 'unsupported-job-posting',
+        }) },
+        jobPostingExtractor: { extract: () => Promise.resolve({
+          ok: false,
+          error: 'job-posting-extraction-unavailable',
+        }) },
         languageModelGateway: { processingPolicy },
+        matchEvidenceMatcher: { match: () => Promise.resolve({
+          ok: false,
+          error: 'match-evidence-unavailable',
+        }) },
         now: () => currentTime,
         persistence: createInMemoryPersistence({ storedSession }),
         sourceDocumentReader: { read: ({ bytes }) => Promise.resolve(
@@ -427,6 +439,7 @@ function createInMemoryPersistence({ storedSession }: Readonly<{
 function createConsentedCandidateSession(): CandidateSession {
   return {
     expiresAt: currentTime + candidateSessionDurationMilliseconds,
+    jobMatch: null,
     phase: 'source-intake',
     processingConsent: { grantedAt: currentTime, policy: activeProcessingPolicy },
     sessionId: 'candidate-session-00000000-0000-4000-8000-000000000039',

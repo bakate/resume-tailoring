@@ -15,6 +15,14 @@ import {
   createSourceIntake,
   resolveCriticalAmbiguity,
 } from './source-intake'
+import { createJobMatch } from './job-match'
+import type {
+  JobMatchFailure,
+  JobPostingDocument,
+  JobPostingDocumentReader,
+  JobPostingExtractor,
+  MatchEvidenceMatcher,
+} from './job-match'
 import type {
   SourceDocument,
   SourceDocumentReader,
@@ -54,7 +62,10 @@ export type CandidateSessionPersistence = Readonly<{
 
 export type CandidateJourneyDependencies = Readonly<{
   createSessionId: () => string
+  jobPostingDocumentReader: JobPostingDocumentReader
+  jobPostingExtractor: JobPostingExtractor
   languageModelGateway: Readonly<{ processingPolicy: ProcessingPolicy }>
+  matchEvidenceMatcher: MatchEvidenceMatcher
   now: () => number
   persistence: CandidateSessionPersistence
   sourceDocumentReader: SourceDocumentReader
@@ -66,8 +77,13 @@ type CandidateJourneySourceIntakeFailure =
   | 'ambiguity-unavailable'
   | 'candidate-session-storage-unavailable'
 
+type CandidateJourneyJobMatchFailure =
+  | JobMatchFailure
+  | 'candidate-session-storage-unavailable'
+
 type CandidateJourneyContext = Readonly<{
   dependencies: CandidateJourneyDependencies
+  jobMatchFailure: CandidateJourneyJobMatchFailure | null
   notice: CandidateSessionNotice
   sourceIntakeFailure: CandidateJourneySourceIntakeFailure | null
   session: CandidateSession | null
@@ -79,6 +95,7 @@ type CandidateJourneyEvent =
   | Readonly<{ type: 'RESOLVE_CRITICAL_AMBIGUITY'; ambiguityId: `critical-ambiguity-${string}`; answer: string }>
   | Readonly<{ type: 'SUBMIT_SOURCE_DOCUMENT'; document: SourceDocument }>
   | Readonly<{ type: 'START_CANDIDATE_SESSION' }>
+  | Readonly<{ type: 'SUBMIT_JOB_POSTING'; document: JobPostingDocument }>
 
 type RestoredCandidateSession = Readonly<{
   notice: CandidateSessionNotice
@@ -92,7 +109,9 @@ export type CandidateJourneyView =
       status: 'candidate-session-open'
       processingConsentStatus: 'granted' | 'required'
       processingPolicy: ProcessingPolicy
-      operation: 'processing-source-document' | 'resolving-critical-ambiguity' | null
+      jobMatchFailure: CandidateJourneyJobMatchFailure | null
+      operation: 'processing-job-posting' | 'processing-source-document'
+        | 'resolving-critical-ambiguity' | null
       session: CandidateSession
       sourceIntakeFailure: CandidateJourneySourceIntakeFailure | null
     }>
@@ -108,6 +127,7 @@ export type CandidateJourney = Readonly<{
   }>) => void
   start: () => void
   startCandidateSession: () => void
+  submitJobPosting: (document: JobPostingDocument) => void
   submitSourceDocument: (document: SourceDocument) => void
   subscribe: (listener: () => void) => () => void
 }>
@@ -124,6 +144,7 @@ const startCandidateSession = fromPromise<
   const startedAt = input.now()
   const session = {
     expiresAt: startedAt + candidateSessionDurationMilliseconds,
+    jobMatch: null,
     phase: 'source-intake',
     processingConsent: null,
     sessionId: `candidate-session-${input.createSessionId()}`,
@@ -170,6 +191,7 @@ const submitSourceDocument = fromPromise<SourceIntakeActorResult, SourceIntakeAc
   if (!sourceIntakeResult.ok) return sourceIntakeResult
   const nextSession = {
     ...input.session,
+    jobMatch: null,
     phase: sourceIntakeResult.value.criticalAmbiguities.length === 0
       ? 'job-match' as const
       : 'source-intake' as const,
@@ -204,12 +226,42 @@ const persistCriticalAmbiguityResolution = fromPromise<
   if (!resolution.ok) return Promise.resolve(resolution)
   const nextSession = {
     ...input.session,
+    jobMatch: null,
     phase: resolution.value.criticalAmbiguities.length === 0
       ? 'job-match' as const
       : 'source-intake' as const,
     sourceIntake: resolution.value,
   }
   return Promise.resolve(input.dependencies.persistence.save({ session: nextSession }))
+})
+
+type JobMatchActorInput = Readonly<{
+  dependencies: CandidateJourneyDependencies
+  document: JobPostingDocument
+  session: CandidateSession | null
+}>
+type JobMatchActorResult = CandidateSessionStorageResult<CandidateSession>
+  | Readonly<{ ok: false; error: JobMatchFailure }>
+
+const submitJobPosting = fromPromise<JobMatchActorResult, JobMatchActorInput>(async ({ input }) => {
+  if (input.session?.sourceIntake === null || input.session === null) {
+    return storageUnavailableResult
+  }
+  if (!hasProcessingConsentForPolicy({
+    consent: input.session.processingConsent,
+    policy: input.dependencies.languageModelGateway.processingPolicy,
+  })) return processingConsentRequiredResult
+  const jobMatchResult = await createJobMatch({
+    candidateFacts: input.session.sourceIntake.candidateFacts,
+    document: input.document,
+    jobPostingDocumentReader: input.dependencies.jobPostingDocumentReader,
+    jobPostingExtractor: input.dependencies.jobPostingExtractor,
+    matchEvidenceMatcher: input.dependencies.matchEvidenceMatcher,
+  })
+  if (!jobMatchResult.ok) return jobMatchResult
+  return input.dependencies.persistence.save({
+    session: { ...input.session, jobMatch: jobMatchResult.value },
+  })
 })
 
 const candidateJourneyMachine = setup({
@@ -219,6 +271,7 @@ const candidateJourneyMachine = setup({
     persistCriticalAmbiguityResolution,
     restoreCandidateSession,
     startCandidateSession,
+    submitJobPosting,
     submitSourceDocument,
   },
   delays: {
@@ -234,6 +287,7 @@ const candidateJourneyMachine = setup({
 }).createMachine({
   context: ({ input }: Readonly<{ input: CandidateJourneyDependencies }>) => ({
     dependencies: input,
+    jobMatchFailure: null,
     notice: null,
     sourceIntakeFailure: null,
     session: null,
@@ -272,6 +326,40 @@ const candidateJourneyMachine = setup({
           actions: assign({ sourceIntakeFailure: null }),
           target: 'processingSourceDocument',
         },
+        SUBMIT_JOB_POSTING: {
+          actions: assign({ jobMatchFailure: null }),
+          target: 'processingJobPosting',
+        },
+      },
+    },
+    processingJobPosting: {
+      invoke: {
+        input: ({ context, event }) => ({
+          dependencies: context.dependencies,
+          document: event.type === 'SUBMIT_JOB_POSTING' ? event.document : emptyJobPostingDocument,
+          session: context.session,
+        }),
+        onDone: [
+          {
+            actions: assign({
+              jobMatchFailure: null,
+              session: ({ event }) => event.output.ok ? event.output.value : null,
+            }),
+            guard: ({ event }) => event.output.ok,
+            target: 'candidateSessionAvailable',
+          },
+          {
+            actions: assign({
+              jobMatchFailure: ({ event }) => readJobMatchFailure({ result: event.output }),
+            }),
+            target: 'candidateSessionAvailable',
+          },
+        ],
+        onError: {
+          actions: assign({ jobMatchFailure: 'match-evidence-unavailable' }),
+          target: 'candidateSessionAvailable',
+        },
+        src: 'submitJobPosting',
       },
     },
     processingSourceDocument: {
@@ -441,6 +529,9 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     },
     start: () => { actor.start() },
     startCandidateSession: () => { actor.send({ type: 'START_CANDIDATE_SESSION' }) },
+    submitJobPosting: (document) => {
+      actor.send({ type: 'SUBMIT_JOB_POSTING', document })
+    },
     submitSourceDocument: (document) => {
       actor.send({ type: 'SUBMIT_SOURCE_DOCUMENT', document })
     },
@@ -465,6 +556,7 @@ function readCandidateJourneyView({ snapshot }: Readonly<{
   }
   if (snapshot.context.session !== null && (
     snapshot.matches('candidateSessionAvailable')
+    || snapshot.matches('processingJobPosting')
     || snapshot.matches('processingSourceDocument')
     || snapshot.matches('resolvingCriticalAmbiguity')
     || snapshot.matches('persistingProcessingConsent')
@@ -476,8 +568,11 @@ function readCandidateJourneyView({ snapshot }: Readonly<{
         policy: processingPolicy,
       }) ? 'granted' : 'required',
       processingPolicy,
-      operation: snapshot.matches('processingSourceDocument')
-        ? 'processing-source-document'
+      jobMatchFailure: snapshot.context.jobMatchFailure,
+      operation: snapshot.matches('processingJobPosting')
+        ? 'processing-job-posting'
+        : snapshot.matches('processingSourceDocument')
+          ? 'processing-source-document'
         : snapshot.matches('resolvingCriticalAmbiguity')
           ? 'resolving-critical-ambiguity'
           : null,
@@ -499,9 +594,16 @@ const processingConsentRequiredResult = {
 } as const
 const ambiguityUnavailableResult = { ok: false, error: 'ambiguity-unavailable' } as const
 const emptySourceDocument = { bytes: new Uint8Array(), mediaType: '', name: '' } as const
+const emptyJobPostingDocument = { bytes: new Uint8Array(), mediaType: '', name: '' } as const
 
 function readSourceIntakeFailure({ result }: Readonly<{
   result: SourceIntakeActorResult | ResolveAmbiguityActorResult
 }>): CandidateJourneySourceIntakeFailure | null {
+  return result.ok ? null : result.error
+}
+
+function readJobMatchFailure({ result }: Readonly<{
+  result: JobMatchActorResult
+}>): CandidateJourneyJobMatchFailure | null {
   return result.ok ? null : result.error
 }

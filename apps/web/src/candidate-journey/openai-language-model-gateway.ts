@@ -12,6 +12,10 @@ import type {
   StructuredSourceProfileExtractor,
 } from '@resume-tailoring/application/source-intake'
 import type {
+  JobPostingExtractor as ExplainableJobPostingExtractor,
+  MatchEvidenceMatcher as ExplainableMatchEvidenceMatcher,
+} from '@resume-tailoring/application/job-match'
+import type {
   JobRequirementExtractor,
   MatchEvidenceMatcher,
   ResumeClaimSemanticValidator,
@@ -26,8 +30,14 @@ import {
   createBrowserSourceProfileExtractor,
 } from '../resume-tailoring/browser-adapters'
 import { createBrowserStructuredSourceProfileExtractor } from './browser-structured-source-profile-extractor'
+import {
+  createBrowserJobMatchEvidenceMatcher,
+  createBrowserJobPostingExtractor,
+} from './browser-job-match-adapters'
 
 type StructuredModelRequest =
+  | ModelRequest<'explainable-job-posting-extraction', Parameters<ExplainableJobPostingExtractor['extract']>[0]>
+  | ModelRequest<'explainable-match-evidence', Parameters<ExplainableMatchEvidenceMatcher['match']>[0]>
   | ModelRequest<'job-requirement-extraction', Parameters<JobRequirementExtractor['extract']>[0]>
   | ModelRequest<'match-analysis', Parameters<MatchEvidenceMatcher['match']>[0]>
   | ModelRequest<'resume-claim-validation', Parameters<ResumeClaimSemanticValidator['validate']>[0]>
@@ -37,6 +47,8 @@ type WritingModelRequest =
   | ModelRequest<'resume-claim-reformulation', Parameters<ResumeClaimWriter['reformulate']>[0]>
   | ModelRequest<'resume-claim-writing', Parameters<ResumeClaimWriter['write']>[0]>
 type StructuredModelValue =
+  | ModelValue<'explainable-job-posting-extraction', ExplainableJobPostingExtractor['extract']>
+  | ModelValue<'explainable-match-evidence', ExplainableMatchEvidenceMatcher['match']>
   | ModelValue<'job-requirement-extraction', JobRequirementExtractor['extract']>
   | ModelValue<'match-analysis', MatchEvidenceMatcher['match']>
   | ModelValue<'resume-claim-validation', ResumeClaimSemanticValidator['validate']>
@@ -63,6 +75,8 @@ export type OpenAiLanguageModelGateway = LanguageModelGateway<
 >
 
 type OpenAiModelAdapters = Readonly<{
+  explainableJobPostingExtractor: ExplainableJobPostingExtractor
+  explainableMatchEvidenceMatcher: ExplainableMatchEvidenceMatcher
   jobRequirementExtractor: JobRequirementExtractor
   matchEvidenceMatcher: MatchEvidenceMatcher
   resumeClaimSemanticValidator: ResumeClaimSemanticValidator
@@ -118,6 +132,8 @@ function createOpenAiModelAdapters({ request }: Readonly<{
   request: typeof fetch
 }>): OpenAiModelAdapters {
   return {
+    explainableJobPostingExtractor: createBrowserJobPostingExtractor({ request }),
+    explainableMatchEvidenceMatcher: createBrowserJobMatchEvidenceMatcher({ request }),
     jobRequirementExtractor: createBrowserJobRequirementExtractor({ request }),
     matchEvidenceMatcher: createBrowserMatchEvidenceMatcher({ request }),
     resumeClaimSemanticValidator: createBrowserResumeClaimSemanticValidator({ request }),
@@ -131,6 +147,14 @@ async function processStructured({ modelAdapters, modelRequest }: Readonly<{
   modelAdapters: OpenAiModelAdapters
   modelRequest: StructuredModelRequest
 }>): Promise<LanguageModelResult<StructuredModelValue>> {
+  if (modelRequest.operation === 'explainable-job-posting-extraction') {
+    const result = await modelAdapters.explainableJobPostingExtractor.extract(modelRequest.input)
+    return toGatewayResult({ operation: modelRequest.operation, result })
+  }
+  if (modelRequest.operation === 'explainable-match-evidence') {
+    const result = await modelAdapters.explainableMatchEvidenceMatcher.match(modelRequest.input)
+    return toGatewayResult({ operation: modelRequest.operation, result })
+  }
   if (modelRequest.operation === 'source-profile-extraction') {
     const result = await modelAdapters.sourceProfileExtractor.extract(modelRequest.input)
     return toGatewayResult({ operation: modelRequest.operation, result })
@@ -150,6 +174,8 @@ async function processStructuredAnalysis({ modelAdapters, modelRequest }: Readon
   modelAdapters: OpenAiModelAdapters
   modelRequest: Exclude<StructuredModelRequest,
   { readonly operation:
+    | 'explainable-job-posting-extraction'
+    | 'explainable-match-evidence'
     | 'job-requirement-extraction'
     | 'source-profile-extraction'
     | 'structured-source-profile-extraction'

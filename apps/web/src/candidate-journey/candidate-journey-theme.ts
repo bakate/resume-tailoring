@@ -2,6 +2,10 @@ import { createTheme } from '@mantine/core'
 
 export const candidateJourneyTheme = createTheme({
   colors: {
+    caution: [
+      '#fff8e6', '#ffefbf', '#ffe494', '#ffd866', '#ffcd3f',
+      '#f5b800', '#d99d00', '#ad7900', '#805800', '#543900',
+    ],
     danger: [
       '#fff1f0',
       '#ffe0dd',
@@ -25,6 +29,10 @@ export const candidateJourneyTheme = createTheme({
       '#26806a',
       '#1b5e4d',
       '#0f3d2f',
+    ],
+    informative: [
+      '#edf5ff', '#dce8f8', '#b8d0ef', '#91b6e6', '#6fa0de',
+      '#578fd9', '#4986d7', '#3974bf', '#2d66ac', '#1c5798',
     ],
   },
   cursorType: 'pointer',

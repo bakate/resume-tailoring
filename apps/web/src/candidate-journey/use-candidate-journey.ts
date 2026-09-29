@@ -4,6 +4,7 @@ import { createCandidateJourney } from '@resume-tailoring/application/candidate-
 import { createBrowserCandidateSessionPersistence } from './browser-candidate-session-persistence'
 import { createOpenAiLanguageModelGateway } from './openai-language-model-gateway'
 import { createBrowserSourceIntakeDocumentReader } from './source-intake-document-reader'
+import { createBrowserJobPostingDocumentReader } from './job-posting-document-reader'
 import type { CandidateJourney } from '@resume-tailoring/application/candidate-journey'
 
 export function useCandidateJourney() {
@@ -23,6 +24,7 @@ export function useCandidateJourney() {
     languageModelGateway: candidateJourneySystem.languageModelGateway,
     resolveCriticalAmbiguity: candidateJourney.resolveCriticalAmbiguity,
     startCandidateSession: candidateJourney.startCandidateSession,
+    submitJobPosting: candidateJourney.submitJobPosting,
     submitSourceDocument: candidateJourney.submitSourceDocument,
     view,
   } as const
@@ -36,7 +38,26 @@ function createBrowserCandidateJourneySystem() {
   candidateJourney = createCandidateJourney({
     dependencies: {
       createSessionId: () => crypto.randomUUID(),
+      jobPostingDocumentReader: createBrowserJobPostingDocumentReader(),
+      jobPostingExtractor: { extract: async (input) => {
+        const result = await languageModelGateway.structured.process({
+          input,
+          operation: 'explainable-job-posting-extraction',
+        })
+        return result.ok && result.value.operation === 'explainable-job-posting-extraction'
+          ? { ok: true, value: result.value.value }
+          : { ok: false, error: 'job-posting-extraction-unavailable' as const }
+      } },
       languageModelGateway,
+      matchEvidenceMatcher: { match: async (input) => {
+        const result = await languageModelGateway.structured.process({
+          input,
+          operation: 'explainable-match-evidence',
+        })
+        return result.ok && result.value.operation === 'explainable-match-evidence'
+          ? { ok: true, value: result.value.value }
+          : { ok: false, error: 'match-evidence-unavailable' as const }
+      } },
       now: () => Date.now(),
       persistence: createBrowserCandidateSessionPersistence({ storage: localStorage }),
       sourceDocumentReader: createBrowserSourceIntakeDocumentReader(),
