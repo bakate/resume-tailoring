@@ -28,6 +28,7 @@ describe('Resume Claim workflow', () => {
     await system.generateTailoredResume()
 
     system.expectAProvenanceBackedClaim()
+    system.expectTailoredResumeProgressionToBeRecorded()
   })
 
   it('writes Resume Claims in the Candidate-selected language', async () => {
@@ -360,6 +361,13 @@ class ResumeClaimWorkflowTestSystem {
 
   expectGenerationToSucceed() {
     expect(this.#readActionResult().ok).toBe(true)
+  }
+
+  expectTailoredResumeProgressionToBeRecorded() {
+    expect(this.#telemetry.recordedEvents()).toEqual([{
+      name: 'candidate-journey-phase-reached',
+      phase: 'tailored-resume-preparation',
+    }])
   }
 
   expectSupportedEditToBePersisted() {

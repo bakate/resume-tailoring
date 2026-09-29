@@ -60,4 +60,19 @@ describe('privacy-safe analytics observability', () => {
     })
     expect(metric.dimensions).not.toHaveProperty('candidateId')
   })
+
+  it('produces a journey counter with only the reached phase', () => {
+    const metric = createPrivacySafeAggregateMetric({
+      name: 'candidate-journey-phase-reached',
+      phase: 'tailored-resume-preparation',
+    })
+
+    expect(metric).toEqual({
+      category: 'privacy-safe-mvp-analytics',
+      metric: 'candidate-journey-phase-reached',
+      value: 1,
+      dimensions: { phase: 'tailored-resume-preparation' },
+    })
+    expect(metric.dimensions).not.toHaveProperty('sessionId')
+  })
 })
