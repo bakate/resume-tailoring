@@ -4,6 +4,7 @@ import type {
   JobRequirement,
   ProposedFactMatch,
   ProposedMatchEvidence,
+  ProposedRelevantFact,
 } from './resume-matching-engine'
 import { canonicalizeKnownTerm, foldText, normalizeText } from './text-normalization'
 
@@ -24,6 +25,39 @@ export function validateMatchEvidence({
   }))
   const validEvidence = evidence.filter((item) => item !== null)
   return proposedEvidence.length > 0 && validEvidence.length === 0 ? null : validEvidence
+}
+
+export function validateRelevantFactProposals({
+  candidateFacts, proposals, requirements,
+}: Readonly<{
+  candidateFacts: readonly CandidateFact[]
+  proposals: readonly ProposedRelevantFact[]
+  requirements: readonly JobRequirement[]
+}>) {
+  const candidateFactById = new Map(candidateFacts.map((fact) => [fact.id, fact]))
+  const requirementById = new Map(requirements.map((requirement) => [requirement.id, requirement]))
+  const references = new Set<string>()
+  const relevantFactIds = proposals.map((proposal) => validateRelevanceProposal({
+    candidateFactById, proposal, references, requirementById,
+  }))
+  if (relevantFactIds.some((factId) => factId === null)) return null
+  return [...new Set(relevantFactIds)] as string[]
+}
+
+function validateRelevanceProposal({
+  candidateFactById, proposal, references, requirementById,
+}: Readonly<{
+  candidateFactById: ReadonlyMap<string, CandidateFact>
+  proposal: ProposedRelevantFact
+  references: Set<string>
+  requirementById: ReadonlyMap<string, JobRequirement>
+}>) {
+  const fact = candidateFactById.get(proposal.factMatch.factId)
+  const requirement = requirementById.get(proposal.requirementId)
+  const reference = `${proposal.requirementId}:${proposal.factMatch.factId}`
+  if (fact === undefined || requirement === undefined || references.has(reference)) return null
+  references.add(reference)
+  return provesRelevance({ fact, factMatch: proposal.factMatch, requirement }) ? fact.id : null
 }
 
 type EvidenceProposalValidation = Readonly<{
@@ -74,16 +108,7 @@ type RequirementProof = Readonly<{
 }>
 
 function provesRequirement({ coverage, fact, factMatch, requirement }: RequirementProof) {
-  if (!containsProposedTerms({ fact, factMatch, requirement })) return false
-  const factTerm = normalizeTerm({ value: factMatch.factTerm })
-  const requirementTerm = normalizeTerm({ value: factMatch.requirementTerm })
-  if (rejectsCandidateFact({ fact, factTerm, originalFactTerm: factMatch.factTerm })) return false
-  if (!representsCompleteRequirementConcept({ requirement, requirementTerm })) return false
-  if (!hasEquivalentEvidenceTerms({
-    factTerm,
-    relationship: factMatch.relationship,
-    requirementTerm,
-  })) return false
+  if (!provesRelevance({ fact, factMatch, requirement })) return false
   const satisfiesConstraints = satisfiesRequirementConstraints({
     fact,
     factTerm: factMatch.factTerm,
@@ -91,6 +116,19 @@ function provesRequirement({ coverage, fact, factMatch, requirement }: Requireme
     requirementTerm: factMatch.requirementTerm,
   })
   return coverage === 'covered' ? satisfiesConstraints : !satisfiesConstraints
+}
+
+function provesRelevance({ fact, factMatch, requirement }: Omit<RequirementProof, 'coverage'>) {
+  if (!containsProposedTerms({ fact, factMatch, requirement })) return false
+  const factTerm = normalizeTerm({ value: factMatch.factTerm })
+  const requirementTerm = normalizeTerm({ value: factMatch.requirementTerm })
+  if (rejectsCandidateFact({ fact, factTerm, originalFactTerm: factMatch.factTerm })) return false
+  if (!representsCompleteRequirementConcept({ requirement, requirementTerm })) return false
+  return hasEquivalentEvidenceTerms({
+    factTerm,
+    relationship: factMatch.relationship,
+    requirementTerm,
+  })
 }
 
 function containsProposedTerms({ fact, factMatch, requirement }: Omit<RequirementProof, 'coverage'>) {

@@ -64,6 +64,19 @@ test.describe('Candidate Journey', () => {
     await system.expectActiveProcessingPolicyToBeVisible()
   })
 
+  test('the active Processing Policy content follows the selected locale', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    // Given
+    await system.givenCandidateSessionIsActive()
+
+    // Action
+    await system.selectFrenchLocale()
+
+    // Then
+    await system.expectFrenchProcessingPolicyToBeVisible()
+  })
+
   test('a Candidate grants Processing Consent to the active policy', async ({ page }) => {
     const system = createSystemUnderTest({ page })
 
@@ -133,15 +146,76 @@ test.describe('Candidate Journey', () => {
     // Then
     await system.expectExplainableMatchAnalysisToBeVisible()
   })
+
+  test('a Candidate confirms targeted missing evidence and receives a fresh Match Analysis', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    // Given
+    await system.givenProcessingConsentIsGranted()
+    await system.givenStructuredSourceProfileExtractionSucceeds()
+    await system.givenSourceIntakeIsReadyForJobMatch()
+    await system.givenExplainableJobMatchSucceeds()
+    await system.submitPastedJobPosting()
+    await system.expectTargetedProfileEnrichmentIsVisible()
+    system.givenProfileEnrichmentRefreshSucceeds()
+
+    // Action
+    await system.confirmProfileEnrichment()
+
+    // Then
+    await system.expectCandidateFactAndFreshMatchAnalysis()
+  })
+
+  test('a low Match Score warns without blocking an evidence-backed Tailored Resume', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    // Given
+    await system.givenProcessingConsentIsGranted()
+    await system.givenStructuredSourceProfileExtractionSucceeds()
+    await system.givenSourceIntakeIsReadyForJobMatch()
+    await system.givenLowExplainableJobMatchSucceeds()
+
+    // Action
+    await system.submitPastedJobPosting()
+
+    // Then
+    await system.expectLowScoreWarningAndTailoredResumeOffer()
+  })
+
+  test('no relevant evidence offers only an explicitly non-tailored normalized source resume', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    // Given
+    await system.givenProcessingConsentIsGranted()
+    await system.givenStructuredSourceProfileExtractionSucceeds()
+    await system.givenSourceIntakeIsReadyForJobMatch()
+    await system.givenUnsupportedJobMatchSucceeds()
+
+    // Action
+    await system.submitPastedJobPosting()
+
+    // Then
+    await system.expectOnlyNormalizedSourceResumeOffer()
+  })
 })
 
 function createSystemUnderTest({ page }: Readonly<{ page: Page }>) {
   return new CandidateJourneyTestSystem(page)
 }
 
+type MatchEvidenceApiResponse = typeof matchEvidenceResponse
+  | ReturnType<typeof createEnrichedMatchEvidenceResponse>
+  | typeof lowMatchEvidenceResponse
+  | typeof unsupportedMatchEvidenceResponse
+
 class CandidateJourneyTestSystem {
   readonly #page: Page
   #completedAction: CandidateJourneyAction | null = null
+  #matchEvidenceResponse: MatchEvidenceApiResponse = matchEvidenceResponse
+  #readMatchEvidenceResponse: (candidateFacts: readonly Readonly<{
+    id: `source-fact-${string}`
+  }>[]) => MatchEvidenceApiResponse = () => this.#matchEvidenceResponse
+  #lastMatchResponse: unknown = null
 
   constructor(page: Page) {
     this.#page = page
@@ -186,9 +260,39 @@ class CandidateJourneyTestSystem {
     await this.#page.route('**/api/explainable-job-posting-extraction', (route) => (
       route.fulfill({ json: jobPostingExtractionResponse })
     ))
-    await this.#page.route('**/api/explainable-match-evidence', (route) => (
-      route.fulfill({ json: matchEvidenceResponse })
-    ))
+    await this.#page.route('**/api/explainable-match-evidence', async (route) => {
+      const request = route.request().postDataJSON() as Readonly<{
+        candidateFacts: readonly Readonly<{ id: `source-fact-${string}` }>[]
+      }>
+      const response = this.#readMatchEvidenceResponse(request.candidateFacts)
+      await route.fulfill({ json: response })
+    })
+  }
+
+  async givenLowExplainableJobMatchSucceeds() {
+    this.#matchEvidenceResponse = lowMatchEvidenceResponse
+    await this.givenExplainableJobMatchSucceeds()
+  }
+
+  async givenUnsupportedJobMatchSucceeds() {
+    this.#matchEvidenceResponse = unsupportedMatchEvidenceResponse
+    await this.givenExplainableJobMatchSucceeds()
+  }
+
+  givenProfileEnrichmentRefreshSucceeds() {
+    this.#readMatchEvidenceResponse = (candidateFacts) => {
+      const enrichedFactId = candidateFacts.at(-1)?.id
+      return enrichedFactId === undefined ? this.#matchEvidenceResponse
+        : createEnrichedMatchEvidenceResponse({ enrichedFactId })
+    }
+  }
+
+  async expectTargetedProfileEnrichmentIsVisible() {
+    this.#expectCompletedAction('job-posting-submitted')
+    const enrichment = this.#page.getByRole('region', { name: 'Optional profile enrichment' })
+    await expect(enrichment).toContainText('Architecture leadership')
+    await expect(enrichment).toContainText('Executive communication')
+    await expect(enrichment).not.toContainText('Kubernetes')
   }
 
   async openCandidateJourney() {
@@ -217,6 +321,11 @@ class CandidateJourneyTestSystem {
     this.#completedAction = 'processing-consent-granted'
   }
 
+  async selectFrenchLocale() {
+    await this.#page.getByRole('radiogroup', { name: 'Language' }).getByText('FR').click()
+    this.#completedAction = 'french-locale-selected'
+  }
+
   async submitPastedProfessionalText() {
     await this.#submitProfessionalText()
     this.#completedAction = 'source-document-submitted'
@@ -233,6 +342,18 @@ class CandidateJourneyTestSystem {
     await this.#page.getByRole('textbox', { name: 'Job Posting text' }).fill(jobPostingText)
     await this.#page.getByRole('button', { name: 'Analyze this Job Posting' }).click()
     this.#completedAction = 'job-posting-submitted'
+  }
+
+  async confirmProfileEnrichment() {
+    const prompt = this.#page.getByRole('group', { name: 'Architecture leadership' })
+    await prompt.getByRole('textbox', { name: 'Describe only what you actually did' })
+      .fill('Practiced Architecture leadership across the organization')
+    const refreshResponse = this.#page.waitForResponse('**/api/explainable-match-evidence')
+    await prompt.getByRole('button', {
+      name: 'Add this Candidate Fact and refresh analysis',
+    }).click()
+    this.#lastMatchResponse = await (await refreshResponse).json()
+    this.#completedAction = 'profile-enrichment-confirmed'
   }
 
   async #submitProfessionalText() {
@@ -264,6 +385,16 @@ class CandidateJourneyTestSystem {
       '02Job MatchCompare your evidence with one Job Posting.',
       '03Tailored Resume PreparationPrepare and export an evidence-backed resume.',
     ])
+  }
+
+  async expectFrenchProcessingPolicyToBeVisible() {
+    this.#expectCompletedAction('french-locale-selected')
+    const policy = this.#page.getByRole('region', { name: 'Politique de Traitement' })
+    await expect(policy).toContainText('Extraire et structurer les preuves professionnelles')
+    await expect(policy).toContainText("Contenu de l’Offre d’emploi")
+    await expect(policy).toContainText('jusqu’à 30 jours')
+    await expect(policy).toContainText('Le contenu du Candidat reste dans le navigateur')
+    await expect(policy).not.toContainText('Extract and structure professional evidence')
   }
 
   async expectCandidateSessionToBeActiveInSourceIntake() {
@@ -322,6 +453,44 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByText('TypeScript', { exact: true }).last()).toBeVisible()
   }
 
+  async expectCandidateFactAndFreshMatchAnalysis() {
+    this.#expectCompletedAction('profile-enrichment-confirmed')
+    expect(this.#lastMatchResponse).toEqual(expect.objectContaining({
+      ok: true,
+      value: expect.objectContaining({
+        evidence: expect.arrayContaining([
+          expect.objectContaining({ requirementId: 'job-requirement-4' }),
+        ]),
+      }),
+    }))
+    await expect(this.#page.getByText('77%')).toBeVisible()
+    await this.#page.getByText('Complete requirement-to-evidence details').click()
+    await expect(this.#page.getByText(
+      'Practiced Architecture leadership across the organization',
+    )).toBeVisible()
+  }
+
+  async expectLowScoreWarningAndTailoredResumeOffer() {
+    this.#expectCompletedAction('job-posting-submitted')
+    await expect(this.#page.getByText(
+      'A low Match Score is a warning, not a generation block.',
+    )).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Prepare my Tailored Resume' }))
+      .toBeEnabled()
+  }
+
+  async expectOnlyNormalizedSourceResumeOffer() {
+    this.#expectCompletedAction('job-posting-submitted')
+    await expect(this.#page.getByText(
+      'No relevant Candidate Fact supports an honest Tailored Resume.',
+    )).toBeVisible()
+    await expect(this.#page.getByRole('button', {
+      name: 'Use my normalized source resume — not tailored',
+    })).toBeEnabled()
+    await expect(this.#page.getByRole('button', { name: 'Prepare my Tailored Resume' }))
+      .toHaveCount(0)
+  }
+
   #expectCompletedAction(expectedAction: CandidateJourneyAction) {
     expect(this.#completedAction, 'Expected a caller-visible Action before reading the outcome')
       .toBe(expectedAction)
@@ -339,7 +508,9 @@ type CandidateJourneyAction =
   | 'candidate-session-restored'
   | 'candidate-session-started'
   | 'critical-ambiguity-answered'
+  | 'french-locale-selected'
   | 'job-posting-submitted'
+  | 'profile-enrichment-confirmed'
   | 'processing-consent-granted'
   | 'source-document-submitted'
 
@@ -425,18 +596,66 @@ const matchEvidenceResponse = {
       evidence('2', 'source-fact-skills-1-name-0', 'React'),
       evidence('3', 'source-fact-skills-2-name-0', 'Node.js'),
     ],
-    relevantFactIds: [
-      'source-fact-skills-0-name-0',
-      'source-fact-skills-1-name-0',
-      'source-fact-skills-2-name-0',
+    relevance: [
+      relevance('1', 'source-fact-skills-0-name-0', 'TypeScript'),
+      relevance('2', 'source-fact-skills-1-name-0', 'React'),
+      relevance('3', 'source-fact-skills-2-name-0', 'Node.js'),
     ],
   },
 } as const
 
-function evidence(identifier: string, factId: `source-fact-${string}`, term: string) {
+const lowMatchEvidenceResponse = {
+  ok: true,
+  value: {
+    evidence: [evidence('1', 'source-fact-skills-0-name-0', 'TypeScript')],
+    relevance: [relevance('1', 'source-fact-skills-0-name-0', 'TypeScript')],
+  },
+} as const
+
+const unsupportedMatchEvidenceResponse = {
+  ok: true,
+  value: { evidence: [], relevance: [] },
+} as const
+
+function createEnrichedMatchEvidenceResponse({ enrichedFactId }: Readonly<{
+  enrichedFactId: `source-fact-${string}`
+}>) {
+  return {
+    ok: true,
+    value: {
+      evidence: [
+        ...matchEvidenceResponse.value.evidence,
+        evidence('4', enrichedFactId, 'Architecture leadership', 'Architecture leadership'),
+      ],
+      relevance: [
+        ...matchEvidenceResponse.value.relevance,
+        relevance('4', enrichedFactId, 'Architecture leadership'),
+      ],
+    },
+  } as const
+}
+
+function evidence(
+  identifier: string,
+  factId: `source-fact-${string}`,
+  requirementTerm: string,
+  factTerm = requirementTerm,
+) {
   return {
     coverage: 'covered',
-    factMatches: [{ factId, factTerm: term, relationship: 'exact', requirementTerm: term }],
+    factMatches: [{ factId, factTerm, relationship: 'exact', requirementTerm }],
+    requirementId: `job-requirement-${identifier}`,
+  }
+}
+
+function relevance(
+  identifier: string,
+  factId: `source-fact-${string}`,
+  requirementTerm: string,
+  factTerm = requirementTerm,
+) {
+  return {
+    factMatch: { factId, factTerm, relationship: 'exact', requirementTerm },
     requirementId: `job-requirement-${identifier}`,
   }
 }

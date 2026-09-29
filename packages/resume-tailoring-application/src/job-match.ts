@@ -5,7 +5,9 @@ import type {
   CandidateFact as EngineCandidateFact,
   MatchAnalysis as EngineMatchAnalysis,
   ProposedMatchEvidence,
+  ProposedRelevantFact,
 } from '@resume-tailoring/matching-engine'
+import { validateRelevantFactProposals } from '@resume-tailoring/matching-engine'
 import type { CandidateFact } from '@resume-tailoring/domain/source-intake'
 import type {
   JobMatch,
@@ -64,7 +66,7 @@ export type JobPostingExtractor = Readonly<{
 
 export type MatchEvidenceProposal = Readonly<{
   evidence: readonly ProposedMatchEvidence[]
-  relevantFactIds: readonly string[]
+  relevance: readonly ProposedRelevantFact[]
 }>
 
 export type MatchEvidenceMatcher = Readonly<{
@@ -76,6 +78,17 @@ export type MatchEvidenceMatcher = Readonly<{
     | Readonly<{ ok: false; error: 'match-evidence-unavailable' }>
   >
 }>
+
+export const profileEnrichmentFactKinds = [
+  'certification',
+  'education',
+  'experience',
+  'language',
+  'project',
+  'skill',
+] as const
+
+export type ProfileEnrichmentFactKind = typeof profileEnrichmentFactKinds[number]
 
 export type JobMatchFailure =
   | JobPostingDocumentFailure
@@ -114,6 +127,29 @@ export async function createJobMatch({
   })
 }
 
+export async function refreshJobMatch({
+  candidateFacts,
+  jobMatch,
+  matchEvidenceMatcher,
+}: Readonly<{
+  candidateFacts: readonly CandidateFact[]
+  jobMatch: JobMatch
+  matchEvidenceMatcher: MatchEvidenceMatcher
+}>): CreateJobMatchResult {
+  const analysisResult = await analyzeCandidateFacts({
+    candidateFacts,
+    matchEvidenceMatcher,
+    requirements: jobMatch.requirements,
+  })
+  if (!analysisResult.ok) return analysisResult
+  return { ok: true, value: {
+    ...jobMatch,
+    analysis: mapMatchAnalysis({ analysis: analysisResult.value }),
+    priorityGapRequirementIds: readPriorityGapRequirementIds({ analysis: analysisResult.value }),
+    strengthRequirementIds: readStrengthRequirementIds({ analysis: analysisResult.value }),
+  } }
+}
+
 async function extractAndAnalyzeJobMatch({
   candidateFacts, content, document, jobPostingExtractor, matchEvidenceMatcher,
 }: Readonly<{
@@ -143,21 +179,45 @@ type AnalyzeExtractedJobPostingRequest = Readonly<{
 async function analyzeExtractedJobPosting({
   candidateFacts, content, document, extraction, matchEvidenceMatcher,
 }: AnalyzeExtractedJobPostingRequest) {
-  const engineFacts = mapCandidateFacts({ candidateFacts })
-  const proposalResult = await matchEvidenceMatcher.match(
-    { candidateFacts: engineFacts, requirements: extraction.requirements },
-  )
-  if (!proposalResult.ok) return proposalResult
-  const analysisResult = analyzeResumeMatch({
-    candidateFacts: engineFacts,
-    proposedEvidence: proposalResult.value.evidence,
-    relevantFactIds: proposalResult.value.relevantFactIds,
+  const analysisResult = await analyzeCandidateFacts({
+    candidateFacts,
+    matchEvidenceMatcher,
     requirements: extraction.requirements,
   })
-  if (!analysisResult.ok) return matchEvidenceUnavailableResult
+  if (!analysisResult.ok) return analysisResult
   return { ok: true, value: buildJobMatch({
     analysis: analysisResult.value, content, document, extraction,
   }) } as const
+}
+
+async function analyzeCandidateFacts({
+  candidateFacts,
+  matchEvidenceMatcher,
+  requirements,
+}: Readonly<{
+  candidateFacts: readonly CandidateFact[]
+  matchEvidenceMatcher: MatchEvidenceMatcher
+  requirements: readonly JobRequirement[]
+}>) {
+  const engineFacts = mapCandidateFacts({ candidateFacts })
+  const proposalResult = await matchEvidenceMatcher.match(
+    { candidateFacts: engineFacts, requirements },
+  )
+  if (!proposalResult.ok) return proposalResult
+  const relevantFactIds = validateRelevantFactProposals({
+    candidateFacts: engineFacts,
+    proposals: proposalResult.value.relevance,
+    requirements,
+  })
+  if (relevantFactIds === null) return matchEvidenceUnavailableResult
+  const analysisResult = analyzeResumeMatch({
+    candidateFacts: engineFacts,
+    proposedEvidence: proposalResult.value.evidence,
+    relevantFactIds,
+    requirements,
+  })
+  if (!analysisResult.ok) return matchEvidenceUnavailableResult
+  return analysisResult
 }
 
 type BuildJobMatchRequest = Readonly<{

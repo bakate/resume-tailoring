@@ -35,7 +35,10 @@ describe('OpenAI explainable Job Match adapters', () => {
     const matcher = createOpenAiJobMatchEvidenceMatcher({
       apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
       request: createRecordedRequest({
-        output: { ...evidenceProposal, relevantFactIds: ['source-fact-invented'] },
+        output: { ...evidenceProposal, relevance: [{
+          factMatch: { ...evidenceProposal.relevance[0].factMatch, factId: 'source-fact-invented' },
+          requirementId: 'job-requirement-1',
+        }] },
         requests: [],
       }),
     })
@@ -101,5 +104,13 @@ const evidenceProposal = {
     }],
     requirementId: 'job-requirement-1',
   }],
-  relevantFactIds: ['source-fact-1'],
+  relevance: [{
+    factMatch: {
+      factId: 'source-fact-1',
+      factTerm: 'TypeScript',
+      relationship: 'exact',
+      requirementTerm: 'TypeScript',
+    },
+    requirementId: 'job-requirement-1',
+  }],
 } as const

@@ -5,6 +5,7 @@ import {
   type CandidateFact,
   type JobRequirement,
   type ProposedMatchEvidence,
+  validateRelevantFactProposals,
 } from '@resume-tailoring/matching-engine'
 
 describe('resume matching engine', () => {
@@ -28,6 +29,38 @@ describe('resume matching engine', () => {
       matchBand: 'ambitious',
       matchScore: 0,
     })
+  })
+
+  it('validates relevance independently from requirement coverage', () => {
+    const result = validateRelevantFactProposals({
+      candidateFacts,
+      proposals: [{
+        factMatch: {
+          factId: 'fact-typescript', factTerm: 'TypeScript', relationship: 'exact',
+          requirementTerm: 'TypeScript',
+        },
+        requirementId: 'requirement-typescript',
+      }],
+      requirements,
+    })
+
+    expect(result).toEqual(['fact-typescript'])
+  })
+
+  it('rejects unsupported relevance references', () => {
+    const result = validateRelevantFactProposals({
+      candidateFacts,
+      proposals: [{
+        factMatch: {
+          factId: 'fact-typescript', factTerm: 'TypeScript', relationship: 'exact',
+          requirementTerm: 'French',
+        },
+        requirementId: 'requirement-french',
+      }],
+      requirements,
+    })
+
+    expect(result).toBeNull()
   })
 
   it('calculates a Match Analysis from importance-weighted evidence coverage', () => {

@@ -92,7 +92,10 @@ export const matchEvidenceProposalSchema = z.strictObject({
     factMatches: z.array(proposedFactMatchSchema).min(1).max(500),
     requirementId: requirementIdSchema,
   })).max(100),
-  relevantFactIds: z.array(candidateFactIdSchema).max(500),
+  relevance: z.array(z.strictObject({
+    factMatch: proposedFactMatchSchema,
+    requirementId: requirementIdSchema,
+  })).max(500),
 })
 
 export const matchEvidenceSuccessSchema = z.strictObject({

@@ -79,9 +79,9 @@ function hasKnownReferences({ matchRequest, proposal }: Readonly<{
 }>) {
   const factIds = new Set(matchRequest.candidateFacts.map(({ id }) => id))
   const requirementIds = new Set(matchRequest.requirements.map(({ id }) => id))
-  const relevantFactIds = new Set(proposal.relevantFactIds)
-  return relevantFactIds.size === proposal.relevantFactIds.length
-    && proposal.relevantFactIds.every((factId) => factIds.has(factId))
+  const relevantFactIds = new Set(proposal.relevance.map(({ factMatch }) => factMatch.factId))
+  return proposal.relevance.every(({ factMatch, requirementId }) =>
+    factIds.has(factMatch.factId) && requirementIds.has(requirementId))
     && proposal.evidence.every((evidence) => requirementIds.has(evidence.requirementId)
       && evidence.factMatches.every(({ factId }) => relevantFactIds.has(factId)))
 }
@@ -106,7 +106,8 @@ const matchingInstructions = [
   'Use partially-covered only for the same capability at incomplete scope; reject adjacent or transferable capabilities.',
   'Quote the shortest exact contiguous factTerm and requirementTerm that identify the same capability.',
   'Use exact for identical normalized terms and controlled only for genuine synonyms or translations.',
-  'Return relevantFactIds only for facts relevant enough to support an honest Tailored Resume.',
+  'Return relevance links only for facts relevant enough to support an honest Tailored Resume.',
+  'Every relevance link must quote equivalent contiguous fact and requirement terms.',
   'Never calculate a score, importance, Match Band, or Generation Eligibility.',
   'Never invent identifiers, facts, requirements, or evidence.',
 ].join(' ')
