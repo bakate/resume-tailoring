@@ -9,6 +9,9 @@ import type {
   ProcessingPolicy,
 } from '@resume-tailoring/application/language-model-gateway'
 import type {
+  StructuredSourceProfileExtractor,
+} from '@resume-tailoring/application/source-intake'
+import type {
   JobRequirementExtractor,
   MatchEvidenceMatcher,
   ResumeClaimSemanticValidator,
@@ -22,12 +25,14 @@ import {
   createBrowserResumeClaimWriter,
   createBrowserSourceProfileExtractor,
 } from '../resume-tailoring/browser-adapters'
+import { createBrowserStructuredSourceProfileExtractor } from './browser-structured-source-profile-extractor'
 
 type StructuredModelRequest =
   | ModelRequest<'job-requirement-extraction', Parameters<JobRequirementExtractor['extract']>[0]>
   | ModelRequest<'match-analysis', Parameters<MatchEvidenceMatcher['match']>[0]>
   | ModelRequest<'resume-claim-validation', Parameters<ResumeClaimSemanticValidator['validate']>[0]>
   | ModelRequest<'source-profile-extraction', Parameters<SourceProfileExtractor['extract']>[0]>
+  | ModelRequest<'structured-source-profile-extraction', Parameters<StructuredSourceProfileExtractor['extract']>[0]>
 type WritingModelRequest =
   | ModelRequest<'resume-claim-reformulation', Parameters<ResumeClaimWriter['reformulate']>[0]>
   | ModelRequest<'resume-claim-writing', Parameters<ResumeClaimWriter['write']>[0]>
@@ -36,6 +41,7 @@ type StructuredModelValue =
   | ModelValue<'match-analysis', MatchEvidenceMatcher['match']>
   | ModelValue<'resume-claim-validation', ResumeClaimSemanticValidator['validate']>
   | ModelValue<'source-profile-extraction', SourceProfileExtractor['extract']>
+  | ModelValue<'structured-source-profile-extraction', StructuredSourceProfileExtractor['extract']>
 type WritingModelValue =
   | ModelValue<'resume-claim-reformulation', ResumeClaimWriter['reformulate']>
   | ModelValue<'resume-claim-writing', ResumeClaimWriter['write']>
@@ -62,6 +68,7 @@ type OpenAiModelAdapters = Readonly<{
   resumeClaimSemanticValidator: ResumeClaimSemanticValidator
   resumeClaimWriter: ResumeClaimWriter
   sourceProfileExtractor: SourceProfileExtractor
+  structuredSourceProfileExtractor: StructuredSourceProfileExtractor
 }>
 
 const openAiProcessingPolicy = {
@@ -116,6 +123,7 @@ function createOpenAiModelAdapters({ request }: Readonly<{
     resumeClaimSemanticValidator: createBrowserResumeClaimSemanticValidator({ request }),
     resumeClaimWriter: createBrowserResumeClaimWriter({ request }),
     sourceProfileExtractor: createBrowserSourceProfileExtractor({ request }),
+    structuredSourceProfileExtractor: createBrowserStructuredSourceProfileExtractor({ request }),
   }
 }
 
@@ -125,6 +133,10 @@ async function processStructured({ modelAdapters, modelRequest }: Readonly<{
 }>): Promise<LanguageModelResult<StructuredModelValue>> {
   if (modelRequest.operation === 'source-profile-extraction') {
     const result = await modelAdapters.sourceProfileExtractor.extract(modelRequest.input)
+    return toGatewayResult({ operation: modelRequest.operation, result })
+  }
+  if (modelRequest.operation === 'structured-source-profile-extraction') {
+    const result = await modelAdapters.structuredSourceProfileExtractor.extract(modelRequest.input)
     return toGatewayResult({ operation: modelRequest.operation, result })
   }
   if (modelRequest.operation === 'job-requirement-extraction') {
@@ -137,7 +149,11 @@ async function processStructured({ modelAdapters, modelRequest }: Readonly<{
 async function processStructuredAnalysis({ modelAdapters, modelRequest }: Readonly<{
   modelAdapters: OpenAiModelAdapters
   modelRequest: Exclude<StructuredModelRequest,
-  { readonly operation: 'job-requirement-extraction' | 'source-profile-extraction' }>
+  { readonly operation:
+    | 'job-requirement-extraction'
+    | 'source-profile-extraction'
+    | 'structured-source-profile-extraction'
+  }>
 }>): Promise<LanguageModelResult<StructuredModelValue>> {
   if (modelRequest.operation === 'match-analysis') {
     const result = await modelAdapters.matchEvidenceMatcher.match(modelRequest.input)

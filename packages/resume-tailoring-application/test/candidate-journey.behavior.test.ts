@@ -12,6 +12,11 @@ import type {
   CandidateSessionPersistence,
 } from '@resume-tailoring/application/candidate-journey'
 import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
+import type {
+  SourceDocumentFailure,
+  SourceDocumentReader,
+  StructuredSourceProfileExtraction,
+} from '@resume-tailoring/application/source-intake'
 
 const currentTime = Date.UTC(2026, 8, 29, 9)
 const activeProcessingPolicy = {
@@ -54,6 +59,82 @@ describe('Candidate Journey Processing Consent', () => {
   })
 })
 
+describe('Candidate Journey Source Intake', () => {
+  it('structures pasted professional text without transmitting contact details', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    await system.givenProcessingConsentIsGranted()
+
+    // Action
+    await system.submitPastedProfessionalText()
+
+    // Then
+    system.expectStructuredSourceProfileToBeReadyForJobMatch()
+  })
+
+  it('isolates a Critical Ambiguity without withholding usable Candidate Facts', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    await system.givenProcessingConsentIsGranted()
+    system.givenAnAmbiguousExperienceDate()
+
+    // Action
+    await system.submitPastedProfessionalTextForAmbiguityResolution()
+
+    // Then
+    system.expectOnlyAmbiguousFactToBeExcluded()
+  })
+
+  it('resolves a Critical Ambiguity through its targeted question', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    await system.givenSourceIntakeRequiresAmbiguityResolution()
+
+    // Action
+    await system.answerCriticalAmbiguity()
+
+    // Then
+    system.expectResolvedFactToBeReadyForJobMatch()
+  })
+
+  it.each([
+    ['a scan', 'scanned-document'],
+    ['an encrypted document', 'encrypted-document'],
+    ['an empty document', 'empty-document'],
+    ['an oversized document', 'oversized-document'],
+    ['an unsupported document', 'unsupported-document'],
+  ] as const)('keeps the Candidate Session after %s fails', async (_caseName, failure) => {
+    const system = createSystemUnderTest()
+
+    // Given
+    await system.givenProcessingConsentIsGranted()
+    system.givenSourceDocumentFailsWith(failure)
+
+    // Action
+    await system.submitInvalidSourceDocument()
+
+    // Then
+    system.expectSourceDocumentFailureWithoutSessionLoss(failure)
+  })
+
+  it('rejects a Source Document longer than five pages without losing the session', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    await system.givenProcessingConsentIsGranted()
+    system.givenSixPageSourceDocument()
+
+    // Action
+    await system.submitInvalidSourceDocument()
+
+    // Then
+    system.expectSourceDocumentFailureWithoutSessionLoss('oversized-document')
+  })
+})
+
 function createSystemUnderTest({
   processingPolicy = activeProcessingPolicy,
   storedSession = null,
@@ -66,6 +147,9 @@ function createSystemUnderTest({
 
 class CandidateJourneyTestSystem {
   readonly #candidateJourney: CandidateJourney
+  readonly #modelRequests: string[] = []
+  #extractionResult: StructuredSourceProfileExtraction = structuredExtraction
+  #documentReadResult: Awaited<ReturnType<SourceDocumentReader['read']>> | null = null
   #completedAction: CandidateJourneyAction | null = null
   #view: CandidateJourneyView | null = null
 
@@ -79,6 +163,16 @@ class CandidateJourneyTestSystem {
         languageModelGateway: { processingPolicy },
         now: () => currentTime,
         persistence: createInMemoryPersistence({ storedSession }),
+        sourceDocumentReader: { read: ({ bytes }) => Promise.resolve(
+          this.#documentReadResult ?? {
+            ok: true,
+            value: { pageCount: null, text: new TextDecoder().decode(bytes) },
+          },
+        ) },
+        sourceProfileExtractor: { extract: ({ professionalContent }) => {
+          this.#modelRequests.push(professionalContent)
+          return Promise.resolve({ ok: true, value: this.#extractionResult })
+        } },
       },
     })
   }
@@ -88,6 +182,34 @@ class CandidateJourneyTestSystem {
     await this.#waitForView('candidate-session-absent')
     this.#candidateJourney.startCandidateSession()
     await this.#waitForView('candidate-session-open')
+  }
+
+  async givenProcessingConsentIsGranted() {
+    await this.givenCandidateSessionIsOpen()
+    this.#candidateJourney.grantProcessingConsent()
+    await this.#waitForView('candidate-session-open', 'granted')
+  }
+
+  givenAnAmbiguousExperienceDate() {
+    this.#extractionResult = ambiguousStructuredExtraction
+  }
+
+  givenSourceDocumentFailsWith(failure: SourceDocumentFailure) {
+    this.#documentReadResult = { ok: false, error: failure }
+  }
+
+  givenSixPageSourceDocument() {
+    this.#documentReadResult = {
+      ok: true,
+      value: { pageCount: 6, text: 'Senior FullStack Developer' },
+    }
+  }
+
+  async givenSourceIntakeRequiresAmbiguityResolution() {
+    await this.givenProcessingConsentIsGranted()
+    this.givenAnAmbiguousExperienceDate()
+    this.#candidateJourney.submitSourceDocument(createPastedSourceDocument())
+    await this.#waitForCriticalAmbiguity()
   }
 
   givenCandidateJourneyIsStarted() {
@@ -105,6 +227,33 @@ class CandidateJourneyTestSystem {
     this.#completedAction = 'candidate-session-restored'
   }
 
+  async submitPastedProfessionalText() {
+    this.#candidateJourney.submitSourceDocument(createPastedSourceDocument())
+    this.#view = await this.#waitForPhase('job-match')
+    this.#completedAction = 'source-document-submitted'
+  }
+
+  async submitPastedProfessionalTextForAmbiguityResolution() {
+    this.#candidateJourney.submitSourceDocument(createPastedSourceDocument())
+    this.#view = await this.#waitForCriticalAmbiguity()
+    this.#completedAction = 'source-document-submitted'
+  }
+
+  async answerCriticalAmbiguity() {
+    this.#candidateJourney.resolveCriticalAmbiguity({
+      ambiguityId: 'critical-ambiguity-1',
+      answer: '2021',
+    })
+    this.#view = await this.#waitForPhase('job-match')
+    this.#completedAction = 'critical-ambiguity-answered'
+  }
+
+  async submitInvalidSourceDocument() {
+    this.#candidateJourney.submitSourceDocument(createPastedSourceDocument())
+    this.#view = await this.#waitForSourceIntakeFailure()
+    this.#completedAction = 'source-document-submitted'
+  }
+
   expectActiveProcessingConsentToBeGranted() {
     this.#expectCompletedAction('processing-consent-granted')
     expect(this.#readOpenView().processingConsentStatus).toBe('granted')
@@ -117,6 +266,62 @@ class CandidateJourneyTestSystem {
   expectProcessingConsentToBeRequired() {
     this.#expectCompletedAction('candidate-session-restored')
     expect(this.#readOpenView().processingConsentStatus).toBe('required')
+  }
+
+  expectStructuredSourceProfileToBeReadyForJobMatch() {
+    this.#expectCompletedAction('source-document-submitted')
+    const view = this.#readOpenView()
+    expect(view.session.phase).toBe('job-match')
+    expect(view.session.sourceIntake?.sourceProfile).toMatchObject({
+      certifications: [{ name: 'AWS Solutions Architect' }],
+      education: [{ institution: 'Example University' }],
+      experiences: [{ organization: 'Acme', role: 'Senior FullStack Developer' }],
+      languages: [{ name: 'French' }],
+      projects: [{ name: 'Billing platform' }],
+      skills: [{ name: 'TypeScript' }],
+    })
+    expect(view.session.sourceIntake?.candidateFacts.every(
+      (candidateFact) => candidateFact.status === 'attested',
+    )).toBe(true)
+    expect(view.session.sourceIntake?.contactDetails).toEqual([
+      { kind: 'email', value: 'bakate@example.com' },
+    ])
+    expect(this.#modelRequests).toHaveLength(1)
+    expect(this.#modelRequests[0]).not.toContain('bakate@example.com')
+  }
+
+  expectOnlyAmbiguousFactToBeExcluded() {
+    this.#expectCompletedAction('source-document-submitted')
+    const sourceIntake = this.#readOpenView().session.sourceIntake
+    expect(this.#readOpenView().session.phase).toBe('source-intake')
+    expect(sourceIntake?.criticalAmbiguities).toEqual([expect.objectContaining({
+      question: 'What year did you start at Acme?',
+    })])
+    expect(sourceIntake?.candidateFacts.filter(
+      (candidateFact) => candidateFact.status === 'excluded-critical-ambiguity',
+    )).toEqual([expect.objectContaining({ path: 'experiences.0.startDate.0' })])
+    expect(sourceIntake?.candidateFacts.some(
+      (candidateFact) => candidateFact.value === 'TypeScript'
+        && candidateFact.status === 'attested',
+    )).toBe(true)
+  }
+
+  expectResolvedFactToBeReadyForJobMatch() {
+    this.#expectCompletedAction('critical-ambiguity-answered')
+    const sourceIntake = this.#readOpenView().session.sourceIntake
+    expect(sourceIntake?.criticalAmbiguities).toEqual([])
+    expect(sourceIntake?.candidateFacts.find(
+      (candidateFact) => candidateFact.path === 'experiences.0.startDate.0',
+    )).toMatchObject({ status: 'attested', value: '2021' })
+    expect(sourceIntake?.sourceProfile.experiences[0]?.startDate).toBe('2021')
+  }
+
+  expectSourceDocumentFailureWithoutSessionLoss(expectedFailure: SourceDocumentFailure) {
+    this.#expectCompletedAction('source-document-submitted')
+    const view = this.#readOpenView()
+    expect(view.sourceIntakeFailure).toBe(expectedFailure)
+    expect(view.session.phase).toBe('source-intake')
+    expect(view.session.sourceIntake).toBeNull()
   }
 
   #expectCompletedAction(expectedAction: CandidateJourneyAction) {
@@ -141,6 +346,49 @@ class CandidateJourneyTestSystem {
       const unsubscribe = this.#candidateJourney.subscribe(() => {
         const nextView = this.#candidateJourney.readView()
         if (!matchesView({ currentView: nextView, processingConsentStatus, status })) return
+        unsubscribe()
+        resolve(nextView)
+      })
+    })
+  }
+
+  async #waitForPhase(phase: CandidateSession['phase']) {
+    const currentView = this.#candidateJourney.readView()
+    if (currentView.status === 'candidate-session-open' && currentView.session.phase === phase) {
+      return currentView
+    }
+    return new Promise<CandidateJourneyView>((resolve) => {
+      const unsubscribe = this.#candidateJourney.subscribe(() => {
+        const nextView = this.#candidateJourney.readView()
+        if (nextView.status !== 'candidate-session-open' || nextView.session.phase !== phase) return
+        unsubscribe()
+        resolve(nextView)
+      })
+    })
+  }
+
+  async #waitForCriticalAmbiguity() {
+    const currentView = this.#candidateJourney.readView()
+    if (hasCriticalAmbiguity({ view: currentView })) return currentView
+    return new Promise<CandidateJourneyView>((resolve) => {
+      const unsubscribe = this.#candidateJourney.subscribe(() => {
+        const nextView = this.#candidateJourney.readView()
+        if (!hasCriticalAmbiguity({ view: nextView })) return
+        unsubscribe()
+        resolve(nextView)
+      })
+    })
+  }
+
+  async #waitForSourceIntakeFailure() {
+    const currentView = this.#candidateJourney.readView()
+    if (currentView.status === 'candidate-session-open'
+      && currentView.sourceIntakeFailure !== null) return currentView
+    return new Promise<CandidateJourneyView>((resolve) => {
+      const unsubscribe = this.#candidateJourney.subscribe(() => {
+        const nextView = this.#candidateJourney.readView()
+        if (nextView.status !== 'candidate-session-open'
+          || nextView.sourceIntakeFailure === null) return
         unsubscribe()
         resolve(nextView)
       })
@@ -182,9 +430,57 @@ function createConsentedCandidateSession(): CandidateSession {
     phase: 'source-intake',
     processingConsent: { grantedAt: currentTime, policy: activeProcessingPolicy },
     sessionId: 'candidate-session-00000000-0000-4000-8000-000000000039',
+    sourceIntake: null,
     startedAt: currentTime,
     version: candidateSessionStorageVersion,
   }
 }
 
-type CandidateJourneyAction = 'candidate-session-restored' | 'processing-consent-granted'
+const structuredExtraction = {
+  certifications: [{ name: 'AWS Solutions Architect', issuer: 'AWS', issuedAt: '2024' }],
+  criticalAmbiguities: [],
+  education: [{ institution: 'Example University', qualification: 'MSc Computer Science' }],
+  experiences: [{
+    achievements: ['Built a billing platform'],
+    context: 'Payments',
+    endDate: null,
+    organization: 'Acme',
+    role: 'Senior FullStack Developer',
+    startDate: '2021',
+  }],
+  languages: [{ name: 'French', proficiency: 'Native' }],
+  projects: [{ description: 'Billing platform', name: 'Billing platform' }],
+  skills: [{ category: 'Programming language', name: 'TypeScript' }],
+} as const satisfies StructuredSourceProfileExtraction
+
+const ambiguousStructuredExtraction = {
+  ...structuredExtraction,
+  experiences: [{ ...structuredExtraction.experiences[0], startDate: null }],
+  criticalAmbiguities: [{
+    path: 'experiences.0.startDate.0',
+    question: 'What year did you start at Acme?',
+  }],
+} as const satisfies StructuredSourceProfileExtraction
+
+function createPastedSourceDocument() {
+  return {
+    bytes: new TextEncoder().encode([
+      'Bakate Example',
+      'bakate@example.com',
+      'Senior FullStack Developer at Acme',
+    ].join('\n')),
+    mediaType: 'text/plain',
+    name: 'pasted-professional-text.txt',
+  } as const
+}
+
+function hasCriticalAmbiguity({ view }: Readonly<{ view: CandidateJourneyView }>) {
+  return view.status === 'candidate-session-open'
+    && (view.session.sourceIntake?.criticalAmbiguities.length ?? 0) > 0
+}
+
+type CandidateJourneyAction =
+  | 'candidate-session-restored'
+  | 'critical-ambiguity-answered'
+  | 'processing-consent-granted'
+  | 'source-document-submitted'

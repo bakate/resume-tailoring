@@ -3,6 +3,7 @@ import { createCandidateJourney } from '@resume-tailoring/application/candidate-
 
 import { createBrowserCandidateSessionPersistence } from './browser-candidate-session-persistence'
 import { createOpenAiLanguageModelGateway } from './openai-language-model-gateway'
+import { createBrowserSourceIntakeDocumentReader } from './source-intake-document-reader'
 import type { CandidateJourney } from '@resume-tailoring/application/candidate-journey'
 
 export function useCandidateJourney() {
@@ -20,7 +21,9 @@ export function useCandidateJourney() {
     deleteCandidateSession: candidateJourney.deleteCandidateSession,
     grantProcessingConsent: candidateJourney.grantProcessingConsent,
     languageModelGateway: candidateJourneySystem.languageModelGateway,
+    resolveCriticalAmbiguity: candidateJourney.resolveCriticalAmbiguity,
     startCandidateSession: candidateJourney.startCandidateSession,
+    submitSourceDocument: candidateJourney.submitSourceDocument,
     view,
   } as const
 }
@@ -36,6 +39,24 @@ function createBrowserCandidateJourneySystem() {
       languageModelGateway,
       now: () => Date.now(),
       persistence: createBrowserCandidateSessionPersistence({ storage: localStorage }),
+      sourceDocumentReader: createBrowserSourceIntakeDocumentReader(),
+      sourceProfileExtractor: { extract: async (input) => {
+        const result = await languageModelGateway.structured.process({
+          input,
+          operation: 'structured-source-profile-extraction',
+        })
+        if (!result.ok) {
+          return {
+            ok: false,
+            error: result.error.type === 'processing-consent-required'
+              ? 'processing-consent-required' as const
+              : 'source-profile-extraction-unavailable' as const,
+          }
+        }
+        return result.value.operation === 'structured-source-profile-extraction'
+          ? { ok: true, value: result.value.value }
+          : { ok: false, error: 'source-profile-extraction-unavailable' as const }
+      } },
     },
   })
   return { candidateJourney, languageModelGateway } as const

@@ -1,4 +1,5 @@
 import type { ProcessingConsent } from './processing-policy'
+import type { SourceIntake } from './source-intake'
 
 export const candidateJourneyPhases = [
   'source-intake',
@@ -9,7 +10,7 @@ export const candidateJourneyPhases = [
 export type CandidateJourneyPhase = typeof candidateJourneyPhases[number]
 export type CandidateSessionId = `candidate-session-${string}`
 
-export const candidateSessionStorageVersion = 2
+export const candidateSessionStorageVersion = 3
 export const candidateSessionDurationMilliseconds = 24 * 60 * 60 * 1_000
 
 export type CandidateSession = Readonly<{
@@ -17,6 +18,7 @@ export type CandidateSession = Readonly<{
   phase: CandidateJourneyPhase
   processingConsent: ProcessingConsent | null
   sessionId: CandidateSessionId
+  sourceIntake: SourceIntake | null
   startedAt: number
   version: typeof candidateSessionStorageVersion
 }>

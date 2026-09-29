@@ -33,7 +33,22 @@ export function createBrowserSourceDocumentReader({
 }: SourceDocumentReaderDependencies = {}): SourceDocumentReader {
   const browserEnvironment = readBrowserEnvironment()
   return {
-    read: (document) => readSourceDocument({ browserEnvironment, document, loadPdfReader }),
+    read: async (document) => {
+      const result = await readSourceDocumentDetails({ browserEnvironment, document, loadPdfReader })
+      return result.ok ? { ok: true, value: result.value.text } : result
+    },
+  }
+}
+
+export function createBrowserPdfDocumentReader({
+  loadPdfReader = loadBrowserPdfReader,
+  readBrowserEnvironment = readCurrentBrowserEnvironment,
+}: SourceDocumentReaderDependencies = {}) {
+  const browserEnvironment = readBrowserEnvironment()
+  return {
+    read: (document: Parameters<SourceDocumentReader['read']>[0]) => (
+      readSourceDocumentDetails({ browserEnvironment, document, loadPdfReader })
+    ),
   }
 }
 
@@ -71,7 +86,7 @@ function readCurrentBrowserEnvironment(): SourceDocumentBrowserEnvironment {
   }
 }
 
-async function readSourceDocument({
+async function readSourceDocumentDetails({
   browserEnvironment,
   document,
   loadPdfReader,
@@ -79,7 +94,7 @@ async function readSourceDocument({
   browserEnvironment: SourceDocumentBrowserEnvironment
   document: Parameters<SourceDocumentReader['read']>[0]
   loadPdfReader: () => Promise<PdfReaderLoadResult>
-}>): ReturnType<SourceDocumentReader['read']> {
+}>) {
   if (isText({ document })) return readPastedText({ document })
   if (!isPdf({ document })) return unsupportedResult
   const compatibilityFailure = readCompatibilityFailure({ browserEnvironment })
@@ -130,7 +145,9 @@ async function loadPdfDocument({ loadingTask }: Readonly<{
 async function extractPdfText({ pdfDocument }: Readonly<{ pdfDocument: PDFDocumentProxy }>) {
   try {
     const text = await readPdfText({ pdfDocument })
-    return text.length === 0 ? textEmptyResult : { ok: true, value: text } as const
+    return text.length === 0
+      ? textEmptyResult
+      : { ok: true, value: { pageCount: pdfDocument.numPages, text } } as const
   } catch {
     return pdfReadFailureResult
   }
@@ -171,7 +188,9 @@ function readPastedText({ document }: Readonly<{
   document: Parameters<SourceDocumentReader['read']>[0]
 }>) {
   const text = decodeUtf8({ bytes: document.bytes }).trim()
-  return text.length === 0 ? textEmptyResult : { ok: true, value: text } as const
+  return text.length === 0
+    ? textEmptyResult
+    : { ok: true, value: { pageCount: null, text } } as const
 }
 
 function decodeUtf8({ bytes }: Readonly<{ bytes: Uint8Array }>) {

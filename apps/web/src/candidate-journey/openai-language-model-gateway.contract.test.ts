@@ -20,6 +20,22 @@ describe('OpenAI Language Model Gateway adapter', () => {
     expect(request).not.toHaveBeenCalled()
   })
 
+  it('blocks structured Source Profile extraction before Processing Consent', async () => {
+    const request = vi.fn<typeof fetch>()
+    const gateway = createOpenAiLanguageModelGateway({
+      readProcessingConsent: () => null,
+      request,
+    })
+
+    const result = await gateway.structured.process({
+      input: { professionalContent: 'Candidate content' },
+      operation: 'structured-source-profile-extraction',
+    })
+
+    expect(result).toEqual({ ok: false, error: { type: 'processing-consent-required' } })
+    expect(request).not.toHaveBeenCalled()
+  })
+
   it('routes structured work through the validated production adapter', async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json(sourceProfileResponse))
     const gateway = createConsentedGateway({ request })
@@ -36,6 +52,33 @@ describe('OpenAI Language Model Gateway adapter', () => {
     expect(request).toHaveBeenCalledWith('/api/source-profile-extraction', expect.objectContaining({
       body: JSON.stringify({ professionalContent: 'TypeScript' }), method: 'POST',
     }))
+  })
+
+  it('routes structured Source Profile extraction only after Processing Consent', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json(structuredSourceProfileResponse),
+    )
+    const gateway = createConsentedGateway({ request })
+
+    const result = await gateway.structured.process({
+      input: { professionalContent: 'TypeScript' },
+      operation: 'structured-source-profile-extraction',
+    })
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        operation: 'structured-source-profile-extraction',
+        value: structuredSourceProfileResponse.value,
+      },
+    })
+    expect(request).toHaveBeenCalledWith(
+      '/api/structured-source-profile-extraction',
+      expect.objectContaining({
+        body: JSON.stringify({ professionalContent: 'TypeScript' }),
+        method: 'POST',
+      }),
+    )
   })
 
   it('routes writing work through the validated production adapter', async () => {
@@ -75,6 +118,19 @@ const sourceProfileResponse = {
     propositionKey: 'proposition-skill-typescript',
     value: 'TypeScript',
   }],
+} as const
+
+const structuredSourceProfileResponse = {
+  ok: true,
+  value: {
+    certifications: [],
+    criticalAmbiguities: [],
+    education: [],
+    experiences: [],
+    languages: [],
+    projects: [],
+    skills: [{ category: null, name: 'TypeScript' }],
+  },
 } as const
 
 const writingInputs = {

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { createBrowserSourceDocumentReader } from './source-document-pdf'
+import {
+  createBrowserPdfDocumentReader,
+  createBrowserSourceDocumentReader,
+} from './source-document-pdf'
 
 describe('browser Source Document reader', () => {
   it('reports browser incompatibility when PDF reading capabilities are unavailable', async () => {
@@ -125,6 +128,23 @@ describe('browser Source Document reader', () => {
     } finally {
       restoreWithResolvers({ descriptor: withResolversDescriptor })
     }
+  })
+
+  it('reports the authoritative PDF page count from the parsed document', async () => {
+    const reader = createBrowserPdfDocumentReader({
+      readBrowserEnvironment: readSupportedBrowserEnvironment,
+    })
+
+    const result = await reader.read({
+      bytes: createTextPdf({ text: 'Senior FullStack Developer' }),
+      mediaType: 'application/pdf',
+      name: 'resume.pdf',
+    })
+
+    expect(result).toEqual({
+      ok: true,
+      value: { pageCount: 1, text: 'Senior FullStack Developer' },
+    })
   })
 
   it('reports a PDF reader runtime failure as browser incompatibility', async () => {
