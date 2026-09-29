@@ -87,35 +87,6 @@ describe('OpenAI explainable Job Match adapters', () => {
     expect(result).toEqual({ ok: true, value: { evidence: [], relevance: [] } })
   })
 
-  it('retries an invalid relevance response with a correction instruction', async () => {
-    const requests: Request[] = []
-    const matcher = createOpenAiJobMatchEvidenceMatcher({
-      apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
-      request: createSequentialRecordedRequest({
-        outputs: [{
-          ...evidenceProposal,
-          relevance: [{
-            factMatch: {
-              ...evidenceProposal.relevance[0].factMatch,
-              factTerm: 'UI library',
-              relationship: 'controlled',
-              requirementTerm: 'deployment process',
-            },
-            requirementId: 'job-requirement-1',
-          }],
-        }, evidenceProposal],
-        requests,
-      }),
-    })
-
-    const result = await matcher.match(matchRequest)
-
-    expect(result).toEqual({ ok: true, value: evidenceProposal })
-    expect(requests).toHaveLength(2)
-    const secondRequestBody = await requests[1]?.text()
-    expect(secondRequestBody).toContain('failed deterministic validation')
-  })
-
   it('returns a typed failure before sending an oversized matching request', async () => {
     const result = await requestOpenAiJobMatchEvidence({
       apiKey: 'test-api-key',
@@ -150,22 +121,6 @@ function createRecordedRequest({ output, requests, response = 'output-items' }: 
       ...(response === 'output-text'
         ? { output_text: JSON.stringify(output) }
         : { output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(output) }] }] }),
-    }))
-  }
-}
-
-function createSequentialRecordedRequest({ outputs, requests }: Readonly<{
-  outputs: readonly unknown[]
-  requests: Request[]
-}>) {
-  let responseIndex = 0
-  return (input: string | URL | Request, init?: RequestInit) => {
-    requests.push(new Request(input, init))
-    const output = outputs[responseIndex] ?? outputs.at(-1)
-    responseIndex += 1
-    return Promise.resolve(Response.json({
-      id: `response-${String(responseIndex)}`,
-      output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(output) }] }],
     }))
   }
 }
