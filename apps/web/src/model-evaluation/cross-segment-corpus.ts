@@ -1,7 +1,6 @@
 import {
   createQualificationFixture,
   type QualificationCorpus,
-  type QualificationRoleFamily,
 } from './cross-segment-qualification'
 import { salesCommercialQualificationCorpus } from './sales-commercial-corpus'
 
@@ -14,12 +13,6 @@ type TechnologyScenario = Readonly<{
   importance?: 'critical' | 'central' | 'complementary'
   hasRelevantEvidence?: boolean
 }>
-
-const roleTerms = {
-  technology: ['TypeScript', 'Kubernetes', 'data pipelines', 'threat modeling', 'incident response'],
-  'general-management': ['operating plans', 'budget ownership', 'people leadership', 'program delivery', 'process improvement'],
-  sales: ['pipeline development', 'account planning', 'discovery calls', 'quota ownership', 'commercial negotiation'],
-} as const satisfies Record<QualificationRoleFamily, readonly string[]>
 
 type GeneralManagementScenario = Readonly<{
   ambiguity: 'none' | 'scope' | 'seniority' | 'ownership'
@@ -164,24 +157,5 @@ function createTechnologyFixture({ scenario, scenarioIndex }: Readonly<{
     roleTitle: scenario.roleTitle,
     scenarioTags: scenario.scenarioTags,
     split: scenarioIndex < 20 ? 'development' : 'held-out',
-  })
-}
-
-function createRoleFixtures({ count, heldOutCount, roleFamily }: Readonly<{
-  count: number
-  heldOutCount: number
-  roleFamily: Exclude<QualificationRoleFamily, 'technology'>
-}>) {
-  return Array.from({ length: count }, (unusedFixture, fixtureIndex) => {
-    void unusedFixture
-    const requirementTerm = roleTerms[roleFamily][fixtureIndex % roleTerms[roleFamily].length] ?? roleFamily
-    const factId = `${roleFamily}-fact-${String(fixtureIndex).padStart(2, '0')}`
-    return createQualificationFixture({
-      candidateFacts: [{ id: factId, kind: 'experience', value: `Delivered ${requirementTerm}.` }],
-      index: fixtureIndex + 1,
-      requirementTerm,
-      roleFamily,
-      split: fixtureIndex < count - heldOutCount ? 'development' : 'held-out',
-    })
   })
 }
