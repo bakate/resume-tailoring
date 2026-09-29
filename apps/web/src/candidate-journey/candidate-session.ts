@@ -107,6 +107,27 @@ const jobMatchSchema = z.strictObject({
   }).nullable(),
 })
 
+const tailoredResumeFieldSchema = z.strictObject({
+  factIds: z.array(candidateFactIdSchema).min(1),
+  text: z.string().min(1),
+})
+
+const tailoredResumeSchema = z.strictObject({
+  contactDetails: sourceIntakeSchema.shape.contactDetails,
+  experiences: z.array(z.strictObject({
+    chronology: z.enum(['context', 'earlier', 'relevant']),
+    fields: z.array(tailoredResumeFieldSchema),
+  })),
+  identity: sourceIntakeSchema.shape.contactDetails.element.nullable(),
+  locale: z.enum(['en', 'fr']),
+  sections: z.array(z.strictObject({
+    fields: z.array(tailoredResumeFieldSchema),
+    section: z.enum(['certifications', 'education', 'languages', 'projects', 'skills']),
+  })),
+  targetRole: jobMatchSchema.shape.targetRole,
+  valueProposition: z.array(tailoredResumeFieldSchema).max(4),
+})
+
 export const candidateSessionSchema = z.strictObject({
   expiresAt: z.number().int().positive(),
   jobMatch: jobMatchSchema.nullable(),
@@ -119,6 +140,7 @@ export const candidateSessionSchema = z.strictObject({
     (value) => typeof value === 'string' && candidateSessionIdPattern.test(value),
   ),
   sourceIntake: sourceIntakeSchema.nullable(),
+  tailoredResume: tailoredResumeSchema.nullable(),
   startedAt: z.number().int().nonnegative(),
   version: z.literal(candidateSessionStorageVersion),
 }).refine(

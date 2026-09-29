@@ -632,6 +632,7 @@ function createJobMatchSession(): CandidateSession {
         certifications: [], education: [], experiences: [], languages: [], projects: [], skills: [],
       },
     },
+    tailoredResume: null,
     startedAt: currentTime,
     version: candidateSessionStorageVersion,
   }

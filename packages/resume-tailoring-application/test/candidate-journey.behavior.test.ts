@@ -444,6 +444,7 @@ function createConsentedCandidateSession(): CandidateSession {
     processingConsent: { grantedAt: currentTime, policy: activeProcessingPolicy },
     sessionId: 'candidate-session-00000000-0000-4000-8000-000000000039',
     sourceIntake: null,
+    tailoredResume: null,
     startedAt: currentTime,
     version: candidateSessionStorageVersion,
   }

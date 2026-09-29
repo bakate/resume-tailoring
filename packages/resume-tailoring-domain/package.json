@@ -7,7 +7,8 @@
     "./job-match": "./src/job-match.ts",
     "./processing-policy": "./src/processing-policy.ts",
     "./resume-tailoring-state": "./src/resume-tailoring-state.ts",
-    "./source-intake": "./src/source-intake.ts"
+    "./source-intake": "./src/source-intake.ts",
+    "./tailored-resume": "./src/tailored-resume.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

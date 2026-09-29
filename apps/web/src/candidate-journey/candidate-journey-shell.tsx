@@ -29,6 +29,7 @@ import type { CandidateJourneyPhase } from './candidate-journey-phases'
 import { useCandidateJourney } from './use-candidate-journey'
 import { SourceIntakeWorkspace } from './source-intake-workspace'
 import { JobMatchWorkspace } from './job-match-workspace'
+import { TailoredResumeWorkspace } from './tailored-resume-workspace'
 
 export function CandidateJourneyShell() {
   const localizationResult = useLocalization()
@@ -49,6 +50,7 @@ function LocalizedCandidateJourneyShell({ localization }: LocalizationProps) {
         <ProcessingPolicyCard {...{ candidateJourney, localization }} />
         <SourceIntakeWorkspace {...{ candidateJourney, localization }} />
         <JobMatchWorkspace {...{ candidateJourney, localization }} />
+        <TailoredResumeWorkspace {...{ candidateJourney, localization }} />
         <CandidateJourneyPhaseList {...{ activePhase, localization }} />
       </Stack></Container></AppShell.Main>
     </AppShell>
