@@ -12,7 +12,7 @@
 body {
   margin: 0;
   min-width: 320px;
-  background: #ffffff;
+  background: var(--mantine-color-white);
 }
 
 .candidate-journey-app {
@@ -31,7 +31,7 @@ body {
 }
 
 .candidate-journey-app :where(button, input, textarea, select, [role='button']):focus-visible {
-  outline: 3px solid #94cdb8;
+  outline: 3px solid var(--mantine-color-forest-3);
   outline-offset: 3px;
 }
 
@@ -57,8 +57,8 @@ body {
   left: 1rem;
   padding: 0.75rem 1rem;
   transform: translateY(-150%);
-  background: #ffffff;
-  color: #164f3d;
+  background: var(--mantine-color-white);
+  color: var(--mantine-color-forest-8);
   font-weight: 700;
 }
 
