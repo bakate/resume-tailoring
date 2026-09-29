@@ -11,6 +11,7 @@ const sessionStartedAt = 1_000
 const candidateSessionStorageKey = 'honest-resume:candidate-session'
 const candidateSession = {
   expiresAt: sessionStartedAt + candidateSessionDurationMilliseconds,
+  jobMatch: null,
   phase: 'source-intake',
   processingConsent: null,
   sessionId: 'candidate-session-00000000-0000-4000-8000-000000000038',
@@ -91,6 +92,18 @@ describe('browser Candidate Session persistence', () => {
       ok: true, value: { notice: null, session: sourceIntakeCandidateSession },
     })
   })
+
+  it('restores the complete explainable Match Analysis', () => {
+    const storage = createMemoryStorage()
+    const persistence = createBrowserCandidateSessionPersistence({ storage })
+
+    expect(persistence.save({ session: jobMatchCandidateSession })).toEqual({
+      ok: true, value: jobMatchCandidateSession,
+    })
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
+      ok: true, value: { notice: null, session: jobMatchCandidateSession },
+    })
+  })
 })
 
 const sourceIntakeCandidateSession = {
@@ -115,6 +128,49 @@ const sourceIntakeCandidateSession = {
       projects: [],
       skills: [{ category: 'Programming language', name: 'TypeScript' }],
     },
+  },
+} as const satisfies CandidateSession
+
+const jobMatchCandidateSession = {
+  ...sourceIntakeCandidateSession,
+  jobMatch: {
+    analysis: {
+      criticalRequirementReserve: { requirementIds: [], status: 'clear' },
+      evidence: [{
+        coverage: 'covered',
+        factIds: ['source-fact-skills-0-name-0'],
+        requirementId: 'job-requirement-1',
+      }],
+      generationEligibility: 'eligible',
+      matchBand: 'strong',
+      matchBandQualification: null,
+      matchScore: 100,
+      relevantFactIds: ['source-fact-skills-0-name-0'],
+      requirementGroups: [{
+        capabilities: [{ dimension: 'technical-expertise', name: 'TypeScript' }],
+        coverage: 'covered',
+        effectiveWeight: 3,
+        importance: 'critical',
+        requirementIds: ['job-requirement-1'],
+      }],
+    },
+    jobPosting: {
+      kind: 'pasted-text',
+      name: 'pasted-job-posting.txt',
+      originalContent: 'TypeScript is required.',
+    },
+    practicalConstraints: [],
+    priorityGapRequirementIds: [],
+    requirements: [{
+      capability: { dimension: 'technical-expertise', name: 'TypeScript' },
+      id: 'job-requirement-1',
+      importance: 'critical',
+      importanceRationale: 'The posting says required.',
+      sourceExcerpt: 'TypeScript is required.',
+      value: 'TypeScript',
+    }],
+    strengthRequirementIds: ['job-requirement-1'],
+    targetRole: null,
   },
 } as const satisfies CandidateSession
 

@@ -22,7 +22,7 @@ export type MatchBand = typeof matchBands[number]
 
 export type CandidateFact = Readonly<{
   id: string
-  kind: 'education' | 'experience' | 'language' | 'project' | 'skill'
+  kind: 'certification' | 'education' | 'experience' | 'language' | 'project' | 'skill'
   value: string
 }>
 

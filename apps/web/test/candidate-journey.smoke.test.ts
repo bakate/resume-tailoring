@@ -117,6 +117,22 @@ test.describe('Candidate Journey', () => {
     // Then
     await system.expectCriticalAmbiguityToBeResolvedForJobMatch()
   })
+
+  test('a Candidate receives an explainable Match Analysis without requirement review', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    // Given
+    await system.givenProcessingConsentIsGranted()
+    await system.givenStructuredSourceProfileExtractionSucceeds()
+    await system.givenSourceIntakeIsReadyForJobMatch()
+    await system.givenExplainableJobMatchSucceeds()
+
+    // Action
+    await system.submitPastedJobPosting()
+
+    // Then
+    await system.expectExplainableMatchAnalysisToBeVisible()
+  })
 })
 
 function createSystemUnderTest({ page }: Readonly<{ page: Page }>) {
@@ -160,6 +176,21 @@ class CandidateJourneyTestSystem {
       .toBeVisible()
   }
 
+  async givenSourceIntakeIsReadyForJobMatch() {
+    await this.#submitProfessionalText()
+    await expect(this.#page.getByRole('listitem').filter({ hasText: 'Job Match' }))
+      .toHaveAttribute('aria-current', 'step')
+  }
+
+  async givenExplainableJobMatchSucceeds() {
+    await this.#page.route('**/api/explainable-job-posting-extraction', (route) => (
+      route.fulfill({ json: jobPostingExtractionResponse })
+    ))
+    await this.#page.route('**/api/explainable-match-evidence', (route) => (
+      route.fulfill({ json: matchEvidenceResponse })
+    ))
+  }
+
   async openCandidateJourney() {
     await this.#page.goto('/')
     this.#completedAction = 'candidate-journey-opened'
@@ -196,6 +227,12 @@ class CandidateJourneyTestSystem {
     await this.#page.getByRole('textbox', { name: question }).fill('2021')
     await this.#page.getByRole('button', { name: 'Save this answer' }).click()
     this.#completedAction = 'critical-ambiguity-answered'
+  }
+
+  async submitPastedJobPosting() {
+    await this.#page.getByRole('textbox', { name: 'Job Posting text' }).fill(jobPostingText)
+    await this.#page.getByRole('button', { name: 'Analyze this Job Posting' }).click()
+    this.#completedAction = 'job-posting-submitted'
   }
 
   async #submitProfessionalText() {
@@ -269,6 +306,22 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByText('Your Source Profile is ready.')).toBeVisible()
   }
 
+  async expectExplainableMatchAnalysisToBeVisible() {
+    this.#expectCompletedAction('job-posting-submitted')
+    await expect(this.#page.getByText('54%')).toBeVisible()
+    await expect(this.#page.getByText('Credible evidence coverage')).toBeVisible()
+    await expect(this.#page.getByText('Three strongest matches')).toBeVisible()
+    await expect(this.#page.getByText('Three priority gaps')).toBeVisible()
+    const criticalReserve = this.#page.getByRole('heading', {
+      name: 'Critical Requirement Reserve',
+    }).locator('..')
+    await expect(criticalReserve).toContainText('Architecture leadership')
+    await expect(this.#page.getByText('Important Practical Constraints')).toBeVisible()
+    await this.#page.getByText('Complete requirement-to-evidence details').click()
+    await expect(this.#page.getByText('Exact source excerpt: TypeScript is required.')).toBeVisible()
+    await expect(this.#page.getByText('TypeScript', { exact: true }).last()).toBeVisible()
+  }
+
   #expectCompletedAction(expectedAction: CandidateJourneyAction) {
     expect(this.#completedAction, 'Expected a caller-visible Action before reading the outcome')
       .toBe(expectedAction)
@@ -286,6 +339,7 @@ type CandidateJourneyAction =
   | 'candidate-session-restored'
   | 'candidate-session-started'
   | 'critical-ambiguity-answered'
+  | 'job-posting-submitted'
   | 'processing-consent-granted'
   | 'source-document-submitted'
 
@@ -305,9 +359,87 @@ const structuredSourceProfileResponse = {
     }],
     languages: [],
     projects: [],
-    skills: [{ category: 'Programming language', name: 'TypeScript' }],
+    skills: [
+      { category: 'Programming language', name: 'TypeScript' },
+      { category: 'Frontend', name: 'React' },
+      { category: 'Runtime', name: 'Node.js' },
+    ],
   },
 } as const
+
+const jobPostingText = [
+  'We are hiring a Staff Engineer.',
+  'TypeScript is required.',
+  'React is central to the role.',
+  'Node.js is central to the role.',
+  'Architecture leadership is essential.',
+  'Executive communication is expected.',
+  'Kubernetes is a plus.',
+  'Work from Paris three days per week.',
+].join('\n')
+
+const jobPostingExtractionResponse = {
+  ok: true,
+  value: {
+    practicalConstraints: [{
+      sourceExcerpt: 'Work from Paris three days per week.',
+      value: 'Paris, three days per week',
+    }],
+    requirements: [
+      requirement('1', 'technical-expertise', 'TypeScript', 'central', 'TypeScript is required.'),
+      requirement('2', 'technical-expertise', 'React', 'central', 'React is central to the role.'),
+      requirement('3', 'technical-expertise', 'Node.js', 'central', 'Node.js is central to the role.'),
+      requirement('4', 'leadership', 'Architecture leadership', 'critical', 'Architecture leadership is essential.'),
+      requirement('5', 'stakeholder-communication', 'Executive communication', 'central', 'Executive communication is expected.'),
+      requirement('6', 'technical-expertise', 'Kubernetes', 'complementary', 'Kubernetes is a plus.'),
+    ],
+    targetRole: {
+      sourceExcerpt: 'We are hiring a Staff Engineer.',
+      value: 'Staff Engineer',
+    },
+  },
+} as const
+
+function requirement(
+  identifier: string,
+  dimension: 'leadership' | 'stakeholder-communication' | 'technical-expertise',
+  value: string,
+  importance: 'central' | 'complementary' | 'critical',
+  sourceExcerpt: string,
+) {
+  return {
+    capability: { dimension, name: value },
+    id: `job-requirement-${identifier}`,
+    importance,
+    importanceRationale: `The source wording makes ${value} ${importance}.`,
+    sourceExcerpt,
+    value,
+  }
+}
+
+const matchEvidenceResponse = {
+  ok: true,
+  value: {
+    evidence: [
+      evidence('1', 'source-fact-skills-0-name-0', 'TypeScript'),
+      evidence('2', 'source-fact-skills-1-name-0', 'React'),
+      evidence('3', 'source-fact-skills-2-name-0', 'Node.js'),
+    ],
+    relevantFactIds: [
+      'source-fact-skills-0-name-0',
+      'source-fact-skills-1-name-0',
+      'source-fact-skills-2-name-0',
+    ],
+  },
+} as const
+
+function evidence(identifier: string, factId: `source-fact-${string}`, term: string) {
+  return {
+    coverage: 'covered',
+    factMatches: [{ factId, factTerm: term, relationship: 'exact', requirementTerm: term }],
+    requirementId: `job-requirement-${identifier}`,
+  }
+}
 
 const criticalAmbiguitySourceProfileResponse = {
   ...structuredSourceProfileResponse,

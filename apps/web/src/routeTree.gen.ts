@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiAnalyticsRouteImport } from './routes/api.analytics'
 import { Route as ApiDemoAccessRouteImport } from './routes/api.demo-access'
+import { Route as ApiExplainableJobPostingExtractionRouteImport } from './routes/api.explainable-job-posting-extraction'
+import { Route as ApiExplainableMatchEvidenceRouteImport } from './routes/api.explainable-match-evidence'
 import { Route as ApiJobRequirementExtractionRouteImport } from './routes/api.job-requirement-extraction'
 import { Route as ApiMatchAnalysisRouteImport } from './routes/api.match-analysis'
 import { Route as ApiResumeClaimValidationRouteImport } from './routes/api.resume-claim-validation'
@@ -35,6 +37,18 @@ const ApiDemoAccessRoute = ApiDemoAccessRouteImport.update({
   path: '/api/demo-access',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiExplainableJobPostingExtractionRoute =
+  ApiExplainableJobPostingExtractionRouteImport.update({
+    id: '/api/explainable-job-posting-extraction',
+    path: '/api/explainable-job-posting-extraction',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiExplainableMatchEvidenceRoute =
+  ApiExplainableMatchEvidenceRouteImport.update({
+    id: '/api/explainable-match-evidence',
+    path: '/api/explainable-match-evidence',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiJobRequirementExtractionRoute =
   ApiJobRequirementExtractionRouteImport.update({
     id: '/api/job-requirement-extraction',
@@ -79,6 +93,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/analytics': typeof ApiAnalyticsRoute
   '/api/demo-access': typeof ApiDemoAccessRoute
+  '/api/explainable-job-posting-extraction': typeof ApiExplainableJobPostingExtractionRoute
+  '/api/explainable-match-evidence': typeof ApiExplainableMatchEvidenceRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
@@ -91,6 +107,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/analytics': typeof ApiAnalyticsRoute
   '/api/demo-access': typeof ApiDemoAccessRoute
+  '/api/explainable-job-posting-extraction': typeof ApiExplainableJobPostingExtractionRoute
+  '/api/explainable-match-evidence': typeof ApiExplainableMatchEvidenceRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
@@ -104,6 +122,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/api/analytics': typeof ApiAnalyticsRoute
   '/api/demo-access': typeof ApiDemoAccessRoute
+  '/api/explainable-job-posting-extraction': typeof ApiExplainableJobPostingExtractionRoute
+  '/api/explainable-match-evidence': typeof ApiExplainableMatchEvidenceRoute
   '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
@@ -118,6 +138,8 @@ export interface FileRouteTypes {
     | '/'
     | '/api/analytics'
     | '/api/demo-access'
+    | '/api/explainable-job-posting-extraction'
+    | '/api/explainable-match-evidence'
     | '/api/job-requirement-extraction'
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
@@ -130,6 +152,8 @@ export interface FileRouteTypes {
     | '/'
     | '/api/analytics'
     | '/api/demo-access'
+    | '/api/explainable-job-posting-extraction'
+    | '/api/explainable-match-evidence'
     | '/api/job-requirement-extraction'
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
@@ -142,6 +166,8 @@ export interface FileRouteTypes {
     | '/'
     | '/api/analytics'
     | '/api/demo-access'
+    | '/api/explainable-job-posting-extraction'
+    | '/api/explainable-match-evidence'
     | '/api/job-requirement-extraction'
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
@@ -155,6 +181,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiAnalyticsRoute: typeof ApiAnalyticsRoute
   ApiDemoAccessRoute: typeof ApiDemoAccessRoute
+  ApiExplainableJobPostingExtractionRoute: typeof ApiExplainableJobPostingExtractionRoute
+  ApiExplainableMatchEvidenceRoute: typeof ApiExplainableMatchEvidenceRoute
   ApiJobRequirementExtractionRoute: typeof ApiJobRequirementExtractionRoute
   ApiMatchAnalysisRoute: typeof ApiMatchAnalysisRoute
   ApiResumeClaimValidationRoute: typeof ApiResumeClaimValidationRoute
@@ -185,6 +213,20 @@ declare module '@tanstack/react-router' {
       path: '/api/demo-access'
       fullPath: '/api/demo-access'
       preLoaderRoute: typeof ApiDemoAccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/explainable-job-posting-extraction': {
+      id: '/api/explainable-job-posting-extraction'
+      path: '/api/explainable-job-posting-extraction'
+      fullPath: '/api/explainable-job-posting-extraction'
+      preLoaderRoute: typeof ApiExplainableJobPostingExtractionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/explainable-match-evidence': {
+      id: '/api/explainable-match-evidence'
+      path: '/api/explainable-match-evidence'
+      fullPath: '/api/explainable-match-evidence'
+      preLoaderRoute: typeof ApiExplainableMatchEvidenceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/job-requirement-extraction': {
@@ -243,6 +285,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiAnalyticsRoute: ApiAnalyticsRoute,
   ApiDemoAccessRoute: ApiDemoAccessRoute,
+  ApiExplainableJobPostingExtractionRoute:
+    ApiExplainableJobPostingExtractionRoute,
+  ApiExplainableMatchEvidenceRoute: ApiExplainableMatchEvidenceRoute,
   ApiJobRequirementExtractionRoute: ApiJobRequirementExtractionRoute,
   ApiMatchAnalysisRoute: ApiMatchAnalysisRoute,
   ApiResumeClaimValidationRoute: ApiResumeClaimValidationRoute,
