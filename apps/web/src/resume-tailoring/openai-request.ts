@@ -9,6 +9,13 @@ type OpenAiOperation =
   | 'structured-source-profile-extraction'
   | 'tailored-resume-pdf-validation'
 
+export type OpenAiRequestFailure = Readonly<{
+  type: 'invalid-response' | 'rate-limited' | 'timeout' | 'transport'
+    | 'upstream-invalid-request' | 'upstream-failure'
+  status?: number
+  retryAfter?: string
+}>
+
 type OpenAiRequesterDependencies = Readonly<{
   apiKey: string
   request?: typeof fetch
@@ -41,17 +48,19 @@ async function sendOpenAiRequest({
   request,
 }: OpenAiRequestDetails & Required<OpenAiRequesterDependencies>) {
   const startedAtMilliseconds = Date.now()
+  const requestCharacterCount = JSON.stringify(body).length
   const responseResult = await fetchOpenAiResponse({ apiKey, body, deadlineSignal, request })
   if (!responseResult.ok) {
-    return recordFailure({ ...responseResult.error, operation, startedAtMilliseconds })
+    return recordFailure({ ...responseResult.error, operation, requestCharacterCount, startedAtMilliseconds })
   }
   if (!responseResult.value.ok) {
     return recordFailure({
-      cause: 'upstream-status', operation,
-      startedAtMilliseconds, status: responseResult.value.status,
+      cause: readUpstreamFailure({ status: responseResult.value.status }), operation,
+      retryAfter: responseResult.value.headers.get('retry-after') ?? undefined,
+      requestCharacterCount, startedAtMilliseconds, status: responseResult.value.status,
     })
   }
-  return readOpenAiResponse({ operation, response: responseResult.value, startedAtMilliseconds })
+  return readOpenAiResponse({ operation, requestCharacterCount, response: responseResult.value, startedAtMilliseconds })
 }
 
 async function fetchOpenAiResponse({
@@ -76,12 +85,17 @@ async function fetchOpenAiResponse({
 }
 
 async function readOpenAiResponse({
-  operation, response, startedAtMilliseconds,
-}: Readonly<{ operation: OpenAiOperation; response: Response; startedAtMilliseconds: number }>) {
+  operation, requestCharacterCount, response, startedAtMilliseconds,
+}: Readonly<{
+  operation: OpenAiOperation
+  requestCharacterCount: number
+  response: Response
+  startedAtMilliseconds: number
+}>) {
   try {
     return { ok: true, value: await response.json() as unknown } as const
   } catch {
-    return recordFailure({ cause: 'invalid-response', operation, startedAtMilliseconds })
+    return recordFailure({ cause: 'invalid-response', operation, requestCharacterCount, startedAtMilliseconds })
   }
 }
 
@@ -94,23 +108,38 @@ function readFailureCause({ error }: Readonly<{ error: unknown }>) {
 function recordFailure({
   cause,
   operation,
+  requestCharacterCount,
+  retryAfter,
   startedAtMilliseconds,
   status,
 }: Readonly<{
-  cause: 'invalid-response' | 'timeout' | 'transport' | 'upstream-status'
+  cause: OpenAiRequestFailure['type']
   operation: OpenAiOperation
+  requestCharacterCount: number
+  retryAfter?: string
   startedAtMilliseconds: number
   status?: number
 }>) {
   const durationMilliseconds = Math.max(0, Date.now() - startedAtMilliseconds)
-  const dimensions = status === undefined
-    ? { cause, durationMilliseconds, operation }
-    : { cause, durationMilliseconds, operation, status }
+  const dimensions = {
+    cause, durationMilliseconds, operation, requestCharacterCount,
+    ...(retryAfter === undefined ? {} : { retryAfter }),
+    ...(status === undefined ? {} : { status }),
+  }
   console.info(JSON.stringify({
     category: 'privacy-safe-openai-request', metric: 'failed', value: 1, dimensions,
   }))
-  return unavailableResult
+  return { ok: false, error: {
+    ...(retryAfter === undefined ? {} : { retryAfter }),
+    ...(status === undefined ? {} : { status }),
+    type: cause,
+  } } as const
 }
 
-const unavailableResult = { ok: false } as const
+function readUpstreamFailure({ status }: Readonly<{ status: number }>) {
+  if (status === 429) return 'rate-limited' as const
+  if (status >= 500) return 'upstream-failure' as const
+  return 'upstream-invalid-request' as const
+}
+
 const openAiRequestTimeoutMilliseconds = 90_000

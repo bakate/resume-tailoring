@@ -41,7 +41,7 @@ describe('OpenAI request policy', () => {
       operation: 'source-profile-extraction',
     })
 
-    expect(result).toEqual({ ok: false })
+    expect(result).toEqual({ ok: false, error: { type: 'timeout' } })
     expect(writeLog).toHaveBeenCalledOnce()
     const serializedMetric = String(writeLog.mock.calls.at(0)?.at(0))
     expect(serializedMetric).toContain('"cause":"timeout"')
@@ -49,5 +49,22 @@ describe('OpenAI request policy', () => {
     expect(serializedMetric).not.toContain('Private Candidate history')
     expect(serializedMetric).not.toContain('private-api-key')
     writeLog.mockRestore()
+  })
+
+  it('classifies provider rate limits and preserves Retry-After', async () => {
+    const requester = createOpenAiRequester({
+      apiKey: 'test-api-key',
+      request: () => Promise.resolve(new Response(null, {
+        headers: { 'Retry-After': '15' },
+        status: 429,
+      })),
+    })
+
+    const result = await requester.send({ body: {}, operation: 'match-analysis' })
+
+    expect(result).toEqual({
+      ok: false,
+      error: { retryAfter: '15', status: 429, type: 'rate-limited' },
+    })
   })
 })
