@@ -17,6 +17,7 @@ import type {
 
 import type {
   ResumeTailoringCommand,
+  ResumeTailoringFailure,
   ResumeTailoringResult,
   ResumeTailoringView,
   ResumeTailoringWorkflow,
@@ -165,7 +166,13 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     return result
   }
 
-  #executeCommand(command: ResumeTailoringCommand) {
+  async #executeCommand(command: ResumeTailoringCommand) {
+    const result = await this.#executeCommandOnce(command)
+    if (!shouldRetryCommand({ command, result })) return result
+    return this.#executeCommandOnce(command)
+  }
+
+  #executeCommandOnce(command: ResumeTailoringCommand) {
     if (command.type === 'open-workflow') return this.#openWorkflow()
     if (command.type === 'delete-session') return this.#deleteSession()
     if (command.type === 'import-source-document') return this.#importSourceDocument(command)
@@ -767,10 +774,42 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
         ? sourceProfileFactConflictResult
         : sourceProfileFactUnavailableResult)
     }
-    return this.#persistSourceProfile({
-      currentState,
+    const nextState = {
+      ...currentState,
+      currentJobPostingStatus: undefined,
       sourceProfile: { ...currentState.sourceProfile, facts: transition.value },
+      tailoredResume: undefined,
+    }
+    const nextStateResult = { ok: true, value: nextState } as const
+    if (!hasMatchInputs(nextStateResult) || currentState.matchAnalysis === undefined) {
+      return this.#persistSourceProfile({
+        currentState,
+        sourceProfile: nextState.sourceProfile,
+      })
+    }
+    return this.#recalculateMatchAnalysisAfterFactChange({ state: nextStateResult.value })
+  }
+
+  async #recalculateMatchAnalysisAfterFactChange({ state }: Readonly<{
+    state: ReadyResumeTailoringState & {
+      readonly jobPosting: JobPostingReview & { readonly status: 'reviewing-requirements' }
+      readonly sourceProfile: NonNullable<ReadyResumeTailoringState['sourceProfile']>
+    }
+  }>) {
+    const persistedState = await this.#dependencies.candidateSessionPersistence.update({
+      sessionId: state.sessionId,
+      state,
     })
+    if (!persistedState.ok) return unavailableResult
+    const matcher = this.#dependencies.matchEvidenceMatcher
+    if (matcher === undefined) return persistedState
+    const matchAnalysis = await requestMatchAnalysis({ matcher, state })
+    if (!matchAnalysis.ok) return matchAnalysis
+    const recalculatedState = await this.#dependencies.candidateSessionPersistence.update({
+      sessionId: state.sessionId,
+      state: { ...state, currentJobPostingStatus: 'analyzed', matchAnalysis: matchAnalysis.value },
+    })
+    return recalculatedState.ok ? recalculatedState : unavailableResult
   }
 
   async #extractSourceProfile(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
@@ -1070,6 +1109,15 @@ function readConcurrentOutcome({ currentState, latestState }: Readonly<{
 
 function ignoreResult(): undefined {
   return undefined
+}
+
+function shouldRetryCommand({ command, result }: Readonly<{
+  command: ResumeTailoringCommand
+  result: ResumeTailoringResult<ResumeTailoringView>
+}>) {
+  return !result.ok
+    && automaticRetryCommandTypes.has(command.type)
+    && automaticRetryFailureTypes.has(result.error.type)
 }
 
 function readMatchScoreBand(matchScore: number): MatchScoreBand {
@@ -1541,6 +1589,28 @@ const unavailableResult = {
   ok: false,
   error: { type: 'candidate-session-unavailable' },
 } as const satisfies ResumeTailoringResult<ResumeTailoringView>
+
+const automaticRetryCommandTypes = new Set<ResumeTailoringCommand['type']>([
+  'extract-source-profile',
+  'confirm-processing-and-extract-source-profile',
+  'extract-job-requirements',
+  'analyze-match',
+  'enrich-source-profile',
+  'generate-resume-claims',
+  'reformulate-resume-claim',
+  'edit-resume-claim',
+  'confirm-resume-claim-edit',
+])
+
+const automaticRetryFailureTypes = new Set<ResumeTailoringFailure['type']>([
+  'source-profile-extraction-unavailable',
+  'job-requirement-extraction-unavailable',
+  'job-requirement-transport-unavailable',
+  'match-analysis-unavailable',
+  'match-analysis-transport-unavailable',
+  'resume-claim-writing-unavailable',
+  'resume-claim-validation-unavailable',
+])
 
 const processingNoticeRequiredResult = {
   ok: false,
