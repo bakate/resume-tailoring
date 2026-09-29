@@ -86,7 +86,7 @@ function EditableTailoredResume({ candidateFacts, localization, tailoredResume }
       <ResumeFieldsEditor {...{ candidateFacts: facts, localization, resume, unsupportedKeys,
         changeField, attestField, hideField, moveField }} />
       <HiddenFields {...{ hiddenFields, localization, restoreField }} />
-      {unsupportedFieldCount === 0 ? null : <Text c="red" role="alert">
+      {unsupportedFieldCount === 0 ? null : <Text c="danger.8" role="alert">
         {localization.translate('tailoredResume.unsupportedFields')}
       </Text>}
       <TailoredResumePreview source={{ candidateFacts: facts, tailoredResume: editedResume }}
@@ -159,7 +159,7 @@ function EditableField({ attestField, candidateFacts, changeField, hideField, lo
   return <Paper p="sm" withBorder>
     <Textarea label={localization.translate('tailoredResume.fieldLabel')} value={text}
       onChange={(event) => { onChange(event.currentTarget.value) }} autosize />
-    {unsupported ? <Text c="red" role="alert">{localization.translate('tailoredResume.unsupportedField')}</Text> : null}
+    {unsupported ? <Text c="danger.8" role="alert">{localization.translate('tailoredResume.unsupportedField')}</Text> : null}
     <Group mt="xs"><Button size="compact-sm" onClick={() => { const isUnsupported = !isSupportedResumeFieldText({
       candidateFacts, field: reference.field, text,
     }); changeField(reference, text); setUnsupported(isUnsupported) }}>
@@ -208,7 +208,7 @@ function TailoredResumePreview({ canExportOverride = true, localization, source 
       title="Tailored Resume preview" />
     {canExport ? <Button mt="md" onClick={() => { printTailoredResume({ html }) }}>
       Download PDF
-    </Button> : <Text c="red" mt="md" role="alert">
+    </Button> : <Text c="danger.8" mt="md" role="alert">
       {localization.translate('tailoredResume.exportBlocked')}
     </Text>}
   </section>
