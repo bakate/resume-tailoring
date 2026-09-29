@@ -102,15 +102,6 @@ export const resumeClaimValidationResultSchema = z.discriminatedUnion('ok', [
   }),
 ])
 
-export const storedTailoredResumeSchema = z.object({
-  claims: z.array(proposedResumeClaimSchema.extend({ id: resumeClaimIdSchema }))
-    .max(resumeClaimContractLimits.claimCount),
-  exclusions: z.array(z.object({
-    reason: z.literal('unsupported-after-regeneration'),
-  })).max(resumeClaimContractLimits.claimCount),
-  locale: z.enum(['en', 'fr']).default('en'),
-})
-
 export function hasOnlyResumeClaimInputReferences({
   claims,
   inputs,

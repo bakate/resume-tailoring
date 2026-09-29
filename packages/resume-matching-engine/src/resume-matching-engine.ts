@@ -15,6 +15,10 @@ export const capabilityDimensions = [
 export const requirementImportances = ['critical', 'central', 'complementary'] as const
 export const requirementCoverages = ['covered', 'partially-covered'] as const
 export const matchBands = ['ambitious', 'credible', 'strong'] as const
+export const matchBandThresholds = {
+  credibleMinimum: 50,
+  strongMinimum: 75,
+} as const
 
 export type CapabilityDimension = typeof capabilityDimensions[number]
 export type RequirementImportance = typeof requirementImportances[number]
@@ -172,8 +176,8 @@ function hasValidStoredEvidence({ candidateFacts, evidence, requirements }: Read
 }
 
 export function readMatchBand({ matchScore }: Readonly<{ matchScore: number }>): MatchBand {
-  if (matchScore >= 75) return 'strong'
-  if (matchScore >= 50) return 'credible'
+  if (matchScore >= matchBandThresholds.strongMinimum) return 'strong'
+  if (matchScore >= matchBandThresholds.credibleMinimum) return 'credible'
   return 'ambitious'
 }
 

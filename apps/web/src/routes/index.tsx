@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-import { CandidateJourneyCutover } from '../candidate-journey/candidate-journey-cutover'
+import { CandidateJourneyShell } from '../candidate-journey/candidate-journey-shell'
 import { DemoAccessGate } from '../demo-access/demo-access-gate'
 
 export const Route = createFileRoute('/')({
@@ -10,7 +10,7 @@ export const Route = createFileRoute('/')({
 function DemoRoute() {
   return (
     <DemoAccessGate>
-      <CandidateJourneyCutover />
+      <CandidateJourneyShell />
     </DemoAccessGate>
   )
 }

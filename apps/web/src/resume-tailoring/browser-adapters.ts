@@ -29,7 +29,6 @@ import {
 } from './resume-claim-schemas'
 import { privacySafeAnalyticsEventSchema } from './privacy-safe-analytics'
 
-export { createBrowserCandidateSessionPersistence } from './candidate-session-indexed-db'
 export { createBrowserSourceDocumentReader } from './source-document-pdf'
 
 export function createBrowserCandidateSessionClock(): CandidateSessionClock {
