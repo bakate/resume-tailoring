@@ -598,32 +598,6 @@ h1 {
   cursor: progress;
 }
 
-.source-profile-workspace > h2:focus-visible,
-.job-posting-workspace > h2:focus-visible,
-.match-analysis-workspace > h2:focus-visible,
-.tailored-resume-workspace > h2:focus-visible {
-  outline: 3px solid #94cdb8;
-  outline-offset: 8px;
-}
-
-.source-profile-workspace,
-.job-posting-workspace,
-.match-analysis-workspace,
-.tailored-resume-workspace {
-  padding: 72px 0;
-  border-bottom: 1px solid #dfe1df;
-}
-
-.source-profile-workspace > h2,
-.job-posting-workspace > h2,
-.match-analysis-workspace > h2,
-.tailored-resume-workspace > h2 {
-  margin: 0 0 30px;
-  font-family: 'DM Serif Display', Georgia, serif;
-  font-size: clamp(36px, 4vw, 54px);
-  font-weight: 400;
-}
-
 .tailored-resume-preview-frame {
   width: 100%;
   height: 72rem;

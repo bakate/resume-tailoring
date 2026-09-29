@@ -1,14 +1,9 @@
 import {
   sensitiveContentKinds,
   sourceProfileFactKinds,
-  sourceProfileFactStatuses,
-  sourceProfileReviewStatuses,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
-import type { MatchScore } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { z } from 'zod'
 
-const candidateSessionIdSchema = z.templateLiteral(['candidate-session-', z.string().min(1)])
-const sourceProfileFactIdSchema = z.templateLiteral(['source-fact-', z.string().min(1)])
 const sourceProfilePropositionKeySchema = z.templateLiteral(['proposition-', z.string().min(1)])
 
 const sourceProfileFactContentSchema = z.object({
@@ -30,69 +25,16 @@ export const extractedSourceProfileFactContentSchema = sourceProfileFactContentS
     }
   })
 
-const sourceProfileFactSchema = sourceProfileFactContentSchema.extend({
-  authorship: z.literal('candidate').optional(),
-  id: sourceProfileFactIdSchema,
-  status: z.enum(sourceProfileFactStatuses),
-  supersedesFactId: sourceProfileFactIdSchema.optional(),
-})
-
 export const sensitiveContentSchema = z.object({
   id: z.templateLiteral(['sensitive-', z.string().min(1)]),
   kind: z.enum(sensitiveContentKinds),
   value: z.string(),
 })
 
-export const sourceProfileReviewSchema = z.object({
-  status: z.enum(sourceProfileReviewStatuses),
-  documentName: z.string(),
-  detectedSensitiveContent: z.array(sensitiveContentSchema),
-  outgoingContent: z.string(),
-  processingNotice: z.object({
-    version: z.string(),
-    confirmedAt: z.number(),
-  }).nullable(),
-  facts: z.array(sourceProfileFactSchema),
-})
-
 export const outcomeFeedbackSchema = z.object({
   comment: z.string().max(1_000).optional(),
   useful: z.boolean(),
 })
-
-const storedOutcomeFeedbackSchema = z.union([
-  outcomeFeedbackSchema,
-  z.object({
-    fidelity: z.enum(['faithful', 'needs-correction']).optional(),
-    relevance: z.enum(['relevant', 'needs-improvement']).optional(),
-  }),
-]).transform((feedback) => 'useful' in feedback ? feedback : undefined)
-
-const jobPostingHistoryItemSchema = z.object({
-  id: z.templateLiteral(['job-posting-', z.string().min(1)]),
-  matchScore: z.custom<MatchScore>((value) =>
-    typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 100),
-  status: z.enum(['analyzed', 'draft-generated', 'pdf-downloaded']),
-  targetRole: z.string().min(1).optional(),
-})
-
-export const storedCandidateSessionSchema = z.object({
-  status: z.literal('ready'),
-  sessionId: candidateSessionIdSchema,
-  expiresAt: z.number(),
-  currentJobPostingDownloaded: z.boolean().optional(),
-  currentJobPostingStatus: z.enum(['analyzed', 'draft-generated', 'pdf-downloaded']).optional(),
-  jobPostingHistory: z.array(jobPostingHistoryItemSchema).optional(),
-  sourceProfile: z.unknown().optional(),
-  jobPosting: z.unknown().optional(),
-  matchAnalysis: z.unknown().optional(),
-  outcomeFeedback: storedOutcomeFeedbackSchema.optional(),
-  tailoredResume: z.unknown().optional(),
-}).transform(({ currentJobPostingDownloaded, ...session }) => ({
-  ...session,
-  currentJobPostingStatus: session.currentJobPostingStatus
-    ?? (currentJobPostingDownloaded === true ? 'pdf-downloaded' as const : undefined),
-}))
 
 export const sourceProfileExtractionSuccessSchema = z.object({
   ok: z.literal(true),
