@@ -624,6 +624,13 @@ h1 {
   font-weight: 400;
 }
 
+.tailored-resume-preview-frame {
+  width: 100%;
+  height: 72rem;
+  margin-top: 1rem;
+  border: 0;
+}
+
 .resume-claim-list {
   display: grid;
   gap: 12px;
