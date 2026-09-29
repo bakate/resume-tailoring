@@ -127,7 +127,8 @@ function GenerationAvailability({ candidateSession, locale, localization,
     {localization.translate('matchAnalysis.denied')}
   </p>
   return <ResumeGenerationControls {...{
-    candidateSession, label: localization.translate('resumeClaims.generate'), locale,
+    candidateSession, confirmReplacement: false,
+    label: localization.translate('resumeClaims.generate'), locale,
     localization, onGenerated: ignoreGenerated, setLocale,
   }} />
 }
@@ -141,8 +142,9 @@ function usePreferredResumeLocale({ candidateSession, localization }: WorkspaceP
 }
 
 function ResumeGenerationControls({ candidateSession, label, locale, localization, onGenerated,
-  setLocale }:
+  confirmReplacement, setLocale }:
 WorkspaceProps & Readonly<{
+  confirmReplacement: boolean
   label: string
   locale: 'en' | 'fr'
   onGenerated: () => void
@@ -152,18 +154,30 @@ WorkspaceProps & Readonly<{
     <ResumeLanguageSelector {...{ locale, localization, setLocale }} />
     <button className="primary-action compact-action"
       disabled={candidateSession.pendingOperation !== null}
-      onClick={() => void generateResumeClaims({ candidateSession, locale, onGenerated })}
+      onClick={() => void generateResumeClaims({
+        candidateSession,
+        confirmMessage: localization.translate('resumeClaims.confirmRegeneration'),
+        confirmReplacement,
+        locale,
+        onGenerated,
+      })}
       type="button">
       {label}
     </button>
   </>
 }
 
-export async function generateResumeClaims({ candidateSession, locale, onGenerated }: Readonly<{
+export async function generateResumeClaims({
+  candidateSession, confirmMessage, confirmReplacement = false, locale, onGenerated,
+}: Readonly<{
   candidateSession: Pick<CandidateSessionController, 'generateResumeClaims'>
+  confirmMessage?: string
+  confirmReplacement?: boolean
   locale: 'en' | 'fr'
   onGenerated: () => void
 }>) {
+  if (confirmReplacement && typeof window !== 'undefined'
+    && !window.confirm(confirmMessage ?? '')) return
   const result = await candidateSession.generateResumeClaims({ locale })
   if (result.ok) onGenerated()
 }
@@ -210,7 +224,8 @@ function CuratedGenerationControls({ locale, props, setLocale }: Readonly<{
 }>) {
   const { candidateSession, clearUnsupportedEdits, localization } = props
   return <ResumeGenerationControls {...{
-    candidateSession, label: localization.translate('resumeClaims.regenerate'), locale,
+    candidateSession, confirmReplacement: true,
+    label: localization.translate('resumeClaims.regenerate'), locale,
     localization, onGenerated: clearUnsupportedEdits, setLocale,
   }} />
 }

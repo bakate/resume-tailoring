@@ -465,6 +465,7 @@ class JobRequirementWorkflowTestSystem {
     failureType: 'job-requirement-extraction-unavailable' | 'job-requirement-transport-unavailable'
   }>) {
     expect(this.#readActionResult()).toEqual({ ok: false, error: { type: failureType } })
+    expect(this.#modelRequests).toHaveLength(2)
     expect(await this.#readPersistedJobPosting()).toEqual(confirmedJobPosting)
   }
 

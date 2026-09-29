@@ -25,7 +25,10 @@ export type QualificationFixture = Readonly<{
   expectedRequirements: readonly JobRequirement[]
   extractedRequirements: readonly JobRequirement[]
   id: string
+  language: 'en' | 'fr'
   jobPosting: string
+  roleTitle: string
+  scenarioTags: readonly string[]
   prohibitedMatches: readonly Readonly<{ factId: string; requirementId: string }>[]
   proposedEvidence: readonly ProposedMatchEvidence[]
   relevantFactIds: readonly string[]
@@ -270,9 +273,12 @@ export function createQualificationFixture({
   expectedMatchScoreRange = { maximum: 100, minimum: 100 },
   importance = 'central',
   index,
+  language = 'en',
   requirementTerm,
   requirementValue = requirementTerm,
   roleFamily,
+  roleTitle = roleFamily,
+  scenarioTags = [],
   split,
   generalManagement,
   includeEvidence = true,
@@ -283,9 +289,12 @@ export function createQualificationFixture({
   expectedMatchScoreRange?: Readonly<{ maximum: number; minimum: number }>
   importance?: RequirementImportance
   index: number
+  language?: 'en' | 'fr'
   requirementTerm: string
   requirementValue?: string
   roleFamily: QualificationRoleFamily
+  roleTitle?: string
+  scenarioTags?: readonly string[]
   split: QualificationSplit
   generalManagement?: QualificationFixture['generalManagement']
   includeEvidence?: boolean
@@ -312,12 +321,19 @@ export function createQualificationFixture({
     expectedRequirements: [requirement],
     extractedRequirements: [requirement],
     id: fixtureId,
-    jobPosting: `The ${roleFamily} role requires ${requirementTerm}.`,
+    language,
+    jobPosting: language === 'fr'
+      ? `Le poste ${roleFamily} requiert ${requirementTerm}.`
+      : `The ${roleFamily} role requires ${requirementTerm}.`,
+    roleTitle,
+    scenarioTags,
     prohibitedMatches: [],
     proposedEvidence,
     relevantFactIds: fact === undefined || !includeEvidence ? [] : [fact.id],
     roleFamily,
-    sourceDocument: `Synthetic ${roleFamily} evidence for ${requirementTerm}.`,
+    sourceDocument: language === 'fr'
+      ? `Expérience ${roleFamily} pour ${requirementTerm}.`
+      : `Synthetic ${roleFamily} evidence for ${requirementTerm}.`,
     split,
     writingClaimsSupported: true,
     exportablePdf: true,
