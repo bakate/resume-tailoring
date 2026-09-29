@@ -5,6 +5,24 @@ import type { PrivacySafeTelemetry } from '@resume-tailoring/application/resume-
 import { createPrivacySafeBrowserTelemetry } from './browser-adapters'
 
 describe('privacy-safe browser analytics', () => {
+  it('transmits journey progression without a Candidate identifier', async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 202 }))
+    const telemetry = createPrivacySafeBrowserTelemetry({ request })
+
+    const result = await telemetry.record({
+      name: 'candidate-journey-phase-reached',
+      phase: 'job-match',
+    })
+
+    expect(result).toEqual({ ok: true, value: undefined })
+    expect(request).toHaveBeenCalledWith('/api/analytics', {
+      body: JSON.stringify({ name: 'candidate-journey-phase-reached', phase: 'job-match' }),
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    })
+  })
+
   it('transmits an allowlisted aggregate outcome', async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 202 }))
     const telemetry = createPrivacySafeBrowserTelemetry({ request })

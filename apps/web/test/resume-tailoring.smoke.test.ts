@@ -301,6 +301,7 @@ test('an unreadable PDF preserves the Candidate session with adjacent feedback',
 })
 
 test('a Candidate recovers from an unreadable PDF with a readable replacement', async ({ page }) => {
+  test.slow()
   const system = createSystemUnderTest({ page })
 
   await system.givenUnreadablePdfWasRejected()

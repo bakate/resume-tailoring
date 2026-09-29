@@ -33,6 +33,7 @@ import type {
   CandidateSessionIdentity,
   CandidateSessionPersistence,
   PrivacySafeTelemetry,
+  journeyPhases,
   SourceDocumentReader,
   SourceProfileFactIdentity,
   SourceProfileExtractor,
@@ -99,6 +100,7 @@ type CorrectionKind = Extract<
   PrivacySafeTelemetryEvent,
   { readonly name: 'resume-correction-recorded' }
 >['correctionKind']
+type JourneyPhase = typeof journeyPhases[number]
 type SourceProfileFactCommand = Exclude<ResumeTailoringCommand,
   | { readonly type: 'open-workflow' }
   | { readonly type: 'delete-session' }
@@ -493,7 +495,11 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
         tailoredResume: { claims, exclusions, locale: tailoredResumeLocale },
       },
     })
-    return persistedState.ok ? persistedState : unavailableResult
+    if (!persistedState.ok) return unavailableResult
+    if (currentState.tailoredResume === undefined) {
+      await this.#recordJourneyPhase('tailored-resume-preparation')
+    }
+    return persistedState
   }
 
   async #analyzeMatch(): Promise<ResumeTailoringResult<ResumeTailoringView>> {
@@ -548,7 +554,9 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
         tailoredResume: undefined,
       },
     })
-    return persistedState.ok ? persistedState : unavailableResult
+    if (!persistedState.ok) return unavailableResult
+    await this.#recordJourneyPhase('job-match')
+    return persistedState
   }
 
   async #reviewJobPosting(
@@ -749,6 +757,12 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
     })
   }
 
+  #recordJourneyPhase(phase: JourneyPhase) {
+    return this.#dependencies.telemetry.record({
+      name: 'candidate-journey-phase-reached', phase,
+    })
+  }
+
   async #rejectSourceProfileFact({ factId }: Readonly<{
     factId: SourceProfileFactId
   }>): Promise<ResumeTailoringResult<ResumeTailoringView>> {
@@ -870,6 +884,9 @@ class DefaultResumeTailoringWorkflow implements ResumeTailoringWorkflow {
         status: 'reviewing-facts',
         facts,
       },
+    }).then(async (result) => {
+      if (result.ok) await this.#recordJourneyPhase('source-intake')
+      return result
     })
   }
 

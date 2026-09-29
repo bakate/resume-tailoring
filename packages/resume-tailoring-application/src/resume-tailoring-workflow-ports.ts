@@ -108,11 +108,20 @@ export const correctionKinds = [
   'resume-claim-reformulation',
   'resume-claim-edit',
 ] as const
+export const journeyPhases = [
+  'source-intake',
+  'job-match',
+  'tailored-resume-preparation',
+] as const
 
 export type MatchScoreBand = typeof matchScoreBands[number]
 
 export type PrivacySafeTelemetryEvent =
   | Readonly<{ name: 'resume-tailoring-opened' }>
+  | Readonly<{
+      name: 'candidate-journey-phase-reached'
+      phase: typeof journeyPhases[number]
+    }>
   | Readonly<{ name: 'candidate-session-deleted' }>
   | Readonly<{ name: 'candidate-session-expired' }>
   | Readonly<{

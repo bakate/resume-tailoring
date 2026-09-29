@@ -16,12 +16,12 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `pnpm exec vite dev --host 127.0.0.1 --port ${testPort}`,
+      command: `VITE_E2E=1 pnpm exec vite dev --host 127.0.0.1 --port ${testPort}`,
       reuseExistingServer: true,
       url: testBaseUrl,
     },
     {
-      command: `VITE_CANDIDATE_JOURNEY_RELEASE=legacy pnpm exec vite dev --host 127.0.0.1 --port ${legacyTestPort}`,
+      command: `VITE_E2E=1 VITE_CANDIDATE_JOURNEY_RELEASE=legacy pnpm exec vite dev --host 127.0.0.1 --port ${legacyTestPort}`,
       reuseExistingServer: true,
       url: legacyTestBaseUrl,
     },
