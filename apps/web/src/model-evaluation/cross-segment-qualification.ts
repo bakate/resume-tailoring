@@ -34,6 +34,14 @@ export type QualificationFixture = Readonly<{
   split: QualificationSplit
   writingClaimsSupported: boolean
   exportablePdf: boolean
+  generalManagement?: Readonly<{
+    ambiguity: 'none' | 'scope' | 'seniority' | 'ownership'
+    constraints: readonly string[]
+    domain: 'operations' | 'finance' | 'hr' | 'program-leadership' | 'cross-functional'
+    language: 'en' | 'fr'
+    profile: 'operator' | 'functional-leader' | 'program-leader' | 'executive'
+    scenario: 'strong-match' | 'partial-match' | 'critical-gap' | 'wishlist' | 'transferable-capability'
+  }>
 }>
 
 export type QualificationCorpus = Readonly<{
@@ -266,6 +274,8 @@ export function createQualificationFixture({
   requirementValue = requirementTerm,
   roleFamily,
   split,
+  generalManagement,
+  includeEvidence = true,
 }: Readonly<{
   candidateFacts: readonly CandidateFact[]
   coverage?: RequirementCoverage
@@ -277,12 +287,14 @@ export function createQualificationFixture({
   requirementValue?: string
   roleFamily: QualificationRoleFamily
   split: QualificationSplit
+  generalManagement?: QualificationFixture['generalManagement']
+  includeEvidence?: boolean
 }>): QualificationFixture {
   const fixtureId = `${roleFamily}-${String(index).padStart(2, '0')}`
   const requirementId = `${fixtureId}-requirement`
   const requirement = createRequirement({ importance, requirementId, requirementTerm, requirementValue })
   const fact = candidateFacts[0]
-  const proposedEvidence = fact === undefined ? [] : [{
+  const proposedEvidence = fact === undefined || !includeEvidence ? [] : [{
     coverage,
     factMatches: [{
       factId: fact.id, factTerm: requirementTerm, relationship: 'exact' as const, requirementTerm,
@@ -303,12 +315,13 @@ export function createQualificationFixture({
     jobPosting: `The ${roleFamily} role requires ${requirementTerm}.`,
     prohibitedMatches: [],
     proposedEvidence,
-    relevantFactIds: fact === undefined ? [] : [fact.id],
+    relevantFactIds: fact === undefined || !includeEvidence ? [] : [fact.id],
     roleFamily,
     sourceDocument: `Synthetic ${roleFamily} evidence for ${requirementTerm}.`,
     split,
     writingClaimsSupported: true,
     exportablePdf: true,
+    generalManagement,
   }
 }
 
