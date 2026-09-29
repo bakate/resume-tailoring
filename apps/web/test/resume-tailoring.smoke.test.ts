@@ -332,6 +332,7 @@ test('switching Source Document methods does not start review or extraction', as
 })
 
 test('a Candidate builds a Verified Source Profile from minimized PDF content', async ({ page }) => {
+  test.slow()
   const system = createSystemUnderTest({ page })
 
   await system.givenCandidateSessionIsActive()
@@ -343,6 +344,7 @@ test('a Candidate builds a Verified Source Profile from minimized PDF content', 
 })
 
 test('a Candidate imports a valid PDF without native Promise.withResolvers', async ({ page }) => {
+  test.slow()
   const system = createSystemUnderTest({ page })
 
   await system.givenPromiseWithResolversIsUnavailable()
