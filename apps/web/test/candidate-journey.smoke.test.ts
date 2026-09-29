@@ -89,6 +89,34 @@ test.describe('Candidate Journey', () => {
     // Then
     await system.expectRestoredProcessingConsentToBeGranted()
   })
+
+  test('a Candidate pastes professional text and proceeds directly to Job Match', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    // Given
+    await system.givenProcessingConsentIsGranted()
+    await system.givenStructuredSourceProfileExtractionSucceeds()
+
+    // Action
+    await system.submitPastedProfessionalText()
+
+    // Then
+    await system.expectStructuredSourceProfileToBeOptionalAndJobMatchToBeCurrent()
+  })
+
+  test('a Candidate resolves only the targeted Critical Ambiguity', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    // Given
+    await system.givenProcessingConsentIsGranted()
+    await system.givenSourceIntakeRequiresCriticalAmbiguityResolution()
+
+    // Action
+    await system.answerCriticalAmbiguity()
+
+    // Then
+    await system.expectCriticalAmbiguityToBeResolvedForJobMatch()
+  })
 })
 
 function createSystemUnderTest({ page }: Readonly<{ page: Page }>) {
@@ -117,6 +145,21 @@ class CandidateJourneyTestSystem {
     await this.grantProcessingConsent()
   }
 
+  async givenStructuredSourceProfileExtractionSucceeds() {
+    await this.#page.route('**/api/structured-source-profile-extraction', (route) => (
+      route.fulfill({ json: structuredSourceProfileResponse })
+    ))
+  }
+
+  async givenSourceIntakeRequiresCriticalAmbiguityResolution() {
+    await this.#page.route('**/api/structured-source-profile-extraction', (route) => (
+      route.fulfill({ json: criticalAmbiguitySourceProfileResponse })
+    ))
+    await this.#submitProfessionalText()
+    await expect(this.#page.getByRole('region', { name: 'Resolve Critical Ambiguities' }))
+      .toBeVisible()
+  }
+
   async openCandidateJourney() {
     await this.#page.goto('/')
     this.#completedAction = 'candidate-journey-opened'
@@ -141,6 +184,27 @@ class CandidateJourneyTestSystem {
   async grantProcessingConsent() {
     await this.#page.getByRole('button', { name: 'Grant Processing Consent' }).click()
     this.#completedAction = 'processing-consent-granted'
+  }
+
+  async submitPastedProfessionalText() {
+    await this.#submitProfessionalText()
+    this.#completedAction = 'source-document-submitted'
+  }
+
+  async answerCriticalAmbiguity() {
+    const question = 'What year did you start at Acme?'
+    await this.#page.getByRole('textbox', { name: question }).fill('2021')
+    await this.#page.getByRole('button', { name: 'Save this answer' }).click()
+    this.#completedAction = 'critical-ambiguity-answered'
+  }
+
+  async #submitProfessionalText() {
+    await this.#page.getByRole('textbox', { name: 'Professional text' }).fill([
+      'Bakate Example',
+      'bakate@example.com',
+      'Senior FullStack Developer at Acme',
+    ].join('\n'))
+    await this.#page.getByRole('button', { name: 'Build my Source Profile' }).click()
   }
 
   async expectActiveProcessingPolicyToBeVisible() {
@@ -188,6 +252,23 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByText('Processing Consent granted for this policy.')).toBeVisible()
   }
 
+  async expectStructuredSourceProfileToBeOptionalAndJobMatchToBeCurrent() {
+    this.#expectCompletedAction('source-document-submitted')
+    await expect(this.#page.getByRole('listitem').filter({ hasText: 'Job Match' }))
+      .toHaveAttribute('aria-current', 'step')
+    await expect(this.#page.getByText('Your Source Profile is ready.')).toBeVisible()
+    await this.#page.getByRole('button', { name: 'Inspect Source Profile' }).click()
+    await expect(this.#page.getByRole('region', { name: 'Detailed Source Profile' }))
+      .toContainText('TypeScript')
+  }
+
+  async expectCriticalAmbiguityToBeResolvedForJobMatch() {
+    this.#expectCompletedAction('critical-ambiguity-answered')
+    await expect(this.#page.getByRole('listitem').filter({ hasText: 'Job Match' }))
+      .toHaveAttribute('aria-current', 'step')
+    await expect(this.#page.getByText('Your Source Profile is ready.')).toBeVisible()
+  }
+
   #expectCompletedAction(expectedAction: CandidateJourneyAction) {
     expect(this.#completedAction, 'Expected a caller-visible Action before reading the outcome')
       .toBe(expectedAction)
@@ -204,4 +285,41 @@ type CandidateJourneyAction =
   | 'candidate-session-deleted'
   | 'candidate-session-restored'
   | 'candidate-session-started'
+  | 'critical-ambiguity-answered'
   | 'processing-consent-granted'
+  | 'source-document-submitted'
+
+const structuredSourceProfileResponse = {
+  ok: true,
+  value: {
+    certifications: [],
+    criticalAmbiguities: [],
+    education: [],
+    experiences: [{
+      achievements: ['Built a billing platform'],
+      context: null,
+      endDate: null,
+      organization: 'Acme',
+      role: 'Senior FullStack Developer',
+      startDate: '2021',
+    }],
+    languages: [],
+    projects: [],
+    skills: [{ category: 'Programming language', name: 'TypeScript' }],
+  },
+} as const
+
+const criticalAmbiguitySourceProfileResponse = {
+  ...structuredSourceProfileResponse,
+  value: {
+    ...structuredSourceProfileResponse.value,
+    criticalAmbiguities: [{
+      path: 'experiences.0.startDate.0',
+      question: 'What year did you start at Acme?',
+    }],
+    experiences: [{
+      ...structuredSourceProfileResponse.value.experiences[0],
+      startDate: '2021 or 2022',
+    }],
+  },
+} as const

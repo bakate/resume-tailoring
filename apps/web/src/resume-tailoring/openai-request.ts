@@ -4,6 +4,7 @@ type OpenAiOperation =
   | 'resume-claim-validation'
   | 'resume-claim-writing'
   | 'source-profile-extraction'
+  | 'structured-source-profile-extraction'
   | 'tailored-resume-pdf-validation'
 
 type OpenAiRequesterDependencies = Readonly<{

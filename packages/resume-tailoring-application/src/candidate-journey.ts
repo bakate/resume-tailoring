@@ -11,6 +11,16 @@ import type {
 } from '@resume-tailoring/domain/candidate-session'
 import { hasProcessingConsentForPolicy } from '@resume-tailoring/domain/processing-policy'
 import type { ProcessingPolicy } from '@resume-tailoring/domain/processing-policy'
+import {
+  createSourceIntake,
+  resolveCriticalAmbiguity,
+} from './source-intake'
+import type {
+  SourceDocument,
+  SourceDocumentReader,
+  SourceIntakeFailure,
+  StructuredSourceProfileExtractor,
+} from './source-intake'
 
 export {
   candidateJourneyPhases,
@@ -47,17 +57,27 @@ export type CandidateJourneyDependencies = Readonly<{
   languageModelGateway: Readonly<{ processingPolicy: ProcessingPolicy }>
   now: () => number
   persistence: CandidateSessionPersistence
+  sourceDocumentReader: SourceDocumentReader
+  sourceProfileExtractor: StructuredSourceProfileExtractor
 }>
+
+type CandidateJourneySourceIntakeFailure =
+  | SourceIntakeFailure
+  | 'ambiguity-unavailable'
+  | 'candidate-session-storage-unavailable'
 
 type CandidateJourneyContext = Readonly<{
   dependencies: CandidateJourneyDependencies
   notice: CandidateSessionNotice
+  sourceIntakeFailure: CandidateJourneySourceIntakeFailure | null
   session: CandidateSession | null
 }>
 
 type CandidateJourneyEvent =
   | Readonly<{ type: 'DELETE_CANDIDATE_SESSION' }>
   | Readonly<{ type: 'GRANT_PROCESSING_CONSENT' }>
+  | Readonly<{ type: 'RESOLVE_CRITICAL_AMBIGUITY'; ambiguityId: `critical-ambiguity-${string}`; answer: string }>
+  | Readonly<{ type: 'SUBMIT_SOURCE_DOCUMENT'; document: SourceDocument }>
   | Readonly<{ type: 'START_CANDIDATE_SESSION' }>
 
 type RestoredCandidateSession = Readonly<{
@@ -72,7 +92,9 @@ export type CandidateJourneyView =
       status: 'candidate-session-open'
       processingConsentStatus: 'granted' | 'required'
       processingPolicy: ProcessingPolicy
+      operation: 'processing-source-document' | 'resolving-critical-ambiguity' | null
       session: CandidateSession
+      sourceIntakeFailure: CandidateJourneySourceIntakeFailure | null
     }>
   | Readonly<{ status: 'candidate-session-unavailable' }>
 
@@ -80,8 +102,13 @@ export type CandidateJourney = Readonly<{
   deleteCandidateSession: () => void
   grantProcessingConsent: () => void
   readView: () => CandidateJourneyView
+  resolveCriticalAmbiguity: (request: Readonly<{
+    ambiguityId: `critical-ambiguity-${string}`
+    answer: string
+  }>) => void
   start: () => void
   startCandidateSession: () => void
+  submitSourceDocument: (document: SourceDocument) => void
   subscribe: (listener: () => void) => () => void
 }>
 
@@ -100,6 +127,7 @@ const startCandidateSession = fromPromise<
     phase: 'source-intake',
     processingConsent: null,
     sessionId: `candidate-session-${input.createSessionId()}`,
+    sourceIntake: null,
     startedAt,
     version: candidateSessionStorageVersion,
   } as const satisfies CandidateSession
@@ -118,12 +146,80 @@ const grantProcessingConsent = fromPromise<
   ? { ok: false, error: 'candidate-session-storage-unavailable' }
   : input.dependencies.persistence.save({ session: input.session })))
 
+type SourceIntakeActorInput = Readonly<{
+  dependencies: CandidateJourneyDependencies
+  document: SourceDocument
+  session: CandidateSession | null
+}>
+type SourceIntakeActorResult = CandidateSessionStorageResult<CandidateSession>
+  | Readonly<{ ok: false; error: SourceIntakeFailure }>
+
+const submitSourceDocument = fromPromise<SourceIntakeActorResult, SourceIntakeActorInput>(async ({ input }: Readonly<{
+  input: SourceIntakeActorInput
+}>) => {
+  if (input.session === null) return storageUnavailableResult
+  if (!hasProcessingConsentForPolicy({
+    consent: input.session.processingConsent,
+    policy: input.dependencies.languageModelGateway.processingPolicy,
+  })) return processingConsentRequiredResult
+  const sourceIntakeResult = await createSourceIntake({
+    document: input.document,
+    sourceDocumentReader: input.dependencies.sourceDocumentReader,
+    sourceProfileExtractor: input.dependencies.sourceProfileExtractor,
+  })
+  if (!sourceIntakeResult.ok) return sourceIntakeResult
+  const nextSession = {
+    ...input.session,
+    phase: sourceIntakeResult.value.criticalAmbiguities.length === 0
+      ? 'job-match' as const
+      : 'source-intake' as const,
+    sourceIntake: sourceIntakeResult.value,
+  }
+  return input.dependencies.persistence.save({ session: nextSession })
+})
+
+type ResolveAmbiguityActorInput = Readonly<{
+  ambiguityId: `critical-ambiguity-${string}`
+  answer: string
+  dependencies: CandidateJourneyDependencies
+  session: CandidateSession | null
+}>
+type ResolveAmbiguityActorResult = CandidateSessionStorageResult<CandidateSession>
+  | Readonly<{ ok: false; error: 'ambiguity-unavailable' }>
+
+const persistCriticalAmbiguityResolution = fromPromise<
+  ResolveAmbiguityActorResult,
+  ResolveAmbiguityActorInput
+>(({ input }: Readonly<{
+  input: ResolveAmbiguityActorInput
+}>) => {
+  if (input.session?.sourceIntake === null || input.session === null) {
+    return Promise.resolve(ambiguityUnavailableResult)
+  }
+  const resolution = resolveCriticalAmbiguity({
+    answer: input.answer,
+    criticalAmbiguityId: input.ambiguityId,
+    sourceIntake: input.session.sourceIntake,
+  })
+  if (!resolution.ok) return Promise.resolve(resolution)
+  const nextSession = {
+    ...input.session,
+    phase: resolution.value.criticalAmbiguities.length === 0
+      ? 'job-match' as const
+      : 'source-intake' as const,
+    sourceIntake: resolution.value,
+  }
+  return Promise.resolve(input.dependencies.persistence.save({ session: nextSession }))
+})
+
 const candidateJourneyMachine = setup({
   actors: {
     deleteCandidateSession,
     grantProcessingConsent,
+    persistCriticalAmbiguityResolution,
     restoreCandidateSession,
     startCandidateSession,
+    submitSourceDocument,
   },
   delays: {
     candidateSessionExpiration: ({ context }) => context.session === null
@@ -139,6 +235,7 @@ const candidateJourneyMachine = setup({
   context: ({ input }: Readonly<{ input: CandidateJourneyDependencies }>) => ({
     dependencies: input,
     notice: null,
+    sourceIntakeFailure: null,
     session: null,
   }),
   id: 'candidate-journey',
@@ -168,6 +265,43 @@ const candidateJourneyMachine = setup({
           }),
           target: 'persistingProcessingConsent',
         },
+        RESOLVE_CRITICAL_AMBIGUITY: {
+          target: 'resolvingCriticalAmbiguity',
+        },
+        SUBMIT_SOURCE_DOCUMENT: {
+          actions: assign({ sourceIntakeFailure: null }),
+          target: 'processingSourceDocument',
+        },
+      },
+    },
+    processingSourceDocument: {
+      invoke: {
+        input: ({ context, event }) => ({
+          dependencies: context.dependencies,
+          document: event.type === 'SUBMIT_SOURCE_DOCUMENT' ? event.document : emptySourceDocument,
+          session: context.session,
+        }),
+        onDone: [
+          {
+            actions: assign({
+              session: ({ event }) => event.output.ok ? event.output.value : null,
+              sourceIntakeFailure: null,
+            }),
+            guard: ({ event }) => event.output.ok,
+            target: 'candidateSessionAvailable',
+          },
+          {
+            actions: assign({
+              sourceIntakeFailure: ({ event }) => readSourceIntakeFailure({ result: event.output }),
+            }),
+            target: 'candidateSessionAvailable',
+          },
+        ],
+        onError: {
+          actions: assign({ sourceIntakeFailure: 'unreadable-document' }),
+          target: 'candidateSessionAvailable',
+        },
+        src: 'submitSourceDocument',
       },
     },
     removingCandidateSession: {
@@ -251,6 +385,39 @@ const candidateJourneyMachine = setup({
         src: 'grantProcessingConsent',
       },
     },
+    resolvingCriticalAmbiguity: {
+      invoke: {
+        input: ({ context, event }) => ({
+          ambiguityId: event.type === 'RESOLVE_CRITICAL_AMBIGUITY'
+            ? event.ambiguityId
+            : 'critical-ambiguity-unavailable',
+          answer: event.type === 'RESOLVE_CRITICAL_AMBIGUITY' ? event.answer : '',
+          dependencies: context.dependencies,
+          session: context.session,
+        }),
+        onDone: [
+          {
+            actions: assign({
+              session: ({ event }) => event.output.ok ? event.output.value : null,
+              sourceIntakeFailure: null,
+            }),
+            guard: ({ event }) => event.output.ok,
+            target: 'candidateSessionAvailable',
+          },
+          {
+            actions: assign({
+              sourceIntakeFailure: ({ event }) => readSourceIntakeFailure({ result: event.output }),
+            }),
+            target: 'candidateSessionAvailable',
+          },
+        ],
+        onError: {
+          actions: assign({ sourceIntakeFailure: 'ambiguity-unavailable' }),
+          target: 'candidateSessionAvailable',
+        },
+        src: 'persistCriticalAmbiguityResolution',
+      },
+    },
     storageFailure: {},
   },
 })
@@ -269,8 +436,14 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     deleteCandidateSession: () => { actor.send({ type: 'DELETE_CANDIDATE_SESSION' }) },
     grantProcessingConsent: () => { actor.send({ type: 'GRANT_PROCESSING_CONSENT' }) },
     readView: () => view,
+    resolveCriticalAmbiguity: ({ ambiguityId, answer }) => {
+      actor.send({ type: 'RESOLVE_CRITICAL_AMBIGUITY', ambiguityId, answer })
+    },
     start: () => { actor.start() },
     startCandidateSession: () => { actor.send({ type: 'START_CANDIDATE_SESSION' }) },
+    submitSourceDocument: (document) => {
+      actor.send({ type: 'SUBMIT_SOURCE_DOCUMENT', document })
+    },
     subscribe: (listener) => subscribeToActor({ actor, listener }),
   }
 }
@@ -290,7 +463,12 @@ function readCandidateJourneyView({ snapshot }: Readonly<{
   if (snapshot.matches('awaitingCandidate')) {
     return { status: 'candidate-session-absent', notice: snapshot.context.notice }
   }
-  if (snapshot.matches('candidateSessionAvailable') && snapshot.context.session !== null) {
+  if (snapshot.context.session !== null && (
+    snapshot.matches('candidateSessionAvailable')
+    || snapshot.matches('processingSourceDocument')
+    || snapshot.matches('resolvingCriticalAmbiguity')
+    || snapshot.matches('persistingProcessingConsent')
+  )) {
     const processingPolicy = snapshot.context.dependencies.languageModelGateway.processingPolicy
     return {
       processingConsentStatus: hasProcessingConsentForPolicy({
@@ -298,9 +476,32 @@ function readCandidateJourneyView({ snapshot }: Readonly<{
         policy: processingPolicy,
       }) ? 'granted' : 'required',
       processingPolicy,
+      operation: snapshot.matches('processingSourceDocument')
+        ? 'processing-source-document'
+        : snapshot.matches('resolvingCriticalAmbiguity')
+          ? 'resolving-critical-ambiguity'
+          : null,
       session: snapshot.context.session,
+      sourceIntakeFailure: snapshot.context.sourceIntakeFailure,
       status: 'candidate-session-open',
     }
   }
   return { status: 'preparing-session' }
+}
+
+const storageUnavailableResult = {
+  ok: false,
+  error: 'candidate-session-storage-unavailable',
+} as const
+const processingConsentRequiredResult = {
+  ok: false,
+  error: 'processing-consent-required',
+} as const
+const ambiguityUnavailableResult = { ok: false, error: 'ambiguity-unavailable' } as const
+const emptySourceDocument = { bytes: new Uint8Array(), mediaType: '', name: '' } as const
+
+function readSourceIntakeFailure({ result }: Readonly<{
+  result: SourceIntakeActorResult | ResolveAmbiguityActorResult
+}>): CandidateJourneySourceIntakeFailure | null {
+  return result.ok ? null : result.error
 }

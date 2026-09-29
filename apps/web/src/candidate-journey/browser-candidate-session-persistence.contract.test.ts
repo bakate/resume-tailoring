@@ -14,6 +14,7 @@ const candidateSession = {
   phase: 'source-intake',
   processingConsent: null,
   sessionId: 'candidate-session-00000000-0000-4000-8000-000000000038',
+  sourceIntake: null,
   startedAt: sessionStartedAt,
   version: candidateSessionStorageVersion,
 } as const satisfies CandidateSession
@@ -78,7 +79,44 @@ describe('browser Candidate Session persistence', () => {
       ok: true, value: { notice: null, session: consentedCandidateSession },
     })
   })
+
+  it('restores the browser-local Source Document, contacts, and structured Source Profile', () => {
+    const storage = createMemoryStorage()
+    const persistence = createBrowserCandidateSessionPersistence({ storage })
+
+    expect(persistence.save({ session: sourceIntakeCandidateSession })).toEqual({
+      ok: true, value: sourceIntakeCandidateSession,
+    })
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
+      ok: true, value: { notice: null, session: sourceIntakeCandidateSession },
+    })
+  })
 })
+
+const sourceIntakeCandidateSession = {
+  ...consentedCandidateSession,
+  phase: 'job-match',
+  sourceIntake: {
+    candidateFacts: [{
+      id: 'source-fact-skills-0-name-0',
+      path: 'skills.0.name.0',
+      status: 'attested',
+      value: 'TypeScript',
+    }],
+    contactDetails: [{ kind: 'email', value: 'bakate@example.com' }],
+    criticalAmbiguities: [],
+    originalContent: 'bakate@example.com\nTypeScript',
+    sourceDocument: { kind: 'pasted-text', name: 'pasted-professional-text.txt' },
+    sourceProfile: {
+      certifications: [],
+      education: [],
+      experiences: [],
+      languages: [],
+      projects: [],
+      skills: [{ category: 'Programming language', name: 'TypeScript' }],
+    },
+  },
+} as const satisfies CandidateSession
 
 function createMemoryStorage({ initialValue = null }: Readonly<{
   initialValue?: string | null

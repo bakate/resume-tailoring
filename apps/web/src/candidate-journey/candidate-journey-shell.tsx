@@ -27,6 +27,7 @@ import type { ProcessingPolicy } from '@resume-tailoring/application/language-mo
 import { candidateJourneyPhases } from './candidate-journey-phases'
 import type { CandidateJourneyPhase } from './candidate-journey-phases'
 import { useCandidateJourney } from './use-candidate-journey'
+import { SourceIntakeWorkspace } from './source-intake-workspace'
 
 export function CandidateJourneyShell() {
   const localizationResult = useLocalization()
@@ -45,6 +46,7 @@ function LocalizedCandidateJourneyShell({ localization }: LocalizationProps) {
       <AppShell.Main><Container size="xl"><Stack gap="xl">
         <CandidateJourneyIntroduction {...{ candidateJourney, localization }} />
         <ProcessingPolicyCard {...{ candidateJourney, localization }} />
+        <SourceIntakeWorkspace {...{ candidateJourney, localization }} />
         <CandidateJourneyPhaseList {...{ activePhase, localization }} />
       </Stack></Container></AppShell.Main>
     </AppShell>
