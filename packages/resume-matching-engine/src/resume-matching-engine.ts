@@ -1,4 +1,5 @@
 import { validateMatchEvidence } from './evidence-validation'
+export { validateRelevantFactProposals } from './evidence-validation'
 import { canonicalizeKnownTerm } from './text-normalization'
 
 export const capabilityDimensions = [
@@ -48,6 +49,11 @@ export type ProposedFactMatch = Readonly<{
 export type ProposedMatchEvidence = Readonly<{
   coverage: RequirementCoverage
   factMatches: readonly ProposedFactMatch[]
+  requirementId: string
+}>
+
+export type ProposedRelevantFact = Readonly<{
+  factMatch: ProposedFactMatch
   requirementId: string
 }>
 

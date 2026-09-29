@@ -1,4 +1,5 @@
 import {
+  Alert,
   Badge,
   Button,
   FileInput,
@@ -6,6 +7,7 @@ import {
   List,
   Paper,
   SegmentedControl,
+  Select,
   SimpleGrid,
   Stack,
   Text,
@@ -13,9 +15,16 @@ import {
   Title,
 } from '@mantine/core'
 import { useState } from 'react'
+import type { SyntheticEvent } from 'react'
 
 import type { JobMatch, JobRequirement } from '@resume-tailoring/application/job-match'
+import {
+  profileEnrichmentFactKinds,
+} from '@resume-tailoring/application/job-match'
+import type { ProfileEnrichmentFactKind } from '@resume-tailoring/application/job-match'
+import type { CandidateFact, SourceIntake } from '@resume-tailoring/application/source-intake'
 import type { Localization } from '../localization/localization'
+import { formatNormalizedSourceResume } from './normalized-source-resume'
 import type { useCandidateJourney } from './use-candidate-journey'
 
 type CandidateJourneyController = ReturnType<typeof useCandidateJourney>
@@ -36,9 +45,10 @@ export function JobMatchWorkspace({ candidateJourney, localization }: Readonly<{
       <JobMatchFailure failure={form.localFailure ?? view.jobMatchFailure}
         localization={localization} />
       {view.session.jobMatch === null ? null : <JobMatchResult
+        candidateJourney={candidateJourney}
         jobMatch={view.session.jobMatch}
         localization={localization}
-        sourceFacts={view.session.sourceIntake.candidateFacts} />}
+        sourceIntake={view.session.sourceIntake} />}
     </Stack>
   </Paper>
 }
@@ -131,19 +141,81 @@ async function readSelectedJobPosting({ jobPostingFile, jobPostingText, method }
   }
 }
 
-function JobMatchResult({ jobMatch, localization, sourceFacts }: Readonly<{
+function JobMatchResult({ candidateJourney, jobMatch, localization, sourceIntake }: Readonly<{
+  candidateJourney: CandidateJourneyController
   jobMatch: JobMatch
   localization: Localization
-  sourceFacts: readonly Readonly<{ id: string; value: string }>[]
+  sourceIntake: SourceIntake
 }>) {
+  const sourceFacts = sourceIntake.candidateFacts
   return <Stack gap="xl" role="status">
     <MatchOverview {...{ jobMatch, localization }} />
+    <GenerationDecision {...{ candidateJourney, jobMatch, localization, sourceIntake }} />
     <Text>{localization.translate('jobMatch.measurement')}</Text>
     <MatchSummaries {...{ jobMatch, localization }} />
     <CriticalReserve {...{ jobMatch, localization }} />
     <PracticalConstraints {...{ jobMatch, localization }} />
     <RequirementDetails {...{ jobMatch, localization, sourceFacts }} />
+    <ProfileEnrichmentPrompts {...{ candidateJourney, jobMatch, localization }} />
   </Stack>
+}
+
+function GenerationDecision({
+  candidateJourney, jobMatch, localization, sourceIntake,
+}: Readonly<{
+  candidateJourney: CandidateJourneyController
+  jobMatch: JobMatch
+  localization: Localization
+  sourceIntake: SourceIntake
+}>) {
+  return jobMatch.analysis.generationEligibility === 'denied'
+    ? <DeniedGenerationDecision {...{ localization, sourceIntake }} />
+    : <EligibleGenerationDecision {...{ candidateJourney, jobMatch, localization }} />
+}
+
+function DeniedGenerationDecision({ localization, sourceIntake }: Readonly<{
+  localization: Localization
+  sourceIntake: SourceIntake
+}>) {
+  return <Alert color="danger" title={localization.translate('jobMatch.generation.denied')}>
+    <Stack gap="sm"><Text>{localization.translate('jobMatch.generation.normalizedNotice')}</Text>
+      <Button onClick={() => { downloadNormalizedSourceResume({ localization, sourceIntake }) }}
+        variant="outline">
+        {localization.translate('jobMatch.generation.normalizedAction')}
+      </Button></Stack>
+  </Alert>
+}
+
+function EligibleGenerationDecision({ candidateJourney, jobMatch, localization }: Readonly<{
+  candidateJourney: CandidateJourneyController
+  jobMatch: JobMatch
+  localization: Localization
+}>) {
+  return <Alert color="forest" title={localization.translate('jobMatch.generation.eligible')}>
+    <Stack gap="sm">
+      {jobMatch.analysis.matchBand === 'ambitious'
+        ? <Text>{localization.translate('jobMatch.generation.lowScoreWarning')}</Text>
+        : null}
+      <Button loading={candidateJourney.view.status === 'candidate-session-open'
+        ? candidateJourney.view.operation === 'preparing-tailored-resume' : false}
+        onClick={candidateJourney.startTailoredResumePreparation}>
+        {localization.translate('jobMatch.generation.tailoredAction')}
+      </Button>
+    </Stack>
+  </Alert>
+}
+
+function downloadNormalizedSourceResume({ localization, sourceIntake }: Readonly<{
+  localization: Localization
+  sourceIntake: SourceIntake
+}>) {
+  const content = formatNormalizedSourceResume({ sourceIntake, translate: localization.translate })
+  const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.download = localization.translate('jobMatch.generation.normalizedFileName')
+  link.href = url
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 function MatchOverview({ jobMatch, localization }: Readonly<{
@@ -223,7 +295,7 @@ function PracticalConstraints({ jobMatch, localization }: Readonly<{
 function RequirementDetails({ jobMatch, localization, sourceFacts }: Readonly<{
   jobMatch: JobMatch
   localization: Localization
-  sourceFacts: readonly Readonly<{ id: string; value: string }>[]
+  sourceFacts: readonly CandidateFact[]
 }>) {
   return <details><summary>{localization.translate('jobMatch.details')}</summary>
     <Stack gap="md" mt="md">{jobMatch.requirements.map((requirement) => (
@@ -237,7 +309,7 @@ type RequirementDetailProps = Readonly<{
   jobMatch: JobMatch
   localization: Localization
   requirement: JobRequirement
-  sourceFacts: readonly Readonly<{ id: string; value: string }>[]
+  sourceFacts: readonly CandidateFact[]
 }>
 
 function RequirementDetail({
@@ -279,9 +351,107 @@ function RequirementEvidence({ evidenceValues, localization }: Readonly<{
       : evidenceValues.join(' · ')}</Text>
 }
 
+function ProfileEnrichmentPrompts({ candidateJourney, jobMatch, localization }: Readonly<{
+  candidateJourney: CandidateJourneyController
+  jobMatch: JobMatch
+  localization: Localization
+}>) {
+  const requirements = readProfileEnrichmentRequirements({ jobMatch })
+  if (requirements.length === 0) return null
+  return <section aria-label={localization.translate('matchAnalysis.enrichmentTitle')}>
+    <Title order={4}>{localization.translate('matchAnalysis.enrichmentTitle')}</Title>
+    <Text c="dimmed" mt="xs">{localization.translate('matchAnalysis.enrichmentDescription')}</Text>
+    <ProfileEnrichmentFailure {...{ candidateJourney, localization }} />
+    <Stack gap="md" mt="md">{requirements.map((requirement) => (
+      <ProfileEnrichmentPrompt {...{ candidateJourney, localization, requirement }}
+        key={requirement.id} />
+    ))}</Stack>
+  </section>
+}
+
+function readProfileEnrichmentRequirements({ jobMatch }: Readonly<{ jobMatch: JobMatch }>) {
+  const requirementById = new Map(jobMatch.requirements.map((requirement) => [
+    requirement.id, requirement,
+  ]))
+  return jobMatch.priorityGapRequirementIds.flatMap((requirementId) => {
+    const requirement = requirementById.get(requirementId)
+    return requirement === undefined || requirement.importance === 'complementary'
+      ? [] : [requirement]
+  })
+}
+
+function ProfileEnrichmentFailure({ candidateJourney, localization }: Readonly<{
+  candidateJourney: CandidateJourneyController
+  localization: Localization
+}>) {
+  if (candidateJourney.view.status !== 'candidate-session-open'
+    || candidateJourney.view.profileEnrichmentFailure === null) return null
+  const key = profileEnrichmentFailureKeys[candidateJourney.view.profileEnrichmentFailure]
+  return <Alert color="danger" mt="md">{localization.translate(key)}</Alert>
+}
+
+function ProfileEnrichmentPrompt({
+  candidateJourney, localization, requirement,
+}: Readonly<{
+  candidateJourney: CandidateJourneyController
+  localization: Localization
+  requirement: JobRequirement
+}>) {
+  const form = useProfileEnrichmentForm({ candidateJourney, requirement })
+  return <Paper aria-label={requirement.value} component="form" onSubmit={form.submit}
+    p="md" role="group" withBorder>
+    <Stack gap="sm"><Text>{localization.translate('matchAnalysis.enrichmentQuestion')}</Text>
+      <Text fw={700}>{requirement.value}</Text>
+      <ProfileEnrichmentFields {...{ form, localization }} />
+      <Button loading={candidateJourney.view.status === 'candidate-session-open'
+        ? candidateJourney.view.operation === 'processing-profile-enrichment' : false}
+        type="submit">{localization.translate('matchAnalysis.enrichmentAdd')}</Button>
+    </Stack>
+  </Paper>
+}
+
+function useProfileEnrichmentForm({ candidateJourney, requirement }: Readonly<{
+  candidateJourney: CandidateJourneyController
+  requirement: JobRequirement
+}>) {
+  const [kind, setKind] = useState<ProfileEnrichmentFactKind>('experience')
+  const [value, setValue] = useState('')
+  const submit = (event: SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    candidateJourney.confirmProfileEnrichment({ kind, requirementId: requirement.id, value })
+  }
+  return { kind, setKind, setValue, submit, value }
+}
+
+type ProfileEnrichmentForm = ReturnType<typeof useProfileEnrichmentForm>
+
+function ProfileEnrichmentFields({ form, localization }: Readonly<{
+  form: ProfileEnrichmentForm
+  localization: Localization
+}>) {
+  return <><Select data={createProfileEnrichmentKindOptions({ localization })}
+    label={localization.translate('matchAnalysis.enrichmentKind')}
+    onChange={(nextKind) => { form.setKind(readProfileEnrichmentKind({ value: nextKind })) }}
+    value={form.kind} />
+  <Textarea label={localization.translate('matchAnalysis.enrichmentAnswer')}
+    onChange={(event) => { form.setValue(event.currentTarget.value) }} value={form.value} /></>
+}
+
+function createProfileEnrichmentKindOptions({ localization }: Readonly<{
+  localization: Localization
+}>) {
+  return profileEnrichmentFactKinds.map((value) => ({
+    label: localization.translate(`sourceProfile.kind.${value}`), value,
+  }))
+}
+
+function readProfileEnrichmentKind({ value }: Readonly<{ value: string | null }>) {
+  return profileEnrichmentFactKinds.find((kind) => kind === value) ?? 'experience'
+}
+
 function readEvidenceValues({ evidence, sourceFacts }: Readonly<{
   evidence: JobMatch['analysis']['evidence']
-  sourceFacts: readonly Readonly<{ id: string; value: string }>[]
+  sourceFacts: readonly CandidateFact[]
 }>) {
   const factIds = new Set(evidence.flatMap(({ factIds: evidenceFactIds }) => evidenceFactIds))
   return sourceFacts.filter(({ id }) => factIds.has(id)).map(({ value }) => value)
@@ -329,6 +499,14 @@ const jobMatchFailureKeys = {
   'scanned-job-posting': 'jobMatch.failure.scanned',
   'unreadable-job-posting': 'jobMatch.failure.unreadable',
   'unsupported-job-posting': 'jobMatch.failure.unsupported',
+} as const
+
+const profileEnrichmentFailureKeys = {
+  'candidate-fact-duplicate': 'matchAnalysis.enrichmentDuplicateFailure',
+  'candidate-fact-invalid': 'matchAnalysis.enrichmentInvalidFailure',
+  'candidate-session-storage-unavailable': 'jobMatch.failure.storage',
+  'match-evidence-unavailable': 'jobMatch.failure.evidence',
+  'profile-enrichment-unavailable': 'jobMatch.enrichmentUnavailable',
 } as const
 
 function readBandColor({ band }: Readonly<{ band: JobMatch['analysis']['matchBand'] }>) {

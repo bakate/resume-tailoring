@@ -15,14 +15,19 @@ import {
   createSourceIntake,
   resolveCriticalAmbiguity,
 } from './source-intake'
-import { createJobMatch } from './job-match'
+import { createJobMatch, refreshJobMatch } from './job-match'
 import type {
   JobMatchFailure,
   JobPostingDocument,
   JobPostingDocumentReader,
   JobPostingExtractor,
   MatchEvidenceMatcher,
+  ProfileEnrichmentFactKind,
 } from './job-match'
+import type { JobMatch, JobRequirementId } from '@resume-tailoring/domain/job-match'
+import type { CandidateFact, SourceIntake } from '@resume-tailoring/domain/source-intake'
+import { createProfileEnrichment } from './profile-enrichment'
+import type { ProfileEnrichmentValidationFailure } from './profile-enrichment'
 import type {
   SourceDocument,
   SourceDocumentReader,
@@ -81,10 +86,16 @@ type CandidateJourneyJobMatchFailure =
   | JobMatchFailure
   | 'candidate-session-storage-unavailable'
 
+type ProfileEnrichmentFailure =
+  | ProfileEnrichmentValidationFailure
+  | 'candidate-session-storage-unavailable'
+  | 'match-evidence-unavailable'
+
 type CandidateJourneyContext = Readonly<{
   dependencies: CandidateJourneyDependencies
   jobMatchFailure: CandidateJourneyJobMatchFailure | null
   notice: CandidateSessionNotice
+  profileEnrichmentFailure: ProfileEnrichmentFailure | null
   sourceIntakeFailure: CandidateJourneySourceIntakeFailure | null
   session: CandidateSession | null
 }>
@@ -92,15 +103,26 @@ type CandidateJourneyContext = Readonly<{
 type CandidateJourneyEvent =
   | Readonly<{ type: 'DELETE_CANDIDATE_SESSION' }>
   | Readonly<{ type: 'GRANT_PROCESSING_CONSENT' }>
+  | Readonly<{
+      type: 'CONFIRM_PROFILE_ENRICHMENT'
+      kind: ProfileEnrichmentFactKind
+      requirementId: JobRequirementId
+      value: string
+    }>
   | Readonly<{ type: 'RESOLVE_CRITICAL_AMBIGUITY'; ambiguityId: `critical-ambiguity-${string}`; answer: string }>
   | Readonly<{ type: 'SUBMIT_SOURCE_DOCUMENT'; document: SourceDocument }>
   | Readonly<{ type: 'START_CANDIDATE_SESSION' }>
+  | Readonly<{ type: 'START_TAILORED_RESUME_PREPARATION' }>
   | Readonly<{ type: 'SUBMIT_JOB_POSTING'; document: JobPostingDocument }>
 
 type RestoredCandidateSession = Readonly<{
   notice: CandidateSessionNotice
   session: CandidateSession | null
 }>
+
+type CandidateJourneyOperation = 'preparing-tailored-resume' | 'processing-job-posting'
+  | 'processing-profile-enrichment' | 'processing-source-document'
+  | 'resolving-critical-ambiguity' | null
 
 export type CandidateJourneyView =
   | Readonly<{ status: 'preparing-session' }>
@@ -110,14 +132,19 @@ export type CandidateJourneyView =
       processingConsentStatus: 'granted' | 'required'
       processingPolicy: ProcessingPolicy
       jobMatchFailure: CandidateJourneyJobMatchFailure | null
-      operation: 'processing-job-posting' | 'processing-source-document'
-        | 'resolving-critical-ambiguity' | null
+      operation: CandidateJourneyOperation
+      profileEnrichmentFailure: ProfileEnrichmentFailure | null
       session: CandidateSession
       sourceIntakeFailure: CandidateJourneySourceIntakeFailure | null
     }>
   | Readonly<{ status: 'candidate-session-unavailable' }>
 
 export type CandidateJourney = Readonly<{
+  confirmProfileEnrichment: (request: Readonly<{
+    kind: ProfileEnrichmentFactKind
+    requirementId: JobRequirementId
+    value: string
+  }>) => void
   deleteCandidateSession: () => void
   grantProcessingConsent: () => void
   readView: () => CandidateJourneyView
@@ -127,6 +154,7 @@ export type CandidateJourney = Readonly<{
   }>) => void
   start: () => void
   startCandidateSession: () => void
+  startTailoredResumePreparation: () => void
   submitJobPosting: (request: Readonly<{ document: JobPostingDocument }>) => void
   submitSourceDocument: (document: SourceDocument) => void
   subscribe: (listener: () => void) => () => void
@@ -159,6 +187,25 @@ const deleteCandidateSession = fromPromise<
   CandidateSessionStorageResult<null>,
   CandidateJourneyDependencies
 >(({ input }) => Promise.resolve(input.persistence.delete()))
+
+const startTailoredResumePreparation = fromPromise<
+  CandidateSessionStorageResult<CandidateSession>,
+  Readonly<{ dependencies: CandidateJourneyDependencies; session: CandidateSession | null }>
+>(({ input }) => {
+  const session = input.session
+  if (session === null || !canStartTailoredResumePreparation({ session })) {
+    return Promise.resolve(storageUnavailableResult)
+  }
+  return Promise.resolve(input.dependencies.persistence.save({
+    session: { ...session, phase: 'tailored-resume-preparation' },
+  }))
+})
+
+function canStartTailoredResumePreparation({ session }: Readonly<{
+  session: CandidateSession | null
+}>) {
+  return session?.jobMatch?.analysis.generationEligibility === 'eligible'
+}
 
 const grantProcessingConsent = fromPromise<
   CandidateSessionStorageResult<CandidateSession>,
@@ -262,6 +309,64 @@ const submitJobPosting = fromPromise<JobMatchActorResult, JobMatchActorInput>(as
   })
 })
 
+type ProfileEnrichmentActorInput = Readonly<{
+  dependencies: CandidateJourneyDependencies
+  kind: ProfileEnrichmentFactKind
+  requirementId: JobRequirementId
+  session: CandidateSession | null
+  value: string
+}>
+type ProfileEnrichmentActorResult = CandidateSessionStorageResult<CandidateSession>
+  | Readonly<{ ok: false; error: ProfileEnrichmentFailure }>
+
+const confirmProfileEnrichment = fromPromise<
+  ProfileEnrichmentActorResult,
+  ProfileEnrichmentActorInput
+>(processProfileEnrichment)
+
+async function processProfileEnrichment({ input }: Readonly<{
+  input: ProfileEnrichmentActorInput
+}>): Promise<ProfileEnrichmentActorResult> {
+  const session = input.session
+  if (session?.sourceIntake === null || session === null || session.jobMatch === null) {
+    return profileEnrichmentUnavailableResult
+  }
+  const enrichmentResult = createProfileEnrichment({
+    candidateFacts: session.sourceIntake.candidateFacts,
+    jobMatch: session.jobMatch,
+    kind: input.kind,
+    requirementId: input.requirementId,
+    value: input.value,
+  })
+  if (!enrichmentResult.ok) return enrichmentResult
+  return persistProfileEnrichment({
+    fact: enrichmentResult.value, input, jobMatch: session.jobMatch, session,
+    sourceIntake: session.sourceIntake,
+  })
+}
+
+async function persistProfileEnrichment({ fact, input, jobMatch, session, sourceIntake }: Readonly<{
+  fact: CandidateFact
+  input: ProfileEnrichmentActorInput
+  jobMatch: JobMatch
+  session: CandidateSession
+  sourceIntake: SourceIntake
+}>): Promise<ProfileEnrichmentActorResult> {
+  const candidateFacts = [...sourceIntake.candidateFacts, fact]
+  const jobMatchResult = await refreshJobMatch({
+    candidateFacts, jobMatch,
+    matchEvidenceMatcher: input.dependencies.matchEvidenceMatcher,
+  })
+  if (!jobMatchResult.ok) return {
+    ok: false, error: 'match-evidence-unavailable',
+  } as const
+  return input.dependencies.persistence.save({ session: {
+    ...session,
+    jobMatch: jobMatchResult.value,
+    sourceIntake: { ...sourceIntake, candidateFacts },
+  } })
+}
+
 function hasJobMatchConsent({ input, session }: Readonly<{
   input: JobMatchActorInput
   session: CandidateSession
@@ -274,11 +379,13 @@ function hasJobMatchConsent({ input, session }: Readonly<{
 
 const candidateJourneyMachine = setup({
   actors: {
+    confirmProfileEnrichment,
     deleteCandidateSession,
     grantProcessingConsent,
     persistCriticalAmbiguityResolution,
     restoreCandidateSession,
     startCandidateSession,
+    startTailoredResumePreparation,
     submitJobPosting,
     submitSourceDocument,
   },
@@ -297,6 +404,7 @@ const candidateJourneyMachine = setup({
     dependencies: input,
     jobMatchFailure: null,
     notice: null,
+    profileEnrichmentFailure: null,
     sourceIntakeFailure: null,
     session: null,
   }),
@@ -311,6 +419,10 @@ const candidateJourneyMachine = setup({
         },
       },
       on: {
+        CONFIRM_PROFILE_ENRICHMENT: {
+          actions: assign({ profileEnrichmentFailure: null }),
+          target: 'processingProfileEnrichment',
+        },
         DELETE_CANDIDATE_SESSION: {
           actions: assign({ notice: 'deleted' }),
           target: 'removingCandidateSession',
@@ -338,6 +450,10 @@ const candidateJourneyMachine = setup({
           actions: assign({ jobMatchFailure: null }),
           guard: ({ context }) => canSubmitJobPosting({ session: context.session }),
           target: 'processingJobPosting',
+        },
+        START_TAILORED_RESUME_PREPARATION: {
+          guard: ({ context }) => canStartTailoredResumePreparation({ session: context.session }),
+          target: 'startingTailoredResumePreparation',
         },
       },
     },
@@ -369,6 +485,39 @@ const candidateJourneyMachine = setup({
           target: 'candidateSessionAvailable',
         },
         src: 'submitJobPosting',
+      },
+    },
+    processingProfileEnrichment: {
+      invoke: {
+        input: ({ context, event }) => ({
+          dependencies: context.dependencies,
+          kind: event.type === 'CONFIRM_PROFILE_ENRICHMENT' ? event.kind : 'experience',
+          requirementId: event.type === 'CONFIRM_PROFILE_ENRICHMENT'
+            ? event.requirementId : 'job-requirement-unavailable',
+          session: context.session,
+          value: event.type === 'CONFIRM_PROFILE_ENRICHMENT' ? event.value : '',
+        }),
+        onDone: [
+          {
+            actions: assign({
+              profileEnrichmentFailure: null,
+              session: ({ event }) => event.output.ok ? event.output.value : null,
+            }),
+            guard: ({ event }) => event.output.ok,
+            target: 'candidateSessionAvailable',
+          },
+          {
+            actions: assign({
+              profileEnrichmentFailure: ({ event }) => event.output.ok ? null : event.output.error,
+            }),
+            target: 'candidateSessionAvailable',
+          },
+        ],
+        onError: {
+          actions: assign({ profileEnrichmentFailure: 'match-evidence-unavailable' }),
+          target: 'candidateSessionAvailable',
+        },
+        src: 'confirmProfileEnrichment',
       },
     },
     processingSourceDocument: {
@@ -516,6 +665,26 @@ const candidateJourneyMachine = setup({
       },
     },
     storageFailure: {},
+    startingTailoredResumePreparation: {
+      invoke: {
+        input: ({ context }) => ({
+          dependencies: context.dependencies,
+          session: context.session,
+        }),
+        onDone: [
+          {
+            actions: assign({
+              session: ({ event }) => event.output.ok ? event.output.value : null,
+            }),
+            guard: ({ event }) => event.output.ok,
+            target: 'candidateSessionAvailable',
+          },
+          { target: 'storageFailure' },
+        ],
+        onError: { target: 'storageFailure' },
+        src: 'startTailoredResumePreparation',
+      },
+    },
   },
 })
 
@@ -530,6 +699,9 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     view = readCandidateJourneyView({ snapshot })
   })
   return {
+    confirmProfileEnrichment: ({ kind, requirementId, value }) => {
+      actor.send({ type: 'CONFIRM_PROFILE_ENRICHMENT', kind, requirementId, value })
+    },
     deleteCandidateSession: () => { actor.send({ type: 'DELETE_CANDIDATE_SESSION' }) },
     grantProcessingConsent: () => { actor.send({ type: 'GRANT_PROCESSING_CONSENT' }) },
     readView: () => view,
@@ -538,6 +710,9 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     },
     start: () => { actor.start() },
     startCandidateSession: () => { actor.send({ type: 'START_CANDIDATE_SESSION' }) },
+    startTailoredResumePreparation: () => {
+      actor.send({ type: 'START_TAILORED_RESUME_PREPARATION' })
+    },
     submitJobPosting: ({ document }) => {
       actor.send({ type: 'SUBMIT_JOB_POSTING', document })
     },
@@ -563,34 +738,50 @@ function readCandidateJourneyView({ snapshot }: Readonly<{
   if (snapshot.matches('awaitingCandidate')) {
     return { status: 'candidate-session-absent', notice: snapshot.context.notice }
   }
-  if (snapshot.context.session !== null && (
-    snapshot.matches('candidateSessionAvailable')
-    || snapshot.matches('processingJobPosting')
-    || snapshot.matches('processingSourceDocument')
-    || snapshot.matches('resolvingCriticalAmbiguity')
-    || snapshot.matches('persistingProcessingConsent')
-  )) {
-    const processingPolicy = snapshot.context.dependencies.languageModelGateway.processingPolicy
-    return {
-      processingConsentStatus: hasProcessingConsentForPolicy({
-        consent: snapshot.context.session.processingConsent,
-        policy: processingPolicy,
-      }) ? 'granted' : 'required',
-      processingPolicy,
-      jobMatchFailure: snapshot.context.jobMatchFailure,
-      operation: snapshot.matches('processingJobPosting')
-        ? 'processing-job-posting'
-        : snapshot.matches('processingSourceDocument')
-          ? 'processing-source-document'
-        : snapshot.matches('resolvingCriticalAmbiguity')
-          ? 'resolving-critical-ambiguity'
-          : null,
-      session: snapshot.context.session,
-      sourceIntakeFailure: snapshot.context.sourceIntakeFailure,
-      status: 'candidate-session-open',
-    }
+  if (snapshot.context.session !== null && hasOpenCandidateSession({ snapshot })) {
+    return readOpenCandidateSessionView({ snapshot, session: snapshot.context.session })
   }
   return { status: 'preparing-session' }
+}
+
+function hasOpenCandidateSession({ snapshot }: Readonly<{ snapshot: CandidateJourneySnapshot }>) {
+  return snapshot.matches('candidateSessionAvailable')
+    || snapshot.matches('processingJobPosting')
+    || snapshot.matches('processingProfileEnrichment')
+    || snapshot.matches('processingSourceDocument')
+    || snapshot.matches('resolvingCriticalAmbiguity')
+    || snapshot.matches('startingTailoredResumePreparation')
+    || snapshot.matches('persistingProcessingConsent')
+}
+
+function readOpenCandidateSessionView({ snapshot, session }: Readonly<{
+  snapshot: CandidateJourneySnapshot
+  session: CandidateSession
+}>): CandidateJourneyView {
+  const processingPolicy = snapshot.context.dependencies.languageModelGateway.processingPolicy
+  return {
+    processingConsentStatus: hasProcessingConsentForPolicy({
+      consent: session.processingConsent, policy: processingPolicy,
+    }) ? 'granted' : 'required',
+    processingPolicy,
+    jobMatchFailure: snapshot.context.jobMatchFailure,
+    operation: readCandidateJourneyOperation({ snapshot }),
+    profileEnrichmentFailure: snapshot.context.profileEnrichmentFailure,
+    session,
+    sourceIntakeFailure: snapshot.context.sourceIntakeFailure,
+    status: 'candidate-session-open',
+  }
+}
+
+function readCandidateJourneyOperation({ snapshot }: Readonly<{
+  snapshot: CandidateJourneySnapshot
+}>): CandidateJourneyOperation {
+  if (snapshot.matches('processingJobPosting')) return 'processing-job-posting'
+  if (snapshot.matches('startingTailoredResumePreparation')) return 'preparing-tailored-resume'
+  if (snapshot.matches('processingProfileEnrichment')) return 'processing-profile-enrichment'
+  if (snapshot.matches('processingSourceDocument')) return 'processing-source-document'
+  if (snapshot.matches('resolvingCriticalAmbiguity')) return 'resolving-critical-ambiguity'
+  return null
 }
 
 const storageUnavailableResult = {
@@ -602,6 +793,9 @@ const processingConsentRequiredResult = {
   error: 'processing-consent-required',
 } as const
 const ambiguityUnavailableResult = { ok: false, error: 'ambiguity-unavailable' } as const
+const profileEnrichmentUnavailableResult = {
+  ok: false, error: 'profile-enrichment-unavailable',
+} as const
 const emptySourceDocument = { bytes: new Uint8Array(), mediaType: '', name: '' } as const
 const emptyJobPostingDocument = { bytes: new Uint8Array(), mediaType: '', name: '' } as const
 

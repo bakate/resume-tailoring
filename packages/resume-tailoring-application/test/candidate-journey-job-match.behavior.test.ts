@@ -92,6 +92,79 @@ describe('Candidate Journey Job Match', () => {
 
     system.expectFrenchImportanceAndAlternatives()
   })
+
+  it('confirms a missing Candidate Fact and refreshes Match Analysis atomically', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    await system.givenAStableMatchAnalysisExists()
+    system.givenEnrichedOperationalRiskEvidenceMatches()
+
+    // Action
+    await system.confirmProfileEnrichment()
+
+    // Then
+    system.expectConfirmedCandidateFactAndRefreshedMatchAnalysis()
+  })
+
+  it('rejects empty Profile Enrichment and preserves the stable Match Analysis', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    await system.givenAStableMatchAnalysisExists()
+
+    // Action
+    await system.confirmEmptyProfileEnrichment()
+
+    // Then
+    system.expectRejectedProfileEnrichment('candidate-fact-invalid')
+  })
+
+  it('rejects Profile Enrichment for a complementary Job Requirement', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    await system.givenAStableMatchAnalysisExists()
+
+    // Action
+    await system.confirmComplementaryProfileEnrichment()
+
+    // Then
+    system.expectRejectedProfileEnrichment('profile-enrichment-unavailable')
+  })
+
+  it('starts Tailored Resume Preparation for a low evidence-backed Match Score', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenOnlyOneRelevantCandidateFactMatches()
+    await system.givenAStableMatchAnalysisExists()
+
+    // Action
+    await system.startTailoredResumePreparation()
+
+    // Then
+    system.expectTailoredResumePreparationToStart()
+  })
+
+  it('refuses Tailored Resume Preparation when no relevant Candidate Fact exists', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenNoRelevantCandidateFactMatches()
+    await system.givenAStableMatchAnalysisExists()
+
+    // Action
+    system.startUnavailableTailoredResumePreparation()
+
+    // Then
+    system.expectJobMatchToRemainCurrent()
+  })
 })
 
 async function analyzeFrenchJobPosting() {
@@ -122,19 +195,22 @@ function createSystemUnderTest({ session = createJobMatchSession() }: Readonly<{
 
 type TestDependenciesRequest = Readonly<{
   onMatch: () => void
+  readMatchEvidence: (request: Parameters<CandidateJourneyDependencies['matchEvidenceMatcher']['match']>[0]) => MatchEvidenceProposal
   readExtraction: () => ExtractedJobPosting
   session: CandidateSession
 }>
 
-function createTestDependencies({ onMatch, readExtraction, session }: TestDependenciesRequest): CandidateJourneyDependencies {
+function createTestDependencies({
+  onMatch, readExtraction, readMatchEvidence, session,
+}: TestDependenciesRequest): CandidateJourneyDependencies {
   return {
     createSessionId: () => '00000000-0000-4000-8000-000000000042',
     jobPostingDocumentReader: createJobPostingDocumentReader(),
     jobPostingExtractor: { extract: () => Promise.resolve({ ok: true, value: readExtraction() }) },
     languageModelGateway: { processingPolicy },
-    matchEvidenceMatcher: { match: () => {
+    matchEvidenceMatcher: { match: (request) => {
       onMatch()
-      return Promise.resolve({ ok: true, value: matchEvidenceProposal })
+      return Promise.resolve({ ok: true, value: readMatchEvidence(request) })
     } },
     now: () => currentTime,
     persistence: createInMemoryPersistence({ storedSession: session }),
@@ -148,7 +224,8 @@ class CandidateJourneyJobMatchTestSystem {
   #directJobMatch: Awaited<ReturnType<typeof createJobMatch>> | null = null
   #extractedJobPosting: ExtractedJobPosting = extractedJobPosting
   #matchRequestCount = 0
-  #completedAction: 'job-posting-submitted' | null = null
+  #matchEvidence: MatchEvidenceProposal = matchEvidenceProposal
+  #completedAction: JobMatchAction | null = null
   #view: CandidateJourneyView | null = null
 
   constructor({ session }: Readonly<{ session: CandidateSession }>) {
@@ -157,6 +234,7 @@ class CandidateJourneyJobMatchTestSystem {
         onMatch: () => {
           this.#matchRequestCount += 1
         },
+        readMatchEvidence: () => this.#matchEvidence,
         readExtraction: () => this.#extractedJobPosting,
         session,
       }),
@@ -199,6 +277,18 @@ class CandidateJourneyJobMatchTestSystem {
     }
   }
 
+  givenEnrichedOperationalRiskEvidenceMatches() {
+    this.#matchEvidence = enrichedMatchEvidenceProposal
+  }
+
+  givenOnlyOneRelevantCandidateFactMatches() {
+    this.#matchEvidence = lowMatchEvidenceProposal
+  }
+
+  givenNoRelevantCandidateFactMatches() {
+    this.#matchEvidence = emptyMatchEvidenceProposal
+  }
+
   async submitPastedJobPosting() {
     this.#candidateJourney.submitJobPosting({ document: createJobPostingDocument({
       mediaType: 'text/plain',
@@ -225,6 +315,40 @@ class CandidateJourneyJobMatchTestSystem {
     }) })
     this.#view = await this.#waitForJobMatchFailure()
     this.#completedAction = 'job-posting-submitted'
+  }
+
+  async confirmProfileEnrichment() {
+    this.#candidateJourney.confirmProfileEnrichment({
+      kind: 'experience',
+      requirementId: 'job-requirement-7',
+      value: 'Managed operational risk for production services',
+    })
+    this.#view = await this.#waitForProfileEnrichment()
+    this.#completedAction = 'profile-enrichment-confirmed'
+  }
+
+  async confirmEmptyProfileEnrichment() {
+    await this.#confirmRejectedProfileEnrichment({
+      requirementId: 'job-requirement-7', value: '   ',
+    })
+  }
+
+  async confirmComplementaryProfileEnrichment() {
+    await this.#confirmRejectedProfileEnrichment({
+      requirementId: 'job-requirement-8', value: 'Used Kubernetes',
+    })
+  }
+
+  async startTailoredResumePreparation() {
+    this.#candidateJourney.startTailoredResumePreparation()
+    this.#view = await this.#waitForTailoredResumePreparation()
+    this.#completedAction = 'tailored-resume-preparation-started'
+  }
+
+  startUnavailableTailoredResumePreparation() {
+    this.#candidateJourney.startTailoredResumePreparation()
+    this.#view = this.#candidateJourney.readView()
+    this.#completedAction = 'tailored-resume-preparation-started'
   }
 
   expectExplainableMatchAnalysis() {
@@ -321,9 +445,42 @@ class CandidateJourneyJobMatchTestSystem {
     ])
   }
 
-  #expectCompletedAction() {
+  expectConfirmedCandidateFactAndRefreshedMatchAnalysis() {
+    this.#expectCompletedAction('profile-enrichment-confirmed')
+    const view = this.#readOpenView()
+    expect(view.session.sourceIntake?.candidateFacts).toContainEqual(expect.objectContaining({
+      status: 'attested',
+      value: 'Managed operational risk for production services',
+    }))
+    expect(view.session.jobMatch?.analysis.evidence).toContainEqual(expect.objectContaining({
+      coverage: 'covered',
+      requirementId: 'job-requirement-7',
+    }))
+    expect(this.#matchRequestCount).toBe(2)
+  }
+
+  expectRejectedProfileEnrichment(expectedFailure: 'candidate-fact-invalid'
+    | 'profile-enrichment-unavailable') {
+    this.#expectCompletedAction('profile-enrichment-confirmed')
+    const view = this.#readOpenView()
+    expect(view.profileEnrichmentFailure).toBe(expectedFailure)
+    expect(view.session.sourceIntake?.candidateFacts).toEqual(candidateFacts)
+    expect(this.#matchRequestCount).toBe(1)
+  }
+
+  expectTailoredResumePreparationToStart() {
+    this.#expectCompletedAction('tailored-resume-preparation-started')
+    expect(this.#readOpenView().session.phase).toBe('tailored-resume-preparation')
+  }
+
+  expectJobMatchToRemainCurrent() {
+    this.#expectCompletedAction('tailored-resume-preparation-started')
+    expect(this.#readOpenView().session.phase).toBe('job-match')
+  }
+
+  #expectCompletedAction(expectedAction: JobMatchAction = 'job-posting-submitted') {
     expect(this.#completedAction, 'Expected a caller-visible Action before reading the outcome')
-      .toBe('job-posting-submitted')
+      .toBe(expectedAction)
   }
 
   #readOpenView() {
@@ -382,7 +539,60 @@ class CandidateJourneyJobMatchTestSystem {
       })
     })
   }
+
+
+  async #waitForProfileEnrichment() {
+    return new Promise<CandidateJourneyView>((resolve) => {
+      const unsubscribe = this.#candidateJourney.subscribe(() => {
+        const nextView = this.#candidateJourney.readView()
+        if (nextView.status !== 'candidate-session-open'
+          || nextView.operation === 'processing-profile-enrichment') return
+        const hasEnrichment = nextView.session.sourceIntake?.candidateFacts.some(({ value }) =>
+          value === 'Managed operational risk for production services') ?? false
+        if (!hasEnrichment) return
+        unsubscribe()
+        resolve(nextView)
+      })
+    })
+  }
+
+
+  async #confirmRejectedProfileEnrichment({ requirementId, value }: Readonly<{
+    requirementId: `job-requirement-${string}`
+    value: string
+  }>) {
+    this.#candidateJourney.confirmProfileEnrichment({ kind: 'skill', requirementId, value })
+    this.#view = await this.#waitForProfileEnrichmentFailure()
+    this.#completedAction = 'profile-enrichment-confirmed'
+  }
+
+  async #waitForProfileEnrichmentFailure() {
+    return new Promise<CandidateJourneyView>((resolve) => {
+      const unsubscribe = this.#candidateJourney.subscribe(() => {
+        const nextView = this.#candidateJourney.readView()
+        if (nextView.status !== 'candidate-session-open'
+          || nextView.profileEnrichmentFailure === null) return
+        unsubscribe()
+        resolve(nextView)
+      })
+    })
+  }
+
+  async #waitForTailoredResumePreparation() {
+    return new Promise<CandidateJourneyView>((resolve) => {
+      const unsubscribe = this.#candidateJourney.subscribe(() => {
+        const nextView = this.#candidateJourney.readView()
+        if (nextView.status !== 'candidate-session-open'
+          || nextView.session.phase !== 'tailored-resume-preparation') return
+        unsubscribe()
+        resolve(nextView)
+      })
+    })
+  }
 }
+
+type JobMatchAction = 'job-posting-submitted' | 'profile-enrichment-confirmed'
+  | 'tailored-resume-preparation-started'
 
 function createJobPostingDocumentReader(): JobPostingDocumentReader {
   return { read: (document) => Promise.resolve({
@@ -549,7 +759,7 @@ const frenchJobRequirements = [
 
 const emptyMatchEvidenceMatcher = { match: () => Promise.resolve({
   ok: true,
-  value: { evidence: [], relevantFactIds: [] },
+  value: { evidence: [], relevance: [] },
 } as const) } as const
 
 const unavailableSourceDocumentReader = { read: () => Promise.resolve({
@@ -569,7 +779,34 @@ const matchEvidenceProposal = {
     createEvidence('5', 'source-fact-4', 'covered', 'platform strategy', 'platform strategy'),
     createEvidence('6', 'source-fact-5', 'covered', 'executive stakeholders', 'executive stakeholders'),
   ],
-  relevantFactIds: ['source-fact-1', 'source-fact-3', 'source-fact-4', 'source-fact-5'],
+  relevance: [
+    createRelevance('1', 'source-fact-1', 'TypeScript', 'TypeScript'),
+    createRelevance('4', 'source-fact-3', 'Mentor', 'Mentor'),
+    createRelevance('5', 'source-fact-4', 'platform strategy', 'platform strategy'),
+    createRelevance('6', 'source-fact-5', 'executive stakeholders', 'executive stakeholders'),
+  ],
+} as const satisfies MatchEvidenceProposal
+
+const enrichedMatchEvidenceProposal = {
+  evidence: [
+    ...matchEvidenceProposal.evidence,
+    createEvidence('7', 'source-fact-experiences-1-candidate-enrichment-0', 'covered',
+      'Operational risk', 'operational risk'),
+  ],
+  relevance: [
+    ...matchEvidenceProposal.relevance,
+    createRelevance('7', 'source-fact-experiences-1-candidate-enrichment-0',
+      'Operational risk', 'operational risk'),
+  ],
+} as const satisfies MatchEvidenceProposal
+
+const lowMatchEvidenceProposal = {
+  evidence: [createEvidence('1', 'source-fact-1', 'covered', 'TypeScript', 'TypeScript')],
+  relevance: [createRelevance('1', 'source-fact-1', 'TypeScript', 'TypeScript')],
+} as const satisfies MatchEvidenceProposal
+
+const emptyMatchEvidenceProposal = {
+  evidence: [], relevance: [],
 } as const satisfies MatchEvidenceProposal
 
 function createEvidence(
@@ -582,6 +819,18 @@ function createEvidence(
   return {
     coverage,
     factMatches: [{ factId, factTerm, relationship: 'controlled', requirementTerm }],
+    requirementId: `job-requirement-${requirementId}`,
+  } as const
+}
+
+function createRelevance(
+  requirementId: string,
+  factId: string,
+  requirementTerm: string,
+  factTerm: string,
+) {
+  return {
+    factMatch: { factId, factTerm, relationship: 'controlled', requirementTerm },
     requirementId: `job-requirement-${requirementId}`,
   } as const
 }

@@ -24,11 +24,13 @@ export function useCandidateJourney() {
     candidateJourney.readView,
   )
   return {
+    confirmProfileEnrichment: candidateJourney.confirmProfileEnrichment,
     deleteCandidateSession: candidateJourney.deleteCandidateSession,
     grantProcessingConsent: candidateJourney.grantProcessingConsent,
     languageModelGateway: candidateJourneySystem.languageModelGateway,
     resolveCriticalAmbiguity: candidateJourney.resolveCriticalAmbiguity,
     startCandidateSession: candidateJourney.startCandidateSession,
+    startTailoredResumePreparation: candidateJourney.startTailoredResumePreparation,
     submitJobPosting: candidateJourney.submitJobPosting,
     submitSourceDocument: candidateJourney.submitSourceDocument,
     view,
