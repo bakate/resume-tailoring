@@ -11,6 +11,7 @@
     "./resume-tailoring-workflow": "./src/resume-tailoring-workflow.ts",
     "./resume-tailoring-workflow-composition": "./src/resume-tailoring-workflow-composition.ts",
     "./match-analysis": "./src/match-analysis.ts",
+    "./matching-engine": "./src/matching-engine.ts",
     "./resume-claims": "./src/resume-claims.ts",
     "./tailored-resume-document": "./src/tailored-resume-document.ts",
     "./tailored-resume": "./src/tailored-resume.ts",

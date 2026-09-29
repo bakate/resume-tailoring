@@ -19,6 +19,7 @@
     "@mantine/core": "^9.6.3",
     "@mantine/hooks": "^9.6.3",
     "@resume-tailoring/application": "workspace:*",
+    "@resume-tailoring/matching-engine": "workspace:*",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",
     "jszip": "^3.10.2",
