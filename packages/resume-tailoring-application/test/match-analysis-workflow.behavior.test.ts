@@ -856,7 +856,7 @@ class MatchAnalysisWorkflowTestSystem {
         requirementId: 'job-requirement-rxjs',
         factIds: ['source-fact-rxjs'],
       }],
-      matchScore: 100,
+      matchScore: 25,
     })
   }
 

@@ -3,7 +3,7 @@ import {
   readMatchBand as readEngineMatchBand,
   restoreResumeMatch,
   type MatchAnalysis as EngineMatchAnalysis,
-  type MatchRequirement,
+  type JobRequirement as EngineJobRequirement,
 } from '@resume-tailoring/matching-engine'
 import type {
   JobRequirement,
@@ -69,7 +69,7 @@ export function restoreMatchAnalysis({
 
 function mapRequirements({ requirements }: Readonly<{
   requirements: readonly JobRequirement[]
-}>): readonly MatchRequirement[] {
+}>): readonly EngineJobRequirement[] {
   return requirements.map((requirement) => ({
     capability: { dimension: 'execution', name: requirement.value },
     id: requirement.id,

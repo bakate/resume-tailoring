@@ -1,4 +1,5 @@
 import { validateMatchEvidence } from './evidence-validation'
+import { canonicalizeKnownTerm } from './text-normalization'
 
 export const capabilityDimensions = [
   'technical-expertise',
@@ -25,7 +26,7 @@ export type CandidateFact = Readonly<{
   value: string
 }>
 
-export type MatchRequirement = Readonly<{
+export type JobRequirement = Readonly<{
   capability: Readonly<{
     dimension: CapabilityDimension
     name: string
@@ -57,7 +58,7 @@ export type MatchEvidence = Readonly<{
 }>
 
 export type RequirementGroupAnalysis = Readonly<{
-  capability: MatchRequirement['capability']
+  capability: JobRequirement['capability']
   coverage: RequirementCoverage | 'uncovered'
   effectiveWeight: number
   importance: RequirementImportance
@@ -72,6 +73,7 @@ export type MatchAnalysis = Readonly<{
   evidence: readonly MatchEvidence[]
   generationEligibility: 'denied' | 'eligible'
   matchBand: MatchBand
+  matchBandQualification: 'critical-requirement-reserve' | null
   matchScore: number
   relevantFactIds: readonly string[]
   requirementGroups: readonly RequirementGroupAnalysis[]
@@ -94,12 +96,12 @@ export function analyzeResumeMatch({
   candidateFacts: readonly CandidateFact[]
   proposedEvidence: readonly ProposedMatchEvidence[]
   relevantFactIds: readonly string[]
-  requirements: readonly MatchRequirement[]
+  requirements: readonly JobRequirement[]
 }>): MatchAnalysisResult {
   const evidence = validateMatchEvidence({
+    candidateFacts,
     proposedEvidence,
     requirements,
-    verifiedFacts: candidateFacts,
   })
   if (evidence === null || !hasValidRelevantFacts({ candidateFacts, evidence, relevantFactIds })) {
     return { error: { type: 'invalid-match-input' }, ok: false }
@@ -116,7 +118,7 @@ export function restoreResumeMatch({
   candidateFacts: readonly CandidateFact[]
   evidence: readonly MatchEvidence[]
   relevantFactIds: readonly string[]
-  requirements: readonly MatchRequirement[]
+  requirements: readonly JobRequirement[]
 }>): MatchAnalysisResult {
   if (!hasValidStoredEvidence({ candidateFacts, evidence, requirements })
     || !hasValidRelevantFacts({ candidateFacts, evidence, relevantFactIds })) {
@@ -128,15 +130,18 @@ export function restoreResumeMatch({
 function createSuccessfulResult({ evidence, relevantFactIds, requirements }: Readonly<{
   evidence: readonly MatchEvidence[]
   relevantFactIds: readonly string[]
-  requirements: readonly MatchRequirement[]
+  requirements: readonly JobRequirement[]
 }>): MatchAnalysisResult {
   const matchScore = calculateMatchScore({ evidence, requirements })
+  const criticalRequirementReserve = readCriticalRequirementReserve({ evidence, requirements })
   const requirementGroups = createRequirementGroupAnalyses({ evidence, requirements })
   return { ok: true, value: {
-    criticalRequirementReserve: readCriticalRequirementReserve({ evidence, requirements }),
+    criticalRequirementReserve,
     evidence,
     generationEligibility: relevantFactIds.length > 0 ? 'eligible' : 'denied',
     matchBand: readMatchBand({ matchScore }),
+    matchBandQualification: criticalRequirementReserve.status === 'present'
+      ? 'critical-requirement-reserve' : null,
     matchScore,
     relevantFactIds,
     requirementGroups,
@@ -146,7 +151,7 @@ function createSuccessfulResult({ evidence, relevantFactIds, requirements }: Rea
 function hasValidStoredEvidence({ candidateFacts, evidence, requirements }: Readonly<{
   candidateFacts: readonly CandidateFact[]
   evidence: readonly MatchEvidence[]
-  requirements: readonly MatchRequirement[]
+  requirements: readonly JobRequirement[]
 }>) {
   const factIds = new Set(candidateFacts.map(({ id }) => id))
   const requirementIds = new Set(requirements.map(({ id }) => id))
@@ -180,11 +185,11 @@ function hasValidRelevantFacts({ candidateFacts, evidence, relevantFactIds }: Re
 
 function calculateMatchScore({ evidence, requirements }: Readonly<{
   evidence: readonly MatchEvidence[]
-  requirements: readonly MatchRequirement[]
+  requirements: readonly JobRequirement[]
 }>) {
   const evidenceByRequirementId = new Map(evidence.map((item) => [item.requirementId, item]))
   const weightedGroups = createWeightedGroups({ groups: groupRequirements({ requirements }) })
-  const totalWeight = weightedGroups.reduce((total, { weight }) => total + weight, 0)
+  const totalWeight = readScoreWeightCapacity({ weightedGroups })
   if (totalWeight === 0) return 0
   const coveredWeight = weightedGroups.reduce((total, { group, weight }) => {
     const coverage = readGroupCoverage({ evidenceByRequirementId, group })
@@ -193,9 +198,18 @@ function calculateMatchScore({ evidence, requirements }: Readonly<{
   return Math.round(coveredWeight / totalWeight * 100)
 }
 
+function readScoreWeightCapacity({ weightedGroups }: Readonly<{
+  weightedGroups: readonly Readonly<{ group: readonly JobRequirement[]; weight: number }>[]
+}>) {
+  const totalWeight = weightedGroups.reduce((total, { weight }) => total + weight, 0)
+  const hasCoreRequirement = weightedGroups.some(({ group }) =>
+    readGroupImportance({ group }) !== 'complementary')
+  return hasCoreRequirement ? totalWeight : totalWeight * 4
+}
+
 function createRequirementGroupAnalyses({ evidence, requirements }: Readonly<{
   evidence: readonly MatchEvidence[]
-  requirements: readonly MatchRequirement[]
+  requirements: readonly JobRequirement[]
 }>): readonly RequirementGroupAnalysis[] {
   const evidenceByRequirementId = new Map(evidence.map((item) => [item.requirementId, item]))
   const weightedGroups = createWeightedGroups({ groups: groupRequirements({ requirements }) })
@@ -213,7 +227,7 @@ function createRequirementGroupAnalyses({ evidence, requirements }: Readonly<{
 }
 
 function createWeightedGroups({ groups }: Readonly<{
-  groups: readonly (readonly MatchRequirement[])[]
+  groups: readonly (readonly JobRequirement[])[]
 }>) {
   const complementaryWeight = sumGroupsWithImportance({ groups, importance: 'complementary' })
   const coreWeight = groups.reduce((total, group) => {
@@ -221,8 +235,9 @@ function createWeightedGroups({ groups }: Readonly<{
     return importance === 'complementary'
       ? total : total + readImportanceWeight({ importance })
   }, 0)
-  const complementaryMultiplier = coreWeight === 0 || complementaryWeight === 0
-    ? 1 : Math.min(1, coreWeight / (3 * complementaryWeight))
+  const complementaryMultiplier = coreWeight === 0
+    ? 0.25 : complementaryWeight === 0
+      ? 1 : Math.min(1, coreWeight / (3 * complementaryWeight))
   return groups.map((group) => ({
     group,
     weight: readGroupImportance({ group }) === 'complementary'
@@ -231,7 +246,7 @@ function createWeightedGroups({ groups }: Readonly<{
 }
 
 function sumGroupsWithImportance({ groups, importance }: Readonly<{
-  groups: readonly (readonly MatchRequirement[])[]
+  groups: readonly (readonly JobRequirement[])[]
   importance: RequirementImportance
 }>) {
   return groups.filter((group) => readGroupImportance({ group }) === importance)
@@ -239,9 +254,9 @@ function sumGroupsWithImportance({ groups, importance }: Readonly<{
 }
 
 function groupRequirements({ requirements }: Readonly<{
-  requirements: readonly MatchRequirement[]
+  requirements: readonly JobRequirement[]
 }>) {
-  const groupsByCapability = new Map<string, MatchRequirement[]>()
+  const groupsByCapability = new Map<string, JobRequirement[]>()
   for (const requirement of requirements) {
     const groupKey = readRequirementGroupKey({ requirement })
     groupsByCapability.set(groupKey, [...(groupsByCapability.get(groupKey) ?? []), requirement])
@@ -249,12 +264,12 @@ function groupRequirements({ requirements }: Readonly<{
   return [...groupsByCapability.values()]
 }
 
-function readRequirementGroupKey({ requirement }: Readonly<{ requirement: MatchRequirement }>) {
+function readRequirementGroupKey({ requirement }: Readonly<{ requirement: JobRequirement }>) {
   const capabilityName = requirement.substitutableGroup ?? requirement.capability.name
-  return `${requirement.capability.dimension}:${normalizeText({ value: capabilityName })}`
+  return `${requirement.capability.dimension}:${canonicalizeKnownTerm({ value: capabilityName })}`
 }
 
-function readGroupImportance({ group }: Readonly<{ group: readonly MatchRequirement[] }>) {
+function readGroupImportance({ group }: Readonly<{ group: readonly JobRequirement[] }>) {
   return group.reduce<RequirementImportance>((highestImportance, requirement) =>
     readImportanceWeight({ importance: requirement.importance })
       > readImportanceWeight({ importance: highestImportance })
@@ -263,7 +278,7 @@ function readGroupImportance({ group }: Readonly<{ group: readonly MatchRequirem
 
 function readGroupCoverage({ evidenceByRequirementId, group }: Readonly<{
   evidenceByRequirementId: ReadonlyMap<string, MatchEvidence>
-  group: readonly MatchRequirement[]
+  group: readonly JobRequirement[]
 }>): RequirementCoverage | undefined {
   const coverages = group.flatMap(({ id }) => {
     const coverage = evidenceByRequirementId.get(id)?.coverage
@@ -283,7 +298,7 @@ function readCoverageMultiplier({ coverage }: Readonly<{
 
 function readCriticalRequirementReserve({ evidence, requirements }: Readonly<{
   evidence: readonly MatchEvidence[]
-  requirements: readonly MatchRequirement[]
+  requirements: readonly JobRequirement[]
 }>): MatchAnalysis['criticalRequirementReserve'] {
   const evidenceByRequirementId = new Map(evidence.map((item) => [item.requirementId, item]))
   const requirementIds = groupRequirements({ requirements })
@@ -299,9 +314,4 @@ function readImportanceWeight({ importance }: Readonly<{ importance: Requirement
   if (importance === 'critical') return 3
   if (importance === 'central') return 2
   return 1
-}
-
-function normalizeText({ value }: Readonly<{ value: string }>) {
-  return value.normalize('NFD').replaceAll(/\p{Diacritic}/gu, '')
-    .toLocaleLowerCase('en').replaceAll(/[^a-z0-9+#]+/gu, ' ').trim()
 }

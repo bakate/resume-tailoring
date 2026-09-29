@@ -56,8 +56,16 @@ The unambiguous role title copied from an exact Job Posting excerpt and reviewed
 _Avoid_: Inferred title, desired role, generated headline
 
 **Job Requirement**:
-An explicit qualification or expectation extracted from a Job Posting and classified as required or preferred.
+An explicit qualification or expectation extracted from a Job Posting, backed by an exact excerpt, assigned a Capability Dimension, and reviewed with a Requirement Importance.
 _Avoid_: Keyword, criterion
+
+**Capability Dimension**:
+A role-neutral area in which a Job Requirement asks for evidence: technical expertise, execution, ownership, leadership, strategy, stakeholder communication, or operational risk. Dimensions organize analysis without assigning a fixed Candidate persona.
+_Avoid_: Role family, Candidate persona, title category
+
+**Requirement Importance**:
+The reviewed significance of a Job Requirement as critical, central, or complementary. These levels have respective base weights of three, two, and one before duplicate grouping and the complementary-weight cap.
+_Avoid_: Requirement priority, model confidence
 
 **Requirement Coverage**:
 The evidence-backed assessment of a Job Requirement as covered, partially covered, or not covered. These states contribute respectively all, half, or none of the requirement's weight to the Match Score.
@@ -68,7 +76,7 @@ The explicit relationship between one covered or partially covered Job Requireme
 _Avoid_: Keyword match, inferred match
 
 **Match Score**:
-The percentage expressing how strongly the Source Profile's Candidate Facts cover the explicit professional requirements of a Job Posting. Required requirements have twice the weight of preferred requirements, and Requirement Coverage contributes all, half, or none of that weight; the score does not estimate hiring probability.
+The percentage expressing how strongly the Source Profile's Candidate Facts cover the explicit professional requirements of a Job Posting. Critical, central, and complementary requirements have base weights of three, two, and one; duplicates are grouped, complementary influence is capped at 25 percent, and Requirement Coverage contributes all, half, or none of the effective weight. The score does not estimate hiring probability.
 _Avoid_: Fit score, compatibility score
 
 **Improvement Opportunity**:
@@ -86,6 +94,10 @@ _Avoid_: Model score, suitability decision
 **Match Band**:
 The advisory interpretation of a Match Score: strong from 75 to 100, credible from 50 to 74, and ambitious from 0 to 49. A Match Band communicates evidence coverage rather than hiring probability.
 _Avoid_: Hiring likelihood, application verdict
+
+**Critical Requirement Reserve**:
+An explicit qualification on the Match Band when a critical Job Requirement is partially covered or uncovered. It exposes decisive evidence risk without changing Generation Eligibility or deciding whether the Candidate should apply.
+_Avoid_: Automatic rejection, application blocker
 
 **Generation Eligibility**:
 The ability to create a Tailored Resume when at least one Candidate Fact provides explicit evidence relevant to the Job Posting. A low Match Score produces a warning but never removes eligibility.
