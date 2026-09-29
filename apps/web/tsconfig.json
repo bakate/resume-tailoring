@@ -8,6 +8,7 @@
     "vite.config.ts"
   ],
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx"
   }
 }
