@@ -1,5 +1,7 @@
 # Separate structured and writing model roles
 
+ADR-0013 amends the provider coupling below: model roles remain separate, but their provider and processing policy are supplied by the active Language Model Gateway.
+
 The LLM adapter exposes configurable `structuredModel` and `writingModel` roles, initially using GPT-6 Luna for extraction, classification, matching, and validation, and GPT-6 Sol for faithful translation and resume writing. This adds a small amount of orchestration while avoiding premium writing-model cost on constrained tasks and allowing each role to be evaluated independently.
 
 ## Consequences
