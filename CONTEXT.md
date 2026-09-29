@@ -8,6 +8,22 @@ This context turns a Candidate's declared professional evidence into an explaina
 The person evaluating an opportunity and generating a resume from their own professional information.
 _Avoid_: User, applicant, profile owner
 
+**Candidate Journey**:
+The Candidate's progression through Source Intake, Job Match, and Tailored Resume Preparation.
+_Avoid_: Workflow, wizard, four-step journey
+
+**Source Intake**:
+The Candidate Journey phase in which the Candidate supplies professional evidence and resolves only the Critical Ambiguities that prevent safe reuse.
+_Avoid_: Source Profile step, profile review step
+
+**Job Match**:
+The Candidate Journey phase in which one Job Posting is compared with Candidate Facts to produce a Match Analysis and a generation decision.
+_Avoid_: Job Posting step, Match Analysis step
+
+**Tailored Resume Preparation**:
+The Candidate Journey phase in which the Candidate generates, controls, previews, and exports a Tailored Resume.
+_Avoid_: Resume Claims step, Tailored Resume step
+
 **Candidate Session**:
 The private, browser-local workspace in which one Candidate can reuse one Source Profile for multiple Job Postings for 24 hours.
 _Avoid_: Account, server profile

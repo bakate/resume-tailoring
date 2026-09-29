@@ -1,0 +1,241 @@
+import {
+  AppShell,
+  Badge,
+  Box,
+  Button,
+  Container,
+  Group,
+  Modal,
+  Paper,
+  SegmentedControl,
+  SimpleGrid,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core'
+import { useState } from 'react'
+
+import {
+  LocalizationFailure,
+  useLocalization,
+} from '../localization/localization'
+import type { Localization } from '../localization/localization'
+import type { CandidateJourneyView } from '@resume-tailoring/application/candidate-journey'
+import { candidateJourneyPhases } from './candidate-journey-phases'
+import type { CandidateJourneyPhase } from './candidate-journey-phases'
+import { useCandidateJourney } from './use-candidate-journey'
+
+export function CandidateJourneyShell() {
+  const localizationResult = useLocalization()
+  if (!localizationResult.ok) return <LocalizationFailure />
+  return <LocalizedCandidateJourneyShell localization={localizationResult.value} />
+}
+
+function LocalizedCandidateJourneyShell({ localization }: LocalizationProps) {
+  const candidateJourney = useCandidateJourney()
+  const activePhase = candidateJourney.view.status === 'candidate-session-open'
+    ? candidateJourney.view.session.phase
+    : null
+  return (
+    <AppShell header={{ height: 76 }} padding="xl">
+      <CandidateJourneyHeader localization={localization} />
+      <AppShell.Main><Container size="xl"><Stack gap="xl">
+        <CandidateJourneyIntroduction {...{ candidateJourney, localization }} />
+        <CandidateJourneyPhaseList {...{ activePhase, localization }} />
+      </Stack></Container></AppShell.Main>
+    </AppShell>
+  )
+}
+
+type LocalizationProps = Readonly<{ localization: Localization }>
+type CandidateJourneyController = ReturnType<typeof useCandidateJourney>
+
+function CandidateJourneyHeader({ localization }: LocalizationProps) {
+  return (
+    <AppShell.Header><Container h="100%" size="xl"><Group h="100%" justify="space-between">
+      <Text fw={700} size="lg">{localization.translate('brand.name')}</Text>
+      <Group>
+        <Badge color="forest" variant="light">
+          {localization.translate('candidateJourney.privateByDesign')}
+        </Badge>
+        <LocaleControl localization={localization} />
+      </Group>
+    </Group></Container></AppShell.Header>
+  )
+}
+
+function LocaleControl({ localization }: LocalizationProps) {
+  return <SegmentedControl
+    aria-label={localization.translate('locale.switcherLabel')}
+    data={[
+      { label: 'EN', value: 'en' },
+      { label: 'FR', value: 'fr' },
+    ]}
+    onChange={(locale) => { selectLocale({ locale, localization }) }}
+    value={localization.locale}
+  />
+}
+
+function selectLocale({ locale, localization }: LocalizationProps & Readonly<{ locale: string }>) {
+  if (locale !== 'en' && locale !== 'fr') return
+  localization.selectLocale(locale)
+}
+
+function CandidateJourneyIntroduction({ candidateJourney, localization }: LocalizationProps & Readonly<{
+  candidateJourney: CandidateJourneyController
+}>) {
+  return (
+    <Box maw="48rem" pt="xl">
+      <Text c="forest.8" fw={700} mb="sm" tt="uppercase">
+        {localization.translate('candidateJourney.eyebrow')}
+      </Text>
+      <Title fz={{ base: '2.75rem', sm: '3.75rem' }} order={1}>
+        {localization.translate('candidateJourney.title')}
+      </Title>
+      <Text c="dimmed" mt="lg" size="xl">
+        {localization.translate('candidateJourney.description')}
+      </Text>
+      <CandidateSessionControls {...{ candidateJourney, localization }} />
+      <CandidateSessionNotice localization={localization} view={candidateJourney.view} />
+    </Box>
+  )
+}
+
+function CandidateSessionControls({ candidateJourney, localization }: LocalizationProps & Readonly<{
+  candidateJourney: CandidateJourneyController
+}>) {
+  if (candidateJourney.view.status !== 'candidate-session-open') {
+    return <StartCandidateSessionButton {...{ candidateJourney, localization }} />
+  }
+  return <ActiveCandidateSessionControls {...{ candidateJourney, localization }} />
+}
+
+function ActiveCandidateSessionControls({ candidateJourney, localization }:
+LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) {
+  const [isDeleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false)
+  const closeDeleteConfirmation = () => { setDeleteConfirmationOpen(false) }
+  const openDeleteConfirmation = () => { setDeleteConfirmationOpen(true) }
+  return <>
+    <Group mt="xl">
+      <Badge color="forest" size="lg" variant="light">
+        {localization.translate('candidateJourney.sessionActive')}
+      </Badge>
+      <Button color="danger" onClick={openDeleteConfirmation} variant="subtle">
+        {localization.translate('candidateJourney.deleteSession')}
+      </Button>
+    </Group>
+    <DeleteCandidateSessionModal {...{
+      candidateJourney, closeDeleteConfirmation, isDeleteConfirmationOpen, localization,
+    }} />
+  </>
+}
+
+function StartCandidateSessionButton({ candidateJourney, localization }: LocalizationProps & Readonly<{
+  candidateJourney: CandidateJourneyController
+}>) {
+  const { view } = candidateJourney
+  return <Button disabled={view.status !== 'candidate-session-absent'}
+    loading={view.status === 'preparing-session'}
+    mt="xl" onClick={candidateJourney.startCandidateSession} size="lg">
+    {localization.translate('candidateJourney.startSession')}
+  </Button>
+}
+
+function DeleteCandidateSessionModal({
+  candidateJourney, closeDeleteConfirmation, isDeleteConfirmationOpen, localization,
+}: LocalizationProps & DeleteCandidateSessionModalProps) {
+  const deleteSession = () => {
+    deleteCandidateSession({ candidateJourney, closeDeleteConfirmation })
+  }
+  return <Modal onClose={closeDeleteConfirmation} opened={isDeleteConfirmationOpen}
+    title={localization.translate('candidateJourney.deleteDialogTitle')}>
+    <Stack>
+      <Text>{localization.translate('candidateJourney.deleteDialogDescription')}</Text>
+      <DeleteCandidateSessionActions {...{
+        closeModal: closeDeleteConfirmation, deleteSession, localization,
+      }} />
+    </Stack>
+  </Modal>
+}
+
+type DeleteCandidateSessionModalProps = Readonly<{
+  candidateJourney: CandidateJourneyController
+  closeDeleteConfirmation: () => void
+  isDeleteConfirmationOpen: boolean
+}>
+
+function deleteCandidateSession({ candidateJourney, closeDeleteConfirmation }: Readonly<{
+  candidateJourney: CandidateJourneyController
+  closeDeleteConfirmation: () => void
+}>) {
+  closeDeleteConfirmation()
+  candidateJourney.deleteCandidateSession()
+}
+
+function DeleteCandidateSessionActions({ closeModal, deleteSession, localization }:
+LocalizationProps & Readonly<{ closeModal: () => void; deleteSession: () => void }>) {
+  return <Group justify="flex-end">
+    <Button onClick={closeModal} variant="default">
+      {localization.translate('candidateJourney.deleteCancel')}
+    </Button>
+    <Button color="danger" onClick={deleteSession}>
+      {localization.translate('candidateJourney.deleteConfirm')}
+    </Button>
+  </Group>
+}
+
+function CandidateSessionNotice({ localization, view }: LocalizationProps & Readonly<{
+  view: CandidateJourneyView
+}>) {
+  if (view.status === 'candidate-session-unavailable') {
+    return <Text c="danger.8" mt="md" role="alert">
+      {localization.translate('candidateJourney.storageUnavailable')}
+    </Text>
+  }
+  if (view.status !== 'candidate-session-absent' || view.notice === null) return null
+  return <Text c="dimmed" mt="md" role="status">
+    {localization.translate(candidateSessionNoticeKeys[view.notice])}
+  </Text>
+}
+
+function CandidateJourneyPhaseList({ activePhase, localization }: LocalizationProps & Readonly<{
+  activePhase: CandidateJourneyPhase | null
+}>) {
+  return (
+    <Box aria-label={localization.translate('candidateJourney.phasesLabel')} component="nav">
+      <SimpleGrid cols={{ base: 1, md: 3 }} component="ol" spacing="lg">
+        {candidateJourneyPhases.map((phase, phaseIndex) => (
+          <CandidateJourneyPhaseItem {...{ activePhase, localization, phase, phaseIndex }}
+            key={phase.id} />
+        ))}
+      </SimpleGrid>
+    </Box>
+  )
+}
+
+function CandidateJourneyPhaseItem({ activePhase, localization, phase, phaseIndex }:
+LocalizationProps & Readonly<{
+  activePhase: CandidateJourneyPhase | null
+  phase: typeof candidateJourneyPhases[number]
+  phaseIndex: number
+}>) {
+  return <Paper aria-current={phase.id === activePhase ? 'step' : undefined}
+    component="li" p="xl" shadow="xs" withBorder>
+    <Group align="flex-start" wrap="nowrap">
+      <ThemeIcon radius="xl" size="lg" variant="light">
+        {String(phaseIndex + 1).padStart(2, '0')}
+      </ThemeIcon>
+      <Stack gap="xs">
+        <Title order={2} size="h3">{localization.translate(phase.titleKey)}</Title>
+        <Text c="dimmed">{localization.translate(phase.descriptionKey)}</Text>
+      </Stack>
+    </Group>
+  </Paper>
+}
+
+const candidateSessionNoticeKeys = {
+  deleted: 'candidateJourney.sessionDeleted',
+  'expired-session-discarded': 'candidateJourney.expiredSessionDiscarded',
+  'incompatible-session-discarded': 'candidateJourney.incompatibleSessionDiscarded',
+} as const

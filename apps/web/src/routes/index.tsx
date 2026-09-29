@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
+import { CandidateJourneyCutover } from '../candidate-journey/candidate-journey-cutover'
 import { DemoAccessGate } from '../demo-access/demo-access-gate'
-import { ResumeTailoringScreen } from '../resume-tailoring/resume-tailoring-screen'
 
 export const Route = createFileRoute('/')({
   component: DemoRoute,
@@ -10,7 +10,7 @@ export const Route = createFileRoute('/')({
 function DemoRoute() {
   return (
     <DemoAccessGate>
-      <ResumeTailoringScreen />
+      <CandidateJourneyCutover />
     </DemoAccessGate>
   )
 }

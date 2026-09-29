@@ -1,4 +1,6 @@
-export type CandidateSessionId = `candidate-session-${string}`
+export type { CandidateSessionId } from './candidate-session'
+import { candidateSessionDurationMilliseconds } from './candidate-session'
+import type { CandidateSessionId } from './candidate-session'
 export type SourceProfileFactId = `source-fact-${string}`
 export type SourceProfilePropositionKey = `proposition-${string}`
 export type JobRequirementId = `job-requirement-${string}`
@@ -192,8 +194,6 @@ export type DomainResult<TValue, TError> =
 export type ResumeTailoringDomainError = {
   readonly type: 'workflow-already-open'
 }
-
-export const candidateSessionDurationMilliseconds = 24 * 60 * 60 * 1_000
 
 export const initialResumeTailoringState = {
   status: 'not-started',
