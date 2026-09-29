@@ -7,6 +7,7 @@ import type { Localization } from '../localization/localization'
 import type { useCandidateJourney } from './use-candidate-journey'
 import {
   hasValidTailoredResumeExport,
+  hasValidTailoredResumeProvenance,
   renderTailoredResumeDocument,
 } from './tailored-resume-document'
 import {
@@ -31,8 +32,23 @@ export function TailoredResumeWorkspace({ candidateJourney, localization }: Read
   if (view.status !== 'candidate-session-open'
     || view.session.phase !== 'tailored-resume-preparation'
     || view.session.tailoredResume === null) return null
+  const candidateFacts = view.session.sourceIntake?.candidateFacts ?? []
+  if (!hasValidTailoredResumeProvenance({
+    candidateFacts,
+    tailoredResume: view.session.tailoredResume,
+  })) {
+    return <Paper aria-labelledby="tailored-resume-title" component="section"
+      className="candidate-journey-workspace" p={{ base: 'md', sm: 'xl' }} withBorder>
+      <Title id="tailored-resume-title" order={2} size="h3">
+        {localization.translate('tailoredResume.fallbackRole')}
+      </Title>
+      <Text c="danger.8" mt="md" role="alert">
+        {localization.translate('candidateJourney.provenancePending')}
+      </Text>
+    </Paper>
+  }
   return <EditableTailoredResume {...{ localization, tailoredResume: view.session.tailoredResume,
-    candidateFacts: view.session.sourceIntake?.candidateFacts ?? [] }} />
+    candidateFacts }} />
 }
 
 function EditableTailoredResume({ candidateFacts, localization, tailoredResume }: Readonly<{
@@ -80,7 +96,8 @@ function EditableTailoredResume({ candidateFacts, localization, tailoredResume }
   const exportIsValid = unsupportedFieldCount === 0 && hasValidTailoredResumeExport({
     candidateFacts: facts, tailoredResume: editedResume,
   })
-  return <Paper component="section" p="xl" shadow="xs" withBorder>
+  return <Paper aria-labelledby="tailored-resume-title" component="section"
+    className="candidate-journey-workspace" p={{ base: 'md', sm: 'xl' }} shadow="xs" withBorder>
     <Stack gap="lg"><TailoredResumeHeader {...{ localization, tailoredResume: editedResume }} />
       <ContactEditor {...{ contactDetails, identity, localization, setContactDetails, setIdentity }} />
       <ResumeFieldsEditor {...{ candidateFacts: facts, localization, resume, unsupportedKeys,
@@ -230,7 +247,7 @@ function TailoredResumeHeader({ localization, tailoredResume }: Readonly<{
 }>) {
   return <div><Badge color="forest" variant="light">
     {localization.translate('tailoredResume.ready')}
-  </Badge><Title mt="xs" order={2} size="h3">
+  </Badge><Title id="tailored-resume-title" mt="xs" order={2} size="h3">
     {tailoredResume.identity?.value ?? localization.translate('tailoredResume.fallbackRole')}
   </Title><Text c="dimmed" mt="xs">
     {tailoredResume.targetRole?.value ?? localization.translate('tailoredResume.fallbackRole')}

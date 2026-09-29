@@ -15,6 +15,95 @@ body {
   background: #ffffff;
 }
 
+.candidate-journey-app {
+  min-height: 100vh;
+}
+
+.candidate-journey-app .candidate-journey-header {
+  min-height: 76px;
+  padding-block: 12px;
+}
+
+.candidate-journey-app .candidate-journey-workspace,
+.candidate-journey-app .candidate-journey-progress {
+  width: 100%;
+  min-width: 0;
+}
+
+.candidate-journey-app :where(button, input, textarea, select, [role='button']):focus-visible {
+  outline: 3px solid #94cdb8;
+  outline-offset: 3px;
+}
+
+.candidate-journey-app :where(textarea, input) {
+  max-width: 100%;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  z-index: 10;
+  top: 0;
+  left: 1rem;
+  padding: 0.75rem 1rem;
+  transform: translateY(-150%);
+  background: #ffffff;
+  color: #164f3d;
+  font-weight: 700;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+@media (max-width: 40rem) {
+  .candidate-journey-app .candidate-journey-header {
+    align-content: center;
+  }
+
+  .candidate-journey-app .candidate-journey-header > :first-child {
+    flex: 1 1 100%;
+  }
+
+  .candidate-journey-app .mantine-SegmentedControl-root {
+    max-width: 100%;
+  }
+
+  .candidate-journey-app .mantine-SegmentedControl-label {
+    padding-inline: 0.65rem;
+  }
+
+  .candidate-journey-app .mantine-Group-root {
+    max-width: 100%;
+  }
+
+  .candidate-journey-app .mantine-Button-root {
+    max-width: 100%;
+    white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 .demo-access-gate {
   display: grid;
   min-height: 100vh;
