@@ -65,6 +65,34 @@ describe('OpenAI explainable Job Match adapters', () => {
     writeLog.mockRestore()
   })
 
+  it('rejects relevance that does not prove equivalent evidence terms', async () => {
+    const writeLog = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const matcher = createOpenAiJobMatchEvidenceMatcher({
+      apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
+      request: createRecordedRequest({
+        output: {
+          ...evidenceProposal,
+          relevance: [{
+            factMatch: {
+              ...evidenceProposal.relevance[0].factMatch,
+              factTerm: 'UI library',
+              relationship: 'controlled',
+              requirementTerm: 'deployment process',
+            },
+            requirementId: 'job-requirement-1',
+          }],
+        },
+        requests: [],
+      }),
+    })
+
+    const result = await matcher.match(matchRequest)
+
+    expect(result).toEqual({ ok: false, error: 'match-evidence-unavailable' })
+    expect(String(writeLog.mock.calls.at(-1)?.at(0))).toContain('"cause":"invalid-relevance"')
+    writeLog.mockRestore()
+  })
+
   it('returns a typed failure before sending an oversized matching request', async () => {
     const result = await requestOpenAiJobMatchEvidence({
       apiKey: 'test-api-key',

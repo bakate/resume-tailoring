@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import type { MatchEvidenceMatcher } from '@resume-tailoring/application/job-match'
+import { validateRelevantFactProposals } from '@resume-tailoring/matching-engine'
 import type { OpenAiReasoningEffort } from '../openai-model-configuration'
 import {
   createOpenAiRequester,
@@ -38,6 +39,7 @@ type InvalidModelOutputCause =
   | 'invalid-response-shape'
   | 'invalid-schema'
   | 'missing-output-text'
+  | 'invalid-relevance'
   | 'unknown-reference'
 
 export async function requestOpenAiJobMatchEvidence({
@@ -115,6 +117,9 @@ function parseResponse({ matchRequest, value }: Readonly<{
   if (!hasKnownReferences({ matchRequest, proposal: proposal.data })) {
     return createInvalidModelOutputResult({ cause: 'unknown-reference' })
   }
+  if (!hasValidRelevantFacts({ matchRequest, proposal: proposal.data })) {
+    return createInvalidModelOutputResult({ cause: 'invalid-relevance' })
+  }
   return { ok: true, value: proposal.data } as const
 }
 
@@ -139,6 +144,17 @@ function hasKnownReferences({ matchRequest, proposal }: Readonly<{
     factIds.has(factMatch.factId) && requirementIds.has(requirementId))
     && proposal.evidence.every((evidence) => requirementIds.has(evidence.requirementId)
       && evidence.factMatches.every(({ factId }) => relevantFactIds.has(factId)))
+}
+
+function hasValidRelevantFacts({ matchRequest, proposal }: Readonly<{
+  matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
+  proposal: z.infer<typeof matchEvidenceProposalSchema>
+}>) {
+  return validateRelevantFactProposals({
+    candidateFacts: matchRequest.candidateFacts,
+    proposals: proposal.relevance,
+    requirements: matchRequest.requirements,
+  }) !== null
 }
 
 function readOutputText({ value }: Readonly<{ value: unknown }>) {
