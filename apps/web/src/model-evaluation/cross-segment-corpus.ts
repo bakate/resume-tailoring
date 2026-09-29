@@ -3,6 +3,7 @@ import {
   type QualificationCorpus,
   type QualificationRoleFamily,
 } from './cross-segment-qualification'
+import { salesCommercialQualificationCorpus } from './sales-commercial-corpus'
 
 type TechnologyScenario = Readonly<{
   language: 'en' | 'fr'
@@ -98,7 +99,7 @@ export const crossSegmentQualificationCorpus: QualificationCorpus = {
   fixtures: [
     ...createGeneralManagementFixtures(),
     ...technologyScenarios.map((scenario, scenarioIndex) => createTechnologyFixture({ scenario, scenarioIndex })),
-    ...createRoleFixtures({ count: 20, roleFamily: 'sales', heldOutCount: 6 }),
+    ...salesCommercialQualificationCorpus.fixtures,
   ],
 }
 
