@@ -5,8 +5,10 @@ import {
   Scripts,
   createRootRoute,
 } from '@tanstack/react-router'
+import { MantineProvider } from '@mantine/core'
 import type { ReactNode } from 'react'
 
+import { candidateJourneyTheme } from '../candidate-journey/candidate-journey-theme'
 import {
   LocalizationFailure,
   LocalizationProvider,
@@ -14,6 +16,7 @@ import {
   useLocalization,
 } from '../localization/localization'
 import type { Locale, Localization } from '../localization/localization'
+import '@mantine/core/styles.css'
 import '../styles.css'
 
 export const Route = createRootRoute({
@@ -83,7 +86,7 @@ function RootDocument({ children, locale, readiness }: Readonly<{
         <HeadContent />
       </head>
       <body suppressHydrationWarning style={readiness === 'pending' ? pendingLocaleStyle : undefined}>
-        {children}
+        <MantineProvider theme={candidateJourneyTheme}>{children}</MantineProvider>
         <Scripts />
       </body>
     </html>

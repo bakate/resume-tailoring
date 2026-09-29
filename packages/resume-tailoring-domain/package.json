@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./candidate-session": "./src/candidate-session.ts",
     "./resume-tailoring-state": "./src/resume-tailoring-state.ts"
   },
   "scripts": {

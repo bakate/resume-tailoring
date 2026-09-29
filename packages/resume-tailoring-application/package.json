@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./candidate-journey": "./src/candidate-journey.ts",
     "./job-posting-analysis": "./src/job-posting-analysis.ts",
     "./job-posting-target-role": "./src/job-posting-target-role.ts",
     "./resume-tailoring-workflow": "./src/resume-tailoring-workflow.ts",
@@ -21,7 +22,8 @@
   },
   "dependencies": {
     "@resume-tailoring/domain": "workspace:*",
-    "@resume-tailoring/matching-engine": "workspace:*"
+    "@resume-tailoring/matching-engine": "workspace:*",
+    "xstate": "5.33.2"
   },
   "devDependencies": {
     "typescript": "catalog:",
