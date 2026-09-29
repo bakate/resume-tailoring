@@ -10,6 +10,7 @@ import {
   Paper,
   SegmentedControl,
   SimpleGrid,
+  Skeleton,
   Stack,
   Text,
   ThemeIcon,
@@ -43,11 +44,16 @@ function LocalizedCandidateJourneyShell({ localization }: LocalizationProps) {
     ? candidateJourney.view.session.phase
     : null
   return (
-    <AppShell header={{ height: 76 }} padding="xl">
+    <AppShell className="candidate-journey-app" header={{ height: 76 }} padding={{ base: 'sm', sm: 'xl' }}>
+      <a className="skip-link" href="#main-content">
+        {localization.translate('candidateJourney.skipToContent')}
+      </a>
       <CandidateJourneyHeader localization={localization} />
-      <AppShell.Main><Container size="xl"><Stack gap="xl">
+      <AppShell.Main id="main-content"><Container size="xl"><Stack gap="xl">
         <CandidateJourneyIntroduction {...{ candidateJourney, localization }} />
         <ProcessingPolicyCard {...{ candidateJourney, localization }} />
+        <CandidateJourneyStatusAnnouncements {...{ activePhase, candidateJourney, localization }} />
+        <CandidateJourneyProgress {...{ candidateJourney, localization }} />
         <SourceIntakeWorkspace {...{ candidateJourney, localization }} />
         <JobMatchWorkspace {...{ candidateJourney, localization }} />
         <TailoredResumeWorkspace {...{ candidateJourney, localization }} />
@@ -62,9 +68,9 @@ type CandidateJourneyController = ReturnType<typeof useCandidateJourney>
 
 function CandidateJourneyHeader({ localization }: LocalizationProps) {
   return (
-    <AppShell.Header><Container h="100%" size="xl"><Group h="100%" justify="space-between">
+    <AppShell.Header><Container h="100%" size="xl"><Group className="candidate-journey-header" h="100%" justify="space-between" wrap="wrap">
       <Text fw={700} size="lg">{localization.translate('brand.name')}</Text>
-      <Group>
+      <Group gap="sm" wrap="wrap">
         <Badge color="forest" variant="light">
           {localization.translate('candidateJourney.privateByDesign')}
         </Badge>
@@ -306,6 +312,91 @@ LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) 
   return <Button onClick={candidateJourney.grantProcessingConsent}>
     {localization.translate('processingPolicy.grantConsent')}
   </Button>
+}
+
+function CandidateJourneyStatusAnnouncements({ activePhase, candidateJourney, localization }:
+LocalizationProps & Readonly<{
+  activePhase: CandidateJourneyPhase | null
+  candidateJourney: CandidateJourneyController
+}>) {
+  const activePhaseDefinition = activePhase === null ? null : candidateJourneyPhases.find((phase) =>
+    phase.id === activePhase)
+  const phaseMessage = activePhaseDefinition === undefined || activePhaseDefinition === null ? null : formatJourneyMessage({
+    template: localization.translate('candidateJourney.phaseAnnouncement'),
+    value: localization.translate(activePhaseDefinition.titleKey),
+    token: 'phase',
+  })
+  const operation = candidateJourney.view.status === 'candidate-session-open'
+    ? candidateJourney.view.operation
+    : null
+  const operationMessage = operation === null ? null : formatJourneyMessage({
+    template: localization.translate('candidateJourney.operationAnnouncement'),
+    value: localization.translate(operationTranslationKeys[operation]),
+    token: 'operation',
+  })
+  const resultMessage = readValidatedResultMessage({ candidateJourney, localization })
+  return <div aria-atomic="true" aria-live="polite" className="sr-only" role="status">
+    {[phaseMessage, operationMessage, resultMessage].filter((message): message is string =>
+      message !== null).join(' ')}
+  </div>
+}
+
+function CandidateJourneyProgress({ candidateJourney, localization }:
+LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) {
+  if (candidateJourney.view.status !== 'candidate-session-open'
+    || candidateJourney.view.operation === null) return null
+  const { operation } = candidateJourney.view
+  return <Paper aria-busy="true" aria-describedby="candidate-journey-progress-description"
+    aria-label={localization.translate('candidateJourney.progressLabel')}
+    className="candidate-journey-progress" component="section" p={{ base: 'md', sm: 'lg' }} withBorder>
+    <Group align="flex-start" wrap="nowrap">
+      <Skeleton aria-hidden="true" circle height={36} width={36} />
+      <Stack flex={1} gap="xs">
+        <Text fw={700}>{localization.translate(operationTranslationKeys[operation])}</Text>
+        <Text c="dimmed" id="candidate-journey-progress-description" size="sm">
+          {localization.translate('candidateJourney.progressDescription')}
+        </Text>
+        <Skeleton aria-hidden="true" height={10} radius="xl" width="72%" />
+        <Skeleton aria-hidden="true" height={10} radius="xl" width="48%" />
+      </Stack>
+    </Group>
+  </Paper>
+}
+
+function readValidatedResultMessage({ candidateJourney, localization }:
+LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) {
+  if (candidateJourney.view.status !== 'candidate-session-open') return null
+  const result = candidateJourney.view.session.tailoredResume !== null
+    ? 'candidateJourney.result.tailoredResume'
+    : candidateJourney.view.session.jobMatch !== null
+      ? 'candidateJourney.result.matchAnalysis'
+      : candidateJourney.view.session.sourceIntake?.criticalAmbiguities.length === 0
+        ? 'candidateJourney.result.sourceProfile'
+        : null
+  return result === null ? null : localization.translate('candidateJourney.validatedResultAnnouncement')
+    .replace('{result}', localization.translate(result))
+}
+
+function formatJourneyMessage({ template, token, value }: Readonly<{
+  template: string
+  token: string
+  value: string
+}>) {
+  return template.replace(`{${token}}`, value)
+}
+
+type CandidateJourneyOperation = Exclude<
+  Extract<CandidateJourneyView, Readonly<{ status: 'candidate-session-open' }>>['operation'], null
+>
+
+const operationTranslationKeys: Readonly<Record<CandidateJourneyOperation, Parameters<
+  Localization['translate']
+>[0]>> = {
+  'preparing-tailored-resume': 'candidateJourney.operation.preparingTailoredResume',
+  'processing-job-posting': 'candidateJourney.operation.processingJobPosting',
+  'processing-profile-enrichment': 'candidateJourney.operation.processingProfileEnrichment',
+  'processing-source-document': 'candidateJourney.operation.extractSourceProfile',
+  'resolving-critical-ambiguity': 'candidateJourney.operation.resolvingCriticalAmbiguity',
 }
 
 function CandidateJourneyPhaseList({ activePhase, localization }: LocalizationProps & Readonly<{

@@ -9,6 +9,10 @@ export type TailoredResumeExportSource = Readonly<{
 
 export function hasValidTailoredResumeExport({ candidateFacts, tailoredResume }: TailoredResumeExportSource) {
   if (!hasRequiredContactDetails({ tailoredResume })) return false
+  return hasValidTailoredResumeProvenance({ candidateFacts, tailoredResume })
+}
+
+export function hasValidTailoredResumeProvenance({ candidateFacts, tailoredResume }: TailoredResumeExportSource) {
   const candidateFactIds = new Set(candidateFacts.map(({ id }) => id))
   return readProfessionalFields({ tailoredResume }).every(({ factIds }) =>
     factIds.length > 0 && factIds.every((factId) => candidateFactIds.has(factId)))

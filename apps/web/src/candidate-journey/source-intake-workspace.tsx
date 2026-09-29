@@ -29,7 +29,9 @@ export function SourceIntakeWorkspace({
   const sourceForm = useSourceDocumentForm({ candidateJourney })
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open') return null
-  return <Paper component="section" p="xl" shadow="xs" withBorder>
+  return <Paper aria-busy={view.operation === 'processing-source-document' || view.operation === 'resolving-critical-ambiguity'}
+    aria-labelledby="source-intake-title" component="section" className="candidate-journey-workspace"
+    p={{ base: 'md', sm: 'xl' }} shadow="xs" withBorder>
     <Stack gap="lg">
       <SourceIntakeHeader localization={localization} />
       {view.session.sourceIntake === null
@@ -70,7 +72,7 @@ type SourceDocumentFormController = ReturnType<typeof useSourceDocumentForm>
 
 function SourceIntakeHeader({ localization }: Readonly<{ localization: Localization }>) {
   return <div>
-    <Title order={2} size="h3">{localization.translate('sourceIntake.title')}</Title>
+    <Title id="source-intake-title" order={2} size="h3">{localization.translate('sourceIntake.title')}</Title>
     <Text c="dimmed" mt="xs">{localization.translate('sourceIntake.description')}</Text>
   </div>
 }

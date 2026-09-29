@@ -38,7 +38,9 @@ export function JobMatchWorkspace({ candidateJourney, localization }: Readonly<{
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open' || view.session.sourceIntake === null
     || view.session.phase !== 'job-match') return null
-  return <Paper component="section" p="xl" shadow="xs" withBorder>
+  return <Paper aria-busy={view.operation === 'processing-job-posting' || view.operation === 'processing-profile-enrichment'}
+    aria-labelledby="job-match-title" component="section" className="candidate-journey-workspace"
+    p={{ base: 'md', sm: 'xl' }} shadow="xs" withBorder>
     <Stack gap="lg">
       <JobMatchHeader localization={localization} />
       <JobPostingForm {...{ candidateJourney, form, localization }} />
@@ -78,7 +80,7 @@ function useJobPostingForm({ candidateJourney }: Readonly<{
 type JobPostingFormController = ReturnType<typeof useJobPostingForm>
 
 function JobMatchHeader({ localization }: Readonly<{ localization: Localization }>) {
-  return <div><Title order={2} size="h3">{localization.translate('jobMatch.title')}</Title>
+  return <div><Title id="job-match-title" order={2} size="h3">{localization.translate('jobMatch.title')}</Title>
     <Text c="dimmed" mt="xs">{localization.translate('jobMatch.description')}</Text></div>
 }
 
@@ -177,7 +179,7 @@ function DeniedGenerationDecision({ localization, sourceIntake }: Readonly<{
   localization: Localization
   sourceIntake: SourceIntake
 }>) {
-  return <Alert color="danger" title={localization.translate('jobMatch.generation.denied')}>
+  return <Alert color="danger" role="alert" title={localization.translate('jobMatch.generation.denied')}>
     <Stack gap="sm"><Text>{localization.translate('jobMatch.generation.normalizedNotice')}</Text>
       <Button onClick={() => { downloadNormalizedSourceResume({ localization, sourceIntake }) }}
         variant="outline">
@@ -397,7 +399,7 @@ function ProfileEnrichmentFailure({ candidateJourney, localization }: Readonly<{
   if (candidateJourney.view.status !== 'candidate-session-open'
     || candidateJourney.view.profileEnrichmentFailure === null) return null
   const key = profileEnrichmentFailureKeys[candidateJourney.view.profileEnrichmentFailure]
-  return <Alert color="danger" mt="md">{localization.translate(key)}</Alert>
+  return <Alert color="danger" mt="md" role="alert">{localization.translate(key)}</Alert>
 }
 
 function ProfileEnrichmentPrompt({
