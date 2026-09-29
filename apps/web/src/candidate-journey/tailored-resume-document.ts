@@ -1,5 +1,6 @@
 import type { CandidateFact } from '@resume-tailoring/application/source-intake'
 import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
+import { tailoredResumeDocumentStyles } from './candidate-journey-theme'
 
 export type TailoredResumeExportSource = Readonly<{
   candidateFacts: readonly CandidateFact[]
@@ -25,7 +26,7 @@ export function renderTailoredResumeDocument({ tailoredResume }: Readonly<{
       fields: section.fields, title: label({ key: section.section, locale: tailoredResume.locale }),
     })),
   ].join('')
-  return `<!doctype html><html lang="${tailoredResume.locale}"><head><meta charset="utf-8"><style>${styles}</style></head><body><main class="resume-page"><header><h1>${escapeHtml(title)}</h1><p>${escapeHtml(tailoredResume.targetRole?.value ?? '')}</p><address>${contactDetails}</address></header>${sections}</main></body></html>`
+  return `<!doctype html><html lang="${tailoredResume.locale}"><head><meta charset="utf-8"><style>${tailoredResumeDocumentStyles}</style></head><body><main class="resume-page"><header><h1>${escapeHtml(title)}</h1><p>${escapeHtml(tailoredResume.targetRole?.value ?? '')}</p><address>${contactDetails}</address></header>${sections}</main></body></html>`
 }
 
 function hasRequiredContactDetails({ tailoredResume }: Readonly<{ tailoredResume: TailoredResume }>) {
@@ -68,5 +69,3 @@ const labels = {
   en: { certifications: 'Certifications', education: 'Education', experiences: 'Experience', languages: 'Languages', projects: 'Projects', skills: 'Skills', summary: 'Summary' },
   fr: { certifications: 'Certifications', education: 'Formation', experiences: 'Expérience', languages: 'Langues', projects: 'Projets', skills: 'Compétences', summary: 'Profil' },
 } as const
-
-const styles = `@page{size:A4;margin:0}*{box-sizing:border-box}body{margin:0;color:#151820;font-family:Arial,sans-serif}.resume-page{width:210mm;min-height:297mm;padding:17mm 18mm}header{border-bottom:.5mm solid #164f3d;padding-bottom:6mm}h1,h2{margin:0;color:#164f3d;font-family:Georgia,serif}h1{font-size:25pt}h2{font-size:14pt}header p,address{margin:3mm 0 0;font-style:normal}section{margin-top:6mm;break-inside:avoid}ul{margin:2mm 0 0;padding-left:5mm}li{margin-top:2mm;line-height:1.35}`

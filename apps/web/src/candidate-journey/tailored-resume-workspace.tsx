@@ -44,11 +44,11 @@ function TailoredResumePreview({ source }: Readonly<{
   return <section aria-labelledby="tailored-resume-preview-title">
     <Title id="tailored-resume-preview-title" order={3}>Preview and export</Title>
     <Text c="dimmed" mt="xs">Preview the exact semantic document used for your PDF.</Text>
-    <iframe sandbox="" srcDoc={html} style={{ border: 0, height: '72rem', marginTop: '1rem', width: '100%' }}
+    <iframe className="tailored-resume-preview-frame" sandbox="" srcDoc={html}
       title="Tailored Resume preview" />
     {canExport ? <Button mt="md" onClick={() => { printTailoredResume({ html }) }}>
       Download PDF
-    </Button> : <Text c="red" mt="md" role="alert">
+    </Button> : <Text c="danger.6" mt="md" role="alert">
       Add your full name and an email address or phone number before exporting.
     </Text>}
   </section>

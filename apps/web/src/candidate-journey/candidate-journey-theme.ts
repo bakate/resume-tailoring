@@ -42,3 +42,5 @@ export const candidateJourneyTheme = createTheme({
   primaryColor: 'forest',
   primaryShade: 8,
 })
+
+export const tailoredResumeDocumentStyles = `@page{size:A4;margin:0}*{box-sizing:border-box}body{margin:0;color:#151820;font-family:Arial,sans-serif}.resume-page{width:210mm;min-height:297mm;padding:17mm 18mm}header{border-bottom:.5mm solid #164f3d;padding-bottom:6mm}h1,h2{margin:0;color:#164f3d;font-family:Georgia,serif}h1{font-size:25pt}h2{font-size:14pt}header p,address{margin:3mm 0 0;font-style:normal}section{margin-top:6mm;break-inside:avoid}ul{margin:2mm 0 0;padding-left:5mm}li{margin-top:2mm;line-height:1.35}`
