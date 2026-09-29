@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { createOpenAiJobMatchEvidenceMatcher } from './openai-job-match-evidence-matcher'
+import {
+  createOpenAiJobMatchEvidenceMatcher,
+  requestOpenAiJobMatchEvidence,
+} from './openai-job-match-evidence-matcher'
 import { createOpenAiJobPostingExtractor } from './openai-job-posting-extractor'
 
 describe('OpenAI explainable Job Match adapters', () => {
@@ -46,6 +49,27 @@ describe('OpenAI explainable Job Match adapters', () => {
     const result = await matcher.match(matchRequest)
 
     expect(result).toEqual({ ok: false, error: 'match-evidence-unavailable' })
+  })
+
+  it('returns a typed failure before sending an oversized matching request', async () => {
+    const result = await requestOpenAiJobMatchEvidence({
+      apiKey: 'test-api-key',
+      matchRequest: {
+        candidateFacts: Array.from({ length: 70 }, (factIndex) => ({
+          id: `source-fact-${String(factIndex)}`,
+          kind: 'experience' as const,
+          value: 'A'.repeat(1_000),
+        })),
+        requirements: matchRequest.requirements,
+      },
+      model: 'structured-model',
+      reasoningEffort: 'low',
+      request: () => Promise.reject(new Error('Request should not be sent')),
+    })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.type).toBe('request-too-large')
   })
 })
 

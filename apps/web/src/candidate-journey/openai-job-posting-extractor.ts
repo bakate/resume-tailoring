@@ -1,8 +1,14 @@
 import { z } from 'zod'
 
-import type { JobPostingExtractor } from '@resume-tailoring/application/job-match'
+import type {
+  ExtractedJobPosting,
+  JobPostingExtractor,
+} from '@resume-tailoring/application/job-match'
 import type { OpenAiReasoningEffort } from '../openai-model-configuration'
-import { createOpenAiRequester } from '../resume-tailoring/openai-request'
+import {
+  createOpenAiRequester,
+  type OpenAiRequestFailure,
+} from '../resume-tailoring/openai-request'
 import {
   jobPostingExtractionResponseFormat,
   jobPostingExtractionSchema,
@@ -16,26 +22,37 @@ export function createOpenAiJobPostingExtractor({
   reasoningEffort: OpenAiReasoningEffort
   request?: typeof fetch
 }>): JobPostingExtractor {
-  return { extract: ({ jobPostingContent }) => requestExtraction({
-    apiKey, jobPostingContent, model, reasoningEffort, request,
-  }) }
+  return { extract: async ({ jobPostingContent }) => {
+    const result = await requestOpenAiJobPostingExtraction({
+      apiKey, jobPostingContent, model, reasoningEffort, request,
+    })
+    return result.ok ? result : unavailableResult
+  } }
 }
 
-async function requestExtraction({
-  apiKey, jobPostingContent, model, reasoningEffort, request,
+export type OpenAiJobPostingExtractionFailure = Readonly<{
+  type: 'invalid-model-output'
+}> | OpenAiRequestFailure
+
+export async function requestOpenAiJobPostingExtraction({
+  apiKey, jobPostingContent, model, reasoningEffort, request = fetch,
 }: Readonly<{
   apiKey: string
   jobPostingContent: string
   model: string
   reasoningEffort: OpenAiReasoningEffort
-  request: typeof fetch
-}>) {
+  request?: typeof fetch
+}>): Promise<Readonly<{ ok: true; value: ExtractedJobPosting }> | Readonly<{
+  ok: false
+  error: OpenAiJobPostingExtractionFailure
+}>> {
   const requester = createOpenAiRequester({ apiKey, request })
   const response = await requester.send({
     body: createRequestBody({ jobPostingContent, model, reasoningEffort }),
     operation: 'explainable-job-posting-extraction',
   })
-  return response.ok ? parseResponse({ value: response.value }) : unavailableResult
+  if (!response.ok) return response
+  return parseResponse({ value: response.value })
 }
 
 function createRequestBody({ jobPostingContent, model, reasoningEffort }: Readonly<{
@@ -58,12 +75,12 @@ function createRequestBody({ jobPostingContent, model, reasoningEffort }: Readon
 
 function parseResponse({ value }: Readonly<{ value: unknown }>) {
   const outputText = readOutputText({ value })
-  if (outputText === null) return unavailableResult
+  if (outputText === null) return invalidModelOutputResult
   try {
     const parsed = jobPostingExtractionSchema.safeParse(JSON.parse(outputText))
-    return parsed.success ? createSuccessResult({ extraction: parsed.data }) : unavailableResult
+    return parsed.success ? createSuccessResult({ extraction: parsed.data }) : invalidModelOutputResult
   } catch {
-    return unavailableResult
+    return invalidModelOutputResult
   }
 }
 
@@ -111,3 +128,4 @@ const openAiResponseSchema = z.object({ output: z.array(z.unknown()) })
 const openAiOutputItemSchema = z.object({ content: z.array(z.unknown()) })
 const openAiOutputTextSchema = z.object({ type: z.literal('output_text'), text: z.string() })
 const unavailableResult = { ok: false, error: 'job-posting-extraction-unavailable' } as const
+const invalidModelOutputResult = { ok: false, error: { type: 'invalid-model-output' } } as const

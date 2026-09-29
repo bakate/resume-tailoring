@@ -2,7 +2,10 @@ import { z } from 'zod'
 
 import type { MatchEvidenceMatcher } from '@resume-tailoring/application/job-match'
 import type { OpenAiReasoningEffort } from '../openai-model-configuration'
-import { createOpenAiRequester } from '../resume-tailoring/openai-request'
+import {
+  createOpenAiRequester,
+  type OpenAiRequestFailure,
+} from '../resume-tailoring/openai-request'
 import {
   matchEvidenceProposalSchema,
   matchEvidenceResponseFormat,
@@ -16,26 +19,58 @@ export function createOpenAiJobMatchEvidenceMatcher({
   reasoningEffort: OpenAiReasoningEffort
   request?: typeof fetch
 }>): MatchEvidenceMatcher {
-  return { match: (matchRequest) => requestEvidence({
-    apiKey, matchRequest, model, reasoningEffort, request,
-  }) }
+  return { match: async (matchRequest) => {
+    const result = await requestOpenAiJobMatchEvidence({
+      apiKey, matchRequest, model, reasoningEffort, request,
+    })
+    return result.ok ? result : unavailableResult
+  } }
 }
 
-async function requestEvidence({ apiKey, matchRequest, model, reasoningEffort, request }: Readonly<{
+export type OpenAiMatchEvidenceFailure = Readonly<{
+  type: 'invalid-model-output' | 'request-too-large'
+  characterCount?: number
+  maximumCharacterCount?: number
+}> | OpenAiRequestFailure
+
+export async function requestOpenAiJobMatchEvidence({
+  apiKey, matchRequest, model, reasoningEffort, request = fetch,
+}: Readonly<{
   apiKey: string
   matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
   model: string
   reasoningEffort: OpenAiReasoningEffort
-  request: typeof fetch
-}>) {
+  request?: typeof fetch
+}>): Promise<Readonly<{ ok: true; value: z.infer<typeof matchEvidenceProposalSchema> }> | Readonly<{
+  ok: false
+  error: OpenAiMatchEvidenceFailure
+}>> {
+  const requestCharacterCount = JSON.stringify(matchRequest).length
+  if (requestCharacterCount > maximumMatchEvidenceRequestCharacters) {
+    console.info(JSON.stringify({
+      category: 'privacy-safe-openai-request',
+      metric: 'rejected',
+      value: 1,
+      dimensions: {
+        cause: 'request-too-large',
+        maximumRequestCharacters: maximumMatchEvidenceRequestCharacters,
+        operation: 'explainable-match-evidence',
+        requestCharacters: requestCharacterCount,
+      },
+    }))
+    return { ok: false, error: {
+      characterCount: requestCharacterCount,
+      maximumCharacterCount: maximumMatchEvidenceRequestCharacters,
+      type: 'request-too-large',
+    } }
+  }
   const requester = createOpenAiRequester({ apiKey, request })
   const response = await requester.send({
     body: createRequestBody({ matchRequest, model, reasoningEffort }),
     operation: 'explainable-match-evidence',
   })
-  return response.ok
-    ? parseResponse({ matchRequest, value: response.value })
-    : unavailableResult
+  if (!response.ok) return response
+  return parseResponse({ matchRequest, value: response.value })
 }
 
 function createRequestBody({ matchRequest, model, reasoningEffort }: Readonly<{
@@ -48,7 +83,7 @@ function createRequestBody({ matchRequest, model, reasoningEffort }: Readonly<{
       { role: 'developer', content: [{ type: 'input_text', text: matchingInstructions }] },
       { role: 'user', content: [{ type: 'input_text', text: JSON.stringify(matchRequest) }] },
     ],
-    max_output_tokens: 16_000,
+    max_output_tokens: 8_000,
     model,
     reasoning: { effort: reasoningEffort },
     store: false,
@@ -61,15 +96,15 @@ function parseResponse({ matchRequest, value }: Readonly<{
   value: unknown
 }>) {
   const outputText = readOutputText({ value })
-  if (outputText === null) return unavailableResult
+  if (outputText === null) return invalidModelOutputResult
   try {
     const proposal = matchEvidenceProposalSchema.safeParse(JSON.parse(outputText))
     if (!proposal.success || !hasKnownReferences({ matchRequest, proposal: proposal.data })) {
-      return unavailableResult
+      return invalidModelOutputResult
     }
     return { ok: true, value: proposal.data } as const
   } catch {
-    return unavailableResult
+    return invalidModelOutputResult
   }
 }
 
@@ -116,3 +151,5 @@ const openAiResponseSchema = z.object({ output: z.array(z.unknown()) })
 const openAiOutputItemSchema = z.object({ content: z.array(z.unknown()) })
 const openAiOutputTextSchema = z.object({ type: z.literal('output_text'), text: z.string() })
 const unavailableResult = { ok: false, error: 'match-evidence-unavailable' } as const
+const invalidModelOutputResult = { ok: false, error: { type: 'invalid-model-output' } } as const
+const maximumMatchEvidenceRequestCharacters = 60_000
