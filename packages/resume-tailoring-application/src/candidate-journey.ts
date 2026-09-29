@@ -9,6 +9,8 @@ import type {
   CandidateSession,
   CandidateJourneyPhase,
 } from '@resume-tailoring/domain/candidate-session'
+import { hasProcessingConsentForPolicy } from '@resume-tailoring/domain/processing-policy'
+import type { ProcessingPolicy } from '@resume-tailoring/domain/processing-policy'
 
 export {
   candidateJourneyPhases,
@@ -42,6 +44,7 @@ export type CandidateSessionPersistence = Readonly<{
 
 export type CandidateJourneyDependencies = Readonly<{
   createSessionId: () => string
+  languageModelGateway: Readonly<{ processingPolicy: ProcessingPolicy }>
   now: () => number
   persistence: CandidateSessionPersistence
 }>
@@ -54,6 +57,7 @@ type CandidateJourneyContext = Readonly<{
 
 type CandidateJourneyEvent =
   | Readonly<{ type: 'DELETE_CANDIDATE_SESSION' }>
+  | Readonly<{ type: 'GRANT_PROCESSING_CONSENT' }>
   | Readonly<{ type: 'START_CANDIDATE_SESSION' }>
 
 type RestoredCandidateSession = Readonly<{
@@ -64,11 +68,17 @@ type RestoredCandidateSession = Readonly<{
 export type CandidateJourneyView =
   | Readonly<{ status: 'preparing-session' }>
   | Readonly<{ status: 'candidate-session-absent'; notice: CandidateSessionNotice }>
-  | Readonly<{ status: 'candidate-session-open'; session: CandidateSession }>
+  | Readonly<{
+      status: 'candidate-session-open'
+      processingConsentStatus: 'granted' | 'required'
+      processingPolicy: ProcessingPolicy
+      session: CandidateSession
+    }>
   | Readonly<{ status: 'candidate-session-unavailable' }>
 
 export type CandidateJourney = Readonly<{
   deleteCandidateSession: () => void
+  grantProcessingConsent: () => void
   readView: () => CandidateJourneyView
   start: () => void
   startCandidateSession: () => void
@@ -88,6 +98,7 @@ const startCandidateSession = fromPromise<
   const session = {
     expiresAt: startedAt + candidateSessionDurationMilliseconds,
     phase: 'source-intake',
+    processingConsent: null,
     sessionId: `candidate-session-${input.createSessionId()}`,
     startedAt,
     version: candidateSessionStorageVersion,
@@ -100,9 +111,17 @@ const deleteCandidateSession = fromPromise<
   CandidateJourneyDependencies
 >(({ input }) => Promise.resolve(input.persistence.delete()))
 
+const grantProcessingConsent = fromPromise<
+  CandidateSessionStorageResult<CandidateSession>,
+  Readonly<{ dependencies: CandidateJourneyDependencies; session: CandidateSession | null }>
+>(({ input }) => Promise.resolve(input.session === null
+  ? { ok: false, error: 'candidate-session-storage-unavailable' }
+  : input.dependencies.persistence.save({ session: input.session })))
+
 const candidateJourneyMachine = setup({
   actors: {
     deleteCandidateSession,
+    grantProcessingConsent,
     restoreCandidateSession,
     startCandidateSession,
   },
@@ -136,6 +155,18 @@ const candidateJourneyMachine = setup({
         DELETE_CANDIDATE_SESSION: {
           actions: assign({ notice: 'deleted' }),
           target: 'removingCandidateSession',
+        },
+        GRANT_PROCESSING_CONSENT: {
+          actions: assign({
+            session: ({ context }) => context.session === null ? null : {
+              ...context.session,
+              processingConsent: {
+                grantedAt: context.dependencies.now(),
+                policy: context.dependencies.languageModelGateway.processingPolicy,
+              },
+            },
+          }),
+          target: 'persistingProcessingConsent',
         },
       },
     },
@@ -200,6 +231,26 @@ const candidateJourneyMachine = setup({
         src: 'startCandidateSession',
       },
     },
+    persistingProcessingConsent: {
+      invoke: {
+        input: ({ context }) => ({
+          dependencies: context.dependencies,
+          session: context.session,
+        }),
+        onDone: [
+          {
+            actions: assign({
+              session: ({ event }) => event.output.ok ? event.output.value : null,
+            }),
+            guard: ({ event }) => event.output.ok,
+            target: 'candidateSessionAvailable',
+          },
+          { target: 'storageFailure' },
+        ],
+        onError: { target: 'storageFailure' },
+        src: 'grantProcessingConsent',
+      },
+    },
     storageFailure: {},
   },
 })
@@ -216,6 +267,7 @@ export function createCandidateJourney({ dependencies }: Readonly<{
   })
   return {
     deleteCandidateSession: () => { actor.send({ type: 'DELETE_CANDIDATE_SESSION' }) },
+    grantProcessingConsent: () => { actor.send({ type: 'GRANT_PROCESSING_CONSENT' }) },
     readView: () => view,
     start: () => { actor.start() },
     startCandidateSession: () => { actor.send({ type: 'START_CANDIDATE_SESSION' }) },
@@ -239,7 +291,16 @@ function readCandidateJourneyView({ snapshot }: Readonly<{
     return { status: 'candidate-session-absent', notice: snapshot.context.notice }
   }
   if (snapshot.matches('candidateSessionAvailable') && snapshot.context.session !== null) {
-    return { status: 'candidate-session-open', session: snapshot.context.session }
+    const processingPolicy = snapshot.context.dependencies.languageModelGateway.processingPolicy
+    return {
+      processingConsentStatus: hasProcessingConsentForPolicy({
+        consent: snapshot.context.session.processingConsent,
+        policy: processingPolicy,
+      }) ? 'granted' : 'required',
+      processingPolicy,
+      session: snapshot.context.session,
+      status: 'candidate-session-open',
+    }
   }
   return { status: 'preparing-session' }
 }

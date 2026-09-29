@@ -50,6 +50,45 @@ test.describe('Candidate Journey', () => {
     // Then
     await system.expectCandidateSessionToBeDeleted()
   })
+
+  test('a Candidate sees the active Processing Policy before granting consent', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    // Given
+    await system.givenCandidateJourneyIsOpen()
+
+    // Action
+    await system.startCandidateSession()
+
+    // Then
+    await system.expectActiveProcessingPolicyToBeVisible()
+  })
+
+  test('a Candidate grants Processing Consent to the active policy', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    // Given
+    await system.givenCandidateSessionIsActive()
+
+    // Action
+    await system.grantProcessingConsent()
+
+    // Then
+    await system.expectProcessingConsentToBeGranted()
+  })
+
+  test('a Candidate restores Processing Consent for the unchanged policy', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    // Given
+    await system.givenProcessingConsentIsGranted()
+
+    // Action
+    await system.restoreCandidateSession()
+
+    // Then
+    await system.expectRestoredProcessingConsentToBeGranted()
+  })
 })
 
 function createSystemUnderTest({ page }: Readonly<{ page: Page }>) {
@@ -73,6 +112,11 @@ class CandidateJourneyTestSystem {
     await this.startCandidateSession()
   }
 
+  async givenProcessingConsentIsGranted() {
+    await this.givenCandidateSessionIsActive()
+    await this.grantProcessingConsent()
+  }
+
   async openCandidateJourney() {
     await this.#page.goto('/')
     this.#completedAction = 'candidate-journey-opened'
@@ -92,6 +136,22 @@ class CandidateJourneyTestSystem {
     await this.#page.getByRole('button', { name: 'Delete Candidate Session' }).click()
     await this.#page.getByRole('button', { name: 'Delete session now' }).click()
     this.#completedAction = 'candidate-session-deleted'
+  }
+
+  async grantProcessingConsent() {
+    await this.#page.getByRole('button', { name: 'Grant Processing Consent' }).click()
+    this.#completedAction = 'processing-consent-granted'
+  }
+
+  async expectActiveProcessingPolicyToBeVisible() {
+    this.#expectCompletedAction('candidate-session-started')
+    const policy = this.#page.getByRole('region', { name: 'Processing Policy' })
+    await expect(policy).toContainText('OpenAI')
+    await expect(policy).toContainText('Purposes')
+    await expect(policy).toContainText('Data sent')
+    await expect(policy).toContainText('Retention')
+    await expect(policy).toContainText('Storage')
+    await expect(policy).toContainText('Policy version 2026-09-29')
   }
 
   async expectExactlyThreeCandidateJourneyPhases() {
@@ -118,6 +178,16 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByText('Candidate Session deleted from this browser.')).toBeVisible()
   }
 
+  async expectProcessingConsentToBeGranted() {
+    this.#expectCompletedAction('processing-consent-granted')
+    await expect(this.#page.getByText('Processing Consent granted for this policy.')).toBeVisible()
+  }
+
+  async expectRestoredProcessingConsentToBeGranted() {
+    this.#expectCompletedAction('candidate-session-restored')
+    await expect(this.#page.getByText('Processing Consent granted for this policy.')).toBeVisible()
+  }
+
   #expectCompletedAction(expectedAction: CandidateJourneyAction) {
     expect(this.#completedAction, 'Expected a caller-visible Action before reading the outcome')
       .toBe(expectedAction)
@@ -134,3 +204,4 @@ type CandidateJourneyAction =
   | 'candidate-session-deleted'
   | 'candidate-session-restored'
   | 'candidate-session-started'
+  | 'processing-consent-granted'
