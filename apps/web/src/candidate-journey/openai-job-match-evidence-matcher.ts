@@ -1,7 +1,10 @@
 import { z } from 'zod'
 
 import type { MatchEvidenceMatcher } from '@resume-tailoring/application/job-match'
-import { validateRelevantFactProposals } from '@resume-tailoring/matching-engine'
+import {
+  validateMatchEvidence,
+  validateRelevantFactProposals,
+} from '@resume-tailoring/matching-engine'
 import type { OpenAiReasoningEffort } from '../openai-model-configuration'
 import {
   createOpenAiRequester,
@@ -81,14 +84,7 @@ export async function requestOpenAiJobMatchEvidence({
   if (!response.ok) return response
   const parsedResponse = parseResponse({ matchRequest, value: response.value })
   if (parsedResponse.ok) return parsedResponse
-  const retryResponse = await requester.send({
-    body: createRequestBody({
-      matchRequest, model, reasoningEffort, repairInstruction,
-    }),
-    operation: 'explainable-match-evidence',
-  })
-  if (!retryResponse.ok) return retryResponse
-  return parseResponse({ matchRequest, value: retryResponse.value })
+  return sanitizeResponse({ matchRequest, value: response.value }) ?? parsedResponse
 }
 
 function createRequestBody({ matchRequest, model, reasoningEffort, repairInstruction }: Readonly<{
@@ -170,6 +166,73 @@ function hasValidRelevantFacts({ matchRequest, proposal }: Readonly<{
   }) !== null
 }
 
+function sanitizeResponse({ matchRequest, value }: Readonly<{
+  matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
+  value: unknown
+}>) {
+  const outputTextResult = readOutputText({ value })
+  if (!outputTextResult.ok) return null
+  let parsedValue: unknown
+  try {
+    parsedValue = JSON.parse(outputTextResult.value) as unknown
+  } catch {
+    return null
+  }
+  const proposal = matchEvidenceProposalSchema.safeParse(parsedValue)
+  if (!proposal.success) return null
+  const relevance = filterValidRelevance({ matchRequest, proposal: proposal.data })
+  const evidence = filterValidEvidence({ matchRequest, proposal: proposal.data, relevance })
+  console.info(JSON.stringify({
+    category: 'privacy-safe-openai-request',
+    metric: 'sanitized',
+    value: 1,
+    dimensions: { operation: 'explainable-match-evidence' },
+  }))
+  return { ok: true, value: { evidence, relevance } } as const
+}
+
+function filterValidRelevance({ matchRequest, proposal }: Readonly<{
+  matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
+  proposal: z.infer<typeof matchEvidenceProposalSchema>
+}>) {
+  const factIds = new Set(matchRequest.candidateFacts.map(({ id }) => id))
+  const requirementIds = new Set(matchRequest.requirements.map(({ id }) => id))
+  const references = new Set<string>()
+  return proposal.relevance.filter((relevance) => {
+    const reference = `${relevance.requirementId}:${relevance.factMatch.factId}`
+    if (!factIds.has(relevance.factMatch.factId)
+      || !requirementIds.has(relevance.requirementId)
+      || references.has(reference)) return false
+    references.add(reference)
+    return validateRelevantFactProposals({
+      candidateFacts: matchRequest.candidateFacts,
+      proposals: [relevance],
+      requirements: matchRequest.requirements,
+    }) !== null
+  })
+}
+
+function filterValidEvidence({ matchRequest, proposal, relevance }: Readonly<{
+  matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
+  proposal: z.infer<typeof matchEvidenceProposalSchema>
+  relevance: z.infer<typeof matchEvidenceProposalSchema>['relevance']
+}>) {
+  const relevantFactIds = new Set(relevance.map(({ factMatch }) => factMatch.factId))
+  const requirementIds = new Set(matchRequest.requirements.map(({ id }) => id))
+  const references = new Set<string>()
+  return proposal.evidence.filter((evidence) => {
+    if (!requirementIds.has(evidence.requirementId)
+      || references.has(evidence.requirementId)
+      || !evidence.factMatches.every(({ factId }) => relevantFactIds.has(factId))) return false
+    references.add(evidence.requirementId)
+    return validateMatchEvidence({
+      candidateFacts: matchRequest.candidateFacts,
+      proposedEvidence: [evidence],
+      requirements: matchRequest.requirements,
+    }) !== null
+  })
+}
+
 function readOutputText({ value }: Readonly<{ value: unknown }>) {
   const response = openAiResponseSchema.safeParse(value)
   if (!response.success) return { ok: false, error: 'invalid-response-shape' } as const
@@ -197,12 +260,6 @@ const matchingInstructions = [
   'Every relevance link must quote equivalent contiguous fact and requirement terms.',
   'Never calculate a score, importance, Match Band, or Generation Eligibility.',
   'Never invent identifiers, facts, requirements, or evidence.',
-].join(' ')
-const repairInstruction = [
-  'The previous response failed deterministic validation.',
-  'Return a complete corrected response using only the exact Candidate Fact and Job Requirement identifiers provided.',
-  'Every relevance factTerm and requirementTerm must quote equivalent concrete capability terms.',
-  'Remove unsupported relevance links and their evidence instead of inventing or broadening a relationship.',
 ].join(' ')
 
 const openAiResponseSchema = z.object({

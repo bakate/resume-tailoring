@@ -1,5 +1,6 @@
 import { validateMatchEvidence } from './evidence-validation'
-export { validateRelevantFactProposals } from './evidence-validation'
+
+export { validateMatchEvidence, validateRelevantFactProposals } from './evidence-validation'
 import { canonicalizeKnownTerm } from './text-normalization'
 
 export const capabilityDimensions = [

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import {
   createOpenAiJobMatchEvidenceMatcher,
@@ -46,7 +46,6 @@ describe('OpenAI explainable Job Match adapters', () => {
   })
 
   it('rejects evidence that references an unknown Candidate Fact', async () => {
-    const writeLog = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     const matcher = createOpenAiJobMatchEvidenceMatcher({
       apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
       request: createRecordedRequest({
@@ -60,13 +59,10 @@ describe('OpenAI explainable Job Match adapters', () => {
 
     const result = await matcher.match(matchRequest)
 
-    expect(result).toEqual({ ok: false, error: 'match-evidence-unavailable' })
-    expect(String(writeLog.mock.calls.at(-1)?.at(0))).toContain('"cause":"unknown-reference"')
-    writeLog.mockRestore()
+    expect(result).toEqual({ ok: true, value: { evidence: [], relevance: [] } })
   })
 
   it('rejects relevance that does not prove equivalent evidence terms', async () => {
-    const writeLog = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     const matcher = createOpenAiJobMatchEvidenceMatcher({
       apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
       request: createRecordedRequest({
@@ -88,9 +84,7 @@ describe('OpenAI explainable Job Match adapters', () => {
 
     const result = await matcher.match(matchRequest)
 
-    expect(result).toEqual({ ok: false, error: 'match-evidence-unavailable' })
-    expect(String(writeLog.mock.calls.at(-1)?.at(0))).toContain('"cause":"invalid-relevance"')
-    writeLog.mockRestore()
+    expect(result).toEqual({ ok: true, value: { evidence: [], relevance: [] } })
   })
 
   it('retries an invalid relevance response with a correction instruction', async () => {
