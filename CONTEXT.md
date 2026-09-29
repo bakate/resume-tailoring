@@ -79,23 +79,23 @@ The unambiguous role title copied from an exact Job Posting excerpt and used as 
 _Avoid_: Inferred title, desired role, generated headline
 
 **Job Requirement**:
-An explicit qualification, responsibility, or expectation extracted from a Job Posting and supported by an exact source excerpt.
+An explicit qualification, responsibility, or expectation extracted from a Job Posting, backed by an exact source excerpt, assigned a Capability Dimension, and reviewed with a Requirement Importance.
 _Avoid_: Keyword, hidden criterion
 
+**Capability Dimension**:
+A role-neutral area in which a Job Requirement asks for evidence: technical expertise, execution, ownership, leadership, strategy, stakeholder communication, or operational risk. Dimensions organize analysis without assigning a fixed Candidate persona.
+_Avoid_: Role family, Candidate persona, title category
+
 **Requirement Importance**:
-The evidence-backed classification of a Job Requirement as critical, central, or complementary according to how the Job Posting presents it.
-_Avoid_: Required/preferred flag, model confidence
+The reviewed significance of a Job Requirement as critical, central, or complementary. These levels have respective base weights of three, two, and one before duplicate grouping and the complementary-weight cap.
+_Avoid_: Requirement priority, model confidence
 
 **Requirement Group**:
-A set of semantically duplicate or substitutable Job Requirements counted together to prevent repetition from inflating the Match Score.
-_Avoid_: Keyword group, role taxonomy
-
-**Capability Dimension**:
-A cross-role area of professional capability, such as technical expertise, execution, ownership, leadership, strategy, stakeholder communication, or operational risk.
-_Avoid_: Candidate persona, fixed job family
+The scoring unit formed by semantically duplicate or explicitly substitutable Job Requirements. A group may span Capability Dimensions, retains the identities and capabilities of its source requirements, and contributes one importance and coverage outcome to the Match Score.
+_Avoid_: Requirement cluster, keyword bucket
 
 **Requirement Coverage**:
-The evidence-backed assessment of a Job Requirement as covered, partially covered, or not covered; partial coverage requires evidence of the same capability at incomplete scope.
+The evidence-backed assessment of a Job Requirement as covered, partially covered, or not covered; partial coverage requires evidence of the same capability at incomplete scope. These states contribute respectively all, half, or none of the requirement's effective weight to the Match Score.
 _Avoid_: Model confidence, semantic similarity
 
 **Match Evidence**:
@@ -103,19 +103,19 @@ The explicit relationship between one covered or partially covered Job Requireme
 _Avoid_: Keyword match, inferred match
 
 **Match Score**:
-The percentage expressing how strongly Candidate Facts cover the explicit professional requirements of a Job Posting after importance weighting, duplicate grouping, and complementary-requirement capping; it does not estimate hiring probability.
+The percentage expressing how strongly the Source Profile's Candidate Facts cover the explicit professional requirements of a Job Posting. Critical, central, and complementary requirements have base weights of three, two, and one; duplicates are grouped, complementary influence is capped at 25 percent, and Requirement Coverage contributes all, half, or none of the effective weight. The score does not estimate hiring probability.
 _Avoid_: Fit score, compatibility score, hiring likelihood
 
 **Match Band**:
-The calibrated advisory interpretation of a Match Score as strong, credible, or ambitious evidence coverage.
+The calibrated advisory interpretation of a Match Score: strong from 75 to 100, credible from 50 to 74, and ambitious from 0 to 49.
 _Avoid_: Application verdict, hiring probability
 
 **Critical Requirement Reserve**:
-A separate warning that a critical Job Requirement is uncertain or unsupported even when aggregate evidence coverage is otherwise strong.
-_Avoid_: Automatic rejection, score override
+An explicit qualification on the Match Band when a critical Job Requirement is partially covered or uncovered. It exposes decisive evidence risk without changing Generation Eligibility, overriding the score, or deciding whether the Candidate should apply.
+_Avoid_: Automatic rejection, score override, application blocker
 
 **Practical Constraint**:
-An explicit condition such as location, remote-work policy, work authorization, availability, or compensation that may affect whether an application is viable without measuring professional evidence coverage.
+An explicit condition such as location, remote-work policy, work authorization, availability, or compensation that may affect whether an application is viable without measuring professional evidence coverage. It never changes the Match Score or Generation Eligibility.
 _Avoid_: Job Requirement, score penalty
 
 **Improvement Opportunity**:

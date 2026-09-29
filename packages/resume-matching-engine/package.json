@@ -1,0 +1,17 @@
+{
+  "name": "@resume-tailoring/matching-engine",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/resume-matching-engine.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

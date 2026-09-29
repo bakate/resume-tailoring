@@ -20,7 +20,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@resume-tailoring/domain": "workspace:*"
+    "@resume-tailoring/domain": "workspace:*",
+    "@resume-tailoring/matching-engine": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:",
