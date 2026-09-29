@@ -7,6 +7,11 @@ Each fixture records the Source Document, Job Posting, expected Job Requirements
 importance, Match Evidence proposals, prohibited fact/requirement relationships, the
 Critical Requirement Reserve, an acceptable Match Score range, and deterministic
 writing/provenance/PDF outcomes.
+The twenty general-management fixtures are explicitly reviewed scenarios: ten French
+and ten English examples spanning operations, finance, HR, program leadership, and
+cross-functional execution. Their annotations also record practical constraints,
+ambiguity type, profile seniority, transferable capabilities, wishlist-heavy postings,
+partial matches, and critical gaps.
 
 The 30 technology fixtures are explicit rather than generated repetitions. They cover
 software engineering, data, security, DevOps/SRE, Tech Lead, Engineering Manager, Head
@@ -33,3 +38,9 @@ points mean Match Score error, at most ten points error for any scenario, zero
 unsupported Tailored Resume claims, and 100% valid exportable PDFs. The matching
 assertions execute the provider-neutral deterministic matching engine; no live model
 provider call is needed.
+
+Run the independent general-management qualification with:
+
+```sh
+pnpm --filter @resume-tailoring/web exec vitest run src/model-evaluation/general-management-qualification.test.ts
+```
