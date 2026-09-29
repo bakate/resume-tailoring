@@ -26,10 +26,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Chrome for PDF integration tests
         run: pnpm --filter @resume-tailoring/web exec puppeteer browsers install chrome
-      - name: Install supported browsers
-        run: pnpm --filter @resume-tailoring/web exec playwright install --with-deps chromium firefox webkit
+      - name: Install Chromium for the E2E smoke test
+        run: pnpm --filter @resume-tailoring/web exec playwright install --with-deps chromium
       - run: pnpm check
-      - run: pnpm test:e2e:compatibility
+      - name: Run the Chromium E2E smoke test
+        run: pnpm test:e2e
 
   deploy:
     needs: check

@@ -1,10 +1,13 @@
 # Production deployments with GitHub Actions
 
 The `Production` workflow checks pull requests targeting `main`. A push to `main` runs
-`pnpm check`, builds an ARM64 container, updates the existing `honest-resume-demo` stack,
-deploys the Cloudflare Worker, and checks availability and API access protection.
-Manual runs are supported on `main` only. Deployment jobs are serialized and are never
-cancelled midway by a newer push. Actions are pinned to commit SHAs.
+`pnpm check`, a Chromium E2E smoke test, builds an ARM64 container, updates the existing
+`honest-resume-demo` stack, deploys the Cloudflare Worker, and checks availability and API
+access protection. The `Browser compatibility` workflow runs the complete Chromium,
+Firefox, and WebKit desktop/mobile matrix every Monday and on manual request. Manual
+runs of the production workflow are supported on `main` only. Deployment jobs are
+serialized and are never cancelled midway by a newer push. Actions are pinned to commit
+SHAs.
 
 Dependabot checks GitHub Actions versions every Monday and groups available version updates
 into one pull request, including repeated references across jobs. Review and merge that PR
@@ -139,6 +142,8 @@ It does not test a complete Turnstile challenge, PDF rendering, or model output.
 ## Failures and rollback
 
 - Failed checks prevent deployment. Inspect the failed job before retrying.
+- Browser compatibility failures do not block deployment; inspect that workflow before
+  retrying.
 - A failed CloudFormation update normally rolls back within AWS. A failed Worker deployment
   or smoke check does not automatically revert a successful AWS update; inspect the current
   production state before retrying.
