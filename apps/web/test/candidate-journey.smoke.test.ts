@@ -308,11 +308,14 @@ class CandidateJourneyTestSystem {
 
   async expectExplainableMatchAnalysisToBeVisible() {
     this.#expectCompletedAction('job-posting-submitted')
-    await expect(this.#page.getByText('50%')).toBeVisible()
+    await expect(this.#page.getByText('54%')).toBeVisible()
     await expect(this.#page.getByText('Credible evidence coverage')).toBeVisible()
     await expect(this.#page.getByText('Three strongest matches')).toBeVisible()
     await expect(this.#page.getByText('Three priority gaps')).toBeVisible()
-    await expect(this.#page.getByText('Critical Requirement Reserve')).toBeVisible()
+    const criticalReserve = this.#page.getByRole('heading', {
+      name: 'Critical Requirement Reserve',
+    }).locator('..')
+    await expect(criticalReserve).toContainText('Architecture leadership')
     await expect(this.#page.getByText('Important Practical Constraints')).toBeVisible()
     await this.#page.getByText('Complete requirement-to-evidence details').click()
     await expect(this.#page.getByText('Exact source excerpt: TypeScript is required.')).toBeVisible()

@@ -127,7 +127,7 @@ export type CandidateJourney = Readonly<{
   }>) => void
   start: () => void
   startCandidateSession: () => void
-  submitJobPosting: (document: JobPostingDocument) => void
+  submitJobPosting: (request: Readonly<{ document: JobPostingDocument }>) => void
   submitSourceDocument: (document: SourceDocument) => void
   subscribe: (listener: () => void) => () => void
 }>
@@ -244,15 +244,13 @@ type JobMatchActorResult = CandidateSessionStorageResult<CandidateSession>
   | Readonly<{ ok: false; error: JobMatchFailure }>
 
 const submitJobPosting = fromPromise<JobMatchActorResult, JobMatchActorInput>(async ({ input }) => {
-  if (input.session?.sourceIntake === null || input.session === null) {
+  const session = input.session
+  if (!canSubmitJobPosting({ session }) || session === null || session.sourceIntake === null) {
     return storageUnavailableResult
   }
-  if (!hasProcessingConsentForPolicy({
-    consent: input.session.processingConsent,
-    policy: input.dependencies.languageModelGateway.processingPolicy,
-  })) return processingConsentRequiredResult
+  if (!hasJobMatchConsent({ input, session })) return processingConsentRequiredResult
   const jobMatchResult = await createJobMatch({
-    candidateFacts: input.session.sourceIntake.candidateFacts,
+    candidateFacts: session.sourceIntake.candidateFacts,
     document: input.document,
     jobPostingDocumentReader: input.dependencies.jobPostingDocumentReader,
     jobPostingExtractor: input.dependencies.jobPostingExtractor,
@@ -260,9 +258,19 @@ const submitJobPosting = fromPromise<JobMatchActorResult, JobMatchActorInput>(as
   })
   if (!jobMatchResult.ok) return jobMatchResult
   return input.dependencies.persistence.save({
-    session: { ...input.session, jobMatch: jobMatchResult.value },
+    session: { ...session, jobMatch: jobMatchResult.value },
   })
 })
+
+function hasJobMatchConsent({ input, session }: Readonly<{
+  input: JobMatchActorInput
+  session: CandidateSession
+}>) {
+  return hasProcessingConsentForPolicy({
+    consent: session.processingConsent,
+    policy: input.dependencies.languageModelGateway.processingPolicy,
+  })
+}
 
 const candidateJourneyMachine = setup({
   actors: {
@@ -328,6 +336,7 @@ const candidateJourneyMachine = setup({
         },
         SUBMIT_JOB_POSTING: {
           actions: assign({ jobMatchFailure: null }),
+          guard: ({ context }) => canSubmitJobPosting({ session: context.session }),
           target: 'processingJobPosting',
         },
       },
@@ -529,7 +538,7 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     },
     start: () => { actor.start() },
     startCandidateSession: () => { actor.send({ type: 'START_CANDIDATE_SESSION' }) },
-    submitJobPosting: (document) => {
+    submitJobPosting: ({ document }) => {
       actor.send({ type: 'SUBMIT_JOB_POSTING', document })
     },
     submitSourceDocument: (document) => {
@@ -606,4 +615,12 @@ function readJobMatchFailure({ result }: Readonly<{
   result: JobMatchActorResult
 }>): CandidateJourneyJobMatchFailure | null {
   return result.ok ? null : result.error
+}
+
+function canSubmitJobPosting({ session }: Readonly<{
+  session: CandidateSession | null
+}>) {
+  return session?.phase === 'job-match'
+    && session.sourceIntake !== null
+    && session.sourceIntake.criticalAmbiguities.length === 0
 }

@@ -143,31 +143,71 @@ function createOpenAiModelAdapters({ request }: Readonly<{
   }
 }
 
-async function processStructured({ modelAdapters, modelRequest }: Readonly<{
+type ProcessStructuredRequest = Readonly<{
   modelAdapters: OpenAiModelAdapters
   modelRequest: StructuredModelRequest
-}>): Promise<LanguageModelResult<StructuredModelValue>> {
+}>
+
+async function processStructured({ modelAdapters, modelRequest }: ProcessStructuredRequest) {
   if (modelRequest.operation === 'explainable-job-posting-extraction') {
-    const result = await modelAdapters.explainableJobPostingExtractor.extract(modelRequest.input)
-    return toGatewayResult({ operation: modelRequest.operation, result })
+    return processJobPostingExtraction({ modelAdapters, modelRequest })
   }
   if (modelRequest.operation === 'explainable-match-evidence') {
-    const result = await modelAdapters.explainableMatchEvidenceMatcher.match(modelRequest.input)
-    return toGatewayResult({ operation: modelRequest.operation, result })
+    return processExplainableMatchEvidence({ modelAdapters, modelRequest })
   }
   if (modelRequest.operation === 'source-profile-extraction') {
-    const result = await modelAdapters.sourceProfileExtractor.extract(modelRequest.input)
-    return toGatewayResult({ operation: modelRequest.operation, result })
+    return processSourceProfileExtraction({ modelAdapters, modelRequest })
   }
   if (modelRequest.operation === 'structured-source-profile-extraction') {
-    const result = await modelAdapters.structuredSourceProfileExtractor.extract(modelRequest.input)
-    return toGatewayResult({ operation: modelRequest.operation, result })
+    return processStructuredSourceProfileExtraction({ modelAdapters, modelRequest })
   }
   if (modelRequest.operation === 'job-requirement-extraction') {
-    const result = await modelAdapters.jobRequirementExtractor.extract(modelRequest.input)
-    return toGatewayResult({ operation: modelRequest.operation, result })
+    return processJobRequirementExtraction({ modelAdapters, modelRequest })
   }
   return processStructuredAnalysis({ modelAdapters, modelRequest })
+}
+
+type StructuredRequest<TOperation extends StructuredModelRequest['operation']> =
+  Extract<StructuredModelRequest, { readonly operation: TOperation }>
+
+async function processJobPostingExtraction({ modelAdapters, modelRequest }: Readonly<{
+  modelAdapters: OpenAiModelAdapters
+  modelRequest: StructuredRequest<'explainable-job-posting-extraction'>
+}>) {
+  const result = await modelAdapters.explainableJobPostingExtractor.extract(modelRequest.input)
+  return toGatewayResult({ operation: modelRequest.operation, result })
+}
+
+async function processExplainableMatchEvidence({ modelAdapters, modelRequest }: Readonly<{
+  modelAdapters: OpenAiModelAdapters
+  modelRequest: StructuredRequest<'explainable-match-evidence'>
+}>) {
+  const result = await modelAdapters.explainableMatchEvidenceMatcher.match(modelRequest.input)
+  return toGatewayResult({ operation: modelRequest.operation, result })
+}
+
+async function processSourceProfileExtraction({ modelAdapters, modelRequest }: Readonly<{
+  modelAdapters: OpenAiModelAdapters
+  modelRequest: StructuredRequest<'source-profile-extraction'>
+}>) {
+  const result = await modelAdapters.sourceProfileExtractor.extract(modelRequest.input)
+  return toGatewayResult({ operation: modelRequest.operation, result })
+}
+
+async function processStructuredSourceProfileExtraction({ modelAdapters, modelRequest }: Readonly<{
+  modelAdapters: OpenAiModelAdapters
+  modelRequest: StructuredRequest<'structured-source-profile-extraction'>
+}>) {
+  const result = await modelAdapters.structuredSourceProfileExtractor.extract(modelRequest.input)
+  return toGatewayResult({ operation: modelRequest.operation, result })
+}
+
+async function processJobRequirementExtraction({ modelAdapters, modelRequest }: Readonly<{
+  modelAdapters: OpenAiModelAdapters
+  modelRequest: StructuredRequest<'job-requirement-extraction'>
+}>) {
+  const result = await modelAdapters.jobRequirementExtractor.extract(modelRequest.input)
+  return toGatewayResult({ operation: modelRequest.operation, result })
 }
 
 async function processStructuredAnalysis({ modelAdapters, modelRequest }: Readonly<{

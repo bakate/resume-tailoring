@@ -27,7 +27,8 @@ export function JobMatchWorkspace({ candidateJourney, localization }: Readonly<{
 }>) {
   const form = useJobPostingForm({ candidateJourney })
   const { view } = candidateJourney
-  if (view.status !== 'candidate-session-open' || view.session.sourceIntake === null) return null
+  if (view.status !== 'candidate-session-open' || view.session.sourceIntake === null
+    || view.session.phase !== 'job-match') return null
   return <Paper component="section" p="xl" shadow="xs" withBorder>
     <Stack gap="lg">
       <JobMatchHeader localization={localization} />
@@ -56,7 +57,7 @@ function useJobPostingForm({ candidateJourney }: Readonly<{
       return
     }
     setLocalFailure(null)
-    candidateJourney.submitJobPosting(document)
+    candidateJourney.submitJobPosting({ document })
   }
   return {
     jobPostingFile, jobPostingText, localFailure, method, setJobPostingFile,
@@ -136,26 +137,40 @@ function JobMatchResult({ jobMatch, localization, sourceFacts }: Readonly<{
   sourceFacts: readonly Readonly<{ id: string; value: string }>[]
 }>) {
   return <Stack gap="xl" role="status">
-    <Group align="flex-end" justify="space-between">
-      <div><Text fw={700}>{localization.translate('jobMatch.targetRole')}</Text>
-        <Title order={3}>{jobMatch.targetRole?.value ?? '—'}</Title></div>
-      <div><Text fw={700}>{localization.translate('matchAnalysis.score')}</Text>
-        <Title order={3}>{String(jobMatch.analysis.matchScore)}%</Title></div>
-      <Badge color={readBandColor({ band: jobMatch.analysis.matchBand })} size="lg">
-        {localization.translate(`matchAnalysis.band.${jobMatch.analysis.matchBand}`)}
-      </Badge>
-    </Group>
+    <MatchOverview {...{ jobMatch, localization }} />
     <Text>{localization.translate('jobMatch.measurement')}</Text>
-    <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
-      <RequirementSummary ids={jobMatch.strengthRequirementIds} jobMatch={jobMatch}
-        localization={localization} titleKey="jobMatch.strengths" />
-      <RequirementSummary ids={jobMatch.priorityGapRequirementIds} jobMatch={jobMatch}
-        localization={localization} titleKey="jobMatch.gaps" />
-    </SimpleGrid>
+    <MatchSummaries {...{ jobMatch, localization }} />
     <CriticalReserve {...{ jobMatch, localization }} />
     <PracticalConstraints {...{ jobMatch, localization }} />
     <RequirementDetails {...{ jobMatch, localization, sourceFacts }} />
   </Stack>
+}
+
+function MatchOverview({ jobMatch, localization }: Readonly<{
+  jobMatch: JobMatch
+  localization: Localization
+}>) {
+  return <Group align="flex-end" justify="space-between">
+    <div><Text fw={700}>{localization.translate('jobMatch.targetRole')}</Text>
+      <Title order={3}>{jobMatch.targetRole?.value ?? '—'}</Title></div>
+    <div><Text fw={700}>{localization.translate('matchAnalysis.score')}</Text>
+      <Title order={3}>{String(jobMatch.analysis.matchScore)}%</Title></div>
+    <Badge color={readBandColor({ band: jobMatch.analysis.matchBand })} size="lg">
+      {localization.translate(`matchAnalysis.band.${jobMatch.analysis.matchBand}`)}
+    </Badge>
+  </Group>
+}
+
+function MatchSummaries({ jobMatch, localization }: Readonly<{
+  jobMatch: JobMatch
+  localization: Localization
+}>) {
+  return <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
+    <RequirementSummary ids={jobMatch.strengthRequirementIds} jobMatch={jobMatch}
+      localization={localization} titleKey="jobMatch.strengths" />
+    <RequirementSummary ids={jobMatch.priorityGapRequirementIds} jobMatch={jobMatch}
+      localization={localization} titleKey="jobMatch.gaps" />
+  </SimpleGrid>
 }
 
 function RequirementSummary({ ids, jobMatch, localization, titleKey }: Readonly<{
@@ -179,9 +194,17 @@ function CriticalReserve({ jobMatch, localization }: Readonly<{
   localization: Localization
 }>) {
   const status = jobMatch.analysis.criticalRequirementReserve.status
+  const requirements = readRequirements({
+    ids: jobMatch.analysis.criticalRequirementReserve.requirementIds,
+    jobMatch,
+  })
   return <Paper p="md" withBorder><Title order={4}>
     {localization.translate('jobMatch.criticalReserve')}
-  </Title><Text mt="xs">{localization.translate(`jobMatch.criticalReserve.${status}`)}</Text></Paper>
+  </Title><Text mt="xs">{localization.translate(`jobMatch.criticalReserve.${status}`)}</Text>
+    {requirements.length === 0 ? null : <List mt="xs">{requirements.map((requirement) => (
+      <List.Item key={requirement.id}>{requirement.value}</List.Item>
+    ))}</List>}
+  </Paper>
 }
 
 function PracticalConstraints({ jobMatch, localization }: Readonly<{
@@ -210,35 +233,66 @@ function RequirementDetails({ jobMatch, localization, sourceFacts }: Readonly<{
   </details>
 }
 
-function RequirementDetail({ jobMatch, localization, requirement, sourceFacts }: Readonly<{
+type RequirementDetailProps = Readonly<{
   jobMatch: JobMatch
   localization: Localization
   requirement: JobRequirement
   sourceFacts: readonly Readonly<{ id: string; value: string }>[]
-}>) {
-  const group = jobMatch.analysis.requirementGroups.find(
-    ({ requirementIds }) => requirementIds.includes(requirement.id),
-  )
+}>
+
+function RequirementDetail({
+  jobMatch, localization, requirement, sourceFacts,
+}: RequirementDetailProps) {
   const evidence = jobMatch.analysis.evidence.find(({ requirementId }) =>
     requirementId === requirement.id)
-  const evidenceValues = evidence?.factIds.flatMap((factId) => {
-    const fact = sourceFacts.find(({ id }) => id === factId)
-    return fact === undefined ? [] : [fact.value]
-  }) ?? []
+  const evidenceValues = readEvidenceValues({ evidence: evidence === undefined ? [] : [evidence],
+    sourceFacts })
   return <Paper p="md" withBorder><Stack gap="xs">
-    <Group><Text fw={700}>{requirement.value}</Text><Badge variant="light">
-      {localization.translate(`jobMatch.importance.${requirement.importance}`)}
-    </Badge><Badge color="forest" variant="light">
-      {localization.translate(`jobMatch.coverage.${group?.coverage ?? 'uncovered'}`)}
-    </Badge></Group>
+    <RequirementBadges coverage={evidence?.coverage ?? 'uncovered'}
+      {...{ localization, requirement }} />
     <Text size="sm">{requirement.importanceRationale}</Text>
     <Text size="sm"><strong>{localization.translate('jobMatch.sourceExcerpt')}:</strong>{' '}
       {requirement.sourceExcerpt}</Text>
-    <Text size="sm"><strong>{localization.translate('jobMatch.evidence')}:</strong>{' '}
-      {evidenceValues.length === 0
-        ? localization.translate('jobMatch.evidence.none')
-        : evidenceValues.join(' · ')}</Text>
+    <RequirementEvidence {...{ evidenceValues, localization }} />
   </Stack></Paper>
+}
+
+function RequirementBadges({ coverage, localization, requirement }: Readonly<{
+  coverage: JobMatch['analysis']['requirementGroups'][number]['coverage']
+  localization: Localization
+  requirement: JobRequirement
+}>) {
+  return <Group><Text fw={700}>{requirement.value}</Text><Badge variant="light">
+    {localization.translate(`jobMatch.importance.${requirement.importance}`)}
+  </Badge><Badge color="forest" variant="light">
+    {localization.translate(`jobMatch.coverage.${coverage}`)}
+  </Badge></Group>
+}
+
+function RequirementEvidence({ evidenceValues, localization }: Readonly<{
+  evidenceValues: readonly string[]
+  localization: Localization
+}>) {
+  return <Text size="sm"><strong>{localization.translate('jobMatch.evidence')}:</strong>{' '}
+    {evidenceValues.length === 0
+      ? localization.translate('jobMatch.evidence.none')
+      : evidenceValues.join(' · ')}</Text>
+}
+
+function readEvidenceValues({ evidence, sourceFacts }: Readonly<{
+  evidence: JobMatch['analysis']['evidence']
+  sourceFacts: readonly Readonly<{ id: string; value: string }>[]
+}>) {
+  const factIds = new Set(evidence.flatMap(({ factIds: evidenceFactIds }) => evidenceFactIds))
+  return sourceFacts.filter(({ id }) => factIds.has(id)).map(({ value }) => value)
+}
+
+function readRequirements({ ids, jobMatch }: Readonly<{
+  ids: readonly string[]
+  jobMatch: JobMatch
+}>) {
+  const requirementIds = new Set(ids)
+  return jobMatch.requirements.filter(({ id }) => requirementIds.has(id))
 }
 
 function JobMatchFailure({ failure, localization }: Readonly<{
