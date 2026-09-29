@@ -107,6 +107,9 @@ importers:
       '@resume-tailoring/application':
         specifier: workspace:*
         version: link:../../packages/resume-tailoring-application
+      '@resume-tailoring/matching-engine':
+        specifier: workspace:*
+        version: link:../../packages/resume-matching-engine
       '@tanstack/react-router':
         specifier: 'catalog:'
         version: 1.170.39(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
