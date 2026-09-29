@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   createOpenAiJobMatchEvidenceMatcher,
@@ -34,7 +34,19 @@ describe('OpenAI explainable Job Match adapters', () => {
     expect(result).toEqual({ ok: true, value: evidenceProposal })
   })
 
+  it('accepts the aggregated Responses API output_text field', async () => {
+    const matcher = createOpenAiJobMatchEvidenceMatcher({
+      apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
+      request: createRecordedRequest({ output: evidenceProposal, requests: [], response: 'output-text' }),
+    })
+
+    const result = await matcher.match(matchRequest)
+
+    expect(result).toEqual({ ok: true, value: evidenceProposal })
+  })
+
   it('rejects evidence that references an unknown Candidate Fact', async () => {
+    const writeLog = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     const matcher = createOpenAiJobMatchEvidenceMatcher({
       apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
       request: createRecordedRequest({
@@ -49,6 +61,8 @@ describe('OpenAI explainable Job Match adapters', () => {
     const result = await matcher.match(matchRequest)
 
     expect(result).toEqual({ ok: false, error: 'match-evidence-unavailable' })
+    expect(String(writeLog.mock.calls.at(-1)?.at(0))).toContain('"cause":"unknown-reference"')
+    writeLog.mockRestore()
   })
 
   it('returns a typed failure before sending an oversized matching request', async () => {
@@ -73,15 +87,18 @@ describe('OpenAI explainable Job Match adapters', () => {
   })
 })
 
-function createRecordedRequest({ output, requests }: Readonly<{
+function createRecordedRequest({ output, requests, response = 'output-items' }: Readonly<{
   output: unknown
   requests: Request[]
+  response?: 'output-items' | 'output-text'
 }>) {
   return (input: string | URL | Request, init?: RequestInit) => {
     requests.push(new Request(input, init))
     return Promise.resolve(Response.json({
       id: 'response-1',
-      output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(output) }] }],
+      ...(response === 'output-text'
+        ? { output_text: JSON.stringify(output) }
+        : { output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(output) }] }] }),
     }))
   }
 }
