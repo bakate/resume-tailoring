@@ -7,11 +7,24 @@ import {
 } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateSession } from '@resume-tailoring/application/candidate-journey'
 
+const processingPolicySchema = z.strictObject({
+  provider: z.string().min(1),
+  purposes: z.array(z.string().min(1)).readonly(),
+  retentionPolicy: z.string().min(1),
+  storageBehavior: z.string().min(1),
+  transmittedDataCategories: z.array(z.string().min(1)).readonly(),
+  version: z.string().min(1),
+})
+
 const candidateSessionIdPattern = /^candidate-session-[0-9a-f-]+$/u
 
 export const candidateSessionSchema = z.strictObject({
   expiresAt: z.number().int().positive(),
   phase: z.enum(candidateJourneyPhases),
+  processingConsent: z.strictObject({
+    grantedAt: z.number().int().nonnegative(),
+    policy: processingPolicySchema,
+  }).nullable(),
   sessionId: z.custom<CandidateSession['sessionId']>(
     (value) => typeof value === 'string' && candidateSessionIdPattern.test(value),
   ),

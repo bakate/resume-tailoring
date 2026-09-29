@@ -5,6 +5,7 @@ import {
   Button,
   Container,
   Group,
+  List,
   Modal,
   Paper,
   SegmentedControl,
@@ -22,6 +23,7 @@ import {
 } from '../localization/localization'
 import type { Localization } from '../localization/localization'
 import type { CandidateJourneyView } from '@resume-tailoring/application/candidate-journey'
+import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
 import { candidateJourneyPhases } from './candidate-journey-phases'
 import type { CandidateJourneyPhase } from './candidate-journey-phases'
 import { useCandidateJourney } from './use-candidate-journey'
@@ -42,6 +44,7 @@ function LocalizedCandidateJourneyShell({ localization }: LocalizationProps) {
       <CandidateJourneyHeader localization={localization} />
       <AppShell.Main><Container size="xl"><Stack gap="xl">
         <CandidateJourneyIntroduction {...{ candidateJourney, localization }} />
+        <ProcessingPolicyCard {...{ candidateJourney, localization }} />
         <CandidateJourneyPhaseList {...{ activePhase, localization }} />
       </Stack></Container></AppShell.Main>
     </AppShell>
@@ -197,6 +200,72 @@ function CandidateSessionNotice({ localization, view }: LocalizationProps & Read
   return <Text c="dimmed" mt="md" role="status">
     {localization.translate(candidateSessionNoticeKeys[view.notice])}
   </Text>
+}
+
+function ProcessingPolicyCard({ candidateJourney, localization }: LocalizationProps & Readonly<{
+  candidateJourney: CandidateJourneyController
+}>) {
+  const { view } = candidateJourney
+  if (view.status !== 'candidate-session-open') return null
+  const { processingPolicy } = view
+  return <Paper aria-label={localization.translate('processingPolicy.title')}
+    component="section" maw="48rem" p="xl" shadow="xs" withBorder>
+    <Stack gap="md">
+      <div>
+        <Title order={2} size="h3">{localization.translate('processingPolicy.title')}</Title>
+        <Text c="dimmed" mt="xs">
+          {localization.translate('processingPolicy.description')}
+        </Text>
+      </div>
+      <ProcessingPolicyDetails {...{ localization, processingPolicy }} />
+      <ProcessingConsentControl {...{ candidateJourney, localization }} />
+    </Stack>
+  </Paper>
+}
+
+function ProcessingPolicyDetails({ localization, processingPolicy }: LocalizationProps & Readonly<{
+  processingPolicy: ProcessingPolicy
+}>) {
+  return <>
+    <PolicyText label={localization.translate('processingPolicy.provider')}
+      value={processingPolicy.provider} />
+    <PolicyList label={localization.translate('processingPolicy.purposes')}
+      values={processingPolicy.purposes} />
+    <PolicyList label={localization.translate('processingPolicy.transmittedDataCategories')}
+      values={processingPolicy.transmittedDataCategories} />
+    <PolicyText label={localization.translate('processingPolicy.retentionPolicy')}
+      value={processingPolicy.retentionPolicy} />
+    <PolicyText label={localization.translate('processingPolicy.storageBehavior')}
+      value={processingPolicy.storageBehavior} />
+    <Text size="sm">{localization.translate('processingPolicy.version')}{' '}
+      {processingPolicy.version}</Text>
+  </>
+}
+
+function PolicyText({ label, value }: Readonly<{ label: string; value: string }>) {
+  return <div><Text fw={700}>{label}</Text><Text>{value}</Text></div>
+}
+
+function PolicyList({ label, values }: Readonly<{
+  label: string
+  values: readonly string[]
+}>) {
+  return <div><Text fw={700}>{label}</Text><List>{values.map((value) => (
+    <List.Item key={value}>{value}</List.Item>
+  ))}</List></div>
+}
+
+function ProcessingConsentControl({ candidateJourney, localization }:
+LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) {
+  if (candidateJourney.view.status !== 'candidate-session-open') return null
+  if (candidateJourney.view.processingConsentStatus === 'granted') {
+    return <Text c="forest.8" fw={700} role="status">
+      {localization.translate('processingPolicy.consentGranted')}
+    </Text>
+  }
+  return <Button onClick={candidateJourney.grantProcessingConsent}>
+    {localization.translate('processingPolicy.grantConsent')}
+  </Button>
 }
 
 function CandidateJourneyPhaseList({ activePhase, localization }: LocalizationProps & Readonly<{

@@ -247,11 +247,13 @@ function createBrowserIdentity<TPrefix extends string>({ prefix }: Readonly<{
   }
 }
 
-export function createBrowserSourceProfileExtractor(): SourceProfileExtractor {
+export function createBrowserSourceProfileExtractor({
+  request = fetch,
+}: Readonly<{ request?: typeof fetch }> = {}): SourceProfileExtractor {
   return {
     extract: async ({ professionalContent }) => {
       try {
-        const response = await fetch('/api/source-profile-extraction', {
+        const response = await request('/api/source-profile-extraction', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ professionalContent }),

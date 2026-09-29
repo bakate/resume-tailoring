@@ -12,9 +12,24 @@ const candidateSessionStorageKey = 'honest-resume:candidate-session'
 const candidateSession = {
   expiresAt: sessionStartedAt + candidateSessionDurationMilliseconds,
   phase: 'source-intake',
+  processingConsent: null,
   sessionId: 'candidate-session-00000000-0000-4000-8000-000000000038',
   startedAt: sessionStartedAt,
   version: candidateSessionStorageVersion,
+} as const satisfies CandidateSession
+const consentedCandidateSession = {
+  ...candidateSession,
+  processingConsent: {
+    grantedAt: sessionStartedAt,
+    policy: {
+      provider: 'Example Model Provider',
+      purposes: ['Extract professional evidence'],
+      retentionPolicy: 'Abuse-monitoring retention may apply.',
+      storageBehavior: 'Model storage is disabled.',
+      transmittedDataCategories: ['Professional facts'],
+      version: '2026-09-29',
+    },
+  },
 } as const satisfies CandidateSession
 
 describe('browser Candidate Session persistence', () => {
@@ -50,6 +65,18 @@ describe('browser Candidate Session persistence', () => {
 
     expect(persistence.delete()).toEqual({ ok: true, value: null })
     expect(storage.getItem(candidateSessionStorageKey)).toBeNull()
+  })
+
+  it('restores Processing Consent bound to its complete policy', () => {
+    const storage = createMemoryStorage()
+    const persistence = createBrowserCandidateSessionPersistence({ storage })
+
+    expect(persistence.save({ session: consentedCandidateSession })).toEqual({
+      ok: true, value: consentedCandidateSession,
+    })
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
+      ok: true, value: { notice: null, session: consentedCandidateSession },
+    })
   })
 })
 

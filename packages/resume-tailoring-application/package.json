@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     "./candidate-journey": "./src/candidate-journey.ts",
+    "./language-model-gateway": "./src/language-model-gateway.ts",
     "./job-posting-analysis": "./src/job-posting-analysis.ts",
     "./job-posting-target-role": "./src/job-posting-target-role.ts",
     "./resume-tailoring-workflow": "./src/resume-tailoring-workflow.ts",
