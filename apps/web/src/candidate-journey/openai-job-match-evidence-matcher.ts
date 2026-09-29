@@ -79,18 +79,31 @@ export async function requestOpenAiJobMatchEvidence({
     operation: 'explainable-match-evidence',
   })
   if (!response.ok) return response
-  return parseResponse({ matchRequest, value: response.value })
+  const parsedResponse = parseResponse({ matchRequest, value: response.value })
+  if (parsedResponse.ok) return parsedResponse
+  const retryResponse = await requester.send({
+    body: createRequestBody({
+      matchRequest, model, reasoningEffort, repairInstruction,
+    }),
+    operation: 'explainable-match-evidence',
+  })
+  if (!retryResponse.ok) return retryResponse
+  return parseResponse({ matchRequest, value: retryResponse.value })
 }
 
-function createRequestBody({ matchRequest, model, reasoningEffort }: Readonly<{
+function createRequestBody({ matchRequest, model, reasoningEffort, repairInstruction }: Readonly<{
   matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
   model: string
   reasoningEffort: OpenAiReasoningEffort
+  repairInstruction?: string
 }>) {
   return {
     input: [
       { role: 'developer', content: [{ type: 'input_text', text: matchingInstructions }] },
       { role: 'user', content: [{ type: 'input_text', text: JSON.stringify(matchRequest) }] },
+      ...(repairInstruction === undefined ? [] : [
+        { role: 'user', content: [{ type: 'input_text', text: repairInstruction }] },
+      ]),
     ],
     max_output_tokens: 8_000,
     model,
@@ -184,6 +197,12 @@ const matchingInstructions = [
   'Every relevance link must quote equivalent contiguous fact and requirement terms.',
   'Never calculate a score, importance, Match Band, or Generation Eligibility.',
   'Never invent identifiers, facts, requirements, or evidence.',
+].join(' ')
+const repairInstruction = [
+  'The previous response failed deterministic validation.',
+  'Return a complete corrected response using only the exact Candidate Fact and Job Requirement identifiers provided.',
+  'Every relevance factTerm and requirementTerm must quote equivalent concrete capability terms.',
+  'Remove unsupported relevance links and their evidence instead of inventing or broadening a relationship.',
 ].join(' ')
 
 const openAiResponseSchema = z.object({
