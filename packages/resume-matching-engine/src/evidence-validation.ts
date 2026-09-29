@@ -104,7 +104,7 @@ function rejectsCandidateFact({ fact, factTerm, originalFactTerm }: Readonly<{
   originalFactTerm: string
 }>) {
   if (nonEvidenceTerms.has(factTerm) || hasNegatedEvidence({ fact })) return true
-  return fact.kind === 'experience' && lacksExplicitExperienceEvidence({
+  return fact.kind === 'experience' && isLikelyRoleTitle({
     factTerm: originalFactTerm, value: fact.value,
   })
 }
@@ -271,19 +271,28 @@ function normalizeScaleText({ value }: Readonly<{ value: string }>) {
     .replaceAll(/[^a-z0-9+#.]+/gu, ' ').trim()
 }
 
-function lacksExplicitExperienceEvidence({ factTerm, value }: Readonly<{
+function isLikelyRoleTitle({ factTerm, value }: Readonly<{
   factTerm: string
   value: string
 }>) {
   const factClause = readTermClause({ term: factTerm, value })
-  return factClause !== null && !hasEvidenceSignal({ content: factClause })
+  if (factClause === null || !hasTitleLikeStart({ factClause, factTerm })) return false
+  const words = factClause.match(/\p{L}[\p{L}\p{M}+#.-]*/gu) ?? []
+  const titleWords = words.filter((word) => !titleConnectorTerms.has(normalizeTerm({ value: word })))
+  if (titleWords.length === 0) return false
+  const titleCaseWords = titleWords.filter((word) => /^\p{Lu}/u.test(word))
+  return titleCaseWords.length / titleWords.length >= 0.75
 }
 
-function hasEvidenceSignal({ content }: Readonly<{ content: string }>) {
-  return evidenceVerbs.some((verb) => containsTerm({ content, term: verb }))
-    || evidenceNouns.some((noun) => containsTerm({ content, term: noun }))
-    || content.match(durationPattern) !== null
-    || content.match(scalePattern) !== null
+function hasTitleLikeStart({ factClause, factTerm }: Readonly<{
+  factClause: string
+  factTerm: string
+}>) {
+  const normalizedClause = normalizeTerm({ value: factClause })
+  const normalizedFactTerm = normalizeTerm({ value: factTerm })
+  return normalizedClause === normalizedFactTerm
+    || normalizedClause.startsWith(`${normalizedFactTerm} `)
+    || careerLevelTerms.some((level) => normalizedClause.startsWith(`${level} `))
 }
 
 function readScaleMultiplier({ magnitude }: Readonly<{ magnitude: string | undefined }>) {
@@ -323,10 +332,4 @@ const careerLevelRanks = new Map<string, number>([
 const clauseSeparatorPattern = /[,;\n]|[.!?](?:\s+|$)|\b(?:and|et|qui|who)\b/iu
 const durationPattern = /\b(\d+)\s*\+?\s*(years?|yrs?|ans?|months?|mois)\b/gu
 const scalePattern = /\b(\d+(?:[.,]\d+)?)\s*(k|m|millions?|thousands?)?\s*(users?|requests?|transactions?|people|engineers?|developers?)\b/gu
-const evidenceVerbs = [
-  'applique', 'assure', 'built', 'concu', 'created', 'cree', 'delivered', 'designed',
-  'developed', 'developpe', 'dirige', 'gere', 'implemented', 'led', 'managed', 'negocie',
-  'negotiated', 'operated', 'owned', 'planifie', 'planned', 'used', 'using', 'utilise',
-  'worked with',
-] as const
-const evidenceNouns = ['experience', 'expertise', 'knowledge', 'maitrise', 'proficiency'] as const
+const titleConnectorTerms = new Set(['at', 'chez', 'de', 'of'])

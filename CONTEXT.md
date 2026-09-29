@@ -67,6 +67,10 @@ _Avoid_: Role family, Candidate persona, title category
 The reviewed significance of a Job Requirement as critical, central, or complementary. These levels have respective base weights of three, two, and one before duplicate grouping and the complementary-weight cap.
 _Avoid_: Requirement priority, model confidence
 
+**Requirement Group**:
+The scoring unit formed by semantically duplicate or explicitly substitutable Job Requirements. A group may span Capability Dimensions, retains the identities and capabilities of its source requirements, and contributes one importance and coverage outcome to the Match Score.
+_Avoid_: Requirement cluster, keyword bucket
+
 **Requirement Coverage**:
 The evidence-backed assessment of a Job Requirement as covered, partially covered, or not covered. These states contribute respectively all, half, or none of the requirement's weight to the Match Score.
 _Avoid_: Model confidence, match probability

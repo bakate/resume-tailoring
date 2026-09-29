@@ -50,6 +50,32 @@ describe('resume matching engine', () => {
     expect(result.value).toMatchObject({ matchScore: 100 })
   })
 
+  it.each([
+    { capabilityName: 'Calculus', factValue: 'Taught calculus', term: 'calculus' },
+    {
+      capabilityName: 'Clinical diagnosis',
+      factValue: 'Diagnosed cardiac conditions',
+      term: 'cardiac conditions',
+    },
+    {
+      capabilityName: 'Financial audit',
+      factValue: 'Audited financial statements',
+      term: 'financial statements',
+    },
+  ])('accepts role-neutral experience evidence for $capabilityName', ({
+    capabilityName, factValue, term,
+  }) => {
+    const result = analyzeResumeMatch(createRoleNeutralExperienceInputs({
+      capabilityName,
+      factValue,
+      term,
+    }))
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.matchScore).toBe(100)
+  })
+
   it('groups normalized duplicate capabilities before scoring', () => {
     const result = analyzeResumeMatch(duplicateCapabilityInputs)
 
@@ -64,6 +90,19 @@ describe('resume matching engine', () => {
         'requirement-typescript-duplicate',
       ],
     })
+  })
+
+  it('groups explicit substitutes across Capability Dimensions', () => {
+    const result = analyzeResumeMatch(crossDimensionSubstituteInputs)
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.matchScore).toBe(100)
+    expect(result.value.requirementGroups).toHaveLength(1)
+    expect(result.value.requirementGroups[0]?.requirementIds).toEqual([
+      'requirement-degree',
+      'requirement-equivalent-experience',
+    ])
   })
 
   it('caps complementary requirements at 25 percent of effective weight', () => {
@@ -208,6 +247,35 @@ const strategyMatchInputs = {
   }],
 } as const satisfies MatchInputs
 
+const crossDimensionSubstituteInputs = {
+  candidateFacts: [{ id: 'fact-degree', kind: 'education', value: 'Master of Science' }],
+  proposedEvidence: [createEvidence({
+    coverage: 'covered',
+    factId: 'fact-degree',
+    requirementId: 'requirement-degree',
+    term: 'Master of Science',
+  })],
+  relevantFactIds: ['fact-degree'],
+  requirements: [
+    {
+      capability: { dimension: 'technical-expertise', name: 'Master of Science' },
+      id: 'requirement-degree',
+      importance: 'critical',
+      sourceExcerpt: 'A Master of Science or equivalent experience is required.',
+      substitutableGroup: 'degree-or-equivalent-experience',
+      value: 'Master of Science',
+    },
+    {
+      capability: { dimension: 'execution', name: 'Equivalent experience' },
+      id: 'requirement-equivalent-experience',
+      importance: 'critical',
+      sourceExcerpt: 'A Master of Science or equivalent experience is required.',
+      substitutableGroup: 'degree-or-equivalent-experience',
+      value: 'Equivalent experience',
+    },
+  ],
+} as const satisfies MatchInputs
+
 const complementaryCapabilities = ['French', 'Mentoring', 'FinOps', 'Hiring'] as const
 const complementaryCapInputs = {
   ...weightedMatchInputs,
@@ -316,5 +384,39 @@ function createEvidence({ coverage, factId, requirementId, term }: Readonly<{
       requirementTerm: term,
     }],
     requirementId,
+  }
+}
+
+function createRoleNeutralExperienceInputs({ capabilityName, factValue, term }: Readonly<{
+  capabilityName: string
+  factValue: string
+  term: string
+}>): MatchInputs {
+  const factId = 'fact-role-neutral'
+  const requirementId = 'requirement-role-neutral'
+  return {
+    candidateFacts: [{ id: factId, kind: 'experience', value: factValue }],
+    proposedEvidence: [createEvidence({
+      coverage: 'covered',
+      factId,
+      requirementId,
+      term,
+    })],
+    relevantFactIds: [factId],
+    requirements: [createRoleNeutralRequirement({ capabilityName, requirementId, term })],
+  }
+}
+
+function createRoleNeutralRequirement({ capabilityName, requirementId, term }: Readonly<{
+  capabilityName: string
+  requirementId: string
+  term: string
+}>): JobRequirement {
+  return {
+    capability: { dimension: 'execution', name: capabilityName },
+    id: requirementId,
+    importance: 'central',
+    sourceExcerpt: `${capabilityName} is required.`,
+    value: term,
   }
 }

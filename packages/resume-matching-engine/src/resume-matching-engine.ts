@@ -58,7 +58,7 @@ export type MatchEvidence = Readonly<{
 }>
 
 export type RequirementGroupAnalysis = Readonly<{
-  capability: JobRequirement['capability']
+  capabilities: readonly JobRequirement['capability'][]
   coverage: RequirementCoverage | 'uncovered'
   effectiveWeight: number
   importance: RequirementImportance
@@ -217,7 +217,7 @@ function createRequirementGroupAnalyses({ evidence, requirements }: Readonly<{
     const representative = group[0]
     if (representative === undefined) return []
     return [{
-      capability: representative.capability,
+      capabilities: readGroupCapabilities({ group }),
       coverage: readGroupCoverage({ evidenceByRequirementId, group }) ?? 'uncovered',
       effectiveWeight: weight,
       importance: readGroupImportance({ group }),
@@ -265,8 +265,20 @@ function groupRequirements({ requirements }: Readonly<{
 }
 
 function readRequirementGroupKey({ requirement }: Readonly<{ requirement: JobRequirement }>) {
-  const capabilityName = requirement.substitutableGroup ?? requirement.capability.name
-  return `${requirement.capability.dimension}:${canonicalizeKnownTerm({ value: capabilityName })}`
+  if (requirement.substitutableGroup !== undefined) {
+    return `substitute:${canonicalizeKnownTerm({ value: requirement.substitutableGroup })}`
+  }
+  return `capability:${requirement.capability.dimension}:${canonicalizeKnownTerm({
+    value: requirement.capability.name,
+  })}`
+}
+
+function readGroupCapabilities({ group }: Readonly<{ group: readonly JobRequirement[] }>) {
+  const capabilityByIdentity = new Map(group.map(({ capability }) => [
+    `${capability.dimension}:${canonicalizeKnownTerm({ value: capability.name })}`,
+    capability,
+  ]))
+  return [...capabilityByIdentity.values()]
 }
 
 function readGroupImportance({ group }: Readonly<{ group: readonly JobRequirement[] }>) {
