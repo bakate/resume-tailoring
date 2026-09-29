@@ -16,6 +16,7 @@ const candidateSession = {
   processingConsent: null,
   sessionId: 'candidate-session-00000000-0000-4000-8000-000000000038',
   sourceIntake: null,
+  tailoredResume: null,
   startedAt: sessionStartedAt,
   version: candidateSessionStorageVersion,
 } as const satisfies CandidateSession

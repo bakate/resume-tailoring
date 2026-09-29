@@ -191,14 +191,24 @@ function EligibleGenerationDecision({ candidateJourney, jobMatch, localization }
   jobMatch: JobMatch
   localization: Localization
 }>) {
+  const [locale, setLocale] = useState<'en' | 'fr' | null>(null)
   return <Alert color="forest" title={localization.translate('jobMatch.generation.eligible')}>
     <Stack gap="sm">
       {jobMatch.analysis.matchBand === 'ambitious'
         ? <Text>{localization.translate('jobMatch.generation.lowScoreWarning')}</Text>
         : null}
+      <SegmentedControl aria-label={localization.translate('tailoredResume.language')}
+        data={[
+          { label: localization.translate('tailoredResume.languageAutomatic'), value: 'automatic' },
+          { label: 'EN', value: 'en' }, { label: 'FR', value: 'fr' },
+        ]}
+        onChange={(value) => { setLocale(value === 'en' || value === 'fr' ? value : null) }}
+        value={locale ?? 'automatic'} />
       <Button loading={candidateJourney.view.status === 'candidate-session-open'
         ? candidateJourney.view.operation === 'preparing-tailored-resume' : false}
-        onClick={candidateJourney.startTailoredResumePreparation}>
+        onClick={() => { candidateJourney.startTailoredResumePreparation({
+          ...(locale === null ? {} : { locale }),
+        }) }}>
         {localization.translate('jobMatch.generation.tailoredAction')}
       </Button>
     </Stack>

@@ -13,6 +13,7 @@
     "./match-analysis": "./src/match-analysis.ts",
     "./resume-claims": "./src/resume-claims.ts",
     "./tailored-resume-document": "./src/tailored-resume-document.ts",
+    "./tailored-resume": "./src/tailored-resume.ts",
     "./resume-claim-restoration": "./src/resume-claim-restoration.ts",
     "./resume-tailoring-workflow-ports": "./src/resume-tailoring-workflow-ports.ts",
     "./resume-tailoring-workflow-testing": "./src/resume-tailoring-workflow-testing.ts",

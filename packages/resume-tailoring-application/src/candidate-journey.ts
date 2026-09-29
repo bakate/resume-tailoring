@@ -28,6 +28,8 @@ import type { JobMatch, JobRequirementId } from '@resume-tailoring/domain/job-ma
 import type { CandidateFact, SourceIntake } from '@resume-tailoring/domain/source-intake'
 import { createProfileEnrichment } from './profile-enrichment'
 import type { ProfileEnrichmentValidationFailure } from './profile-enrichment'
+import { createTailoredResume } from './tailored-resume'
+import type { TailoredResumeLocale } from './tailored-resume'
 import type {
   SourceDocument,
   SourceDocumentReader,
@@ -112,7 +114,7 @@ type CandidateJourneyEvent =
   | Readonly<{ type: 'RESOLVE_CRITICAL_AMBIGUITY'; ambiguityId: `critical-ambiguity-${string}`; answer: string }>
   | Readonly<{ type: 'SUBMIT_SOURCE_DOCUMENT'; document: SourceDocument }>
   | Readonly<{ type: 'START_CANDIDATE_SESSION' }>
-  | Readonly<{ type: 'START_TAILORED_RESUME_PREPARATION' }>
+  | Readonly<{ type: 'START_TAILORED_RESUME_PREPARATION'; locale?: TailoredResumeLocale }>
   | Readonly<{ type: 'SUBMIT_JOB_POSTING'; document: JobPostingDocument }>
 
 type RestoredCandidateSession = Readonly<{
@@ -154,7 +156,7 @@ export type CandidateJourney = Readonly<{
   }>) => void
   start: () => void
   startCandidateSession: () => void
-  startTailoredResumePreparation: () => void
+  startTailoredResumePreparation: (request?: Readonly<{ locale?: TailoredResumeLocale }>) => void
   submitJobPosting: (request: Readonly<{ document: JobPostingDocument }>) => void
   submitSourceDocument: (document: SourceDocument) => void
   subscribe: (listener: () => void) => () => void
@@ -177,6 +179,7 @@ const startCandidateSession = fromPromise<
     processingConsent: null,
     sessionId: `candidate-session-${input.createSessionId()}`,
     sourceIntake: null,
+    tailoredResume: null,
     startedAt,
     version: candidateSessionStorageVersion,
   } as const satisfies CandidateSession
@@ -190,14 +193,22 @@ const deleteCandidateSession = fromPromise<
 
 const startTailoredResumePreparation = fromPromise<
   CandidateSessionStorageResult<CandidateSession>,
-  Readonly<{ dependencies: CandidateJourneyDependencies; session: CandidateSession | null }>
+  Readonly<{
+    dependencies: CandidateJourneyDependencies
+    locale?: TailoredResumeLocale
+    session: CandidateSession | null
+  }>
 >(({ input }) => {
   const session = input.session
-  if (session === null || !canStartTailoredResumePreparation({ session })) {
+  if (session === null || session.sourceIntake === null || session.jobMatch === null
+    || !canStartTailoredResumePreparation({ session })) {
     return Promise.resolve(storageUnavailableResult)
   }
+  const tailoredResume = createTailoredResume({
+    jobMatch: session.jobMatch, locale: input.locale, sourceIntake: session.sourceIntake,
+  })
   return Promise.resolve(input.dependencies.persistence.save({
-    session: { ...session, phase: 'tailored-resume-preparation' },
+    session: { ...session, phase: 'tailored-resume-preparation', tailoredResume },
   }))
 })
 
@@ -667,8 +678,9 @@ const candidateJourneyMachine = setup({
     storageFailure: {},
     startingTailoredResumePreparation: {
       invoke: {
-        input: ({ context }) => ({
+        input: ({ context, event }) => ({
           dependencies: context.dependencies,
+          locale: event.type === 'START_TAILORED_RESUME_PREPARATION' ? event.locale : undefined,
           session: context.session,
         }),
         onDone: [
@@ -710,8 +722,8 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     },
     start: () => { actor.start() },
     startCandidateSession: () => { actor.send({ type: 'START_CANDIDATE_SESSION' }) },
-    startTailoredResumePreparation: () => {
-      actor.send({ type: 'START_TAILORED_RESUME_PREPARATION' })
+    startTailoredResumePreparation: (request = {}) => {
+      actor.send({ type: 'START_TAILORED_RESUME_PREPARATION', ...request })
     },
     submitJobPosting: ({ document }) => {
       actor.send({ type: 'SUBMIT_JOB_POSTING', document })
