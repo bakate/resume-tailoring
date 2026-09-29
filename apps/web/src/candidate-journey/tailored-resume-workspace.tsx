@@ -1,8 +1,12 @@
-import { Badge, List, Paper, Stack, Text, Title } from '@mantine/core'
+import { Badge, Button, List, Paper, Stack, Text, Title } from '@mantine/core'
 
 import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
 import type { Localization } from '../localization/localization'
 import type { useCandidateJourney } from './use-candidate-journey'
+import {
+  hasValidTailoredResumeExport,
+  renderTailoredResumeDocument,
+} from './tailored-resume-document'
 
 type CandidateJourneyController = ReturnType<typeof useCandidateJourney>
 
@@ -21,8 +25,43 @@ export function TailoredResumeWorkspace({ candidateJourney, localization }: Read
       <ExperienceList localization={localization} tailoredResume={view.session.tailoredResume} />
       {view.session.tailoredResume.sections.map((section) => <ResumeSection key={section.section}
         localization={localization} section={section} />)}
+      <TailoredResumePreview source={{
+        candidateFacts: view.session.sourceIntake?.candidateFacts ?? [],
+        tailoredResume: view.session.tailoredResume,
+      }} />
     </Stack>
   </Paper>
+}
+
+function TailoredResumePreview({ source }: Readonly<{
+  source: Readonly<{
+    candidateFacts: readonly Readonly<{ id: `source-fact-${string}`; path: string; status: 'attested' | 'excluded-critical-ambiguity'; value: string }>[]
+    tailoredResume: TailoredResume
+  }>
+}>) {
+  const canExport = hasValidTailoredResumeExport(source)
+  const html = renderTailoredResumeDocument({ tailoredResume: source.tailoredResume })
+  return <section aria-labelledby="tailored-resume-preview-title">
+    <Title id="tailored-resume-preview-title" order={3}>Preview and export</Title>
+    <Text c="dimmed" mt="xs">Preview the exact semantic document used for your PDF.</Text>
+    <iframe sandbox="" srcDoc={html} style={{ border: 0, height: '72rem', marginTop: '1rem', width: '100%' }}
+      title="Tailored Resume preview" />
+    {canExport ? <Button mt="md" onClick={() => { printTailoredResume({ html }) }}>
+      Download PDF
+    </Button> : <Text c="red" mt="md" role="alert">
+      Add your full name and an email address or phone number before exporting.
+    </Text>}
+  </section>
+}
+
+function printTailoredResume({ html }: Readonly<{ html: string }>) {
+  const documentUrl = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
+  const printWindow = window.open(documentUrl, '_blank', 'noopener,noreferrer')
+  if (printWindow === null) return
+  printWindow.addEventListener('load', () => {
+    printWindow.print()
+    URL.revokeObjectURL(documentUrl)
+  }, { once: true })
 }
 
 function TailoredResumeHeader({ localization, tailoredResume }: Readonly<{
