@@ -73,7 +73,7 @@ The Candidate Journey will use real phase feedback rather than fake progress or 
 8. As a Candidate, I want my contact details preserved locally, so that they can still appear in my final resume.
 9. As a Candidate, I want extraction to continue without a fact-by-fact review, so that the journey remains short.
 10. As a Candidate, I want to be interrupted before preview only when a Critical Ambiguity prevents a faithful, usable document, so that isolated unsafe evidence can be omitted and disclosed without blocking the result.
-11. As a Candidate, I want each Critical Ambiguity presented as a targeted question, so that I can resolve it without understanding the internal data model.
+11. As a Candidate, I want a targeted question required only for a Critical Ambiguity whose omission would make the document misleading or unusable, so that I can resolve it without understanding the internal data model.
 12. As a Candidate, I want one ambiguous fact to be isolated without blocking unrelated evidence, so that useful parts of my Source Profile remain available.
 13. As a Candidate, I want the option to inspect my detailed Source Profile, so that I retain control without making inspection mandatory.
 14. As a Candidate, I want experiences to retain organizations, roles, dates, context, and achievements, so that a complete resume can be reconstructed.
