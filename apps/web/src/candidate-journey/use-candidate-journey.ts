@@ -3,6 +3,7 @@ import { createResumeDocumentModelAdapters } from './resume-document-model-adapt
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { createCandidateJourney, createResumePreparation } from '@resume-tailoring/application/candidate-journey'
 
+import { createBrowserResumeDocumentRenderer } from './browser-resume-document-renderer'
 import { createBrowserCandidateSessionPersistence } from './browser-candidate-session-persistence'
 import { createOpenAiLanguageModelGateway } from './openai-language-model-gateway'
 import { createBrowserSourceIntakeDocumentReader } from './source-intake-document-reader'
@@ -26,6 +27,7 @@ export function useCandidateJourney() {
     candidateJourney.readView,
   )
   return {
+    renderResumeDocument: candidateJourney.renderResumeDocument,
     invalidateResumeInputs: candidateJourney.invalidateResumeInputs,
     hideResumeEntry: candidateJourney.hideResumeEntry,
     restoreResumeEntry: candidateJourney.restoreResumeEntry,
@@ -72,6 +74,7 @@ function createBrowserDependencies({ languageModelGateway }: Readonly<{
   languageModelGateway: BrowserLanguageModelGateway
 }>) {
   return {
+    resumeDocumentRenderer: createBrowserResumeDocumentRenderer(),
     telemetry: createPrivacySafeBrowserTelemetry(),
     resumeDocumentPorts: { ...createGatewayResumePreparation(languageModelGateway),
       ...createResumeDocumentModelAdapters({ gateway: languageModelGateway }) },

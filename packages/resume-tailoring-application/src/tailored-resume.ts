@@ -25,6 +25,20 @@ export function createTailoredResume({
   return createTailoredResumeValue({ attestedFacts, jobMatch, locale, relevantFactIds, sourceIntake })
 }
 
+export function createNormalizedResume({ sourceIntake, locale }: Readonly<{
+  sourceIntake: SourceIntake; locale: TailoredResumeLocale
+}>): TailoredResume {
+  const facts = sourceIntake.candidateFacts.filter(({ status }) => status === 'attested')
+  return {
+    purpose: 'normalized', locale, targetRole: null,
+    identity: sourceIntake.contactDetails.find(({ kind }) => kind === 'personal-information') ?? null,
+    contactDetails: sourceIntake.contactDetails.filter(({ kind }) => kind !== 'personal-information'),
+    valueProposition: { kind: 'evidence-excerpts', paragraphs: [] },
+    experiences: createExperiences({ facts, relevantFactIds: new Set() }),
+    sections: createSections({ facts }),
+  }
+}
+
 function createTailoredResumeValue({ attestedFacts, jobMatch, locale, relevantFactIds, sourceIntake }: Readonly<{
   attestedFacts: readonly CandidateFact[]
   jobMatch: JobMatch

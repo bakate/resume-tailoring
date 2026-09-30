@@ -133,7 +133,7 @@ export function isSupportedResumeFieldText({ candidateFacts, field, text }: Read
   if (normalize(field.text) === normalizedText) return true
   return candidateFacts.some(({ value }) => {
     const normalizedFact = normalize(value)
-    return normalizedFact.includes(normalizedText) || normalizedText.includes(normalizedFact)
+    return normalizedFact === normalizedText
   })
 }
 

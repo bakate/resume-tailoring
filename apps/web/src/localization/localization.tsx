@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 
 const englishCatalog = {
+  'candidateJourney.operation.renderingResumeDocument': 'Preparing the PDF preview',
   'combinedIntake.outdated': 'This is your last stable resume. Generate again to apply the changed source, posting or language; export is paused.',
   "combinedIntake.title": "Your resume and the opportunity",
   "combinedIntake.description": "Add your resume and the job posting. Generate once to get an evidence-backed preview. PDF/DOCX sources: up to 5 pages and 5 MB. Postings: pasted text or PDF/TXT.",
@@ -589,6 +590,7 @@ const frenchCatalog = {
   'candidateJourney.operation.processingJobPosting': "Analyse de ton Offre d’emploi et création de l’Analyse de Correspondance…",
   'candidateJourney.operation.processingProfileEnrichment': 'Ajout du Fait Candidat confirmé et actualisation de l’Analyse de Correspondance…',
   'candidateJourney.operation.resolvingCriticalAmbiguity': 'Enregistrement de ta résolution de l’Ambiguïté Critique…',
+  'candidateJourney.operation.renderingResumeDocument': 'Préparation de l’aperçu PDF',
   'candidateJourney.operation.preparingTailoredResume': 'Validation et préparation de ton CV Adapté…',
   'candidateJourney.result.sourceProfile': 'Profil Source',
   'candidateJourney.result.matchAnalysis': 'Analyse de Correspondance',

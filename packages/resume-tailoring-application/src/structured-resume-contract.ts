@@ -98,6 +98,7 @@ export type ResumeDocumentPorts = Readonly<{
   }>) => Promise<ResumeSectionChangeOutcome>
   assessLayout: (request: Readonly<{
     draft: ResumeDraft
+    photoDataUrl?: string
     unsupportedFieldIds: readonly string[]
   }>) => Promise<ResumeLayoutAssessment>
   proposeCondensation: (request: Readonly<{

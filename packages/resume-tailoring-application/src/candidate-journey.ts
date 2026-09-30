@@ -14,8 +14,17 @@ import { applyValidatedSectionChange, changedResumeSession, editResumeField, emp
   readResumeEditing, readResumeReview, unavailableResumeResult } from './resume-editing'
 import type { ResumeEditingAccess, ResumeReview, ResumeReviewState } from './resume-editing'
 import type { ResumeDocumentPorts, ResumeSectionChange } from './structured-resume-contract'
-import { assign, createActor, fromPromise, setup } from 'xstate'
+import { assign, createActor, fromPromise, setup, waitFor } from 'xstate'
 import type { AnyActorRef, SnapshotFrom } from 'xstate'
+import { prepareResumeRendering, staleResumeRendering, validateResumeRendering } from './resume-rendering-state'
+import type { ResumeRenderingState } from './resume-rendering-state'
+
+import { unavailableResumeRender } from './resume-export'
+import type { ResumeDocumentRenderer, ResumeRenderInput, ResumeRenderRequest, ResumeRenderResult } from './resume-export'
+
+export { assessResumeExport, unavailableResumeRender } from './resume-export'
+export type { ResumeDocumentRenderer, ResumeRenderInput, ResumeRenderRequest, ResumeRenderResult } from './resume-export'
+
 
 import {
   candidateSessionDurationMilliseconds,
@@ -84,6 +93,7 @@ export type CandidateSessionPersistence = Readonly<{
 }>
 
 export type CandidateJourneyDependencies = Readonly<{
+  resumeDocumentRenderer?: ResumeDocumentRenderer
   telemetry?: PrivacySafeTelemetry
   resumeDocumentPorts?: Partial<ResumeDocumentPorts>
   createSessionId: () => string
@@ -112,6 +122,8 @@ type ProfileEnrichmentFailure =
   | 'match-evidence-unavailable'
 
 type CandidateJourneyContext = Readonly<{
+  resumeRendering: ResumeRenderingState | null
+  resumeRenderSequence: number
   dependencies: CandidateJourneyDependencies
   preparationOutcome: CombinedIntakeOutcome | null
   preparationPhase: PreparationPhase | null
@@ -126,6 +138,7 @@ type CandidateJourneyContext = Readonly<{
 type ResumeContacts = Pick<TailoredResume, 'identity' | 'contactDetails'>
 
 type CandidateJourneyEvent =
+  | Readonly<{ type: 'RENDER_RESUME_DOCUMENT'; input: ResumeRenderInput }>
   | Readonly<{ type: 'INVALIDATE_RESUME_INPUTS' }>
   | Readonly<{ type: 'PREPARATION_PROGRESS'; phase: PreparationPhase; session: CandidateSession }>
   | Readonly<{ type: 'SAVE_RESUME'; session: CandidateSession; baseRevision: string; correctionKind?: ResumeCorrectionKind }>
@@ -150,7 +163,7 @@ type RestoredCandidateSession = Readonly<{
   session: CandidateSession | null
 }>
 
-type CandidateJourneyOperation = 'preparing-tailored-resume' | 'processing-job-posting'
+type CandidateJourneyOperation = 'rendering-resume-document' | 'preparing-tailored-resume' | 'processing-job-posting'
   | 'processing-profile-enrichment' | 'processing-source-document'
   | 'resolving-critical-ambiguity' | null
 
@@ -173,11 +186,12 @@ export type CandidateJourneyView =
   | Readonly<{ status: 'candidate-session-unavailable' }>
 
 export type CandidateJourney = Readonly<{
+  renderResumeDocument: (request: ResumeRenderInput) => Promise<ResumeRenderResult>
   invalidateResumeInputs: () => void
   hideResumeEntry: (request: Readonly<{ experienceId: string }>) => void
   restoreResumeEntry: (request: Readonly<{ experienceId: string }>) => void
-  assessResumeLayout: () => Promise<void>
-  proposeResumeCondensation: () => Promise<void>
+  assessResumeLayout: (request?: Readonly<{ photoDataUrl?: string }>) => Promise<void>
+  proposeResumeCondensation: (request?: Readonly<{ photoDataUrl?: string }>) => Promise<void>
   acceptResumeCondensation: (decision: ResumeProposalDecision) => void
   rejectResumeCondensation: (decision: ResumeProposalDecision) => void
   attestResumeField: (request: Readonly<{ fieldId: string }>) => void
@@ -430,6 +444,14 @@ function hasJobMatchConsent({ input, session }: Readonly<{
   })
 }
 
+const renderResumeDocument = fromPromise<ResumeRenderResult | null, Readonly<{
+  dependencies: CandidateJourneyDependencies; request: ResumeRenderRequest | null
+}>>(async ({ input }) => {
+  if (input.request === null) return null
+  const result = await renderCandidateDocument({ dependencies: input.dependencies, request: input.request })
+  return validateResumeRendering({ request: input.request, result })
+})
+
 function invalidateEditingRevision(session: CandidateSession): CandidateSession {
   if (session.tailoredResume === null) return session
   return { ...session, resumeEditing: { ...readResumeEditing({ session }), revision: crypto.randomUUID() } }
@@ -453,6 +475,7 @@ function invalidateResumeInputs({ session, dependencies }: CandidateJourneyConte
 const candidateJourneyMachine = setup({
   actors: {
     generateApplicationResume,
+    renderResumeDocument,
     confirmProfileEnrichment,
     deleteCandidateSession,
     grantProcessingConsent,
@@ -475,6 +498,7 @@ const candidateJourneyMachine = setup({
 }).createMachine({
   context: ({ input }: Readonly<{ input: CandidateJourneyDependencies }>) => ({
     dependencies: input,
+    resumeRendering: null, resumeRenderSequence: 0,
     preparationOutcome: null,
     preparationPhase: null,
     resumeReview: emptyResumeReview,
@@ -488,6 +512,24 @@ const candidateJourneyMachine = setup({
   initial: 'readingStoredSession',
   states: {
     candidateSessionAvailable: {
+      initial: 'idle',
+      states: {
+        idle: {},
+        rendering: {
+          invoke: {
+            src: 'renderResumeDocument',
+            input: ({ context }) => ({ dependencies: context.dependencies, request: context.resumeRendering?.request ?? null }),
+            onDone: { target: 'idle', actions: assign({
+              resumeReview: ({ context, event }) => renderedResumeReview({ context, result: event.output }),
+              resumeRendering: ({ context, event }) =>
+              context.resumeRendering === null ? null : { ...context.resumeRendering,
+                result: event.output ?? unavailableResumeRender(context.resumeRendering.request) } }) },
+            onError: { target: 'idle', actions: assign({ resumeRendering: ({ context }) =>
+              context.resumeRendering === null ? null : { ...context.resumeRendering,
+                result: unavailableResumeRender(context.resumeRendering.request) } }) },
+          },
+        },
+      },
       after: {
         candidateSessionExpiration: {
           actions: assign({ notice: 'expired-session-discarded' }),
@@ -495,8 +537,20 @@ const candidateJourneyMachine = setup({
         },
       },
       on: {
-        INVALIDATE_RESUME_INPUTS: { actions: assign({ session: ({ context }) => invalidateResumeInputs(context), resumeReview: emptyResumeReview }) },
+        RENDER_RESUME_DOCUMENT: {
+          guard: ({ context }) => context.session?.preparedResumeStatus !== 'outdated',
+          target: '.rendering', reenter: true,
+          actions: assign({
+            resumeRendering: ({ context, event }) => prepareResumeRendering({
+              input: event.input, previous: context.resumeRendering, sequence: context.resumeRenderSequence + 1,
+              revision: `${context.session?.sessionId ?? 'absent'}:${context.dependencies.createSessionId()}:${String(context.resumeRenderSequence + 1)}`,
+            }),
+            resumeRenderSequence: ({ context }) => context.resumeRenderSequence + 1,
+          }),
+        },
+        INVALIDATE_RESUME_INPUTS: { target: '.idle', actions: assign({ resumeRendering: null, session: ({ context }) => invalidateResumeInputs(context), resumeReview: emptyResumeReview }) },
         SAVE_RESUME: {
+          target: '.idle',
           guard: ({ context, event }) => context.session !== null
             && readResumeEditing({ session: context.session }).revision === event.baseRevision,
           actions: assign(({ context, event }) => {
@@ -504,8 +558,8 @@ const candidateJourneyMachine = setup({
             if (result.ok && event.baseRevision !== readResumeEditing({ session: result.value }).revision) {
               recordResumeCorrection({ dependencies: context.dependencies, kind: event.correctionKind ?? 'resume-claim-edit' })
             }
-            return result.ok ? { session: result.value, resumeReview: emptyResumeReview }
-              : { resumeReview: { ...emptyResumeReview, failure: unavailableResumeResult } }
+            return result.ok ? { session: result.value, resumeReview: emptyResumeReview, resumeRendering: null }
+              : { resumeRendering: null, resumeReview: { ...emptyResumeReview, failure: unavailableResumeResult } }
           }),
         },
         REPORT_RESUME: {
@@ -514,14 +568,15 @@ const candidateJourneyMachine = setup({
           actions: assign({ resumeReview: ({ event }) => event.review }),
         },
         UPDATE_RESUME_CONTACTS: {
+          target: '.idle',
           actions: assign(({ context, event }) => {
             const session = context.session
             if (session?.tailoredResume === null || session === null) return {}
             const result = context.dependencies.persistence.save({ session: changedResumeSession({ session,
               document: { ...session.tailoredResume, ...event.contacts },
             }) })
-            return result.ok ? { session: result.value, resumeReview: emptyResumeReview }
-              : { resumeReview: { ...emptyResumeReview, failure: unavailableResumeResult } }
+            return result.ok ? { session: result.value, resumeReview: emptyResumeReview, resumeRendering: null }
+              : { resumeRendering: null, resumeReview: { ...emptyResumeReview, failure: unavailableResumeResult } }
           }),
         },
         CONFIRM_PROFILE_ENRICHMENT: {
@@ -561,7 +616,7 @@ const candidateJourneyMachine = setup({
       },
     },
     generatingApplicationResume: {
-      entry: assign({ preparationOutcome: null, preparationPhase: null, resumeReview: emptyResumeReview,
+      entry: assign({ resumeRendering: null, preparationOutcome: null, preparationPhase: null, resumeReview: emptyResumeReview,
         session: ({ context }) => context.session === null ? null : invalidateEditingRevision(context.session),
       }),
       after: { candidateSessionExpiration: { target: 'removingCandidateSession', actions: assign({ notice: 'expired-session-discarded' }) } },
@@ -586,6 +641,7 @@ const candidateJourneyMachine = setup({
       },
     },
     processingJobPosting: {
+      entry: assign({ resumeRendering: null }),
       invoke: {
         input: ({ context, event }) => ({
           dependencies: context.dependencies,
@@ -616,6 +672,7 @@ const candidateJourneyMachine = setup({
       },
     },
     processingProfileEnrichment: {
+      entry: assign({ resumeRendering: null }),
       invoke: {
         input: ({ context, event }) => ({
           dependencies: context.dependencies,
@@ -649,6 +706,7 @@ const candidateJourneyMachine = setup({
       },
     },
     processingSourceDocument: {
+      entry: assign({ resumeRendering: null }),
       invoke: {
         input: ({ context, event }) => ({
           dependencies: context.dependencies,
@@ -679,6 +737,7 @@ const candidateJourneyMachine = setup({
       },
     },
     removingCandidateSession: {
+      entry: assign({ resumeRendering: null }),
       invoke: {
         input: ({ context }) => context.dependencies,
         onDone: [
@@ -740,6 +799,7 @@ const candidateJourneyMachine = setup({
       },
     },
     persistingProcessingConsent: {
+      entry: assign({ resumeRendering: null }),
       invoke: {
         input: ({ context }) => ({
           dependencies: context.dependencies,
@@ -760,6 +820,7 @@ const candidateJourneyMachine = setup({
       },
     },
     resolvingCriticalAmbiguity: {
+      entry: assign({ resumeRendering: null }),
       invoke: {
         input: ({ context, event }) => ({
           ambiguityId: event.type === 'RESOLVE_CRITICAL_AMBIGUITY'
@@ -808,7 +869,12 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     view = readCandidateJourneyView({ snapshot })
   })
   const editingAccess: ResumeEditingAccess = {
-    ports: dependencies.resumeDocumentPorts ?? {},
+    get ports() { return { ...dependencies.resumeDocumentPorts,
+      assessLayout: dependencies.resumeDocumentPorts?.assessLayout ?? (async (request) => {
+        const result = await renderCandidateDocument({ dependencies, request })
+        return validateResumeRendering({ request, result }).assessment
+      }),
+    } },
     readReview: () => view.status === 'candidate-session-open' ? view.resumeReview : null,
     readSession: () => actor.getSnapshot().matches('candidateSessionAvailable')
       && view.status === 'candidate-session-open' ? view.session : null,
@@ -817,11 +883,12 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     report: (request) => { actor.send({ type: 'REPORT_RESUME', ...request }) },
   }
   return {
+    renderResumeDocument: (input) => requestResumeRendering({ actor, input }),
     invalidateResumeInputs: () => { actor.send({ type: 'INVALIDATE_RESUME_INPUTS' }) },
     hideResumeEntry: (request) => { hideResumeEntry({ access: editingAccess, ...request }) },
     restoreResumeEntry: (request) => { restoreResumeEntry({ access: editingAccess, ...request }) },
-    assessResumeLayout: () => assessResumeLayout({ access: editingAccess }),
-    proposeResumeCondensation: () => proposeResumeCondensation({ access: editingAccess }),
+    assessResumeLayout: (request = {}) => assessResumeLayout({ access: editingAccess, ...request }),
+    proposeResumeCondensation: (request = {}) => proposeResumeCondensation({ access: editingAccess, ...request }),
     acceptResumeCondensation: (decision) => { acceptResumeCondensation({ access: editingAccess, decision }) },
     rejectResumeCondensation: (decision) => { rejectResumeCondensation({ access: editingAccess, decision }) },
     attestResumeField: (request) => { attestResumeField({ access: editingAccess, ...request }) },
@@ -913,6 +980,7 @@ function readOpenCandidateSessionView({ snapshot, session }: Readonly<{
 function readCandidateJourneyOperation({ snapshot }: Readonly<{
   snapshot: CandidateJourneySnapshot
 }>): CandidateJourneyOperation {
+  if (snapshot.matches({ candidateSessionAvailable: 'rendering' })) return 'rendering-resume-document'
   if (snapshot.matches('generatingApplicationResume')) return 'preparing-tailored-resume'
   if (snapshot.matches('processingJobPosting')) return 'processing-job-posting'
   if (snapshot.matches('processingProfileEnrichment')) return 'processing-profile-enrichment'
@@ -964,8 +1032,51 @@ export type {
   ResumeProposalDecision, ResumeProposalDecisionOutcome, ResumeSectionChange, ResumeSectionChangeOutcome,
 } from './structured-resume-contract'
 
+
+async function renderCandidateDocument({ dependencies, request }: Readonly<{
+  dependencies: CandidateJourneyDependencies; request: ResumeRenderRequest
+}>) {
+  try {
+    return await dependencies.resumeDocumentRenderer?.render(request) ?? unavailableResumeRender(request)
+  } catch {
+    return unavailableResumeRender(request)
+  }
+}
+
+
+async function requestResumeRendering({ actor, input }: Readonly<{
+  actor: ReturnType<typeof createActor<typeof candidateJourneyMachine>>; input: ResumeRenderInput
+}>): Promise<ResumeRenderResult> {
+  actor.send({ type: 'RENDER_RESUME_DOCUMENT', input })
+  const rendering = actor.getSnapshot().context.resumeRendering
+  if (rendering === null) return unavailableResumeRender({ ...input, draft: { document: input.document, revision: 'unavailable' } })
+  try {
+    const snapshot = await waitFor(actor, (current) => current.context.resumeRendering?.sequence !== rendering.sequence
+      || current.context.resumeRendering.result !== null, { timeout: 30_000 })
+    const completed = snapshot.context.resumeRendering
+    return completed?.sequence === rendering.sequence && completed.result !== null
+      ? completed.result : staleResumeRendering({ request: rendering.request })
+  } catch {
+    return unavailableResumeRender(rendering.request)
+  }
+}
+
 function recordResumeCorrection({ dependencies, kind }: Readonly<{
   dependencies: CandidateJourneyDependencies; kind: ResumeCorrectionKind
 }>) {
   void dependencies.telemetry?.record({ name: 'resume-correction-recorded', correctionKind: kind }).catch(() => undefined)
+}
+
+function renderedResumeReview({ context, result }: Readonly<{
+  context: CandidateJourneyContext; result: ResumeRenderResult | null
+}>): ResumeReviewState {
+  const { session, resumeRendering, resumeReview } = context
+  if (session === null || session.preparedResumeStatus === 'outdated' || resumeRendering === null || result === null) return resumeReview
+  const review = readResumeReview({ session, review: resumeReview })
+  if (review === null || JSON.stringify(review.draft.document) !== JSON.stringify(resumeRendering.request.draft.document)
+    || JSON.stringify(review.unsupportedFieldIds) !== JSON.stringify(resumeRendering.request.unsupportedFieldIds)) return resumeReview
+  return { ...resumeReview, assessment: {
+    layout: { ...result.assessment.layout, revision: review.draft.revision },
+    exportEligibility: { ...result.assessment.exportEligibility, revision: review.draft.revision },
+  } }
 }
