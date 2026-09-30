@@ -19,7 +19,14 @@ export const resumeModelFailureSchema = z.strictObject({ ok: z.literal(false),
   error: z.strictObject({ type: z.literal('unavailable'), transient: z.boolean().optional() }) })
 
 export function resumeStructuredOutputFormat({ name, schema }: Readonly<{ name: string; schema: z.ZodType }>) {
-  const jsonSchema = z.toJSONSchema(schema, { target: 'draft-7' })
+  const jsonSchema = z.toJSONSchema(schema, { target: 'draft-7', override: useAnyOfForUnions })
   return { type: 'json_schema', name, strict: true,
     schema: Object.fromEntries(Object.entries(jsonSchema).filter(([key]) => key !== '$schema')) } as const
+}
+
+// Strict structured outputs reject oneOf; discriminated unions stay exclusive through their literal discriminator.
+function useAnyOfForUnions({ jsonSchema }: Readonly<{ jsonSchema: { anyOf?: unknown; oneOf?: unknown } }>) {
+  if (jsonSchema.oneOf === undefined) return
+  jsonSchema.anyOf = jsonSchema.oneOf
+  delete jsonSchema.oneOf
 }
