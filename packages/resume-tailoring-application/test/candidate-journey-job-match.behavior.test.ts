@@ -77,6 +77,20 @@ describe('Candidate Journey Job Match', () => {
     system.expectExtractionToBeRejected()
   })
 
+  it('covers a requirement that a Next.js Source Profile proves in different words', async () => {
+    const system = createSystemUnderTest({ session: createNextJsSourceProfileSession() })
+
+    // Given
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenAFullStackJobPostingReformulatingNextJsWork()
+
+    // Action
+    await system.submitPastedJobPosting()
+
+    // Then
+    system.expectReformulatedFullStackRequirementToBeCovered()
+  })
+
   it('keeps valid relevance when another proposed relevance link is unsupported', async () => {
     const system = createSystemUnderTest()
     await system.givenCandidateJourneyIsReadyForJobMatch()
@@ -265,6 +279,7 @@ class CandidateJourneyJobMatchTestSystem {
   readonly #candidateJourney: CandidateJourney
   #directJobMatch: Awaited<ReturnType<typeof createJobMatch>> | null = null
   #extractedJobPosting: ExtractedJobPosting = extractedJobPosting
+  #jobPostingText = jobPostingText
   #matchRequestCount = 0
   #matchEvidence: MatchEvidenceProposal = matchEvidenceProposal
   #completedAction: JobMatchAction | null = null
@@ -328,6 +343,12 @@ class CandidateJourneyJobMatchTestSystem {
     }
   }
 
+  givenAFullStackJobPostingReformulatingNextJsWork() {
+    this.#jobPostingText = fullStackJobPostingText
+    this.#extractedJobPosting = fullStackJobPosting
+    this.#matchEvidence = fullStackMatchEvidenceProposal
+  }
+
   givenMatchEvidenceIncludesAnUnsupportedRelevanceLink() {
     this.#matchEvidence = {
       ...matchEvidenceProposal,
@@ -366,6 +387,7 @@ class CandidateJourneyJobMatchTestSystem {
     this.#candidateJourney.submitJobPosting({ document: createJobPostingDocument({
       mediaType: 'text/plain',
       name: 'pasted-job-posting.txt',
+      text: this.#jobPostingText,
     }) })
     this.#view = await this.#waitForCompletedJobMatch()
     this.#completedAction = 'job-posting-submitted'
@@ -486,6 +508,17 @@ class CandidateJourneyJobMatchTestSystem {
     expect(view.jobMatchFailure).toBeNull()
     expect(view.session.jobMatch?.analysis.relevantFactIds).toEqual(
       matchEvidenceProposal.relevance.map(({ factMatch }) => factMatch.factId))
+  }
+
+  expectReformulatedFullStackRequirementToBeCovered() {
+    this.#expectCompletedAction()
+    const view = this.#readOpenView()
+    expect(view.jobMatchFailure).toBeNull()
+    expect(view.session.jobMatch?.analysis).toMatchObject({
+      evidence: [{ coverage: 'covered', factIds: ['source-fact-1'], requirementId: 'job-requirement-1' }],
+      matchScore: 100,
+      relevantFactIds: ['source-fact-1'],
+    })
   }
 
   expectOnlySupportedMatchEvidence() {
@@ -745,6 +778,20 @@ function createJobMatchSession(): CandidateSession {
   }
 }
 
+function createNextJsSourceProfileSession(): CandidateSession {
+  const session = createJobMatchSession()
+  return {
+    ...session,
+    sourceIntake: session.sourceIntake === null ? null : {
+      ...session.sourceIntake,
+      candidateFacts: [{
+        id: 'source-fact-1', path: 'experiences.0.achievements.0', status: 'attested',
+        value: 'Built end-to-end Next.js applications with a Node.js API',
+      }],
+    },
+  }
+}
+
 function createSourceIntakeSession(): CandidateSession {
   const session = createJobMatchSession()
   return {
@@ -762,11 +809,12 @@ function createSourceIntakeSession(): CandidateSession {
   }
 }
 
-function createJobPostingDocument({ mediaType, name }: Readonly<{
+function createJobPostingDocument({ mediaType, name, text = jobPostingText }: Readonly<{
   mediaType: string
   name: string
+  text?: string
 }>) {
-  return { bytes: new TextEncoder().encode(jobPostingText), mediaType, name }
+  return { bytes: new TextEncoder().encode(text), mediaType, name }
 }
 
 function hasCompletedJobMatch({ view }: Readonly<{ view: CandidateJourneyView }>) {
@@ -844,6 +892,28 @@ function createRequirement(
     value: capabilityName,
   } as const
 }
+
+const fullStackJobPostingText = [
+  'Développeur Full Stack',
+  'Concevoir, développer et maintenir des applications web.',
+].join('\n')
+
+const fullStackJobPosting = {
+  practicalConstraints: [],
+  requirements: [{
+    ...createRequirement('1', 'technical-expertise', 'Web application development', 'critical',
+      'Concevoir, développer et maintenir des applications web.'),
+    value: 'Concevoir, développer et maintenir des applications web',
+  }],
+  targetRole: { sourceExcerpt: 'Développeur Full Stack', value: 'Développeur Full Stack' },
+} as const satisfies ExtractedJobPosting
+
+const fullStackMatchEvidenceProposal = {
+  evidence: [createEvidence('1', 'source-fact-1', 'covered',
+    'développer et maintenir des applications web', 'Built end-to-end Next.js applications')],
+  relevance: [createRelevance('1', 'source-fact-1',
+    'développer et maintenir des applications web', 'Built end-to-end Next.js applications')],
+} as const satisfies MatchEvidenceProposal
 
 const frenchAlternativeExcerpt = 'AWS ou GCP est requis.'
 const frenchJobPostingText = [

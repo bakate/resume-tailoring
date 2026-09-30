@@ -266,6 +266,45 @@ describe('resume matching engine', () => {
     expect(result.value.evidence).toMatchObject([{ coverage: 'covered', factIds: ['fact-web'] }])
   })
 
+  it.each([
+    {
+      case: 'a duration range whose lower bound the fact reaches',
+      factExcerpt: '4 years of TypeScript', factValue: '4 years of TypeScript',
+      requirementExcerpt: 'TypeScript', requirementValue: '3-5 years of TypeScript',
+    },
+    {
+      case: 'a duration range written with words',
+      factExcerpt: '4 years of TypeScript', factValue: '4 years of TypeScript',
+      requirementExcerpt: 'TypeScript', requirementValue: '3 to 5 years of TypeScript',
+    },
+    {
+      case: 'a scale written with a thousands separator',
+      factExcerpt: 'Operated a platform', factValue: 'Operated a platform serving 20,000 users',
+      requirementExcerpt: 'Operate a platform', requirementValue: 'Operate a platform serving 5k users',
+    },
+    {
+      case: 'a scale written with a thousands space',
+      factExcerpt: 'Operated a platform serving 20 000 users', factValue: 'Operated a platform serving 20 000 users',
+      requirementExcerpt: 'Operate a platform', requirementValue: 'Operate a platform serving 5k users',
+    },
+  ])('keeps full coverage for $case', ({ factExcerpt, factValue, requirementExcerpt, requirementValue }) => {
+    const result = analyzeResumeMatch({
+      candidateFacts: [{ id: 'fact-quantity', kind: 'experience', value: factValue }],
+      proposedEvidence: [createEvidence({
+        coverage: 'covered', factExcerpt, factId: 'fact-quantity',
+        requirementExcerpt, requirementId: 'requirement-quantity',
+      })],
+      relevantFactIds: [],
+      requirements: [createRoleNeutralRequirement({
+        capabilityName: requirementExcerpt, requirementId: 'requirement-quantity', term: requirementValue,
+      })],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.evidence).toMatchObject([{ coverage: 'covered', factIds: ['fact-quantity'] }])
+  })
+
   it('ignores duplicate relevant Candidate Facts instead of rejecting the Match Analysis', () => {
     const result = analyzeResumeMatch({
       ...weightedMatchInputs,

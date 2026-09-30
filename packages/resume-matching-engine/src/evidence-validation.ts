@@ -102,15 +102,15 @@ function rejectsCandidateFact({ fact, factExcerpt }: Readonly<{
   fact: CandidateFact
   factExcerpt: string
 }>) {
-  if (nonEvidenceTerms.has(normalizeTerm({ value: factExcerpt }))) return true
+  if (nonEvidenceTerms.has(normalizeText({ value: factExcerpt }))) return true
   const clause = readExcerptContext({ excerpt: factExcerpt, separatorPattern: clauseSeparatorPattern, value: fact.value })
   if (isNegatedBeforeExcerpt({ clause, factExcerpt })) return true
   return fact.kind === 'experience' && isLikelyRoleTitle({ factContext: clause, factExcerpt })
 }
 
 function isNegatedBeforeExcerpt({ clause, factExcerpt }: Readonly<{ clause: string; factExcerpt: string }>) {
-  const normalizedClause = ` ${normalizeTerm({ value: clause })} `
-  const excerptIndex = normalizedClause.indexOf(` ${normalizeTerm({ value: factExcerpt })} `)
+  const normalizedClause = ` ${normalizeText({ value: clause })} `
+  const excerptIndex = normalizedClause.indexOf(` ${normalizeText({ value: factExcerpt })} `)
   const precedingText = normalizedClause.slice(0, excerptIndex + 1)
   return negativeTerms.some((negativeTerm) => precedingText.includes(` ${negativeTerm} `))
 }
@@ -149,7 +149,7 @@ function requiresQualifier({ qualifier, requirementContext }: Readonly<{
 }>) {
   if (!containsTerm({ content: requirementContext, term: qualifier })) return false
   // "Lead the migration" asks for an activity, not a lead-level role.
-  return qualifier !== 'lead' || !leadAsVerbPattern.test(` ${normalizeTerm({ value: requirementContext })} `)
+  return qualifier !== 'lead' || !leadAsVerbPattern.test(` ${normalizeText({ value: requirementContext })} `)
 }
 
 function satisfiesLevelConstraint({ factContext, requiredLevel }: Readonly<{
@@ -182,7 +182,7 @@ function reachesDuration({ factContext, requirementContext }: Readonly<{
 }
 
 function readLongestDurationInMonths({ value }: Readonly<{ value: string }>) {
-  const months = readDurations({ value: normalizeTerm({ value }) }).map((duration) => duration.months)
+  const months = readDurations({ value: normalizeText({ value }) }).map((duration) => duration.months)
   return months.length === 0 ? null : Math.max(...months)
 }
 
@@ -221,7 +221,7 @@ function normalizeScaleUnit({ unit }: Readonly<{ unit: string }>) {
 }
 
 function normalizeScaleText({ value }: Readonly<{ value: string }>) {
-  return foldText({ value }).replaceAll(/(\d),(\d)/gu, '$1.$2')
+  return foldText({ value }).replaceAll(thousandsSeparatorPattern, '').replaceAll(/(\d),(\d)/gu, '$1.$2')
     .replaceAll(/[^a-z0-9+#.]+/gu, ' ').trim()
 }
 
@@ -231,7 +231,7 @@ function isLikelyRoleTitle({ factContext, factExcerpt }: Readonly<{
 }>) {
   if (!hasTitleLikeStart({ factContext, factExcerpt })) return false
   const words = factContext.match(/\p{L}[\p{L}\p{M}+#.-]*/gu) ?? []
-  const titleWords = words.filter((word) => !titleConnectorTerms.has(normalizeTerm({ value: word })))
+  const titleWords = words.filter((word) => !titleConnectorTerms.has(normalizeText({ value: word })))
   if (titleWords.length === 0) return false
   const titleCaseWords = titleWords.filter((word) => /^\p{Lu}/u.test(word))
   return titleCaseWords.length / titleWords.length >= 0.75
@@ -241,8 +241,8 @@ function hasTitleLikeStart({ factContext, factExcerpt }: Readonly<{
   factContext: string
   factExcerpt: string
 }>) {
-  const normalizedContext = normalizeTerm({ value: factContext })
-  const normalizedExcerpt = normalizeTerm({ value: factExcerpt })
+  const normalizedContext = normalizeText({ value: factContext })
+  const normalizedExcerpt = normalizeText({ value: factExcerpt })
   return normalizedContext === normalizedExcerpt
     || normalizedContext.startsWith(`${normalizedExcerpt} `)
     || careerLevelTerms.some((level) => normalizedContext.startsWith(`${level} `))
@@ -255,12 +255,11 @@ function readScaleMultiplier({ magnitude }: Readonly<{ magnitude: string | undef
 }
 
 function containsTerm({ content, term }: Readonly<{ content: string; term: string }>) {
-  const normalizedContent = ` ${normalizeTerm({ value: content })} `
-  const normalizedTerm = normalizeTerm({ value: term })
+  const normalizedContent = ` ${normalizeText({ value: content })} `
+  const normalizedTerm = normalizeText({ value: term })
   return normalizedTerm.length > 1 && normalizedContent.includes(` ${normalizedTerm} `)
 }
 
-const normalizeTerm = normalizeText
 const nonEvidenceTerms = new Set([
   'advanced', 'expert', 'junior', 'lead', 'mid level', 'senior',
 ])
@@ -269,16 +268,20 @@ const qualitativeRequirementTerms = [
   'advanced', 'expert', 'junior', 'lead', 'mid', 'middle', 'principal', 'production', 'senior',
   'staff',
 ] as const
-const careerLevelTerms = ['junior', 'mid', 'middle', 'senior', 'lead', 'staff', 'principal'] as const
 const careerLevelRanks = new Map<string, number>([
   ['junior', 1], ['mid', 2], ['middle', 2], ['senior', 3],
   ['lead', 4], ['staff', 4], ['principal', 5],
 ])
-const clauseSeparatorPattern = /([,;\n]|[.!?](?:\s+|$)|\b(?:and|et|qui|who)\b)/iu
-// Constraints stay bound across relative clauses ("Senior engineer who built…").
-const constraintSeparatorPattern = /([,;\n]|[.!?](?:\s+|$)|\b(?:and|et)\b)/iu
+const careerLevelTerms = [...careerLevelRanks.keys()]
+const clauseSeparatorPattern = /(,(?!\d)|[;\n]|[.!?](?:\s+|$)|\b(?:and|et|qui|who)\b)/iu
+// Constraints stay bound across relative clauses ("Senior engineer who built…"), and a
+// comma between digits separates thousands, not clauses.
+const constraintSeparatorPattern = /(,(?!\d)|[;\n]|[.!?](?:\s+|$)|\b(?:and|et)\b)/iu
 const sentenceSeparatorPattern = /([;\n]|[.!?](?:\s+|$))/u
 const leadAsVerbPattern = / lead (?:a|an|our|the|their|your|d|des|l|la|le|les|un|une) /u
-const durationPattern = /\b(\d+)\s*\+?\s*(years?|yrs?|ans?|months?|mois)\b/gu
+// A range such as "3-5 years" or "3 à 5 ans" requires its lower bound.
+const durationPattern = /\b(\d+)(?:\s+(?:to\s+|a\s+)?\d+)?\s*\+?\s*(years?|yrs?|ans?|months?|mois)\b/gu
+// "20,000" and "20 000" are one number; "1,5" stays a decimal comma.
+const thousandsSeparatorPattern = /(?<=\d)[,\s](?=\d{3}(?!\d))/gu
 const scalePattern = /\b(\d+(?:[.,]\d+)?)\s*(k|m|millions?|thousands?)?\s*(users?|requests?|transactions?|people|engineers?|developers?)\b/gu
 const titleConnectorTerms = new Set(['at', 'chez', 'de', 'of'])
