@@ -1,13 +1,13 @@
-import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion } from '@resume-tailoring/application/candidate-journey'
-import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { groupedResumeDocument, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import type { ResumeWritingInput, ResumeValidationInput } from '@resume-tailoring/application/candidate-journey'
+import { readProfessionalResumeFields } from '@resume-tailoring/application/candidate-journey'
 
-test.describe('Candidate Journey', () => {
+test.describe('Candidate Journey preview-first preparation', () => {
   test('recovers corrected local contacts after reloading the editor', async ({ page }) => {
     const system = createSystemUnderTest({ page })
-    await system.givenGroupedEvidenceIsReadyForPreparation()
-    await system.prepareGroupedResume()
+    await system.givenStablePreview()
 
     await system.correctContactAndReload()
 
@@ -16,8 +16,7 @@ test.describe('Candidate Journey', () => {
 
   test('keeps unresolved wording visible and blocked after reloading', async ({ page }) => {
     const system = createSystemUnderTest({ page })
-    await system.givenGroupedEvidenceIsReadyForPreparation()
-    await system.prepareGroupedResume()
+    await system.givenStablePreview()
 
     await system.editUnsupportedWordingAndReload()
 
@@ -26,28 +25,24 @@ test.describe('Candidate Journey', () => {
 
   test('prepares a grouped semantic preview with a readable mobile order', async ({ page }) => {
     const system = createSystemUnderTest({ page })
-    await system.givenGroupedEvidenceIsReadyForPreparation()
-
-    await system.prepareGroupedResume()
+    await system.givenStablePreview()
 
     await system.expectPreviewFirstReview()
-    await system.expectGroupedResumePreview()
+    await system.expectGroupedPreview()
   })
 
   test('keeps semantic metadata when an employer is hidden and restored', async ({ page }) => {
     const system = createSystemUnderTest({ page })
-    await system.givenGroupedEvidenceIsReadyForPreparation()
-    await system.prepareGroupedResume()
+    await system.givenStablePreview()
 
     await system.hideAndRestoreEmployer()
 
-    await system.expectGroupedResumePreview()
+    await system.expectGroupedPreview()
   })
 
   test('keeps candidate section ordering in the preview', async ({ page }) => {
     const system = createSystemUnderTest({ page })
-    await system.givenGroupedEvidenceIsReadyForPreparation()
-    await system.prepareGroupedResume()
+    await system.givenStablePreview()
 
     await system.moveExperienceBeforeSummary()
 
@@ -56,255 +51,326 @@ test.describe('Candidate Journey', () => {
 
   test('restores a complete hidden experience without losing its metadata', async ({ page }) => {
     const system = createSystemUnderTest({ page })
-    await system.givenGroupedEvidenceIsReadyForPreparation()
-    await system.prepareGroupedResume()
+    await system.givenStablePreview()
 
     await system.hideAndRestoreExperience()
 
-    await system.expectGroupedResumePreview()
+    await system.expectGroupedPreview()
   })
 
-  test('exposes exactly three domain phases', async ({ page }) => {
+
+  test('generates a coherent preview from combined intake in one action', async ({ page }) => {
     const system = createSystemUnderTest({ page })
+    await system.givenCombinedIntake()
 
-    // Action
-    await system.openCandidateJourney()
+    await system.generateResume()
 
-    // Then
-    await system.expectExactlyThreeCandidateJourneyPhases()
+    await system.expectGroupedPreview()
   })
 
-  test('a Candidate can start a browser-local Candidate Session', async ({ page }) => {
-    const system = createSystemUnderTest({ page })
+  test('isolates nonblocking ambiguity and still produces a usable preview', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'isolated-ambiguity' })
+    await system.givenCombinedIntake()
 
-    // Given
-    await system.givenCandidateJourneyIsOpen()
+    await system.generateResume()
 
-    // Action
-    await system.startCandidateSession()
-
-    // Then
-    await system.expectCandidateSessionToBeActiveInSourceIntake()
+    await system.expectIsolatedAmbiguityWithPreview()
   })
 
-  test('a Candidate can restore a browser-local Candidate Session', async ({ page }) => {
-    const system = createSystemUnderTest({ page })
+  test('resumes after a blocking targeted correction without a second generation approval', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'blocking-ambiguity' })
+    await system.givenBlockedPreparation()
 
-    // Given
-    await system.givenCandidateSessionIsActive()
+    await system.correctBlockingAmbiguity()
 
-    // Action
-    await system.restoreCandidateSession()
-
-    // Then
-    await system.expectCandidateSessionToBeActiveInSourceIntake()
+    await system.expectCorrectedPreview()
   })
 
-  test('a Candidate can delete the browser-local Candidate Session', async ({ page }) => {
-    const system = createSystemUnderTest({ page })
+  test('warns on low coverage without blocking the preview', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'low-coverage' })
+    await system.givenCombinedIntake()
 
-    // Given
-    await system.givenCandidateSessionIsActive()
+    await system.generateResume()
 
-    // Action
-    await system.deleteCandidateSession()
-
-    // Then
-    await system.expectCandidateSessionToBeDeleted()
+    await system.expectLowCoveragePreview()
   })
 
-  test('a Candidate sees the active Processing Policy before granting consent', async ({ page }) => {
-    const system = createSystemUnderTest({ page })
+  test('explains no correspondence and offers a non-tailored document', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'no-correspondence' })
+    await system.givenNoCorrespondenceResult()
 
-    // Given
-    await system.givenCandidateJourneyIsOpen()
+    await system.prepareNormalizedResume()
 
-    // Action
-    await system.startCandidateSession()
-
-    // Then
-    await system.expectActiveProcessingPolicyToBeVisible()
+    await system.expectNormalizedPreview()
   })
 
-  test('the active Processing Policy content follows the selected locale', async ({ page }) => {
-    const system = createSystemUnderTest({ page })
+  test('keeps the current extracted profile inspectable without correspondence', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'no-correspondence' })
+    await system.givenNoCorrespondenceResult()
 
-    // Given
-    await system.givenCandidateSessionIsActive()
+    await system.inspectSourceProfile()
 
-    // Action
-    await system.selectFrenchLocale()
-
-    // Then
-    await system.expectFrenchProcessingPolicyToBeVisible()
+    await system.expectCurrentSourceEvidence()
   })
 
-  test('a Candidate grants Processing Consent to the active policy', async ({ page }) => {
-    const system = createSystemUnderTest({ page })
+  test('retains an optional source correction when retrying a failed first generation', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'isolated-ambiguity' })
+    await system.givenFailedResumeWithOptionalCorrection()
 
-    // Given
-    await system.givenCandidateSessionIsActive()
+    await system.correctSourceAndRetry()
 
-    // Action
-    await system.grantProcessingConsent()
-
-    // Then
-    await system.expectProcessingConsentToBeGranted()
+    await system.expectCorrectedSourceInPreview()
   })
 
-  test('a Candidate restores Processing Consent for the unchanged policy', async ({ page }) => {
-    const system = createSystemUnderTest({ page })
+  test('removes a pending correction when the posting changes', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'blocking-ambiguity' })
+    await system.givenBlockedPreparation()
 
-    // Given
-    await system.givenProcessingConsentIsGranted()
+    await system.replacePosting()
 
-    // Action
-    await system.restoreCandidateSession()
-
-    // Then
-    await system.expectRestoredProcessingConsentToBeGranted()
+    await system.expectOutdatedCorrectionRemoved()
   })
 
-  test('a Candidate pastes professional text and proceeds directly to Job Match', async ({ page }) => {
+  test('supports a French override and retains the original employer', async ({ page }) => {
     const system = createSystemUnderTest({ page })
+    await system.givenCombinedIntakeInFrench()
 
-    // Given
-    await system.givenProcessingConsentIsGranted()
-    await system.givenStructuredSourceProfileExtractionSucceeds()
+    await system.generateResume()
 
-    // Action
-    await system.submitPastedProfessionalText()
-
-    // Then
-    await system.expectStructuredSourceProfileToBeOptionalAndJobMatchToBeCurrent()
+    await system.expectFrenchPreview()
   })
 
-  test('a Candidate resolves only the targeted Critical Ambiguity', async ({ page }) => {
-    const system = createSystemUnderTest({ page })
+  test('does not publish unsafe model wording', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'unsafe-output' })
+    await system.givenCombinedIntake()
 
-    // Given
-    await system.givenProcessingConsentIsGranted()
-    await system.givenSourceIntakeRequiresCriticalAmbiguityResolution()
+    await system.generateResume()
 
-    // Action
-    await system.answerCriticalAmbiguity()
-
-    // Then
-    await system.expectCriticalAmbiguityToBeResolvedForJobMatch()
+    await system.expectUnsafeOutputRejected()
   })
 
-  test('a Candidate receives an explainable Match Analysis without requirement review', async ({ page }) => {
-    const system = createSystemUnderTest({ page })
+  test('recovers interrupted preparation after reload', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'interrupted' })
+    await system.givenInterruptedPreparation()
 
-    // Given
-    await system.givenProcessingConsentIsGranted()
-    await system.givenStructuredSourceProfileExtractionSucceeds()
-    await system.givenSourceIntakeIsReadyForJobMatch()
-    await system.givenExplainableJobMatchSucceeds()
+    await system.resumePreparation()
 
-    // Action
-    await system.submitPastedJobPosting()
-
-    // Then
-    await system.expectExplainableMatchAnalysisToBeVisible()
+    await system.expectGroupedPreview()
   })
 
-  test('a Candidate confirms targeted missing evidence and receives a fresh Match Analysis', async ({ page }) => {
+  test('retains a stable preview after failed regeneration', async ({ page }) => {
     const system = createSystemUnderTest({ page })
+    await system.givenStablePreview()
 
-    // Given
-    await system.givenProcessingConsentIsGranted()
-    await system.givenStructuredSourceProfileExtractionSucceeds()
-    await system.givenSourceIntakeIsReadyForJobMatch()
-    await system.givenExplainableJobMatchSucceeds()
-    await system.submitPastedJobPosting()
-    await system.expectTargetedProfileEnrichmentIsVisible()
-    system.givenProfileEnrichmentRefreshSucceeds()
+    await system.regenerateWithUnavailableWriter()
 
-    // Action
-    await system.confirmProfileEnrichment()
-
-    // Then
-    await system.expectCandidateFactAndFreshMatchAnalysis()
+    await system.expectStablePreviewAfterFailure()
   })
 
-  test('a low Match Score warns without blocking an evidence-backed Tailored Resume', async ({ page }) => {
+  test('can hide and restore an employer without losing experience associations', async ({ page }) => {
     const system = createSystemUnderTest({ page })
+    await system.givenStablePreview()
 
-    // Given
-    await system.givenProcessingConsentIsGranted()
-    await system.givenStructuredSourceProfileExtractionSucceeds()
-    await system.givenSourceIntakeIsReadyForJobMatch()
-    await system.givenLowExplainableJobMatchSucceeds()
+    await system.hideAndRestoreEmployer()
 
-    // Action
-    await system.submitPastedJobPosting()
-
-    // Then
-    await system.expectLowScoreWarningAndTailoredResumeOffer()
+    await system.expectGroupedPreview()
   })
 
-  test('no relevant evidence offers only an explicitly non-tailored normalized source resume', async ({ page }) => {
+  test('keeps consent, local session restoration and deletion accessible', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenCombinedIntake()
+
+    await system.restoreAndDeleteSession()
+
+    await system.expectDeletedSession()
+  })
+
+  test('discloses Processing Policy and requires consent before generation', async ({ page }) => {
     const system = createSystemUnderTest({ page })
 
-    // Given
-    await system.givenProcessingConsentIsGranted()
-    await system.givenStructuredSourceProfileExtractionSucceeds()
-    await system.givenSourceIntakeIsReadyForJobMatch()
-    await system.givenUnsupportedJobMatchSucceeds()
+    await system.openUnconsentedIntake()
 
-    // Action
-    await system.submitPastedJobPosting()
-
-    // Then
-    await system.expectOnlyNormalizedSourceResumeOffer()
+    await system.expectConsentGate()
   })
 })
 
-function createSystemUnderTest({ page }: Readonly<{ page: Page }>) {
-  return new CandidateJourneyTestSystem(page)
+function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: Page; scenario?: Scenario }>) {
+  return new CandidateJourneyTestSystem(page, scenario)
 }
 
-type MatchEvidenceApiResponse = typeof matchEvidenceResponse
-  | ReturnType<typeof createEnrichedMatchEvidenceResponse>
-  | typeof lowMatchEvidenceResponse
-  | typeof unsupportedMatchEvidenceResponse
+type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-coverage' | 'no-correspondence'
+  | 'unsafe-output' | 'interrupted' | 'unavailable'
 
 class CandidateJourneyTestSystem {
   readonly #page: Page
-  readonly #pageErrors: string[] = []
-  #completedAction: CandidateJourneyAction | null = null
-  #matchEvidenceResponse: MatchEvidenceApiResponse = matchEvidenceResponse
-  #readMatchEvidenceResponse: (candidateFacts: readonly Readonly<{
-    id: `source-fact-${string}`
-  }>[]) => MatchEvidenceApiResponse = () => this.#matchEvidenceResponse
-  #lastMatchResponse: unknown = null
+  readonly #errors: string[] = []
+  #scenario: Scenario
+  #completedAction: string | null = null
 
-  constructor(page: Page) {
-    this.#page = page
-    page.on('pageerror', (error) => { this.#pageErrors.push(error.message) })
+  constructor(page: Page, scenario: Scenario) {
+    this.#page = page; this.#scenario = scenario
+    page.on('pageerror', (error) => { this.#errors.push(error.message) })
   }
 
-  async givenGroupedEvidenceIsReadyForPreparation() {
-    const startedAt = Date.now()
-    const session = {
-      expiresAt: startedAt + candidateSessionDurationMilliseconds, startedAt,
-      version: candidateSessionStorageVersion,
-      sessionId: 'candidate-session-00000000-0000-4000-8000-000000000056',
-      phase: 'job-match', processingConsent: null, tailoredResume: null,
-      sourceIntake: structuredResumeSource, jobMatch: structuredResumeJobMatch,
-    }
-    await this.#page.addInitScript((storedSession) => {
-      if (window.top !== window || localStorage.getItem('honest-resume:candidate-session') !== null) return
-      localStorage.setItem('honest-resume:candidate-session', JSON.stringify(storedSession))
-    }, session)
+  async #installModelAdapters() {
+    await this.#page.route('**/api/resume-claim-validation', (route) => route.fulfill({ json: {
+      ok: false, error: { type: 'unavailable' },
+    } }))
+    await this.#page.route('**/api/structured-source-profile-extraction', (route) => route.fulfill({ json: {
+      ok: true, value: extractionFor(this.#scenario),
+    } }))
+    await this.#page.route('**/api/explainable-job-posting-extraction', (route) => route.fulfill({ json: {
+      ok: true, value: { targetRole: structuredResumeJobMatch.targetRole, practicalConstraints: [], requirements: requirementsFor(this.#scenario) },
+    } }))
+    await this.#page.route('**/api/explainable-match-evidence', (route) => route.fulfill({ json: {
+      ok: true, value: matchFor(this.#scenario),
+    } }))
+    await this.#page.route('**/api/resume-document-writing', (route) => {
+      if (this.#scenario === 'interrupted') return route.abort()
+      if (this.#scenario === 'unavailable') return route.fulfill({ json: { ok: false, error: { type: 'unavailable' } } })
+      const input = route.request().postDataJSON() as ResumeWritingInput
+      return route.fulfill({ json: { ok: true, value: writtenDocument({ input, scenario: this.#scenario }) } })
+    })
+    await this.#page.route('**/api/resume-document-validation', (route) => {
+      const input = route.request().postDataJSON() as ResumeValidationInput
+      return route.fulfill({ json: { ok: true, value: { coherent: true, languageMatches: true,
+        fields: readProfessionalResumeFields(input.document).map(({ id }) => ({ fieldId: id, supported: this.#scenario !== 'unsafe-output' })),
+      } } })
+    })
+  }
+
+  async openUnconsentedIntake() {
+    await this.#installModelAdapters()
     await this.#page.goto('/')
+    await this.#page.getByRole('button', { name: 'Start a Candidate Session' }).click()
+    this.#completedAction = 'intake-opened'
   }
 
-  async prepareGroupedResume() {
-    await this.#page.getByRole('button', { name: 'Prepare my Tailored Resume' }).click()
+  async givenCombinedIntake() {
+    await this.openUnconsentedIntake()
+    await this.#page.getByRole('button', { name: 'Grant Processing Consent' }).click()
+    await this.#page.getByRole('textbox', { name: 'Professional text', exact: true }).fill(
+      'alex@example.com\nFrontend Engineer at Northwind. Built accessible billing screens. React and TypeScript.')
+    await this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true }).fill(postingText)
+  }
+
+  async givenCombinedIntakeInFrench() {
+    await this.givenCombinedIntake()
+    await this.#page.getByRole('combobox', { name: 'Resume language', exact: true }).click()
+    await this.#page.getByRole('option', { name: 'Français', exact: true }).click()
+  }
+
+  async generateResume() {
+    await this.#page.getByRole('button', { name: 'Generate my resume', exact: true }).click()
+    this.#completedAction = 'generated'
+  }
+
+  async givenStablePreview() {
+    await this.givenCombinedIntake()
+    await this.generateResume()
     await expect(this.#page.getByTitle('Tailored Resume preview')).toBeVisible()
-    this.#completedAction = 'grouped-resume-prepared'
+  }
+
+  async givenBlockedPreparation() {
+    await this.givenCombinedIntake()
+    await this.generateResume()
+    await expect(this.#page.getByRole('textbox', { name: 'Which skill did you use?' })).toBeVisible()
+    await expect(this.#page.getByTitle('Tailored Resume preview')).toHaveCount(0)
+  }
+
+  async correctBlockingAmbiguity() {
+    await this.#page.getByRole('textbox', { name: 'Which skill did you use?' }).fill('React')
+    await this.#page.getByRole('button', { name: 'Save this answer' }).click()
+    this.#completedAction = 'corrected'
+  }
+
+  async givenNoCorrespondenceResult() {
+    await this.givenCombinedIntake()
+    await this.generateResume()
+    await expect(this.#page.getByTitle('Tailored Resume preview')).toHaveCount(0)
+    await expect(this.#page.getByRole('button', { name: 'Prepare a non-tailored resume' })).toBeVisible()
+  }
+
+  async givenFailedResumeWithOptionalCorrection() {
+    await this.givenCombinedIntake()
+    await this.#page.route('**/api/resume-document-writing', (route) => route.fulfill({ json: { ok: false, error: { type: 'unavailable' } } }))
+    await this.generateResume()
+    await expect(this.#page.getByText('Preparation could not finish.', { exact: false }).first()).toBeVisible()
+    await this.#page.getByText('Inspect or enrich your source evidence', { exact: true }).click()
+    await this.#page.unroute('**/api/resume-document-writing')
+    await this.#installModelAdapters()
+    await this.#page.route('**/api/structured-source-profile-extraction', (route) => route.fulfill({ json: { ok: false, error: 'source-profile-extraction-unavailable' } }))
+  }
+
+  async correctSourceAndRetry() {
+    await this.#page.getByRole('textbox', { name: 'Which team?' }).fill('Billing platform team')
+    await this.#page.getByRole('button', { name: 'Save this answer' }).click()
+    await expect(this.#page.getByRole('textbox', { name: 'Which team?' })).toHaveCount(0)
+    await this.generateResume()
+    this.#completedAction = 'corrected-and-retried'
+  }
+
+  async expectCorrectedSourceInPreview() {
+    this.#expectAction()
+    await expect(this.#page.getByTitle('Tailored Resume preview')).toBeVisible()
+    await expect(this.#page.frameLocator('iframe').getByText('Billing platform team', { exact: true })).toBeVisible()
+  }
+
+  async inspectSourceProfile() {
+    await this.#page.getByText('Inspect or enrich your source evidence', { exact: true }).click()
+    await this.#page.getByRole('button', { name: 'Inspect Source Profile', exact: true }).click()
+    this.#completedAction = 'inspected'
+  }
+
+  async replacePosting() {
+    await this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true }).fill('Rust engineer. Rust is required.')
+    this.#completedAction = 'posting-replaced'
+  }
+
+  async expectCurrentSourceEvidence() {
+    this.#expectAction()
+    const source = this.#page.getByRole('region', { name: 'Complete your Source Intake' })
+    await expect(source.getByText('Frontend Engineer — Northwind', { exact: true })).toBeVisible()
+    await expect(source.getByText('Built accessible billing screens', { exact: true })).toBeVisible()
+  }
+
+  async expectOutdatedCorrectionRemoved() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('textbox', { name: 'Which skill did you use?' })).toHaveCount(0)
+    await expect(this.#page.getByTitle('Tailored Resume preview')).toHaveCount(0)
+  }
+
+  async prepareNormalizedResume() {
+    await this.#page.getByRole('button', { name: 'Prepare a non-tailored resume' }).click()
+    this.#completedAction = 'normalized'
+  }
+
+  async givenInterruptedPreparation() {
+    await this.givenCombinedIntake()
+    await this.#page.route('**/api/resume-document-writing', async (route) => {
+      await new Promise((resolve) => { setTimeout(resolve, 2_000) })
+      await route.abort().catch(() => undefined)
+    })
+    await this.generateResume()
+    await expect(this.#page.getByRole('region', { name: 'Candidate Journey progress' })).toContainText('Writing')
+    await this.#page.reload()
+    await expect(this.#page.getByText('Generation was interrupted.', { exact: false })).toBeVisible()
+    await this.#page.unroute('**/api/resume-document-writing')
+    this.#scenario = 'normal'
+    await this.#installModelAdapters()
+  }
+
+  async resumePreparation() {
+    await this.#page.getByRole('button', { name: 'Retry preparation' }).click()
+    this.#completedAction = 'resumed'
+  }
+
+  async regenerateWithUnavailableWriter() {
+    this.#scenario = 'unavailable'
+    await this.#page.getByRole('button', { name: 'Generate my resume', exact: true }).click()
+    await expect(this.#page.getByRole('dialog')).toContainText('including manual edits')
+    await this.#page.getByRole('button', { name: 'Replace and regenerate' }).click()
+    this.#completedAction = 'regenerated'
   }
 
   async correctContactAndReload() {
@@ -315,7 +381,7 @@ class CandidateJourneyTestSystem {
   }
 
   async expectCorrectedContactRecovered() {
-    this.#expectCompletedAction('contact-corrected-and-reloaded')
+    this.#expectAction()
     await expect(this.#page.frameLocator('iframe').getByText('updated@example.com', { exact: true })).toBeVisible()
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
     await expect(this.#page.getByLabel('Email', { exact: true })).toHaveValue('updated@example.com')
@@ -331,7 +397,7 @@ class CandidateJourneyTestSystem {
   }
 
   async expectUnresolvedWordingRecovered() {
-    this.#expectCompletedAction('wording-edited-and-reloaded')
+    this.#expectAction()
     await expect(this.#page.frameLocator('iframe').getByText('Led 100 engineers', { exact: true })).toBeVisible()
     await expect(this.#page.getByRole('button', { name: 'Print current resume', exact: true })).toHaveCount(0)
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
@@ -387,477 +453,127 @@ class CandidateJourneyTestSystem {
     await expect(headings.nth(1)).toHaveText('Summary')
   }
 
-  async expectGroupedResumePreview() {
-    this.#expectCompletedAction('grouped-resume-prepared')
-    expect(this.#pageErrors).toEqual([])
-    await expect(this.#page).toHaveURL('/')
-    await expect(this.#page.locator('vite-error-overlay')).toHaveCount(0)
+  async restoreAndDeleteSession() {
+    await this.#page.reload()
+    await expect(this.#page.getByText('Processing Consent granted for this policy.')).toBeVisible()
+    await this.#page.getByRole('button', { name: 'Delete Candidate Session' }).click()
+    await this.#page.getByRole('button', { name: 'Delete session now' }).click()
+    this.#completedAction = 'deleted'
+  }
+
+  async expectGroupedPreview() {
+    this.#expectAction()
+    await expect(this.#page.getByTitle('Tailored Resume preview')).toBeVisible()
     const preview = this.#page.frameLocator('iframe')
     const experience = preview.locator('article').filter({ has: preview.getByRole('heading', { name: 'Frontend Engineer', exact: true }) })
     await expect(experience).toContainText('Northwind')
     await expect(experience).toContainText('2021 – 2024')
     await expect(experience).toContainText('Built accessible billing screens')
-    await expect(preview.getByRole('heading', { name: 'Front-end', exact: true })).toHaveCount(1)
     await expect(preview.locator('.skill-group')).toHaveText('Front-endReact · TypeScript')
     await expect(preview.locator('li').filter({ hasText: /^Front-end$/ })).toHaveCount(0)
-    const pageWidth = await preview.locator('body').evaluate((body) => body.scrollWidth)
-    const viewportWidth = await this.#page.locator('iframe').evaluate((frame) => frame.clientWidth)
-    expect(pageWidth).toBeLessThanOrEqual(viewportWidth)
+    await expect(this.#page.locator('vite-error-overlay')).toHaveCount(0)
+    expect(this.#errors).toEqual([])
+    const contentWidth = await preview.locator('body').evaluate((body) => body.scrollWidth)
+    const frameWidth = await this.#page.locator('iframe').evaluate((frame) => frame.clientWidth)
+    expect(contentWidth).toBeLessThanOrEqual(frameWidth)
   }
 
-  async givenCandidateJourneyIsOpen() {
-    await this.#page.goto('/')
+  async expectIsolatedAmbiguityWithPreview() {
+    await this.expectGroupedPreview()
+    await expect(this.#page.getByText('Ambiguous evidence was left out.', { exact: false })).toBeVisible()
+    await expect(this.#page.frameLocator('iframe').getByText('Customer billing team')).toHaveCount(0)
   }
 
-  async givenCandidateSessionIsActive() {
-    await this.givenCandidateJourneyIsOpen()
-    await this.startCandidateSession()
+  async expectCorrectedPreview() {
+    this.#expectAction()
+    await expect(this.#page.getByTitle('Tailored Resume preview')).toBeVisible()
+    await expect(this.#page.frameLocator('iframe').getByText('React experience.')).toBeVisible()
+    await expect(this.#page.getByRole('textbox', { name: 'Which skill did you use?' })).toHaveCount(0)
   }
 
-  async givenProcessingConsentIsGranted() {
-    await this.givenCandidateSessionIsActive()
-    await this.grantProcessingConsent()
+  async expectLowCoveragePreview() {
+    await this.expectGroupedPreview()
+    await expect(this.#page.getByText('A low Match Score', { exact: false })).toBeVisible()
   }
 
-  async givenStructuredSourceProfileExtractionSucceeds() {
-    await this.#page.route('**/api/structured-source-profile-extraction', (route) => (
-      route.fulfill({ json: structuredSourceProfileResponse })
-    ))
+  async expectNormalizedPreview() {
+    this.#expectAction()
+    await expect(this.#page.getByText('Non-tailored resume ready', { exact: true })).toBeVisible()
+    await expect(this.#page.frameLocator('iframe').getByText('Normalized Resume', { exact: false })).toBeVisible()
   }
 
-  async givenSourceIntakeRequiresCriticalAmbiguityResolution() {
-    await this.#page.route('**/api/structured-source-profile-extraction', (route) => (
-      route.fulfill({ json: criticalAmbiguitySourceProfileResponse })
-    ))
-    await this.#submitProfessionalText()
-    await expect(this.#page.getByRole('region', { name: 'Resolve Critical Ambiguities' }))
-      .toBeVisible()
+  async expectFrenchPreview() {
+    this.#expectAction()
+    await expect(this.#page.getByTitle('Tailored Resume preview')).toBeVisible()
+    await expect(this.#page.frameLocator('iframe').getByText('Développement d’interfaces de facturation accessibles.', { exact: true })).toBeVisible()
+    await expect(this.#page.frameLocator('iframe').getByText('Northwind', { exact: true })).toBeVisible()
   }
 
-  async givenSourceIntakeIsReadyForJobMatch() {
-    await this.#submitProfessionalText()
-    await expect(this.#page.getByRole('listitem').filter({ hasText: 'Job Match' }))
-      .toHaveAttribute('aria-current', 'step')
+  async expectUnsafeOutputRejected() {
+    this.#expectAction()
+    await expect(this.#page.getByText('The generated wording could not be supported', { exact: false })).toBeVisible()
+    await expect(this.#page.getByTitle('Tailored Resume preview')).toHaveCount(0)
   }
 
-  async givenExplainableJobMatchSucceeds() {
-    await this.#page.route('**/api/explainable-job-posting-extraction', (route) => (
-      route.fulfill({ json: jobPostingExtractionResponse })
-    ))
-    await this.#page.route('**/api/explainable-match-evidence', async (route) => {
-      const request = route.request().postDataJSON() as Readonly<{
-        candidateFacts: readonly Readonly<{ id: `source-fact-${string}` }>[]
-      }>
-      const response = this.#readMatchEvidenceResponse(request.candidateFacts)
-      await route.fulfill({ json: response })
-    })
+  async expectStablePreviewAfterFailure() {
+    this.#expectAction()
+    await expect(this.#page.getByText('Preparation could not finish.', { exact: false })).toBeVisible()
+    await this.expectGroupedPreview()
   }
 
-  async givenLowExplainableJobMatchSucceeds() {
-    this.#matchEvidenceResponse = lowMatchEvidenceResponse
-    await this.givenExplainableJobMatchSucceeds()
-  }
-
-  async givenUnsupportedJobMatchSucceeds() {
-    this.#matchEvidenceResponse = unsupportedMatchEvidenceResponse
-    await this.givenExplainableJobMatchSucceeds()
-  }
-
-  givenProfileEnrichmentRefreshSucceeds() {
-    this.#readMatchEvidenceResponse = (candidateFacts) => {
-      const enrichedFactId = candidateFacts.at(-1)?.id
-      return enrichedFactId === undefined ? this.#matchEvidenceResponse
-        : createEnrichedMatchEvidenceResponse({ enrichedFactId })
-    }
-  }
-
-  async expectTargetedProfileEnrichmentIsVisible() {
-    this.#expectCompletedAction('job-posting-submitted')
-    const enrichment = this.#page.getByRole('region', { name: 'Optional profile enrichment' })
-    await expect(enrichment).toContainText('Architecture leadership')
-    await expect(enrichment).toContainText('Executive communication')
-    await expect(enrichment).not.toContainText('Kubernetes')
-  }
-
-  async openCandidateJourney() {
-    await this.#page.goto('/')
-    this.#completedAction = 'candidate-journey-opened'
-  }
-
-  async startCandidateSession() {
-    await this.#page.getByRole('button', { name: 'Start a Candidate Session' }).click()
-    this.#completedAction = 'candidate-session-started'
-  }
-
-  async restoreCandidateSession() {
-    await this.#page.reload()
-    this.#completedAction = 'candidate-session-restored'
-  }
-
-  async deleteCandidateSession() {
-    await this.#page.getByRole('button', { name: 'Delete Candidate Session' }).click()
-    await this.#page.getByRole('button', { name: 'Delete session now' }).click()
-    this.#completedAction = 'candidate-session-deleted'
-  }
-
-  async grantProcessingConsent() {
-    await this.#page.getByRole('button', { name: 'Grant Processing Consent' }).click()
-    this.#completedAction = 'processing-consent-granted'
-  }
-
-  async selectFrenchLocale() {
-    await this.#page.getByRole('radiogroup', { name: 'Language' }).getByText('FR').click()
-    this.#completedAction = 'french-locale-selected'
-  }
-
-  async submitPastedProfessionalText() {
-    await this.#submitProfessionalText()
-    this.#completedAction = 'source-document-submitted'
-  }
-
-  async answerCriticalAmbiguity() {
-    const question = 'What year did you start at Acme?'
-    await this.#page.getByRole('textbox', { name: question }).fill('2021')
-    await this.#page.getByRole('button', { name: 'Save this answer' }).click()
-    this.#completedAction = 'critical-ambiguity-answered'
-  }
-
-  async submitPastedJobPosting() {
-    await this.#page.getByRole('textbox', { name: 'Job Posting text' }).fill(jobPostingText)
-    await this.#page.getByRole('button', { name: 'Analyze this Job Posting' }).click()
-    this.#completedAction = 'job-posting-submitted'
-  }
-
-  async confirmProfileEnrichment() {
-    const prompt = this.#page.getByRole('group', { name: 'Architecture leadership' })
-    await prompt.getByRole('textbox', { name: 'Describe only what you actually did' })
-      .fill('Practiced Architecture leadership across the organization')
-    const refreshResponse = this.#page.waitForResponse('**/api/explainable-match-evidence')
-    await prompt.getByRole('button', {
-      name: 'Add this Candidate Fact and refresh analysis',
-    }).click()
-    this.#lastMatchResponse = await (await refreshResponse).json()
-    this.#completedAction = 'profile-enrichment-confirmed'
-  }
-
-  async #submitProfessionalText() {
-    await this.#page.getByRole('textbox', { name: 'Professional text' }).fill([
-      'Bakate Example',
-      'bakate@example.com',
-      'Senior FullStack Developer at Acme',
-    ].join('\n'))
-    await this.#page.getByRole('button', { name: 'Build my Source Profile' }).click()
-  }
-
-  async expectActiveProcessingPolicyToBeVisible() {
-    this.#expectCompletedAction('candidate-session-started')
-    const policy = this.#page.getByRole('region', { name: 'Processing Policy' })
-    await expect(policy).toContainText('OpenAI')
-    await expect(policy).toContainText('Purposes')
-    await expect(policy).toContainText('Data sent')
-    await expect(policy).toContainText('Retention')
-    await expect(policy).toContainText('Storage')
-    await expect(policy).toContainText('Policy version 2026-09-29')
-  }
-
-  async expectExactlyThreeCandidateJourneyPhases() {
-    this.#expectCompletedAction('candidate-journey-opened')
-    const phases = this.#page.getByRole('navigation', { name: 'Candidate Journey phases' })
-      .getByRole('listitem')
-    await expect(phases).toHaveText([
-      '01Source IntakeAdd the professional facts that can support your application.',
-      '02Job MatchCompare your evidence with one Job Posting.',
-      '03Tailored Resume PreparationPrepare and export an evidence-backed resume.',
-    ])
-  }
-
-  async expectFrenchProcessingPolicyToBeVisible() {
-    this.#expectCompletedAction('french-locale-selected')
-    const policy = this.#page.getByRole('region', { name: 'Politique de Traitement' })
-    await expect(policy).toContainText('Extraire et structurer les preuves professionnelles')
-    await expect(policy).toContainText("Contenu de l’Offre d’emploi")
-    await expect(policy).toContainText('jusqu’à 30 jours')
-    await expect(policy).toContainText('Le contenu du Candidat reste dans le navigateur')
-    await expect(policy).not.toContainText('Extract and structure professional evidence')
-  }
-
-  async expectCandidateSessionToBeActiveInSourceIntake() {
-    this.#expectCompletedActionIn(['candidate-session-started', 'candidate-session-restored'])
-    await expect(this.#page.getByText('Candidate Session active')).toBeVisible()
-    await expect(this.#page.getByRole('listitem').filter({ hasText: 'Source Intake' }))
-      .toHaveAttribute('aria-current', 'step')
-  }
-
-  async expectCandidateSessionToBeDeleted() {
-    this.#expectCompletedAction('candidate-session-deleted')
-    await expect(this.#page.getByRole('button', { name: 'Start a Candidate Session' })).toBeEnabled()
+  async expectDeletedSession() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('button', { name: 'Start a Candidate Session' })).toBeVisible()
     await expect(this.#page.getByText('Candidate Session deleted from this browser.')).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Generate my resume' })).toHaveCount(0)
   }
 
-  async expectProcessingConsentToBeGranted() {
-    this.#expectCompletedAction('processing-consent-granted')
-    await expect(this.#page.getByText('Processing Consent granted for this policy.')).toBeVisible()
+  async expectConsentGate() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('region', { name: 'Processing Policy' })).toContainText('OpenAI')
+    await expect(this.#page.getByRole('button', { name: 'Generate my resume' })).toBeDisabled()
+    await expect(this.#page.getByRole('textbox', { name: 'Professional text' })).toBeVisible()
+    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text' })).toBeVisible()
   }
 
-  async expectRestoredProcessingConsentToBeGranted() {
-    this.#expectCompletedAction('candidate-session-restored')
-    await expect(this.#page.getByText('Processing Consent granted for this policy.')).toBeVisible()
-  }
-
-  async expectStructuredSourceProfileToBeOptionalAndJobMatchToBeCurrent() {
-    this.#expectCompletedAction('source-document-submitted')
-    await expect(this.#page.getByRole('listitem').filter({ hasText: 'Job Match' }))
-      .toHaveAttribute('aria-current', 'step')
-    await expect(this.#page.getByText('Your Source Profile is ready.')).toBeVisible()
-    await this.#page.getByRole('button', { name: 'Inspect Source Profile' }).click()
-    await expect(this.#page.getByRole('region', { name: 'Detailed Source Profile' }))
-      .toContainText('TypeScript')
-  }
-
-  async expectCriticalAmbiguityToBeResolvedForJobMatch() {
-    this.#expectCompletedAction('critical-ambiguity-answered')
-    await expect(this.#page.getByRole('listitem').filter({ hasText: 'Job Match' }))
-      .toHaveAttribute('aria-current', 'step')
-    await expect(this.#page.getByText('Your Source Profile is ready.')).toBeVisible()
-  }
-
-  async expectExplainableMatchAnalysisToBeVisible() {
-    this.#expectCompletedAction('job-posting-submitted')
-    await expect(this.#page.getByText('54%')).toBeVisible()
-    await expect(this.#page.getByText('Credible evidence coverage')).toBeVisible()
-    await expect(this.#page.getByText('Three strongest matches')).toBeVisible()
-    await expect(this.#page.getByText('Three priority gaps')).toBeVisible()
-    const criticalReserve = this.#page.getByRole('heading', {
-      name: 'Critical Requirement Reserve',
-    }).locator('..')
-    await expect(criticalReserve).toContainText('Architecture leadership')
-    await expect(this.#page.getByText('Important Practical Constraints')).toBeVisible()
-    await this.#page.getByText('Complete requirement-to-evidence details').click()
-    await expect(this.#page.getByText('Exact source excerpt: TypeScript is required.')).toBeVisible()
-    await expect(this.#page.getByText('TypeScript', { exact: true }).last()).toBeVisible()
-  }
-
-  async expectCandidateFactAndFreshMatchAnalysis() {
-    this.#expectCompletedAction('profile-enrichment-confirmed')
-    expect(this.#lastMatchResponse).toEqual(expect.objectContaining({
-      ok: true,
-      value: expect.objectContaining({
-        evidence: expect.arrayContaining([
-          expect.objectContaining({ requirementId: 'job-requirement-4' }),
-        ]),
-      }),
-    }))
-    await expect(this.#page.getByText('77%')).toBeVisible()
-    await this.#page.getByText('Complete requirement-to-evidence details').click()
-    await expect(this.#page.getByText(
-      'Practiced Architecture leadership across the organization',
-    )).toBeVisible()
-  }
-
-  async expectLowScoreWarningAndTailoredResumeOffer() {
-    this.#expectCompletedAction('job-posting-submitted')
-    await expect(this.#page.getByText(
-      'A low Match Score is a warning, not a generation block.',
-    )).toBeVisible()
-    await expect(this.#page.getByRole('button', { name: 'Prepare my Tailored Resume' }))
-      .toBeEnabled()
-  }
-
-  async expectOnlyNormalizedSourceResumeOffer() {
-    this.#expectCompletedAction('job-posting-submitted')
-    await expect(this.#page.getByText(
-      'No relevant Candidate Fact supports an honest Tailored Resume.',
-    )).toBeVisible()
-    await expect(this.#page.getByRole('button', {
-      name: 'Use my normalized source resume — not tailored',
-    })).toBeEnabled()
-    await expect(this.#page.getByRole('button', { name: 'Prepare my Tailored Resume' }))
-      .toHaveCount(0)
-  }
-
-  #expectCompletedAction(expectedAction: CandidateJourneyAction) {
-    expect(this.#completedAction, 'Expected a caller-visible Action before reading the outcome')
-      .toBe(expectedAction)
-  }
-
-  #expectCompletedActionIn(expectedActions: readonly CandidateJourneyAction[]) {
-    expect(expectedActions, 'Expected a caller-visible Action before reading the outcome')
-      .toContain(this.#completedAction)
-  }
+  #expectAction() { expect(this.#completedAction, 'Perform a Candidate Journey action before reading the outcome').not.toBeNull() }
 }
 
-type CandidateJourneyAction =
-  | 'contact-corrected-and-reloaded'
-  | 'wording-edited-and-reloaded'
-  | 'candidate-journey-opened'
-  | 'grouped-resume-prepared'
-  | 'candidate-session-deleted'
-  | 'candidate-session-restored'
-  | 'candidate-session-started'
-  | 'critical-ambiguity-answered'
-  | 'french-locale-selected'
-  | 'job-posting-submitted'
-  | 'profile-enrichment-confirmed'
-  | 'processing-consent-granted'
-  | 'source-document-submitted'
+const postingText = 'Frontend Engineer. React is required. Rust is required. Java is required.'
 
-const structuredSourceProfileResponse = {
-  ok: true,
-  value: {
-    certifications: [],
-    criticalAmbiguities: [],
-    education: [],
-    experiences: [{
-      achievements: ['Built a billing platform'],
-      context: null,
-      endDate: null,
-      organization: 'Acme',
-      role: 'Senior FullStack Developer',
-      startDate: '2021',
-    }],
-    languages: [],
-    projects: [],
-    skills: [
-      { category: 'Programming language', name: 'TypeScript' },
-      { category: 'Frontend', name: 'React' },
-      { category: 'Runtime', name: 'Node.js' },
-    ],
-  },
-} as const
+function extractionFor(scenario: Scenario) {
+  if (scenario === 'blocking-ambiguity') return { experiences: [], projects: [], education: [], languages: [], certifications: [],
+    skills: [{ name: 'React', category: null }], criticalAmbiguities: [{ path: 'skills.0.name.0', question: 'Which skill did you use?' }] }
+  return { ...structuredResumeSource.sourceProfile, criticalAmbiguities: scenario === 'isolated-ambiguity'
+    ? [{ path: 'experiences.0.context.0', question: 'Which team?' }] : [] }
+}
 
-const jobPostingText = [
-  'We are hiring a Staff Engineer.',
-  'TypeScript is required.',
-  'React is central to the role.',
-  'Node.js is central to the role.',
-  'Architecture leadership is essential.',
-  'Executive communication is expected.',
-  'Kubernetes is a plus.',
-  'Work from Paris three days per week.',
-].join('\n')
+function requirementsFor(scenario: Scenario) {
+  if (scenario !== 'low-coverage') return structuredResumeJobMatch.requirements
+  return [...structuredResumeJobMatch.requirements, ...(['Rust', 'Java'] as const).map((name) => ({
+    id: `job-requirement-${name}`, value: name, sourceExcerpt: `${name} is required.`, importance: 'central',
+    importanceRationale: 'Explicit requirement', capability: { dimension: 'technical-expertise', name },
+  }))]
+}
 
-const jobPostingExtractionResponse = {
-  ok: true,
-  value: {
-    practicalConstraints: [{
-      sourceExcerpt: 'Work from Paris three days per week.',
-      value: 'Paris, three days per week',
-    }],
-    requirements: [
-      requirement('1', 'technical-expertise', 'TypeScript', 'central', 'TypeScript is required.'),
-      requirement('2', 'technical-expertise', 'React', 'central', 'React is central to the role.'),
-      requirement('3', 'technical-expertise', 'Node.js', 'central', 'Node.js is central to the role.'),
-      requirement('4', 'leadership', 'Architecture leadership', 'critical', 'Architecture leadership is essential.'),
-      requirement('5', 'stakeholder-communication', 'Executive communication', 'central', 'Executive communication is expected.'),
-      requirement('6', 'technical-expertise', 'Kubernetes', 'complementary', 'Kubernetes is a plus.'),
-    ],
-    targetRole: {
-      sourceExcerpt: 'We are hiring a Staff Engineer.',
-      value: 'Staff Engineer',
-    },
-  },
-} as const
+function matchFor(scenario: Scenario) {
+  if (scenario === 'no-correspondence') return { evidence: [], relevance: [] }
+  const factMatch = { factId: 'source-fact-skills-0-name-0', factTerm: 'React', requirementTerm: 'React', relationship: 'exact' }
+  return { evidence: [{ requirementId: 'job-requirement-react', coverage: 'covered', factMatches: [factMatch] }],
+    relevance: [{ requirementId: 'job-requirement-react', factMatch }] }
+}
 
-function requirement(
-  identifier: string,
-  dimension: 'leadership' | 'stakeholder-communication' | 'technical-expertise',
-  value: string,
-  importance: 'central' | 'complementary' | 'critical',
-  sourceExcerpt: string,
-) {
-  return {
-    capability: { dimension, name: value },
-    id: `job-requirement-${identifier}`,
-    importance,
-    importanceRationale: `The source wording makes ${value} ${importance}.`,
-    sourceExcerpt,
-    value,
+function writtenDocument({ input, scenario }: Readonly<{ input: ResumeWritingInput; scenario: Scenario }>) {
+  if (scenario === 'blocking-ambiguity') return { purpose: input.purpose, locale: input.locale,
+    targetRole: input.jobMatch.targetRole, experiences: [], sections: [],
+    valueProposition: { kind: 'prose', paragraphs: [{ id: 'summary-react', text: 'React experience.', factIds: ['source-fact-skills-0-name-0'] }] } }
+  return { purpose: input.purpose, locale: input.locale, targetRole: input.purpose === 'normalized' ? null : input.jobMatch.targetRole,
+    sections: groupedResumeDocument.sections,
+    experiences: groupedResumeDocument.experiences.map((experience) => ({ ...experience,
+      context: experience.context === null ? null : input.candidateFacts.some(({ id }) => id === experience.context.factIds[0])
+        ? { ...experience.context, text: input.candidateFacts.find(({ id }) => id === experience.context.factIds[0])?.value ?? experience.context.text } : null })),
+    valueProposition: { kind: 'prose', paragraphs: [{ id: 'summary-billing',
+      text: input.locale === 'fr' ? 'Développement d’interfaces de facturation accessibles.' : 'Accessible billing interfaces backed by React experience.',
+      factIds: ['source-fact-experiences-0-achievements-0', 'source-fact-skills-0-name-0'] }] },
   }
 }
-
-const matchEvidenceResponse = {
-  ok: true,
-  value: {
-    evidence: [
-      evidence('1', 'source-fact-skills-0-name-0', 'TypeScript'),
-      evidence('2', 'source-fact-skills-1-name-0', 'React'),
-      evidence('3', 'source-fact-skills-2-name-0', 'Node.js'),
-    ],
-    relevance: [
-      relevance('1', 'source-fact-skills-0-name-0', 'TypeScript'),
-      relevance('2', 'source-fact-skills-1-name-0', 'React'),
-      relevance('3', 'source-fact-skills-2-name-0', 'Node.js'),
-    ],
-  },
-} as const
-
-const lowMatchEvidenceResponse = {
-  ok: true,
-  value: {
-    evidence: [evidence('1', 'source-fact-skills-0-name-0', 'TypeScript')],
-    relevance: [relevance('1', 'source-fact-skills-0-name-0', 'TypeScript')],
-  },
-} as const
-
-const unsupportedMatchEvidenceResponse = {
-  ok: true,
-  value: { evidence: [], relevance: [] },
-} as const
-
-function createEnrichedMatchEvidenceResponse({ enrichedFactId }: Readonly<{
-  enrichedFactId: `source-fact-${string}`
-}>) {
-  return {
-    ok: true,
-    value: {
-      evidence: [
-        ...matchEvidenceResponse.value.evidence,
-        evidence('4', enrichedFactId, 'Architecture leadership', 'Architecture leadership'),
-      ],
-      relevance: [
-        ...matchEvidenceResponse.value.relevance,
-        relevance('4', enrichedFactId, 'Architecture leadership'),
-      ],
-    },
-  } as const
-}
-
-function evidence(
-  identifier: string,
-  factId: `source-fact-${string}`,
-  requirementTerm: string,
-  factTerm = requirementTerm,
-) {
-  return {
-    coverage: 'covered',
-    factMatches: [{ factId, factTerm, relationship: 'exact', requirementTerm }],
-    requirementId: `job-requirement-${identifier}`,
-  }
-}
-
-function relevance(
-  identifier: string,
-  factId: `source-fact-${string}`,
-  requirementTerm: string,
-  factTerm = requirementTerm,
-) {
-  return {
-    factMatch: { factId, factTerm, relationship: 'exact', requirementTerm },
-    requirementId: `job-requirement-${identifier}`,
-  }
-}
-
-const criticalAmbiguitySourceProfileResponse = {
-  ...structuredSourceProfileResponse,
-  value: {
-    ...structuredSourceProfileResponse.value,
-    criticalAmbiguities: [{
-      path: 'experiences.0.startDate.0',
-      question: 'What year did you start at Acme?',
-    }],
-    experiences: [{
-      ...structuredSourceProfileResponse.value.experiences[0],
-      startDate: '2021 or 2022',
-    }],
-  },
-} as const

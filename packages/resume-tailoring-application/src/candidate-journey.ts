@@ -1,3 +1,9 @@
+export { resumePreparationFailures } from '@resume-tailoring/domain/candidate-session'
+export { createResumePreparation, readProfessionalResumeFields } from './resume-preparation'
+export type { ResumeDocumentWriter, ResumeDocumentValidator, ResumeWritingInput, ResumeValidationInput, ResumeDocumentValidation } from './resume-preparation'
+import { prepareCombinedIntake, unavailable } from './combined-intake'
+import type { CombinedIntakeOutcome, CombinedIntakeRequest, PreparationPhase } from './combined-intake'
+
 import type { PrivacySafeTelemetry } from './resume-tailoring-workflow-ports'
 import type { ResumeCorrectionKind } from './resume-editing'
 import { assessResumeLayout, proposeResumeCondensation, acceptResumeCondensation, rejectResumeCondensation } from './resume-condensation'
@@ -38,8 +44,7 @@ import type { JobMatch, JobRequirementId } from '@resume-tailoring/domain/job-ma
 import type { CandidateFact, SourceIntake } from '@resume-tailoring/domain/source-intake'
 import { createProfileEnrichment } from './profile-enrichment'
 import type { ProfileEnrichmentValidationFailure } from './profile-enrichment'
-import { createTailoredResume } from './tailored-resume'
-import type { TailoredResume, TailoredResumeLocale } from './tailored-resume'
+import type { TailoredResume } from './tailored-resume'
 import type {
   SourceDocument,
   SourceDocumentReader,
@@ -54,6 +59,7 @@ export {
   hasValidCandidateSessionLifetime,
 } from '@resume-tailoring/domain/candidate-session'
 export type { CandidateJourneyPhase, CandidateSession }
+export type { StoredIntakeDocument, ResumePreparationFailure } from '@resume-tailoring/domain/candidate-session'
 
 export type CandidateSessionNotice =
   | 'deleted'
@@ -107,6 +113,8 @@ type ProfileEnrichmentFailure =
 
 type CandidateJourneyContext = Readonly<{
   dependencies: CandidateJourneyDependencies
+  preparationOutcome: CombinedIntakeOutcome | null
+  preparationPhase: PreparationPhase | null
   resumeReview: ResumeReviewState
   jobMatchFailure: CandidateJourneyJobMatchFailure | null
   notice: CandidateSessionNotice
@@ -118,6 +126,8 @@ type CandidateJourneyContext = Readonly<{
 type ResumeContacts = Pick<TailoredResume, 'identity' | 'contactDetails'>
 
 type CandidateJourneyEvent =
+  | Readonly<{ type: 'INVALIDATE_RESUME_INPUTS' }>
+  | Readonly<{ type: 'PREPARATION_PROGRESS'; phase: PreparationPhase; session: CandidateSession }>
   | Readonly<{ type: 'SAVE_RESUME'; session: CandidateSession; baseRevision: string; correctionKind?: ResumeCorrectionKind }>
   | Readonly<{ type: 'REPORT_RESUME'; review: ResumeReviewState; baseRevision: string }>
   | Readonly<{ type: 'UPDATE_RESUME_CONTACTS'; contacts: ResumeContacts }>
@@ -132,7 +142,7 @@ type CandidateJourneyEvent =
   | Readonly<{ type: 'RESOLVE_CRITICAL_AMBIGUITY'; ambiguityId: `critical-ambiguity-${string}`; answer: string }>
   | Readonly<{ type: 'SUBMIT_SOURCE_DOCUMENT'; document: SourceDocument }>
   | Readonly<{ type: 'START_CANDIDATE_SESSION' }>
-  | Readonly<{ type: 'START_TAILORED_RESUME_PREPARATION'; locale?: TailoredResumeLocale }>
+  | (Readonly<{ type: 'START_TAILORED_RESUME_PREPARATION' }> & CombinedIntakeRequest)
   | Readonly<{ type: 'SUBMIT_JOB_POSTING'; document: JobPostingDocument }>
 
 type RestoredCandidateSession = Readonly<{
@@ -149,6 +159,8 @@ export type CandidateJourneyView =
   | Readonly<{ status: 'candidate-session-absent'; notice: CandidateSessionNotice }>
   | Readonly<{
       status: 'candidate-session-open'
+      preparationOutcome: CombinedIntakeOutcome | null
+      preparationPhase: PreparationPhase | null
       resumeReview: ResumeReview | null
       processingConsentStatus: 'granted' | 'required'
       processingPolicy: ProcessingPolicy
@@ -161,6 +173,7 @@ export type CandidateJourneyView =
   | Readonly<{ status: 'candidate-session-unavailable' }>
 
 export type CandidateJourney = Readonly<{
+  invalidateResumeInputs: () => void
   hideResumeEntry: (request: Readonly<{ experienceId: string }>) => void
   restoreResumeEntry: (request: Readonly<{ experienceId: string }>) => void
   assessResumeLayout: () => Promise<void>
@@ -190,16 +203,34 @@ export type CandidateJourney = Readonly<{
   }>) => void
   start: () => void
   startCandidateSession: () => void
-  startTailoredResumePreparation: (request?: Readonly<{ locale?: TailoredResumeLocale }>) => void
+  startTailoredResumePreparation: (request?: CombinedIntakeRequest) => void
   submitJobPosting: (request: Readonly<{ document: JobPostingDocument }>) => void
   submitSourceDocument: (document: SourceDocument) => void
   subscribe: (listener: () => void) => () => void
 }>
 
+const generateApplicationResume = fromPromise<CombinedIntakeOutcome, Readonly<{
+  dependencies: CandidateJourneyDependencies; request: CombinedIntakeRequest;
+  session: CandidateSession | null; onProgress: (phase: PreparationPhase, session: CandidateSession) => void
+}>>(async ({ input, signal }) => {
+  if (input.session === null) return unavailable
+  return prepareCombinedIntake({ ...input, session: input.session, signal })
+})
+
 const restoreCandidateSession = fromPromise<
   CandidateSessionStorageResult<RestoredCandidateSession>,
   CandidateJourneyDependencies
->(({ input }) => Promise.resolve(input.persistence.restore({ now: input.now() })))
+>(({ input }) => Promise.resolve(restoreRecoverableSession(input)))
+
+function restoreRecoverableSession(dependencies: CandidateJourneyDependencies) {
+  const result = dependencies.persistence.restore({ now: dependencies.now() })
+  if (!result.ok || result.value.session?.preparation?.status !== 'pending') return result
+  const session = result.value.session
+  const preparation = session.preparation
+  if (preparation === undefined) return result
+  return { ok: true, value: { ...result.value,
+    session: { ...session, preparation: { ...preparation, status: 'interrupted' as const } } } } as const
+}
 
 const startCandidateSession = fromPromise<
   CandidateSessionStorageResult<CandidateSession>,
@@ -224,34 +255,6 @@ const deleteCandidateSession = fromPromise<
   CandidateSessionStorageResult<null>,
   CandidateJourneyDependencies
 >(({ input }) => Promise.resolve(input.persistence.delete()))
-
-const startTailoredResumePreparation = fromPromise<
-  CandidateSessionStorageResult<CandidateSession>,
-  Readonly<{
-    dependencies: CandidateJourneyDependencies
-    locale?: TailoredResumeLocale
-    session: CandidateSession | null
-  }>
->(({ input }) => {
-  const session = input.session
-  if (session === null || session.sourceIntake === null || session.jobMatch === null
-    || !canStartTailoredResumePreparation({ session })) {
-    return Promise.resolve(storageUnavailableResult)
-  }
-  const tailoredResume = createTailoredResume({
-    jobMatch: session.jobMatch, locale: input.locale, sourceIntake: session.sourceIntake,
-  })
-  return Promise.resolve(input.dependencies.persistence.save({
-    session: { ...session, phase: 'tailored-resume-preparation', tailoredResume,
-      resumeEditing: { revision: crypto.randomUUID(), hiddenFields: [], unsupportedFieldIds: [], manuallyEdited: false } },
-  }))
-})
-
-function canStartTailoredResumePreparation({ session }: Readonly<{
-  session: CandidateSession | null
-}>) {
-  return session?.jobMatch?.analysis.generationEligibility === 'eligible'
-}
 
 const grantProcessingConsent = fromPromise<
   CandidateSessionStorageResult<CandidateSession>,
@@ -283,9 +286,8 @@ const submitSourceDocument = fromPromise<SourceIntakeActorResult, SourceIntakeAc
   })
   if (!sourceIntakeResult.ok) return sourceIntakeResult
   const nextSession = {
-    ...input.session,
+    ...invalidatePreparation(input.session),
     jobMatch: null,
-    tailoredResume: null, resumeEditing: undefined, resumeFactLocations: undefined,
     phase: sourceIntakeResult.value.criticalAmbiguities.length === 0
       ? 'job-match' as const
       : 'source-intake' as const,
@@ -309,26 +311,26 @@ const persistCriticalAmbiguityResolution = fromPromise<
 >(({ input }: Readonly<{
   input: ResolveAmbiguityActorInput
 }>) => {
-  if (input.session?.sourceIntake === null || input.session === null) {
-    return Promise.resolve(ambiguityUnavailableResult)
-  }
+  const sourceIntake = input.session?.preparation?.sourceIntake ?? input.session?.sourceIntake
+  if (sourceIntake === null || sourceIntake === undefined || input.session === null) return Promise.resolve(ambiguityUnavailableResult)
   const resolution = resolveCriticalAmbiguity({
     answer: input.answer,
     criticalAmbiguityId: input.ambiguityId,
-    sourceIntake: input.session.sourceIntake,
+    sourceIntake,
   })
   if (!resolution.ok) return Promise.resolve(resolution)
-  const nextSession = {
-    ...input.session,
-    jobMatch: null,
-    tailoredResume: null, resumeEditing: undefined, resumeFactLocations: undefined,
-    phase: resolution.value.criticalAmbiguities.length === 0
-      ? 'job-match' as const
-      : 'source-intake' as const,
-    sourceIntake: resolution.value,
-  }
+  const nextSession = applySourceCorrection({ session: input.session, sourceIntake: resolution.value })
   return Promise.resolve(input.dependencies.persistence.save({ session: nextSession }))
 })
+
+function applySourceCorrection({ session, sourceIntake }: Readonly<{ session: CandidateSession; sourceIntake: SourceIntake }>): CandidateSession {
+  if (session.preparation !== undefined) return { ...invalidateEditingRevision(session), preparedResumeStatus: 'outdated',
+    preparation: { ...session.preparation, status: 'outdated', sourceIntake, jobMatch: null },
+  }
+  return { ...invalidatePreparation(session), sourceIntake, jobMatch: null,
+    phase: sourceIntake.criticalAmbiguities.length === 0 ? 'job-match' : 'source-intake',
+  }
+}
 
 type JobMatchActorInput = Readonly<{
   dependencies: CandidateJourneyDependencies
@@ -353,7 +355,7 @@ const submitJobPosting = fromPromise<JobMatchActorResult, JobMatchActorInput>(as
   })
   if (!jobMatchResult.ok) return jobMatchResult
   return input.dependencies.persistence.save({
-    session: { ...session, jobMatch: jobMatchResult.value, tailoredResume: null, resumeEditing: undefined },
+    session: { ...invalidatePreparation(session), jobMatch: jobMatchResult.value },
   })
 })
 
@@ -375,7 +377,10 @@ const confirmProfileEnrichment = fromPromise<
 async function processProfileEnrichment({ input }: Readonly<{
   input: ProfileEnrichmentActorInput
 }>): Promise<ProfileEnrichmentActorResult> {
-  const session = input.session
+  const session = input.session === null ? null : { ...input.session,
+    sourceIntake: input.session.preparation?.sourceIntake ?? input.session.sourceIntake,
+    jobMatch: input.session.preparation?.jobMatch ?? input.session.jobMatch,
+  }
   if (session?.sourceIntake === null || session === null || session.jobMatch === null) {
     return profileEnrichmentUnavailableResult
   }
@@ -409,8 +414,8 @@ async function persistProfileEnrichment({ fact, input, jobMatch, session, source
     ok: false, error: 'match-evidence-unavailable',
   } as const
   return input.dependencies.persistence.save({ session: {
-    ...session,
-    jobMatch: jobMatchResult.value, tailoredResume: null, resumeEditing: undefined,
+    ...invalidatePreparation(session),
+    jobMatch: jobMatchResult.value,
     sourceIntake: { ...sourceIntake, candidateFacts },
   } })
 }
@@ -425,15 +430,35 @@ function hasJobMatchConsent({ input, session }: Readonly<{
   })
 }
 
+function invalidateEditingRevision(session: CandidateSession): CandidateSession {
+  if (session.tailoredResume === null) return session
+  return { ...session, resumeEditing: { ...readResumeEditing({ session }), revision: crypto.randomUUID() } }
+}
+
+function invalidatePreparation(session: CandidateSession): CandidateSession {
+  const { preparation, ...retained } = session
+  return preparation === undefined && session.tailoredResume === null ? retained
+    : { ...invalidateEditingRevision(retained), preparedResumeStatus: 'outdated' }
+}
+
+function invalidateResumeInputs({ session, dependencies }: CandidateJourneyContext) {
+  if (session === null || (session.preparedResumeStatus === 'outdated' && (session.preparation === undefined || session.preparation.status === 'outdated'))) return session
+  const next: CandidateSession = { ...invalidateEditingRevision(session), preparedResumeStatus: 'outdated',
+    ...(session.preparation === undefined ? {} : { preparation: { ...session.preparation, status: 'outdated' } }),
+  }
+  dependencies.persistence.save({ session: next })
+  return next
+}
+
 const candidateJourneyMachine = setup({
   actors: {
+    generateApplicationResume,
     confirmProfileEnrichment,
     deleteCandidateSession,
     grantProcessingConsent,
     persistCriticalAmbiguityResolution,
     restoreCandidateSession,
     startCandidateSession,
-    startTailoredResumePreparation,
     submitJobPosting,
     submitSourceDocument,
   },
@@ -450,6 +475,8 @@ const candidateJourneyMachine = setup({
 }).createMachine({
   context: ({ input }: Readonly<{ input: CandidateJourneyDependencies }>) => ({
     dependencies: input,
+    preparationOutcome: null,
+    preparationPhase: null,
     resumeReview: emptyResumeReview,
     jobMatchFailure: null,
     notice: null,
@@ -468,6 +495,7 @@ const candidateJourneyMachine = setup({
         },
       },
       on: {
+        INVALIDATE_RESUME_INPUTS: { actions: assign({ session: ({ context }) => invalidateResumeInputs(context), resumeReview: emptyResumeReview }) },
         SAVE_RESUME: {
           guard: ({ context, event }) => context.session !== null
             && readResumeEditing({ session: context.session }).revision === event.baseRevision,
@@ -516,9 +544,10 @@ const candidateJourneyMachine = setup({
           }),
           target: 'persistingProcessingConsent',
         },
-        RESOLVE_CRITICAL_AMBIGUITY: {
-          target: 'resolvingCriticalAmbiguity',
-        },
+        RESOLVE_CRITICAL_AMBIGUITY: [{
+          guard: ({ context }) => context.session?.preparation?.status === 'awaiting-correction',
+          target: 'generatingApplicationResume',
+        }, { target: 'resolvingCriticalAmbiguity' }],
         SUBMIT_SOURCE_DOCUMENT: {
           actions: assign({ sourceIntakeFailure: null }),
           target: 'processingSourceDocument',
@@ -528,10 +557,32 @@ const candidateJourneyMachine = setup({
           guard: ({ context }) => canSubmitJobPosting({ session: context.session }),
           target: 'processingJobPosting',
         },
-        START_TAILORED_RESUME_PREPARATION: {
-          guard: ({ context }) => canStartTailoredResumePreparation({ session: context.session }),
-          target: 'startingTailoredResumePreparation',
-        },
+        START_TAILORED_RESUME_PREPARATION: { target: 'generatingApplicationResume' },
+      },
+    },
+    generatingApplicationResume: {
+      entry: assign({ preparationOutcome: null, preparationPhase: null, resumeReview: emptyResumeReview,
+        session: ({ context }) => context.session === null ? null : invalidateEditingRevision(context.session),
+      }),
+      after: { candidateSessionExpiration: { target: 'removingCandidateSession', actions: assign({ notice: 'expired-session-discarded' }) } },
+      on: { INVALIDATE_RESUME_INPUTS: { target: 'candidateSessionAvailable', actions: assign({
+        session: ({ context }) => invalidateResumeInputs(context), preparationPhase: null, preparationOutcome: null, resumeReview: emptyResumeReview,
+      }) }, PREPARATION_PROGRESS: { actions: assign({ preparationPhase: ({ event }) => event.phase,
+        session: ({ event }) => event.session }) },
+        DELETE_CANDIDATE_SESSION: { target: 'removingCandidateSession', actions: assign({ notice: 'deleted' }) },
+      },
+      invoke: {
+        src: 'generateApplicationResume',
+        input: ({ context, event, self }) => ({ dependencies: context.dependencies, session: context.session,
+          request: event.type === 'START_TAILORED_RESUME_PREPARATION' ? event : event.type === 'RESOLVE_CRITICAL_AMBIGUITY' ? { correction: event } : {},
+          onProgress: (phase: PreparationPhase, session: CandidateSession) => { self.send({ type: 'PREPARATION_PROGRESS', phase, session }) },
+        }),
+        onDone: { target: 'candidateSessionAvailable', actions: assign({
+          preparationPhase: null,
+          preparationOutcome: ({ event }) => event.output,
+          session: ({ context, event }) => event.output.session ?? context.session,
+        }) },
+        onError: { target: 'candidateSessionAvailable', actions: assign({ preparationPhase: null, preparationOutcome: unavailable }) },
       },
     },
     processingJobPosting: {
@@ -742,27 +793,7 @@ const candidateJourneyMachine = setup({
       },
     },
     storageFailure: {},
-    startingTailoredResumePreparation: {
-      invoke: {
-        input: ({ context, event }) => ({
-          dependencies: context.dependencies,
-          locale: event.type === 'START_TAILORED_RESUME_PREPARATION' ? event.locale : undefined,
-          session: context.session,
-        }),
-        onDone: [
-          {
-            actions: assign({
-              session: ({ event }) => event.output.ok ? event.output.value : null,
-            }),
-            guard: ({ event }) => event.output.ok,
-            target: 'candidateSessionAvailable',
-          },
-          { target: 'storageFailure' },
-        ],
-        onError: { target: 'storageFailure' },
-        src: 'startTailoredResumePreparation',
-      },
-    },
+
   },
 })
 
@@ -786,6 +817,7 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     report: (request) => { actor.send({ type: 'REPORT_RESUME', ...request }) },
   }
   return {
+    invalidateResumeInputs: () => { actor.send({ type: 'INVALIDATE_RESUME_INPUTS' }) },
     hideResumeEntry: (request) => { hideResumeEntry({ access: editingAccess, ...request }) },
     restoreResumeEntry: (request) => { restoreResumeEntry({ access: editingAccess, ...request }) },
     assessResumeLayout: () => assessResumeLayout({ access: editingAccess }),
@@ -848,11 +880,11 @@ function readCandidateJourneyView({ snapshot }: Readonly<{
 
 function hasOpenCandidateSession({ snapshot }: Readonly<{ snapshot: CandidateJourneySnapshot }>) {
   return snapshot.matches('candidateSessionAvailable')
+    || snapshot.matches('generatingApplicationResume')
     || snapshot.matches('processingJobPosting')
     || snapshot.matches('processingProfileEnrichment')
     || snapshot.matches('processingSourceDocument')
     || snapshot.matches('resolvingCriticalAmbiguity')
-    || snapshot.matches('startingTailoredResumePreparation')
     || snapshot.matches('persistingProcessingConsent')
 }
 
@@ -862,6 +894,8 @@ function readOpenCandidateSessionView({ snapshot, session }: Readonly<{
 }>): CandidateJourneyView {
   const processingPolicy = snapshot.context.dependencies.languageModelGateway.processingPolicy
   return {
+    preparationOutcome: snapshot.context.preparationOutcome,
+    preparationPhase: snapshot.context.preparationPhase,
     resumeReview: readResumeReview({ session, review: snapshot.context.resumeReview }),
     processingConsentStatus: hasProcessingConsentForPolicy({
       consent: session.processingConsent, policy: processingPolicy,
@@ -879,8 +913,8 @@ function readOpenCandidateSessionView({ snapshot, session }: Readonly<{
 function readCandidateJourneyOperation({ snapshot }: Readonly<{
   snapshot: CandidateJourneySnapshot
 }>): CandidateJourneyOperation {
+  if (snapshot.matches('generatingApplicationResume')) return 'preparing-tailored-resume'
   if (snapshot.matches('processingJobPosting')) return 'processing-job-posting'
-  if (snapshot.matches('startingTailoredResumePreparation')) return 'preparing-tailored-resume'
   if (snapshot.matches('processingProfileEnrichment')) return 'processing-profile-enrichment'
   if (snapshot.matches('processingSourceDocument')) return 'processing-source-document'
   if (snapshot.matches('resolvingCriticalAmbiguity')) return 'resolving-critical-ambiguity'

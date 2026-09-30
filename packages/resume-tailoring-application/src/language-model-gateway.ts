@@ -7,6 +7,7 @@ import type {
 export type { ProcessingConsent, ProcessingPolicy }
 
 export type LanguageModelFailure = Readonly<{
+  transient?: boolean
   type: 'language-model-unavailable' | 'processing-consent-required'
 }>
 

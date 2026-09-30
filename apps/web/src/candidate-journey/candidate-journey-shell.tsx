@@ -28,10 +28,10 @@ import type { ProcessingPolicy } from '@resume-tailoring/application/language-mo
 import { candidateJourneyPhases } from './candidate-journey-phases'
 import type { CandidateJourneyPhase } from './candidate-journey-phases'
 import { useCandidateJourney } from './use-candidate-journey'
+import { CombinedIntakeWorkspace } from './combined-intake-workspace'
 import { SourceIntakeWorkspace } from './source-intake-workspace'
 import { JobMatchWorkspace } from './job-match-workspace'
 import { TailoredResumeWorkspace } from './tailored-resume-workspace'
-import { resumeReviewCopy } from './resume-review-copy'
 
 export function CandidateJourneyShell() {
   const localizationResult = useLocalization()
@@ -55,23 +55,16 @@ function LocalizedCandidateJourneyShell({ localization }: LocalizationProps) {
         <ProcessingPolicyCard {...{ candidateJourney, localization }} />
         <CandidateJourneyStatusAnnouncements {...{ activePhase, candidateJourney, localization }} />
         <CandidateJourneyProgress {...{ candidateJourney, localization }} />
-        <SourceIntakeWorkspace {...{ candidateJourney, localization }} />
-        <ResumeAndAnalysis {...{ candidateJourney, localization }} />
+        <TailoredResumeWorkspace {...{ candidateJourney, localization }} />
+        <CombinedIntakeWorkspace {...{ candidateJourney, localization }} />
+        <details><summary>{localization.translate('combinedIntake.analysis')}</summary>
+          <JobMatchWorkspace {...{ candidateJourney, localization }} /></details>
+        <details><summary>{localization.translate('combinedIntake.inspection')}</summary>
+          <SourceIntakeWorkspace {...{ candidateJourney, localization }} /></details>
         <CandidateJourneyPhaseList {...{ activePhase, localization }} />
       </Stack></Container></AppShell.Main>
     </AppShell>
   )
-}
-
-function ResumeAndAnalysis(props: LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) {
-  const { view } = props.candidateJourney
-  if (view.status !== 'candidate-session-open' || view.session.tailoredResume === null) {
-    return <JobMatchWorkspace {...props} />
-  }
-  return <><TailoredResumeWorkspace {...props} /><details>
-    <summary>{resumeReviewCopy[props.localization.locale].analysis}</summary>
-    <JobMatchWorkspace {...props} />
-  </details></>
 }
 
 type LocalizationProps = Readonly<{ localization: Localization }>
@@ -240,7 +233,10 @@ function ProcessingPolicyCard({ candidateJourney, localization }: LocalizationPr
           {localization.translate('processingPolicy.description')}
         </Text>
       </div>
-      <ProcessingPolicyDetails {...{ localization, processingPolicy }} />
+      <Text size="sm">{processingPolicy.provider} · {localization.translate('processingPolicy.purpose.writeResume')}.{' '}
+        {localization.translate('processingPolicy.storageValue')}</Text>
+      <details><summary>{localization.translate('combinedIntake.policyDetails')}</summary>
+        <ProcessingPolicyDetails {...{ localization, processingPolicy }} /></details>
       <ProcessingConsentControl {...{ candidateJourney, localization }} />
     </Stack>
   </Paper>
@@ -342,7 +338,7 @@ LocalizationProps & Readonly<{
     : null
   const operationMessage = operation === null ? null : formatJourneyMessage({
     template: localization.translate('candidateJourney.operationAnnouncement'),
-    value: localization.translate(operationTranslationKeys[operation]),
+    value: localization.translate(readOperationKey({ candidateJourney, operation })),
     token: 'operation',
   })
   const resultMessage = readValidatedResultMessage({ candidateJourney, localization })
@@ -363,7 +359,7 @@ LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) 
     <Group align="flex-start" wrap="nowrap">
       <Skeleton aria-hidden="true" circle height={36} width={36} />
       <Stack flex={1} gap="xs">
-        <Text fw={700}>{localization.translate(operationTranslationKeys[operation])}</Text>
+        <Text fw={700}>{localization.translate(readOperationKey({ candidateJourney, operation }))}</Text>
         <Text c="dimmed" id="candidate-journey-progress-description" size="sm">
           {localization.translate('candidateJourney.progressDescription')}
         </Text>
@@ -399,6 +395,16 @@ function formatJourneyMessage({ template, token, value }: Readonly<{
 type CandidateJourneyOperation = Exclude<
   Extract<CandidateJourneyView, Readonly<{ status: 'candidate-session-open' }>>['operation'], null
 >
+
+function readOperationKey({ candidateJourney, operation }: Readonly<{
+  candidateJourney: CandidateJourneyController; operation: CandidateJourneyOperation
+}>) {
+  const phase = candidateJourney.view.status === 'candidate-session-open' ? candidateJourney.view.preparationPhase : null
+  if (phase === null) return operationTranslationKeys[operation]
+  return ({ 'extracting-source': 'candidateJourney.operation.extractSourceProfile',
+    'extracting-posting': 'combinedIntake.extractingPosting', matching: 'combinedIntake.matching',
+    writing: 'combinedIntake.writing', validating: 'combinedIntake.validating' } as const)[phase]
+}
 
 const operationTranslationKeys: Readonly<Record<CandidateJourneyOperation, Parameters<
   Localization['translate']

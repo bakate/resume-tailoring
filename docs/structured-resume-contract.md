@@ -80,13 +80,10 @@ allocates a new revision and invalidates the prior layout assessment. Rejection
 retains the current revision. A stale accept returns `stale-result` and retains
 the current draft.
 
-The existing field editor is adapted to semantic fields and stable identifiers
-in this ticket. Its edits still live in component state, as before. Moving that
-editable draft and temporary proposal into Candidate Journey persistence is
-BAK-58's responsibility; this prefactor does not claim reload recovery for local
-edits. The prepared semantic document already round-trips through the versioned
-Candidate Session. Native printing remains the existing export caller, not proof
-of the validated PDF requirements owned by BAK-59.
+The field editor uses semantic fields and stable identifiers. Candidate Journey
+persists the editable draft, while proposals and layout assessments are transient.
+Native printing requires an eligible assessment for the current draft revision;
+validated PDF generation remains owned by BAK-59.
 
 ## Consumer fixtures and expectations
 
@@ -110,14 +107,34 @@ variant renders paragraphs; the prefactor emits `evidence-excerpts` until BAK-57
 provides validated writing. Keep these expectations in each consumer's public
 seam tests without importing machine internals or requiring production adapters.
 
+## Combined preparation (BAK-57)
+
+`startTailoredResumePreparation` accepts source and posting documents together,
+an optional output locale, and an explicit normalized purpose. Omit the source
+to reuse the current Source Profile. The browser adapter supplies the configured
+writing and structured-validation roles through `createResumePreparation` and
+the existing Language Model Gateway; a missing preparation port fails closed.
+
+The session keeps a working preparation checkpoint separately from the last
+validated document. `preparationPhase` announces extraction, matching, writing,
+and validation. A checkpoint can be interrupted, awaiting a consequential
+correction, failed, or awaiting the explicit normalized alternative. Correction
+resumes preparation automatically; recovery after failure or reload is explicit.
+`preparedResumeStatus` marks the stable document outdated after input changes,
+while `preparedResumeRevision` identifies the last successfully published draft.
+Only the local source contacts are attached after professional validation.
+
+Preparation and persisted editing share the current draft contract. Regeneration
+preserves attested evidence and local contacts, resets editing metadata on success,
+and retains the stable edited draft on failure. BAK-59 owns validated layout/export.
 
 ## BAK-58 editing and recovery
 
 The Candidate Journey now owns the edited document, unsupported field identities,
 hidden content, and a fresh revision after each content change. The editor uses
 `readView().resumeReview` and domain-named actions; React owns only the open panel
-and unsaved input text. Existing version-six sessions remain readable because
-editing metadata and section order are optional additions. Interrupted validation
+and unsaved input text. Version-seven sessions persist preparation alongside
+optional editing metadata and section order. Interrupted validation
 restores its saved unresolved fields, with no apparently running operation.
 
 One transient proposal and layout assessment remain outside persisted session

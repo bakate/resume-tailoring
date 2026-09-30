@@ -12,6 +12,7 @@ export type ResumeDraft = Readonly<{
 export type ProfessionalResumeDocument = Omit<TailoredResume, 'identity' | 'contactDetails'>
 
 export type ResumePreparationRequest = Readonly<{
+  onProgress?: (phase: 'writing' | 'validating') => void
   candidateFacts: readonly CandidateFact[]
   jobMatch: JobMatch
   locale: TailoredResumeLocale

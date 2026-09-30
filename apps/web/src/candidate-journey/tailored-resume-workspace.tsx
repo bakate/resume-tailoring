@@ -27,15 +27,25 @@ function ResumeReview(props: ResumeDocumentProps) {
   return <Paper aria-labelledby="tailored-resume-title" component="section"
     className="candidate-journey-workspace" p={{ base: 'md', sm: 'xl' }} shadow="xs" withBorder>
     <Stack gap="lg">
+      <PreparationStatus {...props} />
       <div><Title id="tailored-resume-title" order={2}>{copy.preview}</Title><Text c="dimmed">{copy.description}</Text></div>
       <ResumePreview resume={props.resume} title={copy.previewTitle} />
-      <Group><Button onClick={() => { setEditorOpened(true) }}>{copy.edit}</Button>
+      <Group><Button disabled={props.candidateJourney.view.status === 'candidate-session-open' && props.candidateJourney.view.operation !== null} onClick={() => { setEditorOpened(true) }}>{copy.edit}</Button>
         <ReviewActions candidateJourney={props.candidateJourney} copy={copy} /></Group>
       <ReviewStatus candidateJourney={props.candidateJourney} copy={copy} />
       <CondensationProposal {...props} copy={copy} />
     </Stack>
     <ResumeEditorDialog {...props} {...{ copy, editorOpened }} closeEditor={() => { setEditorOpened(false) }} />
   </Paper>
+}
+
+function PreparationStatus({ candidateJourney, localization, resume }: ResumeDocumentProps) {
+  const { view } = candidateJourney
+  return <>
+    {view.status === 'candidate-session-open' && view.session.preparedResumeStatus === 'outdated'
+      ? <Text c="danger.8" role="status">{localization.translate('combinedIntake.outdated')}</Text> : null}
+    {resume.purpose === 'normalized' ? <Text fw={700}>{localization.translate('combinedIntake.normalizedReady')}</Text> : null}
+  </>
 }
 
 function ResumeEditorDialog(props: ResumeDocumentProps & Readonly<{
@@ -50,11 +60,12 @@ function ResumeEditorDialog(props: ResumeDocumentProps & Readonly<{
 
 function ReviewActions({ candidateJourney, copy }: Readonly<{ candidateJourney: ResumeReviewController; copy: ResumeReviewCopy }>) {
   const review = candidateJourney.view.status === 'candidate-session-open' ? candidateJourney.view.resumeReview : null
-  const busy = review?.operation !== null
+  const busy = review?.operation !== null || (candidateJourney.view.status === 'candidate-session-open' && candidateJourney.view.operation !== null)
+  const outdated = candidateJourney.view.status === 'candidate-session-open' && candidateJourney.view.session.preparedResumeStatus === 'outdated'
   return <><Button variant="default" disabled={busy} onClick={() => { void candidateJourney.proposeResumeCondensation() }}>
     {copy.condense}</Button><Button variant="default" disabled={busy} onClick={() => { void candidateJourney.assessResumeLayout() }}>
     {copy.checkLayout}</Button>
-    {review?.assessment?.exportEligibility.status === 'eligible'
+    {!outdated && review?.assessment?.exportEligibility.status === 'eligible'
       && review.assessment.exportEligibility.revision === review.draft.revision
       ? <Button variant="default" onClick={() => { printResume({ resume: review.draft.document }) }}>{copy.print}</Button> : null}</>
 }

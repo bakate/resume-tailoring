@@ -2,11 +2,9 @@ import {
   Alert,
   Badge,
   Button,
-  FileInput,
   Group,
   List,
   Paper,
-  SegmentedControl,
   Select,
   SimpleGrid,
   Stack,
@@ -24,124 +22,21 @@ import {
 import type { ProfileEnrichmentFactKind } from '@resume-tailoring/application/job-match'
 import type { CandidateFact, SourceIntake } from '@resume-tailoring/application/source-intake'
 import type { Localization } from '../localization/localization'
-import { resumeReviewCopy } from './resume-review-copy'
-import { formatNormalizedSourceResume } from './normalized-source-resume'
 import type { useCandidateJourney } from './use-candidate-journey'
 
 type CandidateJourneyController = ReturnType<typeof useCandidateJourney>
-type JobPostingMethod = 'paste' | 'upload'
 
 export function JobMatchWorkspace({ candidateJourney, localization }: Readonly<{
-  candidateJourney: CandidateJourneyController
-  localization: Localization
+  candidateJourney: CandidateJourneyController; localization: Localization
 }>) {
-  const form = useJobPostingForm({ candidateJourney })
   const { view } = candidateJourney
-  if (view.status !== 'candidate-session-open' || view.session.sourceIntake === null
-    || (view.session.phase !== 'job-match' && view.session.phase !== 'tailored-resume-preparation')) return null
-  return <Paper aria-busy={view.operation === 'processing-job-posting' || view.operation === 'processing-profile-enrichment'}
-    aria-labelledby="job-match-title" component="section" className="candidate-journey-workspace"
-    p={{ base: 'md', sm: 'xl' }} shadow="xs" withBorder>
-    <Stack gap="lg">
-      <JobMatchHeader localization={localization} />
-      <JobPostingForm {...{ candidateJourney, form, localization }} />
-      <JobMatchFailure failure={form.localFailure ?? view.jobMatchFailure}
-        localization={localization} />
-      {view.session.jobMatch === null ? null : <JobMatchResult
-        candidateJourney={candidateJourney}
-        jobMatch={view.session.jobMatch}
-        localization={localization}
-        sourceIntake={view.session.sourceIntake} />}
-    </Stack>
+  if (view.status !== 'candidate-session-open') return null
+  const sourceIntake = view.session.preparation?.sourceIntake ?? view.session.sourceIntake
+  const jobMatch = view.session.preparation?.jobMatch ?? view.session.jobMatch
+  if (sourceIntake === null || jobMatch === null) return null
+  return <Paper component="section" aria-label={localization.translate('jobMatch.title')} p={{ base: 'md', sm: 'xl' }} withBorder>
+    <JobMatchResult {...{ candidateJourney, localization, sourceIntake, jobMatch }} />
   </Paper>
-}
-
-function useJobPostingForm({ candidateJourney }: Readonly<{
-  candidateJourney: CandidateJourneyController
-}>) {
-  const [method, setMethod] = useState<JobPostingMethod>('paste')
-  const [jobPostingText, setJobPostingText] = useState('')
-  const [jobPostingFile, setJobPostingFile] = useState<File | null>(null)
-  const [localFailure, setLocalFailure] = useState<'empty-job-posting' | null>(null)
-  const submitJobPosting = async () => {
-    const document = await readSelectedJobPosting({ jobPostingFile, jobPostingText, method })
-    if (document === null) {
-      setLocalFailure('empty-job-posting')
-      return
-    }
-    setLocalFailure(null)
-    candidateJourney.submitJobPosting({ document })
-  }
-  return {
-    jobPostingFile, jobPostingText, localFailure, method, setJobPostingFile,
-    setJobPostingText, setMethod, submitJobPosting,
-  }
-}
-
-type JobPostingFormController = ReturnType<typeof useJobPostingForm>
-
-function JobMatchHeader({ localization }: Readonly<{ localization: Localization }>) {
-  return <div><Title id="job-match-title" order={2} size="h3">{localization.translate('jobMatch.title')}</Title>
-    <Text c="dimmed" mt="xs">{localization.translate('jobMatch.description')}</Text></div>
-}
-
-function JobPostingForm({ candidateJourney, form, localization }: Readonly<{
-  candidateJourney: CandidateJourneyController
-  form: JobPostingFormController
-  localization: Localization
-}>) {
-  return <Stack gap="md">
-    <SegmentedControl data={[
-      { label: localization.translate('jobMatch.pasteMethod'), value: 'paste' },
-      { label: localization.translate('jobMatch.uploadMethod'), value: 'upload' },
-    ]} onChange={(value) => { form.setMethod(value === 'upload' ? 'upload' : 'paste') }}
-    value={form.method} />
-    <JobPostingInput {...{ form, localization }} />
-    <Button loading={candidateJourney.view.status === 'candidate-session-open'
-      ? candidateJourney.view.operation === 'processing-job-posting'
-      : false}
-      onClick={() => { void form.submitJobPosting() }}>
-      {localization.translate('jobMatch.submit')}
-    </Button>
-  </Stack>
-}
-
-function JobPostingInput({ form, localization }: Readonly<{
-  form: JobPostingFormController
-  localization: Localization
-}>) {
-  return form.method === 'paste'
-    ? <Textarea label={localization.translate('jobMatch.textLabel')} minRows={10}
-        onChange={(event) => { form.setJobPostingText(event.currentTarget.value) }}
-        placeholder={localization.translate('jobMatch.textPlaceholder')}
-        value={form.jobPostingText} />
-    : <FileInput accept=".pdf,.txt,application/pdf,text/plain"
-        label={localization.translate('jobMatch.fileLabel')}
-        onChange={form.setJobPostingFile}
-        placeholder={localization.translate('jobMatch.fileHint')}
-        value={form.jobPostingFile} />
-}
-
-async function readSelectedJobPosting({ jobPostingFile, jobPostingText, method }: Readonly<{
-  jobPostingFile: File | null
-  jobPostingText: string
-  method: JobPostingMethod
-}>) {
-  if (method === 'paste') return jobPostingText.trim().length === 0 ? null : {
-    bytes: new TextEncoder().encode(jobPostingText),
-    mediaType: 'text/plain',
-    name: 'pasted-job-posting.txt',
-  }
-  if (jobPostingFile === null) return null
-  try {
-    return {
-      bytes: new Uint8Array(await jobPostingFile.arrayBuffer()),
-      mediaType: jobPostingFile.type,
-      name: jobPostingFile.name,
-    }
-  } catch {
-    return null
-  }
 }
 
 function JobMatchResult({ candidateJourney, jobMatch, localization, sourceIntake }: Readonly<{
@@ -153,7 +48,7 @@ function JobMatchResult({ candidateJourney, jobMatch, localization, sourceIntake
   const sourceFacts = sourceIntake.candidateFacts
   return <Stack gap="xl" role="status">
     <MatchOverview {...{ jobMatch, localization }} />
-    <GenerationDecision {...{ candidateJourney, jobMatch, localization, sourceIntake }} />
+
     <Text>{localization.translate('jobMatch.measurement')}</Text>
     <MatchSummaries {...{ jobMatch, localization }} />
     <CriticalReserve {...{ jobMatch, localization }} />
@@ -161,77 +56,6 @@ function JobMatchResult({ candidateJourney, jobMatch, localization, sourceIntake
     <RequirementDetails {...{ jobMatch, localization, sourceFacts }} />
     <ProfileEnrichmentPrompts {...{ candidateJourney, jobMatch, localization }} />
   </Stack>
-}
-
-function GenerationDecision({
-  candidateJourney, jobMatch, localization, sourceIntake,
-}: Readonly<{
-  candidateJourney: CandidateJourneyController
-  jobMatch: JobMatch
-  localization: Localization
-  sourceIntake: SourceIntake
-}>) {
-  return jobMatch.analysis.generationEligibility === 'denied'
-    ? <DeniedGenerationDecision {...{ localization, sourceIntake }} />
-    : <EligibleGenerationDecision {...{ candidateJourney, jobMatch, localization }} />
-}
-
-function DeniedGenerationDecision({ localization, sourceIntake }: Readonly<{
-  localization: Localization
-  sourceIntake: SourceIntake
-}>) {
-  return <Alert color="danger" role="alert" title={localization.translate('jobMatch.generation.denied')}>
-    <Stack gap="sm"><Text>{localization.translate('jobMatch.generation.normalizedNotice')}</Text>
-      <Button onClick={() => { downloadNormalizedSourceResume({ localization, sourceIntake }) }}
-        variant="outline">
-        {localization.translate('jobMatch.generation.normalizedAction')}
-      </Button></Stack>
-  </Alert>
-}
-
-function EligibleGenerationDecision({ candidateJourney, jobMatch, localization }: Readonly<{
-  candidateJourney: CandidateJourneyController
-  jobMatch: JobMatch
-  localization: Localization
-}>) {
-  const [locale, setLocale] = useState<'en' | 'fr' | null>(null)
-  return <Alert color="forest" title={localization.translate('jobMatch.generation.eligible')}>
-    <Stack gap="sm">
-      {jobMatch.analysis.matchBand === 'ambitious'
-        ? <Text>{localization.translate('jobMatch.generation.lowScoreWarning')}</Text>
-        : null}
-      <SegmentedControl aria-label={localization.translate('tailoredResume.language')}
-        data={[
-          { label: localization.translate('tailoredResume.languageAutomatic'), value: 'automatic' },
-          { label: 'EN', value: 'en' }, { label: 'FR', value: 'fr' },
-        ]}
-        onChange={(value) => { setLocale(value === 'en' || value === 'fr' ? value : null) }}
-        value={locale ?? 'automatic'} />
-      <Button loading={candidateJourney.view.status === 'candidate-session-open'
-        ? candidateJourney.view.operation === 'preparing-tailored-resume' : false}
-        onClick={() => {
-          const review = candidateJourney.view.status === 'candidate-session-open' ? candidateJourney.view.resumeReview : null
-          if (review?.manuallyEdited === true && !window.confirm(resumeReviewCopy[localization.locale].regenerateWarning)) return
-          candidateJourney.startTailoredResumePreparation({
-          ...(locale === null ? {} : { locale }),
-        }) }}>
-        {localization.translate('jobMatch.generation.tailoredAction')}
-      </Button>
-    </Stack>
-  </Alert>
-}
-
-function downloadNormalizedSourceResume({ localization, sourceIntake }: Readonly<{
-  localization: Localization
-  sourceIntake: SourceIntake
-}>) {
-  const content = formatNormalizedSourceResume({ sourceIntake, translate: localization.translate })
-  const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
-  const link = document.createElement('a')
-  link.download = localization.translate('jobMatch.generation.normalizedFileName')
-  link.href = url
-  link.click()
-  URL.revokeObjectURL(url)
 }
 
 function MatchOverview({ jobMatch, localization }: Readonly<{
@@ -481,7 +305,7 @@ function readRequirements({ ids, jobMatch }: Readonly<{
   return jobMatch.requirements.filter(({ id }) => requirementIds.has(id))
 }
 
-function JobMatchFailure({ failure, localization }: Readonly<{
+export function JobMatchFailure({ failure, localization }: Readonly<{
   failure: JobMatchFailureValue
   localization: Localization
 }>) {
@@ -504,7 +328,7 @@ type JobMatchFailureValue =
   | 'unsupported-job-posting'
   | null
 
-const jobMatchFailureKeys = {
+export const jobMatchFailureKeys = {
   'candidate-session-storage-unavailable': 'jobMatch.failure.storage',
   'empty-job-posting': 'jobMatch.failure.empty',
   'invalid-job-posting': 'jobMatch.failure.invalid',

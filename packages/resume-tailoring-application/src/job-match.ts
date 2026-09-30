@@ -451,7 +451,7 @@ function toRequirementId(requirementId: string): JobRequirementId {
   return `job-requirement-${requirementId.replace(/^job-requirement-/u, '')}`
 }
 
-const maximumJobPostingBytes = 5 * 1_024 * 1_024
+export const maximumJobPostingBytes = 5 * 1_024 * 1_024
 const maximumJobPostingCharacters = 100_000
 const summaryItemLimit = 3
 const complementaryImportanceTerms = [
