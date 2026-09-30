@@ -184,6 +184,15 @@ describe('Candidate Journey combined intake', () => {
     system.expectCorrectionNoLongerActionable()
   })
 
+  it('never presents a detected sensitive attribute as the Candidate name', async () => {
+    const system = createSystemUnderTest()
+    await system.givenConsentedSession()
+
+    await system.generateFromSourceWithSensitiveAttributes()
+
+    system.expectIdentityLeftForCandidateEntry()
+  })
+
   it('explains an unusable source instead of presenting an empty correction form', async () => {
     const system = createSystemUnderTest({ ambiguity: 'no-usable-evidence' })
     await system.givenConsentedSession()
@@ -266,6 +275,21 @@ class CombinedIntakeSystem {
       return view.status === 'candidate-session-open' ? view.preparationOutcome : null
     }).not.toBeNull()
     this.#outcome = this.#journey.readView()
+  }
+
+  async generateFromSourceWithSensitiveAttributes() {
+    this.#journey.startTailoredResumePreparation({
+      sourceDocument: documentFromText('Alex Morgan\nNationality: French\nalex@example.com\nFrontend Engineer at Northwind.'),
+      jobPosting: documentFromText(structuredResumeJobMatch.jobPosting.originalContent),
+    })
+    await this.#expectPreparationFinished()
+  }
+
+  expectIdentityLeftForCandidateEntry() {
+    const resume = this.#expectOutcomeView()?.session.tailoredResume
+    expect(resume?.identity).toBeNull()
+    expect(resume?.contactDetails).toEqual([{ kind: 'email', value: 'alex@example.com' }])
+    expect(JSON.stringify(resume)).not.toContain('Nationality')
   }
 
   expectNoCorrespondenceAlternative() {

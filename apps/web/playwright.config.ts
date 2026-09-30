@@ -19,7 +19,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      testMatch: 'candidate-journey.smoke.test.ts',
+      testMatch: ['candidate-journey.smoke.test.ts', 'candidate-journey.integration.test.ts'],
       use: devices['Desktop Chrome'],
     },
     {

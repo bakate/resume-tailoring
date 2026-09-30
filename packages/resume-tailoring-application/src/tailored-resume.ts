@@ -25,14 +25,21 @@ export function createTailoredResume({
   return createTailoredResumeValue({ attestedFacts, jobMatch, locale, relevantFactIds, sourceIntake })
 }
 
+/**
+ * Locally detected personal information is a labeled sensitive attribute (nationality, gender, marital status),
+ * never the Candidate name, so the identity starts empty and is entered locally before export.
+ */
+export function readLocalResumeContacts({ sourceIntake }: Readonly<{ sourceIntake: SourceIntake }>): Pick<TailoredResume, 'identity' | 'contactDetails'> {
+  return { identity: null, contactDetails: sourceIntake.contactDetails.filter(({ kind }) => kind !== 'personal-information') }
+}
+
 export function createNormalizedResume({ sourceIntake, locale }: Readonly<{
   sourceIntake: SourceIntake; locale: TailoredResumeLocale
 }>): TailoredResume {
   const facts = sourceIntake.candidateFacts.filter(({ status }) => status === 'attested')
   return {
     purpose: 'normalized', locale, targetRole: null,
-    identity: sourceIntake.contactDetails.find(({ kind }) => kind === 'personal-information') ?? null,
-    contactDetails: sourceIntake.contactDetails.filter(({ kind }) => kind !== 'personal-information'),
+    ...readLocalResumeContacts({ sourceIntake }),
     valueProposition: { kind: 'evidence-excerpts', paragraphs: [] },
     experiences: createExperiences({ facts, relevantFactIds: new Set() }),
     sections: createSections({ facts }),
@@ -48,9 +55,8 @@ function createTailoredResumeValue({ attestedFacts, jobMatch, locale, relevantFa
 }>): TailoredResume {
   return {
     purpose: 'tailored',
-    contactDetails: sourceIntake.contactDetails.filter(({ kind }) => kind !== 'personal-information'),
+    ...readLocalResumeContacts({ sourceIntake }),
     experiences: createExperiences({ facts: attestedFacts, relevantFactIds }),
-    identity: sourceIntake.contactDetails.find(({ kind }) => kind === 'personal-information') ?? null,
     locale: locale ?? inferTailoredResumeLocale({ content: jobMatch.jobPosting.originalContent }),
     sections: createSections({ facts: attestedFacts }),
     targetRole: jobMatch.targetRole,

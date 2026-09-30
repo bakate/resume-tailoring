@@ -4,7 +4,7 @@ export type { ResumeDocumentWriter, ResumeDocumentValidator, ResumeWritingInput,
 import { prepareCombinedIntake, unavailable } from './combined-intake'
 import type { CombinedIntakeOutcome, CombinedIntakeRequest, PreparationPhase } from './combined-intake'
 
-import type { PrivacySafeTelemetry } from './resume-tailoring-workflow-ports'
+import type { MatchScoreBand, PrivacySafeTelemetry, PrivacySafeTelemetryEvent } from './resume-tailoring-workflow-ports'
 import type { ResumeCorrectionKind } from './resume-editing'
 import { assessResumeLayout, proposeResumeCondensation, acceptResumeCondensation, rejectResumeCondensation } from './resume-condensation'
 import type { ResumeProposalDecision } from './structured-resume-contract'
@@ -210,6 +210,8 @@ export type CandidateJourney = Readonly<{
   }>) => void
   deleteCandidateSession: () => void
   grantProcessingConsent: () => void
+  rateResumeUsefulness: (request: Readonly<{ useful: boolean }>) => void
+  recordResumeDownload: () => void
   readView: () => CandidateJourneyView
   resolveCriticalAmbiguity: (request: Readonly<{
     ambiguityId: `critical-ambiguity-${string}`
@@ -532,7 +534,7 @@ const candidateJourneyMachine = setup({
       },
       after: {
         candidateSessionExpiration: {
-          actions: assign({ notice: 'expired-session-discarded' }),
+          actions: [recordSessionExpiration, assign({ notice: 'expired-session-discarded' })],
           target: 'removingCandidateSession',
         },
       },
@@ -584,7 +586,7 @@ const candidateJourneyMachine = setup({
           target: 'processingProfileEnrichment',
         },
         DELETE_CANDIDATE_SESSION: {
-          actions: assign({ notice: 'deleted' }),
+          actions: [recordSessionDeletion, assign({ notice: 'deleted' })],
           target: 'removingCandidateSession',
         },
         GRANT_PROCESSING_CONSENT: {
@@ -619,12 +621,12 @@ const candidateJourneyMachine = setup({
       entry: assign({ resumeRendering: null, preparationOutcome: null, preparationPhase: null, resumeReview: emptyResumeReview,
         session: ({ context }) => context.session === null ? null : invalidateEditingRevision(context.session),
       }),
-      after: { candidateSessionExpiration: { target: 'removingCandidateSession', actions: assign({ notice: 'expired-session-discarded' }) } },
+      after: { candidateSessionExpiration: { target: 'removingCandidateSession', actions: [recordSessionExpiration, assign({ notice: 'expired-session-discarded' })] } },
       on: { INVALIDATE_RESUME_INPUTS: { target: 'candidateSessionAvailable', actions: assign({
         session: ({ context }) => invalidateResumeInputs(context), preparationPhase: null, preparationOutcome: null, resumeReview: emptyResumeReview,
-      }) }, PREPARATION_PROGRESS: { actions: assign({ preparationPhase: ({ event }) => event.phase,
-        session: ({ event }) => event.session }) },
-        DELETE_CANDIDATE_SESSION: { target: 'removingCandidateSession', actions: assign({ notice: 'deleted' }) },
+      }) }, PREPARATION_PROGRESS: { actions: [({ context, event }) => { recordJourneyPhase({ context, phase: event.phase }) },
+        assign({ preparationPhase: ({ event }) => event.phase, session: ({ event }) => event.session })] },
+        DELETE_CANDIDATE_SESSION: { target: 'removingCandidateSession', actions: [recordSessionDeletion, assign({ notice: 'deleted' })] },
       },
       invoke: {
         src: 'generateApplicationResume',
@@ -785,10 +787,11 @@ const candidateJourneyMachine = setup({
         input: ({ context }) => context.dependencies,
         onDone: [
           {
-            actions: assign({
-              notice: null,
-              session: ({ event }) => event.output.ok ? event.output.value : null,
-            }),
+            actions: [({ context }) => { recordTelemetry({ dependencies: context.dependencies, event: { name: 'resume-tailoring-opened' } }) },
+              assign({
+                notice: null,
+                session: ({ event }) => event.output.ok ? event.output.value : null,
+              })],
             guard: ({ event }) => event.output.ok,
             target: 'candidateSessionAvailable',
           },
@@ -905,6 +908,10 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     },
     deleteCandidateSession: () => { actor.send({ type: 'DELETE_CANDIDATE_SESSION' }) },
     grantProcessingConsent: () => { actor.send({ type: 'GRANT_PROCESSING_CONSENT' }) },
+    rateResumeUsefulness: ({ useful }) => { recordResumeOutcome({ dependencies, view,
+      event: (matchScoreBand) => ({ name: 'resume-usefulness-rated', hasComment: false, matchScoreBand, useful }) }) },
+    recordResumeDownload: () => { recordResumeOutcome({ dependencies, view,
+      event: (matchScoreBand) => ({ name: 'resume-downloaded', matchScoreBand }) }) },
     readView: () => view,
     resolveCriticalAmbiguity: ({ ambiguityId, answer }) => {
       actor.send({ type: 'RESOLVE_CRITICAL_AMBIGUITY', ambiguityId, answer })
@@ -1064,7 +1071,48 @@ async function requestResumeRendering({ actor, input }: Readonly<{
 function recordResumeCorrection({ dependencies, kind }: Readonly<{
   dependencies: CandidateJourneyDependencies; kind: ResumeCorrectionKind
 }>) {
-  void dependencies.telemetry?.record({ name: 'resume-correction-recorded', correctionKind: kind }).catch(() => undefined)
+  recordTelemetry({ dependencies, event: { name: 'resume-correction-recorded', correctionKind: kind } })
+}
+
+function recordTelemetry({ dependencies, event }: Readonly<{
+  dependencies: CandidateJourneyDependencies; event: PrivacySafeTelemetryEvent
+}>) {
+  void dependencies.telemetry?.record(event).catch(() => undefined)
+}
+
+function recordSessionDeletion({ context }: Readonly<{ context: CandidateJourneyContext }>) {
+  recordTelemetry({ dependencies: context.dependencies, event: { name: 'candidate-session-deleted' } })
+}
+
+function recordSessionExpiration({ context }: Readonly<{ context: CandidateJourneyContext }>) {
+  recordTelemetry({ dependencies: context.dependencies, event: { name: 'candidate-session-expired' } })
+}
+
+function recordJourneyPhase({ context, phase }: Readonly<{ context: CandidateJourneyContext; phase: PreparationPhase }>) {
+  const reached = readJourneyPhase(phase)
+  if (context.preparationPhase !== null && readJourneyPhase(context.preparationPhase) === reached) return
+  recordTelemetry({ dependencies: context.dependencies, event: { name: 'candidate-journey-phase-reached', phase: reached } })
+}
+
+function readJourneyPhase(phase: PreparationPhase): CandidateJourneyPhase {
+  if (phase === 'extracting-source') return 'source-intake'
+  return phase === 'extracting-posting' || phase === 'matching' ? 'job-match' : 'tailored-resume-preparation'
+}
+
+function recordResumeOutcome({ dependencies, event, view }: Readonly<{
+  dependencies: CandidateJourneyDependencies; view: CandidateJourneyView
+  event: (matchScoreBand: MatchScoreBand) => PrivacySafeTelemetryEvent
+}>) {
+  if (view.status !== 'candidate-session-open' || view.session.tailoredResume === null) return
+  const jobMatch = view.session.jobMatch ?? view.session.preparation?.jobMatch ?? null
+  if (jobMatch === null) return
+  recordTelemetry({ dependencies, event: event(readMatchScoreBand(jobMatch.analysis.matchScore)) })
+}
+
+function readMatchScoreBand(matchScore: number): MatchScoreBand {
+  if (matchScore < 25) return '0-24'
+  if (matchScore < 50) return '25-49'
+  return matchScore < 75 ? '50-74' : '75-100'
 }
 
 function renderedResumeReview({ context, result }: Readonly<{

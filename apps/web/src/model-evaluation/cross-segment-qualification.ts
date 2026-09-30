@@ -35,8 +35,6 @@ export type QualificationFixture = Readonly<{
   roleFamily: QualificationRoleFamily
   sourceDocument: string
   split: QualificationSplit
-  writingClaimsSupported: boolean
-  exportablePdf: boolean
   generalManagement?: Readonly<{
     ambiguity: 'none' | 'scope' | 'seniority' | 'ownership'
     constraints: readonly string[]
@@ -58,8 +56,6 @@ export type QualificationThresholds = Readonly<{
   matchEvidencePrecision: number
   meanMatchScoreError: number
   maximumMatchScoreError: number
-  pdfExportValidity: number
-  provenanceSafety: number
   validEvidenceRecall: number
 }>
 
@@ -85,8 +81,6 @@ export const crossSegmentQualificationThresholds = {
   matchEvidencePrecision: 0.98,
   meanMatchScoreError: 5,
   maximumMatchScoreError: 10,
-  pdfExportValidity: 1,
-  provenanceSafety: 1,
   validEvidenceRecall: 0.9,
 } as const satisfies QualificationThresholds
 
@@ -138,16 +132,6 @@ function createGates({ fixtures, thresholds }: Readonly<{
     }),
     maximumMatchScoreError: createMaximumGate({
       threshold: thresholds.maximumMatchScoreError, value: calculateMaximumScoreError({ measurements }),
-    }),
-    pdfExportValidity: createMinimumGate({
-      threshold: thresholds.pdfExportValidity, value: calculateRate({
-        values: fixtures.map(({ exportablePdf }) => exportablePdf),
-      }),
-    }),
-    provenanceSafety: createMinimumGate({
-      threshold: thresholds.provenanceSafety, value: calculateRate({
-        values: fixtures.map(({ writingClaimsSupported }) => writingClaimsSupported),
-      }),
     }),
     validEvidenceRecall: createMinimumGate({
       threshold: thresholds.validEvidenceRecall, value: calculateValidEvidenceRecall({ measurements }),
@@ -245,10 +229,6 @@ function isAcceptedMeasurement({ fixture, result }: FixtureMeasurement) {
   return hasExpectedReserve && hasExpectedEvidence && hasExpectedGroups && scoreIsAcceptable && !prohibitedMatchFound
 }
 
-function calculateRate({ values }: Readonly<{ values: readonly boolean[] }>) {
-  return calculateRatio({ numerator: values.filter(Boolean).length, denominator: values.length })
-}
-
 function calculateRatio({ denominator, numerator }: Readonly<{ denominator: number; numerator: number }>) {
   if (denominator === 0) return 1
   return Number((numerator / denominator).toFixed(4))
@@ -335,8 +315,6 @@ export function createQualificationFixture({
       ? `Expérience ${roleFamily} pour ${requirementTerm}.`
       : `Synthetic ${roleFamily} evidence for ${requirementTerm}.`,
     split,
-    writingClaimsSupported: true,
-    exportablePdf: true,
     generalManagement,
   }
 }

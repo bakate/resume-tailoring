@@ -9,6 +9,7 @@
     "start": "node .output/server/index.mjs",
     "test": "vitest run --passWithNoTests --exclude 'test/**' --exclude '**/*.evaluation.test.ts'",
     "test:evaluation": "vitest run --maxWorkers=1 src/model-evaluation/openai-model-qualification.evaluation.test.ts",
+    "test:qualification": "vitest run --maxWorkers=1 src/model-evaluation/cross-segment-qualification.test.ts src/model-evaluation/general-management-qualification.test.ts src/model-evaluation/sales-commercial-qualification.test.ts src/model-evaluation/cross-segment-document-qualification.test.ts src/model-evaluation/cross-segment-document-qualification.evaluation.test.ts",
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:compatibility": "playwright test --project=chromium-desktop --project=chromium-mobile --project=firefox-desktop --project=firefox-mobile --project=webkit-desktop --project=webkit-mobile",
     "typecheck": "tsc -p tsconfig.json"

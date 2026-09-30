@@ -375,6 +375,8 @@ class StructuredResumeTestSystem {
   async givenReviewableResume() {
     await this.givenMatchedCandidateSession()
     await this.prepareTailoredResume()
+    this.#journey.updateResumeContacts({ identity: { kind: 'personal-information', value: 'Alex Morgan' },
+      contactDetails: [{ kind: 'email', value: 'alex@example.com' }] })
     await this.givenProcessingConsent()
   }
 

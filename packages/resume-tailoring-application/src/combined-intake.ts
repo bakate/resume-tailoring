@@ -5,7 +5,7 @@ import { createJobMatch, maximumJobPostingBytes } from './job-match'
 import type { JobPostingDocument } from './job-match'
 import { createSourceIntake, resolveCriticalAmbiguity, maximumSourceDocumentBytes } from './source-intake'
 import type { CandidateFact, SourceDocument, SourceIntake } from './source-intake'
-import { inferTailoredResumeLocale } from './tailored-resume'
+import { inferTailoredResumeLocale, readLocalResumeContacts } from './tailored-resume'
 import type { TailoredResumeLocale } from './tailored-resume'
 import type { ResumeOperationFailure, ResumePreparationOutcome } from './structured-resume-contract'
 
@@ -147,8 +147,7 @@ function localResumeContacts({ sourceIntake, session }: Readonly<{ sourceIntake:
   if (sourceIntake === session.sourceIntake && session.tailoredResume !== null) {
     return { identity: session.tailoredResume.identity, contactDetails: session.tailoredResume.contactDetails }
   }
-  return { identity: sourceIntake.contactDetails.find(({ kind }) => kind === 'personal-information') ?? null,
-    contactDetails: sourceIntake.contactDetails.filter(({ kind }) => kind !== 'personal-information') }
+  return readLocalResumeContacts({ sourceIntake })
 }
 
 function noCorrespondence(context: PreparationContext): CombinedIntakeOutcome {

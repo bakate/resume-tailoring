@@ -7,7 +7,6 @@ import type { Localization } from '../localization/localization'
 import type { useCandidateJourney } from './use-candidate-journey'
 import { useResumePhoto } from './use-resume-preview'
 import { TailoredResumePreview } from './tailored-resume-preview'
-import { createPrivacySafeBrowserTelemetry } from '../resume-tailoring/browser-adapters'
 import { renderTailoredResumeDocument } from './tailored-resume-document'
 import { ResumeEditor } from './resume-editor'
 import { resumeReviewCopy } from './resume-review-copy'
@@ -28,13 +27,18 @@ function ResumeReview(props: ResumeDocumentProps) {
   const photo = useResumePhoto()
   const [proposalPhoto, setProposalPhoto] = useState<string | undefined>(undefined)
   const [editorOpened, setEditorOpened] = useState(false)
+  const [downloadedRevision, setDownloadedRevision] = useState<string | null>(null)
+  const revision = props.candidateJourney.view.status === 'candidate-session-open' ? props.candidateJourney.view.resumeReview?.draft.revision ?? null : null
   const copy = resumeReviewCopy[props.localization.locale]
   return <Paper aria-labelledby="tailored-resume-title" component="section"
     className="candidate-journey-workspace" p={{ base: 'md', sm: 'xl' }} shadow="xs" withBorder>
     <Stack gap="lg">
       <PreparationStatus {...props} />
       <div><Title id="tailored-resume-title" order={2}>{copy.preview}</Title><Text c="dimmed">{copy.description}</Text></div>
-      <CurrentResumePreview {...props} {...{ editorOpened, photo }} />
+      <CurrentResumePreview {...props} {...{ editorOpened, photo }} onDownload={() => {
+        props.candidateJourney.recordResumeDownload(); setDownloadedRevision(revision) }} />
+      {downloadedRevision !== null && downloadedRevision === revision
+        ? <UsabilityFeedback key={downloadedRevision} candidateJourney={props.candidateJourney} copy={copy} /> : null}
       <Group><Button disabled={props.candidateJourney.view.status === 'candidate-session-open' && props.candidateJourney.view.operation !== null} onClick={() => { setEditorOpened(true) }}>{copy.edit}</Button>
         <ReviewActions candidateJourney={props.candidateJourney} copy={copy} photo={photo} onProposalRequested={setProposalPhoto} /></Group>
       <ReviewStatus candidateJourney={props.candidateJourney} copy={copy} />
@@ -116,8 +120,8 @@ function ResumePreview({ resume, title, photoDataUrl }: Readonly<{ resume: Tailo
     srcDoc={renderTailoredResumeDocument({ tailoredResume: resume, photoDataUrl })} />
 }
 
-function CurrentResumePreview({ candidateJourney, resume, editorOpened, photo }: ResumeDocumentProps & Readonly<{
-  editorOpened: boolean; photo: ReturnType<typeof useResumePhoto>
+function CurrentResumePreview({ candidateJourney, resume, editorOpened, photo, onDownload }: ResumeDocumentProps & Readonly<{
+  editorOpened: boolean; photo: ReturnType<typeof useResumePhoto>; onDownload: () => void
 }>) {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open' || view.resumeReview === null) return null
@@ -125,13 +129,16 @@ function CurrentResumePreview({ candidateJourney, resume, editorOpened, photo }:
     && view.resumeReview.operation === null && (view.operation === null || view.operation === 'rendering-resume-document')
   return <TailoredResumePreview document={resume} enabled={enabled} photo={photo}
     unsupportedFieldIds={view.resumeReview.unsupportedFieldIds} renderDocument={candidateJourney.renderResumeDocument}
-    onDownload={() => { recordDownload({ candidateJourney }) }} />
+    onDownload={onDownload} />
 }
 
-function recordDownload({ candidateJourney }: Readonly<{ candidateJourney: ResumeReviewController }>) {
-  const view = candidateJourney.view
-  if (view.status !== 'candidate-session-open' || view.session.jobMatch === null) return
-  const score = view.session.jobMatch.analysis.matchScore
-  const matchScoreBand = score < 25 ? '0-24' : score < 50 ? '25-49' : score < 75 ? '50-74' : '75-100'
-  void createPrivacySafeBrowserTelemetry().record({ name: 'resume-downloaded', matchScoreBand })
+function UsabilityFeedback({ candidateJourney, copy }: Readonly<{ candidateJourney: ResumeReviewController; copy: ResumeReviewCopy }>) {
+  const [recorded, setRecorded] = useState(false)
+  const rate = (useful: boolean) => { candidateJourney.rateResumeUsefulness({ useful }); setRecorded(true) }
+  if (recorded) return <Text role="status">{copy.usabilityRecorded}</Text>
+  return <div role="group" aria-labelledby="resume-usability-question"><Stack gap="xs">
+    <Text id="resume-usability-question" fw={600}>{copy.usability}</Text>
+    <Group><Button variant="default" onClick={() => { rate(true) }}>{copy.usable}</Button>
+      <Button variant="default" onClick={() => { rate(false) }}>{copy.needsRewriting}</Button></Group>
+  </Stack></div>
 }
