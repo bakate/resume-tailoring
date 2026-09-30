@@ -5,7 +5,6 @@ import {
   Button,
   Container,
   Group,
-  List,
   Modal,
   Paper,
   SegmentedControl,
@@ -24,7 +23,6 @@ import {
 } from '../localization/localization'
 import type { Localization } from '../localization/localization'
 import type { CandidateJourneyView } from '@resume-tailoring/application/candidate-journey'
-import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
 import { candidateJourneyPhases } from './candidate-journey-phases'
 import type { CandidateJourneyPhase } from './candidate-journey-phases'
 import { useCandidateJourney } from './use-candidate-journey'
@@ -52,15 +50,11 @@ function LocalizedCandidateJourneyShell({ localization }: LocalizationProps) {
       <CandidateJourneyHeader localization={localization} />
       <AppShell.Main id="main-content"><Container size="xl"><Stack gap="xl">
         <CandidateJourneyIntroduction {...{ candidateJourney, localization }} />
-        <ProcessingPolicyCard {...{ candidateJourney, localization }} />
         <CandidateJourneyStatusAnnouncements {...{ activePhase, candidateJourney, localization }} />
         <CandidateJourneyProgress {...{ candidateJourney, localization }} />
         <TailoredResumeWorkspace {...{ candidateJourney, localization }} />
         <CombinedIntakeWorkspace {...{ candidateJourney, localization }} />
-        <details><summary>{localization.translate('combinedIntake.analysis')}</summary>
-          <JobMatchWorkspace {...{ candidateJourney, localization }} /></details>
-        <details><summary>{localization.translate('combinedIntake.inspection')}</summary>
-          <SourceIntakeWorkspace {...{ candidateJourney, localization }} /></details>
+        <ResultDisclosures {...{ candidateJourney, localization }} />
         <CandidateJourneyPhaseList {...{ activePhase, localization }} />
       </Stack></Container></AppShell.Main>
     </AppShell>
@@ -69,6 +63,24 @@ function LocalizedCandidateJourneyShell({ localization }: LocalizationProps) {
 
 type LocalizationProps = Readonly<{ localization: Localization }>
 type CandidateJourneyController = ReturnType<typeof useCandidateJourney>
+
+function ResultDisclosures({ candidateJourney, localization }: LocalizationProps & Readonly<{
+  candidateJourney: CandidateJourneyController
+}>) {
+  const { view } = candidateJourney
+  if (view.status !== 'candidate-session-open') return null
+  const { preparation } = view.session
+  const sourceIntake = preparation?.sourceIntake ?? view.session.sourceIntake
+  const jobMatch = preparation?.jobMatch ?? view.session.jobMatch
+  return <>
+    {sourceIntake === null || jobMatch === null ? null
+      : <details><summary>{localization.translate('combinedIntake.analysis')}</summary>
+        <JobMatchWorkspace {...{ candidateJourney, localization }} /></details>}
+    {sourceIntake === null ? null
+      : <details><summary>{localization.translate('combinedIntake.inspection')}</summary>
+        <SourceIntakeWorkspace {...{ candidateJourney, localization }} /></details>}
+  </>
+}
 
 function CandidateJourneyHeader({ localization }: LocalizationProps) {
   return (
@@ -218,109 +230,6 @@ function CandidateSessionNotice({ localization, view }: LocalizationProps & Read
   </Text>
 }
 
-function ProcessingPolicyCard({ candidateJourney, localization }: LocalizationProps & Readonly<{
-  candidateJourney: CandidateJourneyController
-}>) {
-  const { view } = candidateJourney
-  if (view.status !== 'candidate-session-open') return null
-  const { processingPolicy } = view
-  return <Paper aria-label={localization.translate('processingPolicy.title')}
-    component="section" maw="48rem" p="xl" shadow="xs" withBorder>
-    <Stack gap="md">
-      <div>
-        <Title order={2} size="h3">{localization.translate('processingPolicy.title')}</Title>
-        <Text c="dimmed" mt="xs">
-          {localization.translate('processingPolicy.description')}
-        </Text>
-      </div>
-      <Text size="sm">{processingPolicy.provider} · {localization.translate('processingPolicy.purpose.writeResume')}.{' '}
-        {localization.translate('processingPolicy.storageValue')}</Text>
-      <details><summary>{localization.translate('combinedIntake.policyDetails')}</summary>
-        <ProcessingPolicyDetails {...{ localization, processingPolicy }} /></details>
-      <ProcessingConsentControl {...{ candidateJourney, localization }} />
-    </Stack>
-  </Paper>
-}
-
-function ProcessingPolicyDetails({ localization, processingPolicy }: LocalizationProps & Readonly<{
-  processingPolicy: ProcessingPolicy
-}>) {
-  return <>
-    <PolicyText label={localization.translate('processingPolicy.provider')}
-      value={processingPolicy.provider} />
-    <PolicyList label={localization.translate('processingPolicy.purposes')}
-      values={translateProcessingPolicyValues({
-        localization, values: processingPolicy.purposes,
-      })} />
-    <PolicyList label={localization.translate('processingPolicy.transmittedDataCategories')}
-      values={translateProcessingPolicyValues({
-        localization, values: processingPolicy.transmittedDataCategories,
-      })} />
-    <PolicyText label={localization.translate('processingPolicy.retentionPolicy')}
-      value={translateProcessingPolicyValue({
-        localization, value: processingPolicy.retentionPolicy,
-      })} />
-    <PolicyText label={localization.translate('processingPolicy.storageBehavior')}
-      value={translateProcessingPolicyValue({
-        localization, value: processingPolicy.storageBehavior,
-      })} />
-    <Text size="sm">{localization.translate('processingPolicy.version')}{' '}
-      {processingPolicy.version}</Text>
-  </>
-}
-
-function translateProcessingPolicyValues({ localization, values }: LocalizationProps & Readonly<{
-  values: readonly string[]
-}>) {
-  return values.map((value) => translateProcessingPolicyValue({ localization, value }))
-}
-
-function translateProcessingPolicyValue({ localization, value }: LocalizationProps & Readonly<{
-  value: string
-}>) {
-  const key = processingPolicyTranslationKeyByValue.get(value)
-  return key === undefined ? value : localization.translate(key)
-}
-
-const processingPolicyTranslationKeyByValue = new Map<string, Parameters<
-  Localization['translate']
->[0]>([
-  ['Extract and structure professional evidence', 'processingPolicy.purpose.extractEvidence'],
-  ['Compare Candidate evidence with Job Posting requirements', 'processingPolicy.purpose.compareEvidence'],
-  ['Write and validate supported Tailored Resume content', 'processingPolicy.purpose.writeResume'],
-  ['Minimized professional content', 'processingPolicy.data.minimizedProfessionalContent'],
-  ['Job Posting content', 'processingPolicy.data.jobPostingContent'],
-  ['Candidate Facts needed for matching, writing, and validation', 'processingPolicy.data.candidateFacts'],
-  ['API inputs and outputs may be retained for abuse monitoring for up to 30 days, or longer when legally required.', 'processingPolicy.retentionValue'],
-  ['Candidate content remains browser-local; model requests are stateless with application storage disabled.', 'processingPolicy.storageValue'],
-])
-
-function PolicyText({ label, value }: Readonly<{ label: string; value: string }>) {
-  return <div><Text fw={700}>{label}</Text><Text>{value}</Text></div>
-}
-
-function PolicyList({ label, values }: Readonly<{
-  label: string
-  values: readonly string[]
-}>) {
-  return <div><Text fw={700}>{label}</Text><List>{values.map((value) => (
-    <List.Item key={value}>{value}</List.Item>
-  ))}</List></div>
-}
-
-function ProcessingConsentControl({ candidateJourney, localization }:
-LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) {
-  if (candidateJourney.view.status !== 'candidate-session-open') return null
-  if (candidateJourney.view.processingConsentStatus === 'granted') {
-    return <Text c="forest.8" fw={700} role="status">
-      {localization.translate('processingPolicy.consentGranted')}
-    </Text>
-  }
-  return <Button onClick={candidateJourney.grantProcessingConsent}>
-    {localization.translate('processingPolicy.grantConsent')}
-  </Button>
-}
-
 function CandidateJourneyStatusAnnouncements({ activePhase, candidateJourney, localization }:
 LocalizationProps & Readonly<{
   activePhase: CandidateJourneyPhase | null
@@ -422,7 +331,7 @@ function CandidateJourneyPhaseList({ activePhase, localization }: LocalizationPr
 }>) {
   return (
     <Box aria-label={localization.translate('candidateJourney.phasesLabel')} component="nav">
-      <SimpleGrid cols={{ base: 1, md: 3 }} component="ol" spacing="lg">
+      <SimpleGrid className="candidate-journey-phase-list" cols={{ base: 1, md: 3 }} component="ol" spacing="lg">
         {candidateJourneyPhases.map((phase, phaseIndex) => (
           <CandidateJourneyPhaseItem {...{ activePhase, localization, phase, phaseIndex }}
             key={phase.id} />

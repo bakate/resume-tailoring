@@ -129,6 +129,15 @@ describe('Candidate Journey combined intake', () => {
     system.expectConsentRenewal()
   })
 
+  it('grants Processing Consent for the current policy with the generation request', async () => {
+    const system = createSystemUnderTest({ consent: 'outdated' })
+    await system.givenConsentedSession()
+
+    await system.generateWhileGrantingProcessingConsent()
+
+    system.expectConsentGrantedAndResumeWritten()
+  })
+
   it('isolates ambiguous evidence without requiring a review of unaffected facts', async () => {
     const system = createSystemUnderTest({ ambiguity: 'isolated' })
     await system.givenConsentedSession()
@@ -263,6 +272,15 @@ class CombinedIntakeSystem {
       return view.status === 'candidate-session-open' ? view.session.tailoredResume : null
     }).not.toBeNull()
     this.#outcome = this.#journey.readView()
+  }
+
+  async generateWhileGrantingProcessingConsent() {
+    this.#journey.startTailoredResumePreparation({
+      grantProcessingConsent: true,
+      sourceDocument: documentFromText('Source professional evidence'),
+      jobPosting: documentFromText(structuredResumeJobMatch.jobPosting.originalContent),
+    })
+    await this.#expectPreparationFinished()
   }
 
   async requestResumePreparation() {
@@ -430,6 +448,15 @@ class CombinedIntakeSystem {
     const view = this.#expectOutcomeView()
     expect(view?.preparationOutcome).toMatchObject({ status: 'failed', reason: 'processing-consent-required', recovery: 'renew-consent' })
     expect(view?.session.tailoredResume).toBeNull()
+  }
+
+  expectConsentGrantedAndResumeWritten() {
+    const view = this.#expectOutcomeView()
+    expect(view?.processingConsentStatus).toBe('granted')
+    expect(view?.session.processingConsent?.policy).toEqual(policy)
+    expect(view?.session.tailoredResume).not.toBeNull()
+    expect(this.#dependencies.persistence.restore({ now: this.#dependencies.now() }))
+      .toMatchObject({ ok: true, value: { session: { processingConsent: { policy } } } })
   }
 
   expectIsolatedAmbiguity() {

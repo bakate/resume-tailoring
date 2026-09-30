@@ -77,6 +77,26 @@ describe('Candidate Journey Job Match', () => {
     system.expectExtractionToBeRejected()
   })
 
+  it('keeps valid relevance when another proposed relevance link is unsupported', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenMatchEvidenceIncludesAnUnsupportedRelevanceLink()
+
+    await system.submitPastedJobPosting()
+
+    system.expectOnlySupportedRelevantFacts()
+  })
+
+  it('omits an unsupported Practical Constraint without rejecting the analysis', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenExtractionContainsAnInventedPracticalConstraint()
+
+    await system.submitPastedJobPosting()
+
+    system.expectOnlySourceBackedPracticalConstraints()
+  })
+
   it('does not analyze a posting before Critical Ambiguities are resolved', async () => {
     const system = createSystemUnderTest({ session: createSourceIntakeSession() })
     await system.givenCandidateJourneyIsReady()
@@ -271,11 +291,28 @@ class CandidateJourneyJobMatchTestSystem {
     }
   }
 
+  givenExtractionContainsAnInventedPracticalConstraint() {
+    this.#extractedJobPosting = {
+      ...extractedJobPosting,
+      practicalConstraints: [...extractedJobPosting.practicalConstraints, {
+        sourceExcerpt: 'Work from Paris three days per week.', value: 'Lyon',
+      }],
+    }
+  }
+
   givenExtractionContainsAnInventedRequirement() {
     this.#extractedJobPosting = {
       ...extractedJobPosting,
       requirements: extractedJobPosting.requirements.map((requirement, requirementIndex) =>
         requirementIndex === 0 ? { ...requirement, value: 'TypeScript payroll' } : requirement),
+    }
+  }
+
+  givenMatchEvidenceIncludesAnUnsupportedRelevanceLink() {
+    this.#matchEvidence = {
+      ...matchEvidenceProposal,
+      relevance: [...matchEvidenceProposal.relevance,
+        createRelevance('1', 'source-fact-3', 'Mentor', 'TypeScript')],
     }
   }
 
@@ -407,6 +444,21 @@ class CandidateJourneyJobMatchTestSystem {
     const view = this.#readOpenView()
     expect(view.jobMatchFailure).toBe('job-posting-extraction-unavailable')
     expect(view.session.jobMatch?.jobPosting.name).toBe('stable-job-posting.txt')
+  }
+
+  expectOnlySupportedRelevantFacts() {
+    this.#expectCompletedAction()
+    const view = this.#readOpenView()
+    expect(view.jobMatchFailure).toBeNull()
+    expect(view.session.jobMatch?.analysis.relevantFactIds).toEqual(
+      matchEvidenceProposal.relevance.map(({ factMatch }) => factMatch.factId))
+  }
+
+  expectOnlySourceBackedPracticalConstraints() {
+    this.#expectCompletedAction()
+    const view = this.#readOpenView()
+    expect(view.jobMatchFailure).toBeNull()
+    expect(view.session.jobMatch?.practicalConstraints).toEqual(extractedJobPosting.practicalConstraints)
   }
 
   expectExtractionToBeRejected() {

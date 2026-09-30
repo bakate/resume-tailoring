@@ -1,6 +1,7 @@
-import { Alert, Button, FileInput, Group, Modal, Paper, SegmentedControl, Select, Stack, Text, Textarea, Title } from '@mantine/core'
+import { Alert, Button, CloseButton, Divider, Fieldset, Group, Modal, Paper, Select, SimpleGrid, Stack, Text, Textarea, Title } from '@mantine/core'
+import { Dropzone } from '@mantine/dropzone'
 import { useEffect, useState } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
+import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { inferTailoredResumeLocale } from '@resume-tailoring/application/tailored-resume'
 import type { CandidateSession, ResumePreparationFailure, StoredIntakeDocument } from '@resume-tailoring/application/candidate-journey'
 import type { SourceDocument } from '@resume-tailoring/application/source-intake'
@@ -8,6 +9,7 @@ import type { Localization } from '../localization/localization'
 import type { useCandidateJourney } from './use-candidate-journey'
 import { CriticalAmbiguityQuestions, sourceIntakeFailureKeys } from './source-intake-workspace'
 import { jobMatchFailureKeys } from './job-match-workspace'
+import { ProcessingPolicyNotice, processingPolicyNoticeId } from './processing-policy-notice'
 
 type IntakeProps = Readonly<{ candidateJourney: ReturnType<typeof useCandidateJourney>; localization: Localization }>
 type OpenIntakeProps = IntakeProps & Readonly<{ session: CandidateSession }>
@@ -34,9 +36,12 @@ function CombinedIntakeForm(props: OpenIntakeProps) {
   return <Paper component="section" aria-labelledby="combined-intake-title" p={{ base: 'md', sm: 'xl' }} withBorder><Stack>
     <Title id="combined-intake-title" order={2}>{localization.translate('combinedIntake.title')}</Title>
     <Text c="dimmed">{localization.translate('combinedIntake.description')}</Text>
-    <IntakeFields {...props} controls={controls} />
-    <Button disabled={view.processingConsentStatus !== 'granted' || view.operation !== null} loading={view.operation !== null}
-      onClick={() => { controls.requestGeneration({ purpose: 'tailored' }) }}>{localization.translate('combinedIntake.generate')}</Button>
+    <Fieldset disabled={view.operation !== null} p={0} variant="unstyled">
+      <Stack><IntakeFields {...props} busy={view.operation !== null} controls={controls} /></Stack>
+    </Fieldset>
+    <Button aria-describedby={processingPolicyNoticeId} disabled={view.operation !== null} loading={view.operation !== null}
+      onClick={() => { controls.requestGeneration({ purpose: 'tailored' }) }} size="lg">{localization.translate('combinedIntake.generate')}</Button>
+    <ProcessingPolicyNotice {...{ candidateJourney, localization }} />
     <PreparationFeedback {...{ candidateJourney, localization, localFailure: controls.state.failure }}
       onRetry={() => { controls.requestGeneration({ purpose: session.preparation?.purpose ?? 'tailored' }) }}
       onNormalized={() => { controls.requestGeneration({ purpose: 'normalized' }) }} />
@@ -65,7 +70,10 @@ function createIntakeActions(input: IntakeActionsInput) {
     const request = await readIntakeRequest({ ...input, purpose })
     if (!request.ok) { input.setState((current) => ({ ...current, failure: request.error })); return }
     input.setState((current) => ({ ...current, failure: null }))
-    input.candidateJourney.startTailoredResumePreparation(request.value)
+    const { view } = input.candidateJourney
+    const consentRequired = view.status === 'candidate-session-open' && view.processingConsentStatus !== 'granted'
+    input.candidateJourney.startTailoredResumePreparation(consentRequired
+      ? { ...request.value, grantProcessingConsent: true } : request.value)
   }
   const requestGeneration = ({ purpose }: Readonly<{ purpose: ResumePurpose }>) => {
     if (input.session.tailoredResume === null) { void generate({ purpose }); return }
@@ -88,21 +96,99 @@ async function readIntakeRequest({ state, session, purpose }: Readonly<{
     locale: state.locale === 'en' || state.locale === 'fr' ? state.locale : null, purpose } } as const
 }
 
-function IntakeFields({ session, localization, controls }: OpenIntakeProps & Readonly<{ controls: IntakeControls }>) {
+function IntakeFields({ session, localization, controls, busy }: OpenIntakeProps & Readonly<{ controls: IntakeControls; busy: boolean }>) {
   const { state, updateInputs } = controls
-  const sourcePicker = <DocumentPicker choice={state.sourceChoice} kind="source" localization={localization}
-    onChange={(sourceChoice) => { updateInputs({ sourceChoice }) }} />
+  const hasSource = (session.preparation?.sourceIntake ?? session.sourceIntake) !== null
   return <>
-    {(session.preparation?.sourceIntake ?? session.sourceIntake) === null ? sourcePicker
-      : <details><summary>{localization.translate('combinedIntake.replaceSource')}</summary>{sourcePicker}</details>}
-    <DocumentPicker choice={state.postingChoice} kind="posting" localization={localization}
-      onChange={(postingChoice) => { updateInputs({ postingChoice }) }} />
-    <Select label={localization.translate('tailoredResume.language')} value={state.locale}
+    <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
+      <SourceDocumentCard {...{ busy, hasSource, localization }} choice={state.sourceChoice}
+        onChange={(sourceChoice) => { updateInputs({ sourceChoice }) }} />
+      <DocumentCard {...{ busy, localization }} choice={state.postingChoice} kind="posting"
+        onChange={(postingChoice) => { updateInputs({ postingChoice }) }} />
+    </SimpleGrid>
+    <Select label={localization.translate('tailoredResume.language')} maw={{ sm: 320 }} value={state.locale}
       onChange={(locale) => { updateInputs({ locale }) }} data={[
         { value: 'automatic', label: proposedLanguage({ postingChoice: state.postingChoice, localization }) },
         { value: 'en', label: 'English' }, { value: 'fr', label: 'Français' },
       ]} />
   </>
+}
+
+type DocumentCardProps = Readonly<{
+  busy: boolean; choice: DocumentChoice; localization: Localization; onChange: (choice: DocumentChoice) => void
+}>
+
+function SourceDocumentCard({ hasSource, ...props }: Omit<DocumentCardProps, 'kind'> & Readonly<{ hasSource: boolean }>) {
+  const [replacing, setReplacing] = useState(false)
+  useEffect(() => { setReplacing(false) }, [hasSource])
+  const { localization } = props
+  if (!hasSource || replacing) return <DocumentCard {...props} kind="source" footer={hasSource
+    ? <Button onClick={() => { setReplacing(false); props.onChange(emptyChoice) }} size="compact-sm" variant="subtle">
+        {localization.translate('combinedIntake.keepSourceAction')}</Button> : null} />
+  return <Paper className="intake-document" p="lg" radius="md" withBorder>
+    <Stack gap="sm">
+      <Text className="intake-document-title" fw={700} size="lg">{localization.translate('combinedIntake.sourceTitle')}</Text>
+      <Text c="forest.8" fw={600} role="status">{localization.translate('combinedIntake.sourceReady')}</Text>
+      <Group><Button onClick={() => { setReplacing(true) }} variant="default">
+        {localization.translate('combinedIntake.replaceSourceAction')}</Button></Group>
+    </Stack>
+  </Paper>
+}
+
+const emptyChoice: DocumentChoice = { method: 'paste', text: '', file: null }
+
+const acceptedMediaTypes = {
+  source: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+  posting: ['application/pdf', 'text/plain'],
+} as const
+
+function DocumentCard({ busy, choice, footer = null, kind, localization, onChange }: DocumentCardProps & Readonly<{
+  footer?: ReactNode; kind: 'source' | 'posting'
+}>) {
+  const [rejected, setRejected] = useState(false)
+  const source = kind === 'source'
+  const title = localization.translate(source ? 'combinedIntake.sourceTitle' : 'combinedIntake.postingTitle')
+  return <Paper className="intake-document" component="fieldset" p="lg" radius="md" withBorder>
+    <Stack gap="sm">
+      <Text className="intake-document-title" component="legend" fw={700} size="lg">{title}</Text>
+      {choice.method === 'upload' && choice.file !== null
+        ? <SelectedFile file={choice.file} localization={localization} onRemove={() => { onChange(emptyChoice) }} />
+        : <>
+          <Dropzone accept={[...acceptedMediaTypes[kind]]} className="intake-dropzone" disabled={busy} maxFiles={1} multiple={false}
+            aria-label={localization.translate(source ? 'sourceIntake.sourceFile' : 'jobMatch.fileLabel')}
+            onDrop={([file]) => { setRejected(false); if (file !== undefined) onChange({ method: 'upload', text: '', file }) }}
+            onReject={() => { setRejected(true) }}>
+            <Stack align="center" gap={4} py="md">
+              <Text fw={600} ta="center">{localization.translate('combinedIntake.dropFile')}</Text>
+              <Text c="dimmed" size="sm">{localization.translate(source ? 'combinedIntake.sourceHint' : 'combinedIntake.postingHint')}</Text>
+            </Stack>
+          </Dropzone>
+          {rejected ? <Text c="danger.8" role="alert" size="sm">{localization.translate('combinedIntake.rejectedFile')}</Text> : null}
+          <Divider label={localization.translate('combinedIntake.orPaste')} labelPosition="center" />
+          <Textarea aria-label={localization.translate(source ? 'sourceIntake.professionalText' : 'jobMatch.textLabel')}
+            autosize maxRows={16} minRows={8}
+            placeholder={localization.translate(source ? 'combinedIntake.sourcePlaceholder' : 'combinedIntake.postingPlaceholder')}
+            value={choice.text} onChange={(event) => { onChange({ method: 'paste', text: event.currentTarget.value, file: null }) }} />
+        </>}
+      {footer}
+    </Stack>
+  </Paper>
+}
+
+function SelectedFile({ file, localization, onRemove }: Readonly<{ file: File; localization: Localization; onRemove: () => void }>) {
+  return <Group className="intake-selected-file" justify="space-between" wrap="nowrap">
+    <Stack gap={0} miw={0}>
+      <Text fw={600} truncate="end">{file.name}</Text>
+      <Text c="dimmed" size="xs">{formatFileSize({ bytes: file.size, locale: localization.locale })}</Text>
+    </Stack>
+    <CloseButton aria-label={`${localization.translate('combinedIntake.removeFile')} ${file.name}`} onClick={onRemove} />
+  </Group>
+}
+
+function formatFileSize({ bytes, locale }: Readonly<{ bytes: number; locale: Localization['locale'] }>) {
+  const [kilobyte, megabyte] = locale === 'fr' ? ['Ko', 'Mo'] : ['KB', 'MB']
+  return bytes < 1024 * 1024 ? `${String(Math.max(1, Math.round(bytes / 1024)))} ${kilobyte}`
+    : `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(bytes / (1024 * 1024))} ${megabyte}`
 }
 
 function RegenerationConfirmation({ controls, localization }: Readonly<{ controls: IntakeControls; localization: Localization }>) {
@@ -113,24 +199,6 @@ function RegenerationConfirmation({ controls, localization }: Readonly<{ control
       <Button onClick={controls.confirmGeneration}>{localization.translate('combinedIntake.confirmRegenerate')}</Button>
     </Group>
   </Modal>
-}
-
-function DocumentPicker({ choice, kind, localization, onChange }: Readonly<{
-  choice: DocumentChoice; kind: 'source' | 'posting'; localization: Localization; onChange: (choice: DocumentChoice) => void
-}>) {
-  const source = kind === 'source'
-  return <Stack component="fieldset" gap="sm" className="combined-intake-document">
-    <Text component="legend" fw={700}>{localization.translate(source ? 'sourceIntake.title' : 'jobMatch.title')}</Text>
-    <SegmentedControl aria-label={localization.translate(source ? 'sourceIntake.sourceFile' : 'jobMatch.fileLabel')}
-      value={choice.method} onChange={(method) => { onChange({ ...choice, method: method === 'upload' ? 'upload' : 'paste' }) }}
-      data={[{ value: 'paste', label: localization.translate('sourceIntake.pasteMethod') },
-        { value: 'upload', label: localization.translate(source ? 'sourceIntake.uploadMethod' : 'jobMatch.uploadMethod') }]} />
-    {choice.method === 'paste' ? <Textarea minRows={5} label={localization.translate(source ? 'sourceIntake.professionalText' : 'jobMatch.textLabel')}
-      value={choice.text} onChange={(event) => { onChange({ ...choice, text: event.currentTarget.value }) }} />
-      : <FileInput label={localization.translate(source ? 'sourceIntake.sourceFile' : 'jobMatch.fileLabel')}
-        accept={source ? '.pdf,.docx' : '.pdf,.txt'} value={choice.file}
-        onChange={(file) => { onChange({ ...choice, file }) }} />}
-  </Stack>
 }
 
 async function selectedDocument({ choice }: Readonly<{ choice: DocumentChoice }>): Promise<SourceDocument | null> {
@@ -173,33 +241,63 @@ function PreparationFeedback({ candidateJourney, localization, localFailure, onR
   if (view.status !== 'candidate-session-open') return null
   const preparation = view.session.preparation
   const failure = localFailure ?? preparation?.failure ?? null
+  const failedPreparation = localFailure === null && (preparation?.status === 'failed' || preparation?.status === 'interrupted')
   return <>
-    <InputFailure {...{ failure, localization }} />
+    {failedPreparation ? <PreparationFailureAlert {...{ failure, localization, onRetry }}
+      busy={view.operation !== null} hasStableResume={view.session.tailoredResume !== null}
+      interrupted={preparation.status === 'interrupted'} /> : <InputFailure {...{ failure, localization }} />}
     {preparation?.status === 'awaiting-correction' && preparation.sourceIntake !== null
       ? <CriticalAmbiguityQuestions {...{ candidateJourney, localization, sourceIntake: preparation.sourceIntake }} /> : null}
-    {preparation?.status === 'no-relevant-evidence' ? <Alert color="forest" title={localization.translate('jobMatch.generation.denied')}>
+    {preparation?.status === 'no-relevant-evidence' ? <Alert color="caution" title={localization.translate('jobMatch.generation.denied')}>
       <Text>{localization.translate('jobMatch.generation.normalizedNotice')}</Text>
       <Button mt="sm" disabled={view.operation !== null} onClick={onNormalized}>
         {localization.translate('combinedIntake.normalized')}</Button>
     </Alert> : null}
-    {preparation?.status === 'failed' || preparation?.status === 'interrupted' ? <Alert color="forest">
-      <Text>{localization.translate(preparation.status === 'interrupted' ? 'combinedIntake.interrupted' : 'combinedIntake.failed')}</Text>
-      <Button mt="sm" disabled={view.operation !== null || view.processingConsentStatus !== 'granted'}
-        onClick={onRetry}>{localization.translate('combinedIntake.retry')}</Button>
-    </Alert> : null}
     {preparation?.status === 'prepared' && preparation.sourceIntake !== null && preparation.sourceIntake.criticalAmbiguities.length > 0
-      ? <Alert color="forest">{localization.translate('combinedIntake.omittedAmbiguities')}</Alert> : null}
+      ? <Alert color="informative">{localization.translate('combinedIntake.omittedAmbiguities')}</Alert> : null}
     {preparation?.jobMatch?.analysis.matchBand === 'ambitious' && preparation.status === 'prepared'
-      ? <Alert color="forest">{localization.translate('jobMatch.generation.lowScoreWarning')}</Alert> : null}
+      ? <Alert color="caution">{localization.translate('jobMatch.generation.lowScoreWarning')}</Alert> : null}
   </>
 }
 
 const preparationFailureKeys = {
   ...sourceIntakeFailureKeys, ...jobMatchFailureKeys,
   'candidate-session-storage-unavailable': 'candidateJourney.storageUnavailable',
-  'unavailable': 'combinedIntake.failed', 'unsupported-content': 'combinedIntake.unsafe',
+  'unavailable': 'combinedIntake.cause.unavailable', 'unsupported-content': 'combinedIntake.unsafe',
   'stale-result': 'combinedIntake.outdated',
 } as const satisfies Record<ResumePreparationFailure, Parameters<Localization['translate']>[0]>
+
+const retryableFailureCauses = {
+  'source-profile-extraction-unavailable': 'combinedIntake.cause.source',
+  'job-posting-extraction-unavailable': 'combinedIntake.cause.posting',
+  'match-evidence-unavailable': 'combinedIntake.cause.evidence',
+  'unavailable': 'combinedIntake.cause.unavailable',
+} as const satisfies Partial<Record<ResumePreparationFailure, Parameters<Localization['translate']>[0]>>
+
+const inputFailures = new Set<ResumePreparationFailure>([
+  'encrypted-document', 'empty-document', 'invalid-document', 'oversized-document', 'scanned-document',
+  'unsupported-document', 'unreadable-document', 'empty-job-posting', 'invalid-job-posting',
+  'oversized-job-posting', 'scanned-job-posting', 'unsupported-job-posting', 'unreadable-job-posting',
+])
+
+function PreparationFailureAlert({ busy, failure, hasStableResume, interrupted, localization, onRetry }: Readonly<{
+  busy: boolean; failure: ResumePreparationFailure | null; hasStableResume: boolean; interrupted: boolean
+  localization: Localization; onRetry: () => void
+}>) {
+  const cause = interrupted || failure === null ? null
+    : localization.translate(failure in retryableFailureCauses
+      ? retryableFailureCauses[failure as keyof typeof retryableFailureCauses] : preparationFailureKeys[failure])
+  const retryable = interrupted || failure === null || !inputFailures.has(failure)
+  return <Alert color={interrupted ? 'caution' : 'danger'} role="alert"
+    title={localization.translate(interrupted ? 'combinedIntake.interruptedTitle' : 'combinedIntake.failedTitle')}>
+    <Stack gap="sm">
+      {cause === null ? null : <Text size="sm">{cause}</Text>}
+      <Text c="dimmed" size="sm">{localization.translate(hasStableResume ? 'combinedIntake.inputsAndResumeKept' : 'combinedIntake.inputsKept')}</Text>
+      {retryable ? <Group><Button disabled={busy} onClick={onRetry} variant="default">
+        {localization.translate('combinedIntake.retry')}</Button></Group> : null}
+    </Stack>
+  </Alert>
+}
 
 function InputFailure({ failure, localization }: Readonly<{ failure: ResumePreparationFailure | null; localization: Localization }>) {
   if (failure === null || failure === 'unavailable') return null

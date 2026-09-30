@@ -1903,3 +1903,43 @@ h1 {
   padding: 0;
   margin: 0;
 }
+
+.intake-document {
+  margin: 0;
+  min-width: 0;
+}
+
+.intake-document-title {
+  padding: 0;
+}
+
+.intake-dropzone {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 9rem;
+}
+
+.intake-dropzone[data-accept] {
+  border-color: var(--mantine-color-forest-6);
+}
+
+.intake-selected-file {
+  background: var(--mantine-color-gray-0);
+  border: 1px solid var(--mantine-color-gray-3);
+  border-radius: var(--mantine-radius-md);
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+}
+
+.processing-policy-notice summary {
+  color: var(--mantine-color-dimmed);
+  cursor: pointer;
+  font-size: var(--mantine-font-size-xs);
+  margin-top: var(--mantine-spacing-xs);
+}
+
+.candidate-journey-phase-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}

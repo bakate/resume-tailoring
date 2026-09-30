@@ -63,6 +63,42 @@ describe('resume matching engine', () => {
     expect(result).toBeNull()
   })
 
+  it.each([
+    "maîtrise de l'anglais un atout.",
+    "l'anglais est souhaité",
+    'anglais : un plus',
+  ])('accepts a language requirement phrased with elisions and importance markers: %s', (value) => {
+    const result = validateRelevantFactProposals({
+      candidateFacts: [{ id: 'fact-english', kind: 'language', value: 'Anglais' }],
+      proposals: [{
+        factMatch: { factId: 'fact-english', factTerm: 'Anglais', relationship: 'exact', requirementTerm: 'anglais' },
+        requirementId: 'requirement-english',
+      }],
+      requirements: [{
+        capability: { dimension: 'technical-expertise', name: 'Anglais' }, id: 'requirement-english',
+        importance: 'complementary', sourceExcerpt: value, value,
+      }],
+    })
+
+    expect(result).toEqual(['fact-english'])
+  })
+
+  it('still rejects a term that covers only part of the requirement concept', () => {
+    const result = validateRelevantFactProposals({
+      candidateFacts: [{ id: 'fact-english', kind: 'language', value: 'Anglais' }],
+      proposals: [{
+        factMatch: { factId: 'fact-english', factTerm: 'Anglais', relationship: 'exact', requirementTerm: 'anglais' },
+        requirementId: 'requirement-english',
+      }],
+      requirements: [{
+        capability: { dimension: 'technical-expertise', name: 'Anglais technique' }, id: 'requirement-english',
+        importance: 'central', sourceExcerpt: "maîtrise de l'anglais technique", value: "maîtrise de l'anglais technique",
+      }],
+    })
+
+    expect(result).toBeNull()
+  })
+
   it('calculates a Match Analysis from importance-weighted evidence coverage', () => {
     const result = analyzeResumeMatch(weightedMatchInputs)
 

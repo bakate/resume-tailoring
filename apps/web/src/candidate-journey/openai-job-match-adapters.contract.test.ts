@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   createOpenAiJobMatchEvidenceMatcher,
@@ -85,6 +85,30 @@ describe('OpenAI explainable Job Match adapters', () => {
     const result = await matcher.match(matchRequest)
 
     expect(result).toEqual({ ok: true, value: { evidence: [], relevance: [] } })
+  })
+
+  it('records how many proposed links survive sanitization without Candidate content', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const matcher = createOpenAiJobMatchEvidenceMatcher({
+      apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
+      request: createRecordedRequest({
+        output: { ...evidenceProposal, relevance: [{
+          factMatch: { ...evidenceProposal.relevance[0].factMatch, factId: 'source-fact-invented' },
+          requirementId: 'job-requirement-1',
+        }] },
+        requests: [],
+      }),
+    })
+
+    await matcher.match(matchRequest)
+
+    const records = info.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+    info.mockRestore()
+    expect(records).toContainEqual({
+      category: 'privacy-safe-openai-request', metric: 'sanitized', value: 1,
+      dimensions: { operation: 'explainable-match-evidence', proposedRelevance: 1, keptRelevance: 0,
+        proposedEvidence: evidenceProposal.evidence.length, keptEvidence: 0 },
+    })
   })
 
   it('returns a typed failure before sending an oversized matching request', async () => {

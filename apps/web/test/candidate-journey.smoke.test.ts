@@ -250,19 +250,63 @@ test.describe('Candidate Journey preview-first preparation', () => {
 
   test('keeps consent, local session restoration and deletion accessible', async ({ page }) => {
     const system = createSystemUnderTest({ page })
-    await system.givenCombinedIntake()
+    await system.givenStablePreview()
 
     await system.restoreAndDeleteSession()
 
     await system.expectDeletedSession()
   })
 
-  test('discloses Processing Policy and requires consent before generation', async ({ page }) => {
+  test('locks the intake while the resume is being prepared', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'pending-writing' })
+    await system.givenCombinedIntake()
+
+    await system.generateResume()
+
+    await system.expectIntakeLockedDuringPreparation()
+  })
+
+  test('hides analysis and source disclosures until a result exists', async ({ page }) => {
     const system = createSystemUnderTest({ page })
 
     await system.openUnconsentedIntake()
 
-    await system.expectConsentGate()
+    await system.expectNoEmptyResultDisclosures()
+  })
+
+  test('shows a dropped resume file as the selected source', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.openUnconsentedIntake()
+
+    await system.dropSourceFile({ name: 'alex-morgan.pdf', mimeType: 'application/pdf' })
+
+    await system.expectSelectedSourceFile('alex-morgan.pdf')
+  })
+
+  test('explains a dropped resume file in an unsupported format', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.openUnconsentedIntake()
+
+    await system.dropSourceFile({ name: 'alex-morgan.png', mimeType: 'image/png' })
+
+    await system.expectRejectedSourceFile()
+  })
+
+  test('explains a failed posting analysis in a single alert', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'posting-extraction-unavailable' })
+    await system.givenCombinedIntake()
+
+    await system.generateResume()
+
+    await system.expectSinglePostingFailureAlert()
+  })
+
+  test('discloses the Processing Policy at the generation action', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    await system.openUnconsentedIntake()
+
+    await system.expectPolicyDisclosedAtGeneration()
   })
 })
 
@@ -271,7 +315,7 @@ function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: P
 }
 
 type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-coverage' | 'no-correspondence'
-  | 'unsafe-output' | 'interrupted' | 'unavailable'
+  | 'unsafe-output' | 'interrupted' | 'unavailable' | 'pending-writing' | 'posting-extraction-unavailable'
 
 class CandidateJourneyTestSystem {
   readonly #page: Page
@@ -292,7 +336,8 @@ class CandidateJourneyTestSystem {
     await this.#page.route('**/api/structured-source-profile-extraction', (route) => route.fulfill({ json: {
       ok: true, value: extractionFor(this.#scenario),
     } }))
-    await this.#page.route('**/api/explainable-job-posting-extraction', (route) => route.fulfill({ json: {
+    await this.#page.route('**/api/explainable-job-posting-extraction', (route) => route.fulfill({ json: this.#scenario === 'posting-extraction-unavailable'
+      ? { ok: false, error: 'job-posting-extraction-unavailable' } : {
       ok: true, value: { targetRole: structuredResumeJobMatch.targetRole, practicalConstraints: [], requirements: requirementsFor(this.#scenario) },
     } }))
     await this.#page.route('**/api/explainable-match-evidence', (route) => route.fulfill({ json: {
@@ -300,6 +345,7 @@ class CandidateJourneyTestSystem {
     } }))
     await this.#page.route('**/api/resume-document-writing', (route) => {
       if (this.#scenario === 'interrupted') return route.abort()
+      if (this.#scenario === 'pending-writing') return new Promise<void>(() => undefined)
       if (this.#scenario === 'unavailable') return route.fulfill({ json: { ok: false, error: { type: 'unavailable' } } })
       const input = route.request().postDataJSON() as ResumeWritingInput
       return route.fulfill({ json: { ok: true, value: writtenDocument({ input, scenario: this.#scenario }) } })
@@ -321,7 +367,6 @@ class CandidateJourneyTestSystem {
 
   async givenCombinedIntake() {
     await this.openUnconsentedIntake()
-    await this.#page.getByRole('button', { name: 'Grant Processing Consent' }).click()
     await this.#page.getByRole('textbox', { name: 'Professional text', exact: true }).fill(
       'Alex Morgan\nalex@example.com\nFrontend Engineer at Northwind. Built accessible billing screens. React and TypeScript.')
     await this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true }).fill(postingText)
@@ -436,7 +481,7 @@ class CandidateJourneyTestSystem {
   }
 
   async resumePreparation() {
-    await this.#page.getByRole('button', { name: 'Retry preparation' }).click()
+    await this.#page.getByRole('button', { name: 'Try again' }).click()
     this.#completedAction = 'resumed'
   }
 
@@ -637,7 +682,7 @@ class CandidateJourneyTestSystem {
 
   async restoreAndDeleteSession() {
     await this.#page.reload()
-    await expect(this.#page.getByText('Processing Consent granted for this policy.')).toBeVisible()
+    await expect(this.#page.getByText(/^Processed by .+, with nothing stored on our servers.$/)).toBeVisible()
     await this.#page.getByRole('button', { name: 'Delete Candidate Session' }).click()
     await this.#page.getByRole('button', { name: 'Delete session now' }).click()
     this.#completedAction = 'deleted'
@@ -703,7 +748,7 @@ class CandidateJourneyTestSystem {
 
   async expectStablePreviewAfterFailure() {
     this.#expectAction()
-    await expect(this.#page.getByText('Preparation could not finish.', { exact: false })).toBeVisible()
+    await expect(this.#page.getByRole('alert').filter({ hasText: 'Preparation could not finish.' })).toBeVisible()
     await this.expectGroupedPreview()
   }
 
@@ -714,10 +759,54 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByRole('button', { name: 'Generate my resume' })).toHaveCount(0)
   }
 
-  async expectConsentGate() {
+  async dropSourceFile({ name, mimeType }: Readonly<{ name: string; mimeType: string }>) {
+    await this.#page.locator('.intake-dropzone input[type="file"]').first()
+      .setInputFiles({ name, mimeType, buffer: Buffer.from('%PDF-1.4 synthetic') })
+    this.#completedAction = 'source-file-dropped'
+  }
+
+  async expectSelectedSourceFile(name: string) {
     this.#expectAction()
-    await expect(this.#page.getByRole('region', { name: 'Processing Policy' })).toContainText('OpenAI')
-    await expect(this.#page.getByRole('button', { name: 'Generate my resume' })).toBeDisabled()
+    await expect(this.#page.getByText(name, { exact: true })).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: `Remove ${name}` })).toBeVisible()
+    await expect(this.#page.getByRole('textbox', { name: 'Professional text', exact: true })).toHaveCount(0)
+  }
+
+  async expectRejectedSourceFile() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('alert')).toContainText('This file cannot be used here.')
+    await expect(this.#page.getByRole('textbox', { name: 'Professional text', exact: true })).toBeVisible()
+  }
+
+  async expectSinglePostingFailureAlert() {
+    this.#expectAction()
+    const alert = this.#page.getByRole('alert')
+    await expect(alert).toHaveCount(1)
+    await expect(alert).toContainText('Preparation could not finish.')
+    await expect(alert).toContainText('We could not analyze the job posting.')
+    await expect(alert).toContainText('Your inputs are kept.')
+    await expect(alert.getByRole('button', { name: 'Try again' })).toBeEnabled()
+  }
+
+  async expectIntakeLockedDuringPreparation() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('region', { name: 'Candidate Journey progress' })).toBeVisible()
+    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toBeDisabled()
+    await expect(this.#page.getByRole('combobox', { name: 'Resume language', exact: true })).toBeDisabled()
+  }
+
+  async expectNoEmptyResultDisclosures() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toBeVisible()
+    await expect(this.#page.getByText('Match Analysis and supporting evidence', { exact: true })).toHaveCount(0)
+    await expect(this.#page.getByText('Inspect or enrich your source evidence', { exact: true })).toHaveCount(0)
+  }
+
+  async expectPolicyDisclosedAtGeneration() {
+    this.#expectAction()
+    const generate = this.#page.getByRole('button', { name: 'Generate my resume' })
+    await expect(generate).toHaveAccessibleDescription(/OpenAI/)
+    await expect(generate).toBeEnabled()
     await expect(this.#page.getByRole('textbox', { name: 'Professional text' })).toBeVisible()
     await expect(this.#page.getByRole('textbox', { name: 'Job Posting text' })).toBeVisible()
   }

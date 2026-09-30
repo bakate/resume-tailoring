@@ -7,7 +7,7 @@ import type {
   ProposedMatchEvidence,
   ProposedRelevantFact,
 } from '@resume-tailoring/matching-engine'
-import { validateRelevantFactProposals } from '@resume-tailoring/matching-engine'
+import { validateMatchEvidence, validateRelevantFactProposals } from '@resume-tailoring/matching-engine'
 import type { CandidateFact } from '@resume-tailoring/domain/source-intake'
 import type {
   JobMatch,
@@ -204,15 +204,14 @@ async function analyzeCandidateFacts({
     { candidateFacts: engineFacts, requirements },
   )
   if (!proposalResult.ok) return proposalResult
-  const relevantFactIds = validateRelevantFactProposals({
-    candidateFacts: engineFacts,
-    proposals: proposalResult.value.relevance,
-    requirements,
-  })
-  if (relevantFactIds === null) return matchEvidenceUnavailableResult
+  const relevantFactIds = [...new Set(proposalResult.value.relevance.flatMap((proposal) =>
+    validateRelevantFactProposals({ candidateFacts: engineFacts, proposals: [proposal], requirements }) ?? []))]
+  const proposedEvidence = proposalResult.value.evidence.filter((evidence) =>
+    evidence.factMatches.every(({ factId }) => relevantFactIds.includes(factId))
+    && validateMatchEvidence({ candidateFacts: engineFacts, proposedEvidence: [evidence], requirements }) !== null)
   const analysisResult = analyzeResumeMatch({
     candidateFacts: engineFacts,
-    proposedEvidence: proposalResult.value.evidence,
+    proposedEvidence,
     relevantFactIds,
     requirements,
   })
@@ -326,12 +325,12 @@ function readSourceBackedExtraction({ content, extraction }: Readonly<{
 }>): ExtractedJobPosting | null {
   if (!hasValidRequirementIds({ requirements: extraction.requirements })) return null
   if (!hasSupportedTargetRole({ content, targetRole: extraction.targetRole })) return null
-  if (!extraction.practicalConstraints.every((constraint) =>
-    hasSourceSupport({ content, excerpt: constraint.sourceExcerpt, value: constraint.value }))) return null
   if (!extraction.requirements.every((requirement) =>
     hasSourceBackedRequirement({ content, requirement }))) return null
   const requirements = normalizeRequirements({ requirements: extraction.requirements })
-  return requirements.length === 0 ? null : { ...extraction, requirements }
+  const practicalConstraints = extraction.practicalConstraints.filter((constraint) =>
+    hasSourceSupport({ content, excerpt: constraint.sourceExcerpt, value: constraint.value }))
+  return requirements.length === 0 ? null : { ...extraction, practicalConstraints, requirements }
 }
 
 function hasSourceBackedRequirement({ content, requirement }: Readonly<{

@@ -17,6 +17,7 @@ import {
 } from '../localization/localization'
 import type { Locale, Localization } from '../localization/localization'
 import '@mantine/core/styles.css'
+import '@mantine/dropzone/styles.css'
 import '../styles.css'
 
 export const Route = createRootRoute({

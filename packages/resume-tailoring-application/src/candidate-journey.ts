@@ -465,6 +465,13 @@ function invalidatePreparation(session: CandidateSession): CandidateSession {
     : { ...invalidateEditingRevision(retained), preparedResumeStatus: 'outdated' }
 }
 
+function withProcessingConsent({ session, dependencies }: CandidateJourneyContext) {
+  return session === null ? null : {
+    ...session,
+    processingConsent: { grantedAt: dependencies.now(), policy: dependencies.languageModelGateway.processingPolicy },
+  }
+}
+
 function invalidateResumeInputs({ session, dependencies }: CandidateJourneyContext) {
   if (session === null || (session.preparedResumeStatus === 'outdated' && (session.preparation === undefined || session.preparation.status === 'outdated'))) return session
   const next: CandidateSession = { ...invalidateEditingRevision(session), preparedResumeStatus: 'outdated',
@@ -590,15 +597,7 @@ const candidateJourneyMachine = setup({
           target: 'removingCandidateSession',
         },
         GRANT_PROCESSING_CONSENT: {
-          actions: assign({
-            session: ({ context }) => context.session === null ? null : {
-              ...context.session,
-              processingConsent: {
-                grantedAt: context.dependencies.now(),
-                policy: context.dependencies.languageModelGateway.processingPolicy,
-              },
-            },
-          }),
+          actions: assign({ session: ({ context }) => withProcessingConsent(context) }),
           target: 'persistingProcessingConsent',
         },
         RESOLVE_CRITICAL_AMBIGUITY: [{
@@ -614,7 +613,11 @@ const candidateJourneyMachine = setup({
           guard: ({ context }) => canSubmitJobPosting({ session: context.session }),
           target: 'processingJobPosting',
         },
-        START_TAILORED_RESUME_PREPARATION: { target: 'generatingApplicationResume' },
+        START_TAILORED_RESUME_PREPARATION: {
+          actions: assign({ session: ({ context, event }) => event.grantProcessingConsent === true
+            ? withProcessingConsent(context) : context.session }),
+          target: 'generatingApplicationResume',
+        },
       },
     },
     generatingApplicationResume: {
