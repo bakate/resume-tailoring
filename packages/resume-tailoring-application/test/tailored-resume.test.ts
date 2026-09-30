@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createTailoredResume } from '@resume-tailoring/application/tailored-resume'
+import { createTailoredResume, readExperienceFields, readSectionFields } from '@resume-tailoring/application/tailored-resume'
 
 describe('Tailored Resume generation', () => {
   it('creates a complete structured resume with field-level Candidate Fact provenance', () => {
@@ -12,12 +12,12 @@ describe('Tailored Resume generation', () => {
       locale: 'fr',
       targetRole: { value: 'Développeur Full Stack' },
     })
-    expect(tailoredResume.valueProposition[0]).toMatchObject({
+    expect(tailoredResume.valueProposition.paragraphs[0]).toMatchObject({
       factIds: ['source-fact-experiences-0-achievements-0'],
     })
-    expect(tailoredResume.valueProposition).toHaveLength(4)
+    expect(tailoredResume.valueProposition.paragraphs).toHaveLength(4)
     expect(tailoredResume.experiences[0]?.chronology).toBe('relevant')
-    expect(tailoredResume.experiences[0]?.fields).toContainEqual({
+    expect(tailoredResume.experiences[0]?.role).toMatchObject({
       factIds: ['source-fact-experiences-0-role-0'], text: 'Développeur Full Stack',
     })
     expect(tailoredResume.sections.map(({ section }) => section)).toEqual([
@@ -37,9 +37,9 @@ describe('Tailored Resume generation', () => {
 
 function readFields({ tailoredResume }: Readonly<{ tailoredResume: ReturnType<typeof createTailoredResume> }>) {
   return [
-    ...tailoredResume.valueProposition,
-    ...tailoredResume.experiences.flatMap(({ fields }) => fields),
-    ...tailoredResume.sections.flatMap(({ fields }) => fields),
+    ...tailoredResume.valueProposition.paragraphs,
+    ...tailoredResume.experiences.flatMap((experience) => readExperienceFields({ experience })),
+    ...tailoredResume.sections.flatMap((section) => readSectionFields({ section })),
   ]
 }
 

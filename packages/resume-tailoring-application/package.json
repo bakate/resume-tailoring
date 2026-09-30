@@ -18,7 +18,8 @@
     "./resume-claim-restoration": "./src/resume-claim-restoration.ts",
     "./resume-tailoring-workflow-ports": "./src/resume-tailoring-workflow-ports.ts",
     "./resume-tailoring-workflow-testing": "./src/resume-tailoring-workflow-testing.ts",
-    "./source-intake": "./src/source-intake.ts"
+    "./source-intake": "./src/source-intake.ts",
+    "./structured-resume-fixtures": "./src/structured-resume-fixtures.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

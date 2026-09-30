@@ -1,7 +1,28 @@
+import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion } from '@resume-tailoring/application/candidate-journey'
+import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
 test.describe('Candidate Journey', () => {
+  test('prepares a grouped semantic preview with a readable mobile order', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGroupedEvidenceIsReadyForPreparation()
+
+    await system.prepareGroupedResume()
+
+    await system.expectGroupedResumePreview()
+  })
+
+  test('keeps semantic metadata when an employer is hidden and restored', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGroupedEvidenceIsReadyForPreparation()
+    await system.prepareGroupedResume()
+
+    await system.hideAndRestoreEmployer()
+
+    await system.expectGroupedResumePreview()
+  })
+
   test('exposes exactly three domain phases', async ({ page }) => {
     const system = createSystemUnderTest({ page })
 
@@ -210,6 +231,7 @@ type MatchEvidenceApiResponse = typeof matchEvidenceResponse
 
 class CandidateJourneyTestSystem {
   readonly #page: Page
+  readonly #pageErrors: string[] = []
   #completedAction: CandidateJourneyAction | null = null
   #matchEvidenceResponse: MatchEvidenceApiResponse = matchEvidenceResponse
   #readMatchEvidenceResponse: (candidateFacts: readonly Readonly<{
@@ -219,6 +241,56 @@ class CandidateJourneyTestSystem {
 
   constructor(page: Page) {
     this.#page = page
+    page.on('pageerror', (error) => { this.#pageErrors.push(error.message) })
+  }
+
+  async givenGroupedEvidenceIsReadyForPreparation() {
+    const startedAt = Date.now()
+    const session = {
+      expiresAt: startedAt + candidateSessionDurationMilliseconds, startedAt,
+      version: candidateSessionStorageVersion,
+      sessionId: 'candidate-session-00000000-0000-4000-8000-000000000056',
+      phase: 'job-match', processingConsent: null, tailoredResume: null,
+      sourceIntake: structuredResumeSource, jobMatch: structuredResumeJobMatch,
+    }
+    await this.#page.addInitScript((storedSession) => {
+      if (window.top !== window) return
+      localStorage.setItem('honest-resume:candidate-session', JSON.stringify(storedSession))
+    }, session)
+    await this.#page.goto('/')
+  }
+
+  async prepareGroupedResume() {
+    await this.#page.getByRole('button', { name: 'Prepare my Tailored Resume' }).click()
+    await expect(this.#page.getByTitle('Tailored Resume preview')).toBeVisible()
+    this.#completedAction = 'grouped-resume-prepared'
+  }
+
+  async hideAndRestoreEmployer() {
+    const employerField = this.#page.locator('textarea').filter({ hasText: 'Northwind' })
+    const fieldCard = employerField.locator('xpath=ancestor::*[contains(@class,"mantine-Paper-root")][1]')
+    await fieldCard.getByRole('button', { name: 'Hide field', exact: true }).click()
+    await expect(this.#page.frameLocator('iframe').getByText('Northwind', { exact: true })).toHaveCount(0)
+    await this.#page.getByRole('button', { name: 'Restore field', exact: true }).click()
+    this.#completedAction = 'grouped-resume-prepared'
+  }
+
+  async expectGroupedResumePreview() {
+    this.#expectCompletedAction('grouped-resume-prepared')
+    expect(this.#pageErrors).toEqual([])
+    await expect(this.#page).toHaveURL('/')
+    await expect(this.#page.locator('vite-error-overlay')).toHaveCount(0)
+    const preview = this.#page.frameLocator('iframe')
+    const experience = preview.locator('article').filter({ has: preview.getByRole('heading', { name: 'Frontend Engineer', exact: true }) })
+    await expect(experience).toContainText('Northwind')
+    await expect(experience).toContainText('2021 – 2024')
+    await expect(experience).toContainText('Built accessible billing screens')
+    await expect(preview.getByRole('heading', { name: 'Front-end', exact: true })).toHaveCount(1)
+    await expect(preview.locator('.skill-group')).toHaveText('Front-endReact · TypeScript')
+    await expect(preview.locator('li').filter({ hasText: /^Front-end$/ })).toHaveCount(0)
+    const pageWidth = await preview.locator('body').evaluate((body) => body.scrollWidth)
+    const viewportWidth = await this.#page.locator('iframe').evaluate((frame) => frame.clientWidth)
+    expect(pageWidth).toBeLessThanOrEqual(viewportWidth)
   }
 
   async givenCandidateJourneyIsOpen() {
@@ -504,6 +576,7 @@ class CandidateJourneyTestSystem {
 
 type CandidateJourneyAction =
   | 'candidate-journey-opened'
+  | 'grouped-resume-prepared'
   | 'candidate-session-deleted'
   | 'candidate-session-restored'
   | 'candidate-session-started'

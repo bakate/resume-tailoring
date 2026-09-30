@@ -1,3 +1,4 @@
+import { groupedResumeDocument } from '@resume-tailoring/application/structured-resume-fixtures'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -36,6 +37,26 @@ const consentedCandidateSession = {
 } as const satisfies CandidateSession
 
 describe('browser Candidate Session persistence', () => {
+  it('round-trips semantic values, stable identities, prose, and grouped provenance', () => {
+    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage() })
+    const session = { ...candidateSession, tailoredResume: groupedResumeDocument }
+    persistence.save({ session })
+
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
+      ok: true, value: { notice: null, session },
+    })
+  })
+
+  it('explicitly discards the previous flat document version', () => {
+    const storage = createMemoryStorage({ initialValue: JSON.stringify({ ...candidateSession, version: 5 }) })
+    const persistence = createBrowserCandidateSessionPersistence({ storage })
+
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
+      ok: true, value: { notice: 'incompatible-session-discarded', session: null },
+    })
+    expect(storage.getItem(candidateSessionStorageKey)).toBeNull()
+  })
+
   it('stores and restores the current version for 24 hours', () => {
     const storage = createMemoryStorage()
     const persistence = createBrowserCandidateSessionPersistence({ storage })

@@ -1,5 +1,48 @@
 # Three-Phase Resume Tailoring MVP
 
+## Accepted Direction Amendment — 2026-09-30
+
+Published follow-up: [BAK-55 — Preview-First Resume Tailoring and Document Quality](https://linear.app/bakate-projects/issue/BAK-55/spec-preview-first-resume-tailoring-and-document-quality). The standalone specification in [Preview-First Resume Tailoring](preview-first-resume-tailoring.md) consolidates this amendment and defines the implementation scope.
+
+The product owner accepted all thirteen decisions recorded below during the CibleCV comparison and subsequent design interview. The design interview is complete. This amendment updates the BAK-37 baseline; implementation and release qualification remain outstanding.
+
+- Collect the Source Document and Job Posting together, then run extraction, matching, and resume preparation from one generation action after Processing Consent. The three phases describe internal work rather than mandatory Candidate checkpoints. See ADR-0014.
+- Present the Tailored Resume preview as the primary result. Keep Match Analysis and provenance available through secondary disclosures. Offer optional editing by meaningful section instead of displaying every Resume Field before the preview.
+- Perform genuine editorial adaptation: write an evidence-backed Value Proposition, select and prioritize relevant achievements, condense older experiences, and group and deduplicate skills. Preserve source meaning and career chronology; add no unsupported qualification, result, or level.
+- Produce a preview when a faithful, usable resume remains possible despite an isolated Critical Ambiguity. Exclude the unsafe information and disclose its omission. Ask a targeted question before proceeding only when otherwise the document would be misleading or unusable. Missing Job Requirements do not trigger an exhaustive questionnaire.
+- First make the Tailored Resume dependable. Cover-letter generation remains outside this refactor; a subsequent feature may generate it on demand from the result without delaying the initial resume.
+- Borrow CibleCV's document structure and optional section editing while preserving this product's sober editorial identity, provenance guarantees, and shared preview/PDF contract. CibleCV's implementation is reference material, not an architectural or visual specification.
+
+The reference inspection identified existing implementation gaps rather than new scope: the active constructor copies Candidate Facts instead of writing a summary, the renderer flattens experience values into bullets, skill categories repeat as content, and the active export invokes browser printing without the specified PDF validation. These behaviors do not satisfy the existing complete-resume contract.
+
+### Accepted Result Behavior
+
+- Preserve the Source Profile when tailoring selects, condenses, or omits evidence. Provide a secondary omitted-content view from which the Candidate can restore supported content; no per-omission approval is required. Restoring content remains subject to the same document-quality and page-budget checks.
+- When no relevant evidence supports Generation Eligibility, explain the mismatch briefly and offer a Normalized Resume. Label it explicitly as not tailored to the Job Posting; do not imply a match or generate unsupported targeted content.
+- Make the preview the primary result and provide a section-level edit action. Corrections update the preview, with validation targeted to the affected professional content. On mobile, open the section editor in a separate view. Existing provenance rules and unresolved-edit export blocking remain applicable.
+
+### Accepted Editorial Trade-offs
+
+- Emphasize the capabilities relevant to the Target Role when Candidate evidence supports them, even when this substantially reduces the prominence of other specialties or entrepreneurial work. The heading may use the source-backed Target Role; historical role titles, actual seniority, and responsibilities remain faithful to the Source Document.
+- Selectivity takes precedence over exhaustive inclusion. Omit supported but less useful achievements or skills when needed for relevance and readable pagination. Condense less relevant experiences while preserving an intelligible career chronology. The complete Source Profile remains available for restoration; restoration does not guarantee that every item can fit.
+- Remove repetitions that add no information: repeated skill-category labels, duplicate items within a skill group, and the same achievement paraphrased multiple times. A capability may appear in the Value Proposition, skills, and an experience when each occurrence serves a distinct purpose, such as positioning, indexing, and evidence. Global keyword uniqueness is not a quality criterion.
+
+### Accepted Restoration and Overflow Behavior
+
+- Keep restored content in the current draft when it exceeds two readable pages. Offer an explicit action to condense the document to two pages and preview the proposed result before replacing the draft. Do not silently remove content or reduce typography below readable limits.
+- If condensation is insufficient, let the Candidate choose content to remove. Preserve the source evidence and block PDF export while the document exceeds two pages. Applying condensation still requires valid provenance and the shared preview/PDF checks.
+
+### Release Acceptance Criteria
+
+- On the normal path, one generation action after Source Document, Job Posting, and initial Processing Consent leads to a preview without intermediate review or validation actions. Language override remains optional; low coverage alone does not introduce a checkpoint.
+- The result contains a written Value Proposition, distinct experiences with role, organization, dates, and achievements, and grouped skills without duplicate items or repeated category bullets. Include supported education, languages, projects, and certifications as appropriate.
+- A readable one-or-two-page PDF matches the preview's content, order, and layout under the existing shared rendering contract. Browser printing alone does not establish export qualification.
+- Restoring content beyond the two-page budget preserves the additions, offers a separately previewed condensation proposal, and blocks export until the overflow is resolved. Rejecting the proposal preserves the current draft. Verify this recovery through the rendered application and PDF contract.
+- Every professional claim remains supported by Candidate evidence. Isolated omissions and blocking ambiguities follow the accepted interruption policy.
+- Representative CV and Job Posting pairs produce application-ready documents without manual structural rewriting. Regressions must cover repeated skill categories, multiple experiences, condensed older roles, isolated ambiguity, no relevant evidence, restored content, and post-edit export.
+- Existing per-segment qualification thresholds remain applicable. Passing schema, provenance-reference, or section-presence tests alone is insufficient evidence of document quality.
+- Require human review of complete reference documents before release, including a short profile, a dense senior career, a career change, and weak Job Posting correspondence. Assess factual accuracy, selection, writing, hierarchy, and readability. A document requiring substantial rewriting or restructuring fails release acceptance even when automated checks pass. Use the supplied screenshots as explicit regression references for flat experience rendering, repeated categories, and exhaustive editing before preview.
+
 ## Problem Statement
 
 The current Candidate Journey requires excessive review across four visible steps and ends with a document containing only a Target Role, contact details, and a short list of selected claims. A Candidate cannot use that output as a complete resume for an application. The implementation performs real extraction, evidence matching, scoring, provenance validation, and PDF rendering, but its workflow and document model do not fulfill the MVP promise: upload an existing resume, evaluate one Job Posting, and receive an honest Tailored Resume ready to submit.
@@ -8,10 +51,10 @@ The current quality evidence is also concentrated on software-development scenar
 
 ## Solution
 
-Replace the four-step journey with a dynamic three-phase Candidate Journey:
+Collect the Source Document and Job Posting in one intake surface and run three underlying Candidate Journey phases from one generation action:
 
-1. **Source Intake** accepts a text-based PDF, DOCX, or pasted professional text, obtains one Processing Consent, extracts a structured Source Profile in the background, and interrupts the Candidate only for Critical Ambiguities.
-2. **Job Match** accepts a pasted or uploaded Job Posting, extracts and groups its requirements, validates Match Evidence, calculates an explainable Match Score, surfaces critical reserves and practical constraints, and presents the decision to generate.
+1. **Source Intake** accepts a text-based PDF, DOCX, or pasted professional text, obtains one Processing Consent, and extracts a structured Source Profile in the background. Isolated unsafe evidence is omitted and disclosed; a targeted question interrupts preparation only when a faithful, usable document would otherwise be impossible.
+2. **Job Match** processes the pasted or uploaded Job Posting, extracts and groups its requirements, validates Match Evidence, calculates an explainable Match Score, and determines Generation Eligibility. Analysis is available alongside the result without a mandatory checkpoint before preparation.
 3. **Tailored Resume Preparation** creates a complete one-or-two-page ATS-first resume, validates provenance for every professional field, allows controlled editing, previews the exact semantic document, and exports a validated PDF.
 
 The Tailored Resume will contain identity and contact details, the Target Role, a concise Value Proposition, relevant and contextual experiences, skills, education, languages, and relevant projects or certifications. It will select and reformulate only supported Candidate evidence, align terminology with the Job Posting only when meaning is preserved, and retain field-level provenance internally.
@@ -29,7 +72,7 @@ The Candidate Journey will use real phase feedback rather than fake progress or 
 7. As a Candidate, I want sensitive contact information removed before professional content reaches the model provider, so that unnecessary personal data remains private.
 8. As a Candidate, I want my contact details preserved locally, so that they can still appear in my final resume.
 9. As a Candidate, I want extraction to continue without a fact-by-fact review, so that the journey remains short.
-10. As a Candidate, I want to be interrupted only when a Critical Ambiguity makes evidence unsafe to reuse, so that I correct only consequential issues.
+10. As a Candidate, I want to be interrupted before preview only when a Critical Ambiguity prevents a faithful, usable document, so that isolated unsafe evidence can be omitted and disclosed without blocking the result.
 11. As a Candidate, I want each Critical Ambiguity presented as a targeted question, so that I can resolve it without understanding the internal data model.
 12. As a Candidate, I want one ambiguous fact to be isolated without blocking unrelated evidence, so that useful parts of my Source Profile remain available.
 13. As a Candidate, I want the option to inspect my detailed Source Profile, so that I retain control without making inspection mandatory.
@@ -47,13 +90,13 @@ The Candidate Journey will use real phase feedback rather than fake progress or 
 25. As a Candidate, I want the Match Score to describe evidence coverage rather than hiring probability, so that it does not make a false promise.
 26. As a Candidate, I want a separate warning when a critical requirement is uncertain or unsupported, so that a high aggregate score does not hide a decisive gap.
 27. As a Candidate, I want practical constraints reported outside the Match Score, so that location, authorization, availability, and compensation are not confused with professional evidence.
-28. As a Candidate, I want to see my three strongest supported matches, so that I understand why the opportunity may be credible.
-29. As a Candidate, I want to see my three most important gaps, so that I understand the risk before applying.
+28. As a Candidate, I want to inspect my three strongest supported matches alongside the result, so that I understand why the opportunity may be credible.
+29. As a Candidate, I want to inspect my three most important gaps alongside the result, so that I understand the risk before applying.
 30. As a Candidate, I want the complete requirement and evidence analysis available on demand, so that transparency does not become mandatory clutter.
 31. As a Candidate, I want a low Match Score to warn rather than block me when relevant evidence exists, so that the final decision remains mine.
 32. As a Candidate, I want the product to refuse the label “Tailored Resume” when no relevant evidence exists, so that it does not pretend to adapt unsupported content.
 33. As a Candidate, I want to add real missing professional evidence through a targeted prompt, so that an incomplete Source Document can be corrected honestly.
-34. As a Candidate, I want a clear action to adapt my resume after reading the Match Analysis, so that generation occurs only when I choose to proceed.
+34. As a Candidate, I want one generation action after providing my Source Document and Job Posting, so that I receive a reviewable resume without a mandatory Match Analysis checkpoint.
 35. As a Candidate, I want the proposed resume language inferred from the Job Posting, so that the document matches the application context.
 36. As a Candidate, I want to override the proposed French or English language before generation, so that I remain in control.
 37. As a Candidate, I want names, organizations, qualifications, and proper nouns preserved during translation, so that translation does not alter facts.
@@ -73,10 +116,10 @@ The Candidate Journey will use real phase feedback rather than fake progress or 
 51. As a Candidate, I want a single-column document with selectable text and standard section headings, so that recruiters and ATS software can read it naturally.
 52. As a Candidate, I want preview and PDF export generated from the same semantic document, so that the downloaded result matches what I approved.
 53. As a Candidate, I want to edit contact details locally, so that personal corrections never require model processing.
-54. As a Candidate, I want to edit wording, reorder sections, and hide or restore entries, so that I can control the final presentation.
+54. As a Candidate, I want optional editing by section and access to omitted source content, so that I can change wording, reorder sections, and hide or restore entries while keeping the preview primary.
 55. As a Candidate, I want unsupported professional edits identified at the affected field, so that validation does not become another global review step.
 56. As a Candidate, I want to confirm a genuine new professional statement as a Candidate Fact, so that I can add missing evidence without weakening provenance.
-57. As a Candidate, I want export blocked only while an unsupported edit remains unresolved, so that one unsafe change cannot silently enter the PDF.
+57. As a Candidate, I want export blocked while an unsupported edit or page overflow remains unresolved, with a targeted explanation, so that the PDF remains supported and readable within two pages.
 58. As a Candidate, I want regeneration to warn me before replacing manual edits, so that my work is never discarded silently.
 59. As a Candidate, I want profile changes to invalidate stale Match Analyses and Tailored Resumes, so that displayed results always use current evidence.
 60. As a Candidate, I want Job Posting changes to invalidate the old Match Analysis and Tailored Resume, so that content from different opportunities is never mixed.
@@ -109,7 +152,7 @@ The Candidate Journey will use real phase feedback rather than fake progress or 
 
 ## Implementation Decisions
 
-- Replace the current four-step workflow with the three Candidate Journey phases Source Intake, Job Match, and Tailored Resume Preparation.
+- Replace the current four-step workflow with a combined intake and preview-first result, orchestrating Source Intake, Job Match, and Tailored Resume Preparation internally.
 - Perform a hard cutover. Delete the old workflow presentation and persisted format rather than maintaining compatibility or parallel implementations.
 - Version browser persistence and discard incompatible 24-hour test sessions with a clear message. No historical session migration is required.
 - Accept text-based PDF, DOCX, and pasted professional text for Source Documents. Limit documents to five pages for the MVP. Reject scans, encrypted documents, unsupported formats, and empty extraction explicitly; do not add OCR.
@@ -130,9 +173,9 @@ The Candidate Journey will use real phase feedback rather than fake progress or 
 - Cap complementary requirements at 25 percent of the total effective Match Score weight.
 - Keep Practical Constraints separate from the Match Score and Generation Eligibility.
 - Add a Critical Requirement Reserve to Match Analysis. A critical gap qualifies the interpretation of the Match Band but does not automatically decide whether the Candidate should apply.
-- Keep Generation Eligibility when at least one relevant Candidate Fact exists, regardless of a low Match Score. Deny Tailored Resume generation only when no relevant evidence exists; a normalized but explicitly non-tailored source resume may remain available.
+- Keep Generation Eligibility when at least one relevant Candidate Fact exists, regardless of a low Match Score. When none exists, explain the mismatch and offer a Normalized Resume explicitly labeled as not tailored to the Job Posting.
 - Calibrate Match Band thresholds through evaluation rather than treating the current 50 and 75 boundaries as permanent.
-- Show by default the Match Score, Match Band, measurement explanation, three strengths, three priority gaps, critical reserves, and important Practical Constraints. Keep complete requirement evidence in an optional disclosure.
+- Make the resume preview the primary result. Keep Match Score, Match Band, measurement explanation, three strengths, three priority gaps, critical reserves, Practical Constraints, and complete requirement evidence accessible through secondary analysis disclosures.
 - Replace the flat Tailored Resume claim list with a structured Tailored Resume document containing identity, Target Role, Value Proposition, experiences, skills, education, languages, and relevant projects or certifications.
 - Require field-level provenance for every generated or reformulated professional value. Identity and contact values are local exceptions and never enter model context.
 - Build the Value Proposition as a two-to-four-line, evidence-backed explanation of why the Candidate is relevant to the Target Role. Do not generate unsupported seniority, personality traits, ambitions, scope, or outcomes.
@@ -143,7 +186,7 @@ The Candidate Journey will use real phase feedback rather than fake progress or 
 - Keep photo optional and disabled by default. Require a full name and at least one of email or phone before export; keep city and professional links optional.
 - Infer the proposed resume language from the Job Posting and allow French or English override before generation. Never translate proper nouns, employers, or qualifications in a way that alters meaning.
 - Permit local contact edits, supported wording edits, ordering, hiding, restoration, and explicit addition of genuine Candidate Facts.
-- Block export only for unresolved unsupported edits. Validate at the affected field rather than reopening a global review.
+- Block export for unresolved unsupported edits or page overflow, in addition to required identity and contact checks. Validate edits at the affected field; handle overflow through the accepted condensation and content-selection recovery rather than reopening a global review.
 - Treat regeneration as replacement of the current draft. Require confirmation when manual edits would be lost; do not implement automatic merging or version history.
 - Apply deterministic invalidation rules: Candidate Fact changes recalculate Match Analysis and invalidate the Tailored Resume; Job Posting changes invalidate both; locale changes invalidate only the Tailored Resume; local identity, contact, and photo changes update only rendering.
 - Use stable XState v5 actor logic inside the application module to orchestrate Candidate Session states, invoked operations, retries, recovery, and invalidation.
@@ -181,7 +224,7 @@ The Candidate Journey will use real phase feedback rather than fake progress or 
 - Test Tailored Resume Preparation through the journey seam, including language choice, structured generation, field provenance, editing, unsupported additions, ordering, hiding, regeneration warnings, and export eligibility.
 - Add focused public-interface tests for the resume-matching-engine because it is an independently reusable deep module. Test observable Match Analysis results rather than helper functions or calculation internals.
 - Add focused public-interface tests for the structured resume document preparation and rendering contract. Test retained content, provenance rejection, ordering, one-or-two-page selection, and deterministic failure results.
-- Exercise transport and interaction behavior through the rendered web application. Verify the three-phase journey, focus management, keyboard behavior, responsive behavior, live-region announcements, long-operation feedback, and failure recovery.
+- Exercise transport and interaction behavior through the rendered web application. Verify combined intake, automatic progression to preview, optional section editing, analysis disclosures, focus management, keyboard behavior, responsive behavior, live-region announcements, long-operation feedback, and failure recovery.
 - Keep adapter contract tests only where production behavior varies: Source Document readers, Language Model Gateway roles, Candidate Session persistence, analytics transport, and PDF generation.
 - Use in-memory adapters for application behavior tests and recorded deterministic fixtures for provider contract tests. Never require live provider calls in the default test suite.
 - Preserve preview-to-PDF contract tests for semantic content, ordering, selectable text, embedded fonts, A4 dimensions, overflow handling, and contact-data isolation.
