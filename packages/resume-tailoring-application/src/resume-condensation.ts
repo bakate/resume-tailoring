@@ -4,27 +4,27 @@ import { assessEligibility, changedResumeSession, consentRequired, professionalD
   reportFailure, staleResumeResult, unavailableResumeResult, unsupportedResumeResult } from './resume-editing'
 import { readResumeFields } from './resume-field-editing'
 
-export async function assessResumeLayout({ access }: Readonly<{ access: ResumeEditingAccess }>) {
+export async function assessResumeLayout({ access, photoDataUrl }: Readonly<{ access: ResumeEditingAccess; photoDataUrl?: string }>) {
   const review = access.readReview()
   if (review === null) return
   access.report({ baseRevision: review.draft.revision, review: { ...review, operation: 'assessing-layout' } })
-  const layout = await measureResume({ access, draft: review.draft, unsupportedFieldIds: review.unsupportedFieldIds })
+  const layout = await measureResume({ access, photoDataUrl, draft: review.draft, unsupportedFieldIds: review.unsupportedFieldIds })
   const current = access.readReview()
   if (current?.draft.revision !== review.draft.revision) return
   access.report({ baseRevision: current.draft.revision, review: { ...current, operation: null,
     assessment: assessEligibility({ ...current.draft, unsupportedFieldIds: current.unsupportedFieldIds, layout }) } })
 }
 
-async function measureResume({ access, draft, unsupportedFieldIds }: Readonly<{
-  access: ResumeEditingAccess; draft: ResumeDraft; unsupportedFieldIds: readonly string[]
+async function measureResume({ access, draft, unsupportedFieldIds, photoDataUrl }: Readonly<{
+  access: ResumeEditingAccess; draft: ResumeDraft; unsupportedFieldIds: readonly string[]; photoDataUrl?: string
 }>): Promise<ResumeLayoutOutcome> {
   try {
-    const result = await access.ports.assessLayout?.({ draft, unsupportedFieldIds })
+    const result = await access.ports.assessLayout?.({ draft, unsupportedFieldIds, photoDataUrl })
     return result?.layout ?? { status: 'unavailable', revision: draft.revision }
   } catch { return { status: 'unavailable', revision: draft.revision } }
 }
 
-export async function proposeResumeCondensation({ access }: Readonly<{ access: ResumeEditingAccess }>) {
+export async function proposeResumeCondensation({ access, photoDataUrl }: Readonly<{ access: ResumeEditingAccess; photoDataUrl?: string }>) {
   const review = access.readReview()
   const session = access.readSession()
   if (review === null || session === null || review.operation !== null) return
@@ -39,12 +39,12 @@ export async function proposeResumeCondensation({ access }: Readonly<{ access: R
     if (access.readReview()?.draft.revision !== baseRevision) return
     if (result?.status !== 'proposed') { reportFailure({ access, baseRevision,
       failure: result?.status === 'failed' ? result : unavailableResumeResult }); return; }
-    await publishProposal({ access, review, proposal: result.proposal })
+    await publishProposal({ access, review, proposal: result.proposal, photoDataUrl })
   } catch { reportFailure({ access, baseRevision, failure: unavailableResumeResult }) }
 }
 
-async function publishProposal({ access, review, proposal }: Readonly<{
-  access: ResumeEditingAccess; review: ResumeReview; proposal: NonNullable<ResumeReview['proposal']>
+async function publishProposal({ access, review, proposal, photoDataUrl }: Readonly<{
+  access: ResumeEditingAccess; review: ResumeReview; proposal: NonNullable<ResumeReview['proposal']>; photoDataUrl?: string
 }>) {
   const baseRevision = review.draft.revision
   if (proposal.baseRevision !== baseRevision) { reportFailure({ access, baseRevision, failure: staleResumeResult }); return; }
@@ -56,7 +56,7 @@ async function publishProposal({ access, review, proposal }: Readonly<{
       && JSON.stringify(candidate.field.factIds) === JSON.stringify(field.factIds)))) {
     reportFailure({ access, baseRevision, failure: unsupportedResumeResult }); return;
   }
-  const layout = await measureResume({ access, draft: { document, revision: baseRevision }, unsupportedFieldIds: [] })
+  const layout = await measureResume({ access, photoDataUrl, draft: { document, revision: baseRevision }, unsupportedFieldIds: [] })
   if (access.readReview()?.draft.revision !== baseRevision) return
   access.report({ baseRevision, review: { ...review, operation: null, failure: null, proposal: { ...proposal, layout } } })
 }

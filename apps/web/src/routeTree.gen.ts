@@ -18,6 +18,7 @@ import { Route as ApiJobRequirementExtractionRouteImport } from './routes/api.jo
 import { Route as ApiMatchAnalysisRouteImport } from './routes/api.match-analysis'
 import { Route as ApiResumeClaimValidationRouteImport } from './routes/api.resume-claim-validation'
 import { Route as ApiResumeClaimWritingRouteImport } from './routes/api.resume-claim-writing'
+import { Route as ApiResumeDocumentRouteImport } from './routes/api.resume-document'
 import { Route as ApiResumeDocumentValidationRouteImport } from './routes/api.resume-document-validation'
 import { Route as ApiResumeDocumentWritingRouteImport } from './routes/api.resume-document-writing'
 import { Route as ApiSourceProfileExtractionRouteImport } from './routes/api.source-profile-extraction'
@@ -73,6 +74,11 @@ const ApiResumeClaimWritingRoute = ApiResumeClaimWritingRouteImport.update({
   path: '/api/resume-claim-writing',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiResumeDocumentRoute = ApiResumeDocumentRouteImport.update({
+  id: '/api/resume-document',
+  path: '/api/resume-document',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiResumeDocumentValidationRoute =
   ApiResumeDocumentValidationRouteImport.update({
     id: '/api/resume-document-validation',
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
+  '/api/resume-document': typeof ApiResumeDocumentRoute
   '/api/resume-document-validation': typeof ApiResumeDocumentValidationRoute
   '/api/resume-document-writing': typeof ApiResumeDocumentWritingRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
+  '/api/resume-document': typeof ApiResumeDocumentRoute
   '/api/resume-document-validation': typeof ApiResumeDocumentValidationRoute
   '/api/resume-document-writing': typeof ApiResumeDocumentWritingRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
@@ -146,6 +154,7 @@ export interface FileRoutesById {
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
+  '/api/resume-document': typeof ApiResumeDocumentRoute
   '/api/resume-document-validation': typeof ApiResumeDocumentValidationRoute
   '/api/resume-document-writing': typeof ApiResumeDocumentWritingRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
@@ -164,6 +173,7 @@ export interface FileRouteTypes {
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
     | '/api/resume-claim-writing'
+    | '/api/resume-document'
     | '/api/resume-document-validation'
     | '/api/resume-document-writing'
     | '/api/source-profile-extraction'
@@ -180,6 +190,7 @@ export interface FileRouteTypes {
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
     | '/api/resume-claim-writing'
+    | '/api/resume-document'
     | '/api/resume-document-validation'
     | '/api/resume-document-writing'
     | '/api/source-profile-extraction'
@@ -196,6 +207,7 @@ export interface FileRouteTypes {
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
     | '/api/resume-claim-writing'
+    | '/api/resume-document'
     | '/api/resume-document-validation'
     | '/api/resume-document-writing'
     | '/api/source-profile-extraction'
@@ -213,6 +225,7 @@ export interface RootRouteChildren {
   ApiMatchAnalysisRoute: typeof ApiMatchAnalysisRoute
   ApiResumeClaimValidationRoute: typeof ApiResumeClaimValidationRoute
   ApiResumeClaimWritingRoute: typeof ApiResumeClaimWritingRoute
+  ApiResumeDocumentRoute: typeof ApiResumeDocumentRoute
   ApiResumeDocumentValidationRoute: typeof ApiResumeDocumentValidationRoute
   ApiResumeDocumentWritingRoute: typeof ApiResumeDocumentWritingRoute
   ApiSourceProfileExtractionRoute: typeof ApiSourceProfileExtractionRoute
@@ -285,6 +298,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiResumeClaimWritingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/resume-document': {
+      id: '/api/resume-document'
+      path: '/api/resume-document'
+      fullPath: '/api/resume-document'
+      preLoaderRoute: typeof ApiResumeDocumentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/resume-document-validation': {
       id: '/api/resume-document-validation'
       path: '/api/resume-document-validation'
@@ -334,6 +354,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMatchAnalysisRoute: ApiMatchAnalysisRoute,
   ApiResumeClaimValidationRoute: ApiResumeClaimValidationRoute,
   ApiResumeClaimWritingRoute: ApiResumeClaimWritingRoute,
+  ApiResumeDocumentRoute: ApiResumeDocumentRoute,
   ApiResumeDocumentValidationRoute: ApiResumeDocumentValidationRoute,
   ApiResumeDocumentWritingRoute: ApiResumeDocumentWritingRoute,
   ApiSourceProfileExtractionRoute: ApiSourceProfileExtractionRoute,

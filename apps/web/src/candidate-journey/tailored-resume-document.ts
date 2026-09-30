@@ -1,7 +1,7 @@
 import { readExperienceFields, readSectionFields } from '@resume-tailoring/application/tailored-resume'
 import type { CandidateFact } from '@resume-tailoring/application/source-intake'
 import type { ResumeSectionName, TailoredResume, TailoredResumeExperience, TailoredResumeSection } from '@resume-tailoring/application/tailored-resume'
-import { tailoredResumeDocumentStyles } from './candidate-journey-theme'
+import { tailoredResumeDocumentStyles } from '../resume-tailoring/structured-resume-document-styles'
 
 export type TailoredResumeExportSource = Readonly<{
   candidateFacts: readonly CandidateFact[]
@@ -19,8 +19,9 @@ export function hasValidTailoredResumeProvenance({ candidateFacts, tailoredResum
     factIds.length > 0 && factIds.every((factId) => candidateFactIds.has(factId)))
 }
 
-export function renderTailoredResumeDocument({ tailoredResume }: Readonly<{
+export function renderTailoredResumeDocument({ tailoredResume, photoDataUrl }: Readonly<{
   tailoredResume: TailoredResume
+  photoDataUrl?: string
 }>) {
   const title = tailoredResume.identity?.value ?? 'Tailored Resume'
   const heading = tailoredResume.purpose === 'normalized'
@@ -32,10 +33,12 @@ export function renderTailoredResumeDocument({ tailoredResume }: Readonly<{
   const sections = sectionOrder.map((sectionName) => {
     if (sectionName === 'value-proposition') return renderValueProposition({ tailoredResume })
     if (sectionName === 'experiences') return renderExperiences({ tailoredResume })
-    const section = tailoredResume.sections.find(({ section }) => section === sectionName)
-    return section === undefined ? '' : renderSection({ section, locale: tailoredResume.locale })
+    return tailoredResume.sections.filter(({ section }) => section === sectionName)
+      .map((section) => renderSection({ section, locale: tailoredResume.locale })).join('')
   }).join('')
-  return `<!doctype html><html lang="${tailoredResume.locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${tailoredResumeDocumentStyles}</style></head><body><main class="resume-page"><header><h1>${escapeHtml(title)}</h1><p>${escapeHtml(heading)}</p><address>${contactDetails}</address></header>${sections}</main></body></html>`
+  const photo = photoDataUrl !== undefined && /^data:image\/(?:png|jpeg|webp);base64,[a-zA-Z0-9+/]+=*$/u.test(photoDataUrl)
+    ? `<img class="resume-photo" alt="" src="${photoDataUrl}">` : ''
+  return `<!doctype html><html lang="${tailoredResume.locale}"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src data:; img-src data:; style-src 'unsafe-inline'"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${tailoredResumeDocumentStyles}</style></head><body><main class="resume-page"><header>${photo}<h1>${escapeHtml(title)}</h1><p>${escapeHtml(heading)}</p><address>${contactDetails}</address></header>${sections}</main></body></html>`
 }
 
 function renderValueProposition({ tailoredResume }: Readonly<{ tailoredResume: TailoredResume }>) {

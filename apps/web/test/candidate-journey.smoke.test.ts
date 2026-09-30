@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises'
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { groupedResumeDocument, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
@@ -5,6 +7,76 @@ import type { ResumeWritingInput, ResumeValidationInput } from '@resume-tailorin
 import { readProfessionalResumeFields } from '@resume-tailoring/application/candidate-journey'
 
 test.describe('Candidate Journey preview-first preparation', () => {
+  test('downloads the validated PDF shown by the active journey', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenCombinedIntake()
+    await system.generateResume()
+    await system.givenRequiredContactsArePresent()
+
+    await system.downloadCurrentResume()
+
+    await system.expectCurrentResumePdfDownloaded()
+  })
+
+  test('keeps unsupported text blocked and confirmable after repeated saves', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenCombinedIntake()
+    await system.generateResume()
+    await system.givenRequiredContactsArePresent()
+
+    await system.givenUnsupportedProfessionalTextWasSaved()
+
+    await system.saveUnsupportedProfessionalTextAgain()
+
+    await system.expectUnsupportedDownloadBlocked()
+  })
+
+  test('blocks download immediately while an unsupported edit is still unsaved', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenCombinedIntake()
+    await system.generateResume()
+    await system.givenRequiredContactsArePresent()
+
+    await system.enterUnsupportedProfessionalText()
+
+    await system.expectUnsavedDownloadBlocked()
+  })
+
+  test('recovers a failed PDF render without losing the source or draft', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenCombinedIntake()
+    await system.givenRenderingFails()
+    await system.generateResume()
+    await system.givenRequiredContactsArePresent()
+
+    await system.retryResumePreview()
+
+    await system.expectRecoveredPreview()
+  })
+
+  test('downloads a clearly non-tailored normalized PDF through the same quality gate', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'no-correspondence' })
+    await system.givenNoCorrespondenceResult()
+    await system.prepareNormalizedResume()
+    await system.givenRequiredContactsArePresent()
+
+    await system.downloadCurrentResume()
+
+    await system.expectNormalizedResumePdfDownloaded()
+  })
+
+  test('blocks export when the current document loses its only contact method', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenCombinedIntake()
+    await system.generateResume()
+    await system.givenRequiredContactsArePresent()
+
+    await system.removeResumeContact()
+
+    await system.expectMissingContactDownloadBlocked()
+  })
+
+
   test('recovers corrected local contacts after reloading the editor', async ({ page }) => {
     const system = createSystemUnderTest({ page })
     await system.givenStablePreview()
@@ -204,6 +276,7 @@ type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-co
 class CandidateJourneyTestSystem {
   readonly #page: Page
   readonly #errors: string[] = []
+  #downloadPath: string | null = null
   #scenario: Scenario
   #completedAction: string | null = null
 
@@ -250,7 +323,7 @@ class CandidateJourneyTestSystem {
     await this.openUnconsentedIntake()
     await this.#page.getByRole('button', { name: 'Grant Processing Consent' }).click()
     await this.#page.getByRole('textbox', { name: 'Professional text', exact: true }).fill(
-      'alex@example.com\nFrontend Engineer at Northwind. Built accessible billing screens. React and TypeScript.')
+      'Alex Morgan\nalex@example.com\nFrontend Engineer at Northwind. Built accessible billing screens. React and TypeScript.')
     await this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true }).fill(postingText)
   }
 
@@ -268,7 +341,8 @@ class CandidateJourneyTestSystem {
   async givenStablePreview() {
     await this.givenCombinedIntake()
     await this.generateResume()
-    await expect(this.#page.getByTitle('Tailored Resume preview')).toBeVisible()
+    await this.#showDocumentText()
+    await expect(this.#page.locator('iframe')).toBeVisible()
   }
 
   async givenBlockedPreparation() {
@@ -312,7 +386,8 @@ class CandidateJourneyTestSystem {
 
   async expectCorrectedSourceInPreview() {
     this.#expectAction()
-    await expect(this.#page.getByTitle('Tailored Resume preview')).toBeVisible()
+    await this.#showDocumentText()
+    await expect(this.#page.locator('iframe')).toBeVisible()
     await expect(this.#page.frameLocator('iframe').getByText('Billing platform team', { exact: true })).toBeVisible()
   }
 
@@ -382,6 +457,7 @@ class CandidateJourneyTestSystem {
 
   async expectCorrectedContactRecovered() {
     this.#expectAction()
+    await this.#showDocumentText()
     await expect(this.#page.frameLocator('iframe').getByText('updated@example.com', { exact: true })).toBeVisible()
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
     await expect(this.#page.getByLabel('Email', { exact: true })).toHaveValue('updated@example.com')
@@ -398,8 +474,9 @@ class CandidateJourneyTestSystem {
 
   async expectUnresolvedWordingRecovered() {
     this.#expectAction()
+    await this.#showDocumentText()
     await expect(this.#page.frameLocator('iframe').getByText('Led 100 engineers', { exact: true })).toBeVisible()
-    await expect(this.#page.getByRole('button', { name: 'Print current resume', exact: true })).toHaveCount(0)
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeDisabled()
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
     await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
     await expect(this.#page.getByText('This professional edit is not supported by the current Candidate Facts.', { exact: true })).toBeVisible()
@@ -408,12 +485,117 @@ class CandidateJourneyTestSystem {
   async expectPreviewFirstReview() {
     await expect(this.#page.getByRole('button', { name: 'Edit resume', exact: true })).toBeVisible()
     await expect(this.#page.getByLabel('Resume Field', { exact: true })).toHaveCount(0)
-    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toHaveCount(0)
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeVisible()
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
     await expect(this.#page.getByRole('dialog')).toBeVisible()
     await this.#page.keyboard.press('Escape')
     await expect(this.#page.getByRole('dialog')).toHaveCount(0)
     await expect(this.#page.getByRole('button', { name: 'Edit resume', exact: true })).toBeFocused()
+  }
+
+  async givenRequiredContactsArePresent() {
+    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#page.getByRole('textbox', { name: 'Name', exact: true }).fill('Alex Morgan')
+    await this.#page.getByRole('textbox', { name: 'Email', exact: true }).fill('alex@example.com')
+    await this.#page.keyboard.press('Escape')
+  }
+
+  async downloadCurrentResume() {
+    const downloadPromise = this.#page.waitForEvent('download')
+    await this.#page.getByRole('button', { name: 'Download PDF', exact: true }).click({ timeout: 20_000 })
+    this.#downloadPath = await (await downloadPromise).path()
+  }
+
+  async expectCurrentResumePdfDownloaded() {
+    expect(this.#downloadPath, 'downloadCurrentResume must run first').not.toBeNull()
+    if (this.#downloadPath === null) return
+    const bytes = new Uint8Array(await readFile(this.#downloadPath))
+    const loading = getDocument({ data: bytes })
+    try {
+      const pdf = await loading.promise
+      expect(pdf.numPages).toBe(1)
+      const pdfPage = await pdf.getPage(1)
+      const text = (await pdfPage.getTextContent()).items.flatMap((item) => 'str' in item ? item.str : []).join(' ')
+      expect(text).toContain('Alex Morgan')
+      expect(text).toContain('Northwind')
+      expect(text).toContain('React')
+      await expect(this.#page.locator('.resume-pdf-pages canvas')).toHaveCount(pdf.numPages)
+      await expect(this.#page.getByRole('status').filter({ hasText: 'PDF handed to your browser' })).toBeVisible()
+      await this.#page.getByText('Read the document text', { exact: true }).click()
+      await this.#page.setViewportSize({ width: 1280, height: 1800 })
+      await this.#page.locator('[aria-labelledby="tailored-resume-preview-title"]').screenshot({ path: 'test-results/bak-59-preview.png' })
+    } finally { await loading.destroy() }
+  }
+
+  async enterUnsupportedProfessionalText() {
+    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
+    await this.#page.getByRole('textbox', { name: 'Resume Field', exact: true }).first()
+      .fill('Built accessible billing screens and led 500 engineers')
+  }
+
+  async givenUnsupportedProfessionalTextWasSaved() {
+    await this.enterUnsupportedProfessionalText()
+    await this.saveUnsupportedProfessionalTextAgain()
+  }
+
+  async saveUnsupportedProfessionalTextAgain() {
+    await this.#page.getByRole('button', { name: 'Save wording', exact: true }).first().click()
+  }
+
+  async expectUnsavedDownloadBlocked() {
+    await expect(this.#page.getByRole('dialog')).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true, includeHidden: true })).toBeDisabled()
+  }
+
+  async expectUnsupportedDownloadBlocked() {
+    await expect(this.#page.getByRole('button', { name: 'Attest as a new Candidate Fact', exact: true })).toBeVisible()
+    await this.#page.keyboard.press('Escape')
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeDisabled({ timeout: 20_000 })
+    await expect(this.#page.getByText('Resolve or confirm the unsupported professional changes before downloading.', { exact: true })).toBeVisible()
+  }
+
+  async givenRenderingFails() {
+    await this.#page.route('**/api/resume-document', (route) => route.fulfill({ status: 503, body: '{}' }))
+  }
+
+  async retryResumePreview() {
+    await this.#page.getByRole('button', { name: 'Retry preview', exact: true }).waitFor({ state: 'visible' })
+    await this.#page.unroute('**/api/resume-document')
+    await this.#page.getByRole('button', { name: 'Retry preview', exact: true }).click()
+  }
+
+  async expectRecoveredPreview() {
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled({ timeout: 20_000 })
+    await this.#showDocumentText()
+    await expect(this.#page.frameLocator('iframe').getByText('Northwind', { exact: true })).toBeVisible()
+    const session = await this.#page.evaluate(() => localStorage.getItem('honest-resume:candidate-session'))
+    expect(session).toContain('Northwind')
+  }
+
+  async expectNormalizedResumePdfDownloaded() {
+    expect(this.#downloadPath, 'downloadCurrentResume must run first').not.toBeNull()
+    if (this.#downloadPath === null) return
+    const loading = getDocument({ data: new Uint8Array(await readFile(this.#downloadPath)) })
+    try {
+      const pdf = await loading.promise
+      const pdfPage = await pdf.getPage(1)
+      const text = (await pdfPage.getTextContent()).items.flatMap((item) => 'str' in item ? item.str : []).join(' ')
+      expect(text).toContain('Normalized Resume — not tailored')
+      expect(text).toContain('Alex Morgan')
+      expect(pdf.numPages).toBe(1)
+    } finally { await loading.destroy() }
+  }
+
+  async removeResumeContact() {
+    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#page.getByRole('textbox', { name: 'Email', exact: true }).fill('')
+    await this.#page.keyboard.press('Escape')
+  }
+
+  async expectMissingContactDownloadBlocked() {
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeDisabled()
+    await expect(this.#page.getByText('Add an email address or phone number in contact details.', { exact: true })).toBeVisible({ timeout: 20_000 })
   }
 
   async hideAndRestoreEmployer() {
@@ -463,7 +645,8 @@ class CandidateJourneyTestSystem {
 
   async expectGroupedPreview() {
     this.#expectAction()
-    await expect(this.#page.getByTitle('Tailored Resume preview')).toBeVisible()
+    await this.#showDocumentText()
+    await expect(this.#page.locator('iframe')).toBeVisible()
     const preview = this.#page.frameLocator('iframe')
     const experience = preview.locator('article').filter({ has: preview.getByRole('heading', { name: 'Frontend Engineer', exact: true }) })
     await expect(experience).toContainText('Northwind')
@@ -486,7 +669,8 @@ class CandidateJourneyTestSystem {
 
   async expectCorrectedPreview() {
     this.#expectAction()
-    await expect(this.#page.getByTitle('Tailored Resume preview')).toBeVisible()
+    await this.#showDocumentText()
+    await expect(this.#page.locator('iframe')).toBeVisible()
     await expect(this.#page.frameLocator('iframe').getByText('React experience.')).toBeVisible()
     await expect(this.#page.getByRole('textbox', { name: 'Which skill did you use?' })).toHaveCount(0)
   }
@@ -499,12 +683,14 @@ class CandidateJourneyTestSystem {
   async expectNormalizedPreview() {
     this.#expectAction()
     await expect(this.#page.getByText('Non-tailored resume ready', { exact: true })).toBeVisible()
+    await this.#showDocumentText()
     await expect(this.#page.frameLocator('iframe').getByText('Normalized Resume', { exact: false })).toBeVisible()
   }
 
   async expectFrenchPreview() {
     this.#expectAction()
-    await expect(this.#page.getByTitle('Tailored Resume preview')).toBeVisible()
+    await this.#showDocumentText()
+    await expect(this.#page.locator('iframe')).toBeVisible()
     await expect(this.#page.frameLocator('iframe').getByText('Développement d’interfaces de facturation accessibles.', { exact: true })).toBeVisible()
     await expect(this.#page.frameLocator('iframe').getByText('Northwind', { exact: true })).toBeVisible()
   }
@@ -534,6 +720,13 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByRole('button', { name: 'Generate my resume' })).toBeDisabled()
     await expect(this.#page.getByRole('textbox', { name: 'Professional text' })).toBeVisible()
     await expect(this.#page.getByRole('textbox', { name: 'Job Posting text' })).toBeVisible()
+  }
+
+  async #showDocumentText() {
+    const frame = this.#page.locator('iframe')
+    await frame.waitFor({ state: 'attached' })
+    if (await frame.isVisible()) return
+    await this.#page.locator('summary').filter({ hasText: /Read the document text|Lire le texte du document/ }).click()
   }
 
   #expectAction() { expect(this.#completedAction, 'Perform a Candidate Journey action before reading the outcome').not.toBeNull() }

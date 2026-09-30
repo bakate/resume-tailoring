@@ -22,6 +22,8 @@ jobs:
           node-version-file: '.nvmrc'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install Chrome for PDF export
+        run: pnpm --filter @resume-tailoring/web exec puppeteer browsers install chrome
       - name: Install supported browsers
         run: pnpm --filter @resume-tailoring/web exec playwright install --with-deps chromium firefox webkit
       - run: pnpm test:e2e:compatibility

@@ -194,7 +194,7 @@ async function validatePdf({ inputs, pdfBytes, pdfTextReader }: Readonly<{
   }
 }
 
-function hasExpectedEmbeddedFonts({ pdfBytes }: Readonly<{ pdfBytes: Uint8Array }>) {
+export function hasExpectedEmbeddedFonts({ pdfBytes }: Readonly<{ pdfBytes: Uint8Array }>) {
   const pdfSource = new TextDecoder('latin1').decode(pdfBytes)
   const embeddedFontCount = [...pdfSource.matchAll(/\/FontFile(?:2|3)?\b/gu)].length
   return embeddedFontCount >= expectedPdfFontNames.length
@@ -240,7 +240,7 @@ function hasExpectedReadingOrder({ inputs, extractedTextItems }: Readonly<{
   return hasExpectedPdfTextInReadingOrder({ expectedText, extractedTextItems })
 }
 
-function hasExpectedPdfTextInReadingOrder({ expectedText, extractedTextItems }: Readonly<{
+export function hasExpectedPdfTextInReadingOrder({ expectedText, extractedTextItems }: Readonly<{
   expectedText: readonly string[]
   extractedTextItems: readonly string[]
 }>) {
@@ -298,7 +298,7 @@ function normalizeText({ value }: Readonly<{ value: string }>) {
     .trim()
 }
 
-function hasA4Dimensions({ view }: Readonly<{ view: readonly number[] }>) {
+export function hasA4Dimensions({ view }: Readonly<{ view: readonly number[] }>) {
   const width = view[2]
   const height = view[3]
   if (width === undefined || height === undefined) return false

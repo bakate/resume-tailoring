@@ -409,6 +409,7 @@ function readOperationKey({ candidateJourney, operation }: Readonly<{
 const operationTranslationKeys: Readonly<Record<CandidateJourneyOperation, Parameters<
   Localization['translate']
 >[0]>> = {
+  'rendering-resume-document': 'candidateJourney.operation.renderingResumeDocument',
   'preparing-tailored-resume': 'candidateJourney.operation.preparingTailoredResume',
   'processing-job-posting': 'candidateJourney.operation.processingJobPosting',
   'processing-profile-enrichment': 'candidateJourney.operation.processingProfileEnrichment',
