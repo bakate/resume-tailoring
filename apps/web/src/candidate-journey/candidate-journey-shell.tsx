@@ -57,10 +57,7 @@ function LocalizedCandidateJourneyShell({ localization }: LocalizationProps) {
         <CandidateJourneyProgress {...{ candidateJourney, localization }} />
         <TailoredResumeWorkspace {...{ candidateJourney, localization }} />
         <CombinedIntakeWorkspace {...{ candidateJourney, localization }} />
-        <details><summary>{localization.translate('combinedIntake.analysis')}</summary>
-          <JobMatchWorkspace {...{ candidateJourney, localization }} /></details>
-        <details><summary>{localization.translate('combinedIntake.inspection')}</summary>
-          <SourceIntakeWorkspace {...{ candidateJourney, localization }} /></details>
+        <ResultDisclosures {...{ candidateJourney, localization }} />
         <CandidateJourneyPhaseList {...{ activePhase, localization }} />
       </Stack></Container></AppShell.Main>
     </AppShell>
@@ -69,6 +66,24 @@ function LocalizedCandidateJourneyShell({ localization }: LocalizationProps) {
 
 type LocalizationProps = Readonly<{ localization: Localization }>
 type CandidateJourneyController = ReturnType<typeof useCandidateJourney>
+
+function ResultDisclosures({ candidateJourney, localization }: LocalizationProps & Readonly<{
+  candidateJourney: CandidateJourneyController
+}>) {
+  const { view } = candidateJourney
+  if (view.status !== 'candidate-session-open') return null
+  const { preparation } = view.session
+  const sourceIntake = preparation?.sourceIntake ?? view.session.sourceIntake
+  const jobMatch = preparation?.jobMatch ?? view.session.jobMatch
+  return <>
+    {sourceIntake === null || jobMatch === null ? null
+      : <details><summary>{localization.translate('combinedIntake.analysis')}</summary>
+        <JobMatchWorkspace {...{ candidateJourney, localization }} /></details>}
+    {sourceIntake === null ? null
+      : <details><summary>{localization.translate('combinedIntake.inspection')}</summary>
+        <SourceIntakeWorkspace {...{ candidateJourney, localization }} /></details>}
+  </>
+}
 
 function CandidateJourneyHeader({ localization }: LocalizationProps) {
   return (

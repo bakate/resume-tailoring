@@ -257,6 +257,23 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectDeletedSession()
   })
 
+  test('locks the intake while the resume is being prepared', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'pending-writing' })
+    await system.givenCombinedIntake()
+
+    await system.generateResume()
+
+    await system.expectIntakeLockedDuringPreparation()
+  })
+
+  test('hides analysis and source disclosures until a result exists', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    await system.openUnconsentedIntake()
+
+    await system.expectNoEmptyResultDisclosures()
+  })
+
   test('discloses Processing Policy and requires consent before generation', async ({ page }) => {
     const system = createSystemUnderTest({ page })
 
@@ -271,7 +288,7 @@ function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: P
 }
 
 type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-coverage' | 'no-correspondence'
-  | 'unsafe-output' | 'interrupted' | 'unavailable'
+  | 'unsafe-output' | 'interrupted' | 'unavailable' | 'pending-writing'
 
 class CandidateJourneyTestSystem {
   readonly #page: Page
@@ -300,6 +317,7 @@ class CandidateJourneyTestSystem {
     } }))
     await this.#page.route('**/api/resume-document-writing', (route) => {
       if (this.#scenario === 'interrupted') return route.abort()
+      if (this.#scenario === 'pending-writing') return new Promise<void>(() => undefined)
       if (this.#scenario === 'unavailable') return route.fulfill({ json: { ok: false, error: { type: 'unavailable' } } })
       const input = route.request().postDataJSON() as ResumeWritingInput
       return route.fulfill({ json: { ok: true, value: writtenDocument({ input, scenario: this.#scenario }) } })
@@ -712,6 +730,20 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByRole('button', { name: 'Start a Candidate Session' })).toBeVisible()
     await expect(this.#page.getByText('Candidate Session deleted from this browser.')).toBeVisible()
     await expect(this.#page.getByRole('button', { name: 'Generate my resume' })).toHaveCount(0)
+  }
+
+  async expectIntakeLockedDuringPreparation() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('region', { name: 'Candidate Journey progress' })).toBeVisible()
+    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toBeDisabled()
+    await expect(this.#page.getByRole('combobox', { name: 'Resume language', exact: true })).toBeDisabled()
+  }
+
+  async expectNoEmptyResultDisclosures() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toBeVisible()
+    await expect(this.#page.getByText('Match Analysis and supporting evidence', { exact: true })).toHaveCount(0)
+    await expect(this.#page.getByText('Inspect or enrich your source evidence', { exact: true })).toHaveCount(0)
   }
 
   async expectConsentGate() {

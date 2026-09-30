@@ -1,4 +1,4 @@
-import { Alert, Button, FileInput, Group, Modal, Paper, SegmentedControl, Select, Stack, Text, Textarea, Title } from '@mantine/core'
+import { Alert, Button, Fieldset, FileInput, Group, Modal, Paper, SegmentedControl, Select, Stack, Text, Textarea, Title } from '@mantine/core'
 import { useEffect, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { inferTailoredResumeLocale } from '@resume-tailoring/application/tailored-resume'
@@ -34,7 +34,9 @@ function CombinedIntakeForm(props: OpenIntakeProps) {
   return <Paper component="section" aria-labelledby="combined-intake-title" p={{ base: 'md', sm: 'xl' }} withBorder><Stack>
     <Title id="combined-intake-title" order={2}>{localization.translate('combinedIntake.title')}</Title>
     <Text c="dimmed">{localization.translate('combinedIntake.description')}</Text>
-    <IntakeFields {...props} controls={controls} />
+    <Fieldset disabled={view.operation !== null} p={0} variant="unstyled">
+      <Stack><IntakeFields {...props} controls={controls} /></Stack>
+    </Fieldset>
     <Button disabled={view.processingConsentStatus !== 'granted' || view.operation !== null} loading={view.operation !== null}
       onClick={() => { controls.requestGeneration({ purpose: 'tailored' }) }}>{localization.translate('combinedIntake.generate')}</Button>
     <PreparationFeedback {...{ candidateJourney, localization, localFailure: controls.state.failure }}
