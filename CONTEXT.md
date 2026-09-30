@@ -9,7 +9,7 @@ The person evaluating an opportunity and generating a resume from their own prof
 _Avoid_: User, applicant, profile owner
 
 **Candidate Journey**:
-The Candidate's progression from a Source Document and Job Posting to a reviewable Tailored Resume, with Source Intake, Job Match, and Tailored Resume Preparation as its underlying phases.
+The Candidate's progression from a Source Document and Job Posting to a reviewable resume result, either a Tailored Resume or a Normalized Resume, with Source Intake, Job Match, and Tailored Resume Preparation as its underlying phases.
 _Avoid_: Workflow, wizard, four-step journey
 
 **Source Intake**:
