@@ -391,7 +391,9 @@ function normalizeRequirements({ requirements }: Readonly<{
   })).map((requirement) => ({
     ...requirement,
     capability: normalizeCapability({ requirement }),
-    importance: readSourceImportance({ excerpt: requirement.sourceExcerpt }),
+    importance: readSourceImportance({
+      excerpt: requirement.sourceExcerpt, proposedImportance: requirement.importance,
+    }),
     importanceRationale: requirement.sourceExcerpt,
     substitutableGroup: readSourceSubstitutionGroup({ requirement, requirements }),
   }))
@@ -408,17 +410,27 @@ function normalizeCapability({ requirement }: Readonly<{
   }
 }
 
-function readSourceImportance({ excerpt }: Readonly<{
+function readSourceImportance({ excerpt, proposedImportance }: Readonly<{
   excerpt: string
+  proposedImportance: JobRequirement['importance']
 }>): JobRequirement['importance'] {
-  const normalizedExcerpt = excerpt.toLocaleLowerCase('en')
-    .normalize('NFD').replaceAll(/\p{Diacritic}/gu, '')
-    .replaceAll(/[^a-z0-9+#]+/gu, ' ').trim()
-  if (complementaryImportanceTerms.some((term) => normalizedExcerpt.includes(term))) {
+  const normalizedExcerpt = normalizeSourceText({ value: excerpt })
+  if (complementaryImportanceTerms.some((term) => includesImportanceTerm({ normalizedExcerpt, term }))) {
     return 'complementary'
   }
-  return criticalImportanceTerms.some((term) => normalizedExcerpt.includes(term))
-    ? 'critical' : 'central'
+  if (criticalImportanceTerms.some((term) => includesImportanceTerm({ normalizedExcerpt, term }))) {
+    return 'critical'
+  }
+  // Without explicit wording, central stays reserved for responsibilities the posting emphasizes.
+  return proposedImportance === 'complementary' ? 'complementary' : 'central'
+}
+
+// Matches whole words, allowing French agreement endings such as "requise" or "souhaitées".
+function includesImportanceTerm({ normalizedExcerpt, term }: Readonly<{
+  normalizedExcerpt: string
+  term: string
+}>) {
+  return new RegExp(`(?:^| )${term}(?:e|s|es)?(?= |$)`, 'u').test(normalizedExcerpt)
 }
 
 function readSourceSubstitutionGroup({ requirement, requirements }: Readonly<{

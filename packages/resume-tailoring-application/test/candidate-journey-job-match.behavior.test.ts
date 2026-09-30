@@ -148,6 +148,14 @@ describe('Candidate Journey Job Match', () => {
     system.expectFrenchImportanceAndAlternatives()
   })
 
+  it('reserves central importance for responsibilities the Job Posting emphasizes', async () => {
+    const system = createSystemUnderTest()
+
+    await system.analyzeJobPostingWithEmphasizedResponsibilities()
+
+    system.expectCentralImportanceOnlyForEmphasizedResponsibilities()
+  })
+
   it('confirms a missing Candidate Fact and refreshes Match Analysis atomically', async () => {
     const system = createSystemUnderTest()
 
@@ -234,6 +242,21 @@ async function analyzeFrenchJobPosting() {
   })
 }
 
+async function analyzeJobPostingWithEmphasizedResponsibilities() {
+  return createJobMatch({
+    candidateFacts: [],
+    document: { bytes: new TextEncoder().encode(emphasizedResponsibilitiesJobPostingText),
+      mediaType: 'text/plain', name: 'role.txt' },
+    jobPostingDocumentReader: createJobPostingDocumentReader(),
+    jobPostingExtractor: { extract: () => Promise.resolve({ ok: true, value: {
+      practicalConstraints: [],
+      requirements: emphasizedResponsibilitiesJobRequirements,
+      targetRole: null,
+    } }) },
+    matchEvidenceMatcher: emptyMatchEvidenceMatcher,
+  })
+}
+
 function createFrenchExtraction(): ExtractedJobPosting {
   return {
     practicalConstraints: [],
@@ -305,6 +328,10 @@ class CandidateJourneyJobMatchTestSystem {
 
   async analyzeFrenchJobPosting() {
     this.#directJobMatch = await analyzeFrenchJobPosting()
+  }
+
+  async analyzeJobPostingWithEmphasizedResponsibilities() {
+    this.#directJobMatch = await analyzeJobPostingWithEmphasizedResponsibilities()
   }
 
   async givenCandidateJourneyIsReady() {
@@ -582,6 +609,22 @@ class CandidateJourneyJobMatchTestSystem {
       expect.objectContaining({
         requirementIds: ['job-requirement-5', 'job-requirement-6'],
       }),
+    ])
+  }
+
+  expectCentralImportanceOnlyForEmphasizedResponsibilities() {
+    if (this.#directJobMatch === null) expect.fail('Expected a Job Posting analysis')
+    expect(this.#directJobMatch.ok).toBe(true)
+    if (!this.#directJobMatch.ok) return
+    expect(this.#directJobMatch.value.requirements.map(({ capability, importance }) =>
+      [capability.name, importance])).toEqual([
+      ['payments platform architecture', 'central'],
+      ['Define features, ensure quality and collaborate with product managers', 'complementary'],
+      ['Kafka', 'central'],
+      ['TypeScript', 'critical'],
+      ['Go', 'complementary'],
+      ['plusieurs équipes produit', 'central'],
+      ['SQL', 'critical'],
     ])
   }
 
@@ -933,6 +976,29 @@ const frenchJobRequirements = [
     substitutableGroup: 'service-reliability' },
   createRequirement('7', 'technical-expertise', 'No degree is required', 'critical',
     'No degree is required.'),
+] as const
+
+const frenchEmphasizedResponsibilityExcerpt =
+  'Votre mission principale est de piloter plusieurs équipes produit.'
+const genericDutiesExcerpt = 'Define features, ensure quality and collaborate with product managers.'
+const emphasizedResponsibilitiesJobPostingText = [
+  'Your core mission is to own the payments platform architecture.',
+  genericDutiesExcerpt, 'Experience with Kafka.', 'TypeScript is required.', 'Go is a plus.',
+  frenchEmphasizedResponsibilityExcerpt, 'La maîtrise de SQL est requise.',
+].join('\n')
+const emphasizedResponsibilitiesJobRequirements = [
+  createRequirement('1', 'ownership', 'payments platform architecture', 'central',
+    'Your core mission is to own the payments platform architecture.'),
+  createRequirement('2', 'execution',
+    'Define features, ensure quality and collaborate with product managers', 'complementary',
+    genericDutiesExcerpt),
+  createRequirement('3', 'technical-expertise', 'Kafka', 'critical', 'Experience with Kafka.'),
+  createRequirement('4', 'technical-expertise', 'TypeScript', 'central', 'TypeScript is required.'),
+  createRequirement('5', 'technical-expertise', 'Go', 'central', 'Go is a plus.'),
+  createRequirement('6', 'leadership', 'plusieurs équipes produit', 'central',
+    frenchEmphasizedResponsibilityExcerpt),
+  createRequirement('7', 'technical-expertise', 'SQL', 'complementary',
+    'La maîtrise de SQL est requise.'),
 ] as const
 
 const emptyMatchEvidenceMatcher = { match: () => Promise.resolve({
