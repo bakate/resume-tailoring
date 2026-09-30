@@ -241,8 +241,6 @@ class CandidateJourneyIntegrationSystem {
     await this.#page.goto('/')
     await this.#page.getByRole('button', { name: 'Start a Candidate Session' }).focus()
     await this.#page.keyboard.press('Enter')
-    await this.#page.getByRole('button', { name: 'Grant Processing Consent' }).focus()
-    await this.#page.keyboard.press('Enter')
     await this.#fillIntake()
   }
 
@@ -554,7 +552,6 @@ class CandidateJourneyIntegrationSystem {
     await this.#installModelAdapters()
     await this.#page.goto('/')
     await this.#page.getByRole('button', { name: 'Start a Candidate Session' }).click()
-    await this.#page.getByRole('button', { name: 'Grant Processing Consent' }).click()
     await this.#fillIntake()
   }
 

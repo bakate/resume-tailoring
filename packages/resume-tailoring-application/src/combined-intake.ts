@@ -10,6 +10,7 @@ import type { TailoredResumeLocale } from './tailored-resume'
 import type { ResumeOperationFailure, ResumePreparationOutcome } from './structured-resume-contract'
 
 export type CombinedIntakeRequest = Readonly<{
+  grantProcessingConsent?: true
   sourceDocument?: SourceDocument
   jobPosting?: JobPostingDocument
   locale?: TailoredResumeLocale | null
