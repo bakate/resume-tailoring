@@ -738,7 +738,7 @@ class CandidateJourneyTestSystem {
 
   async expectStablePreviewAfterFailure() {
     this.#expectAction()
-    await expect(this.#page.getByText('Preparation could not finish.', { exact: false })).toBeVisible()
+    await expect(this.#page.getByRole('alert').filter({ hasText: 'Preparation could not finish.' })).toBeVisible()
     await this.expectGroupedPreview()
   }
 

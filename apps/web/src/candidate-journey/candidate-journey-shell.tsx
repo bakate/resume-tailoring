@@ -331,7 +331,7 @@ function CandidateJourneyPhaseList({ activePhase, localization }: LocalizationPr
 }>) {
   return (
     <Box aria-label={localization.translate('candidateJourney.phasesLabel')} component="nav">
-      <SimpleGrid cols={{ base: 1, md: 3 }} component="ol" spacing="lg">
+      <SimpleGrid className="candidate-journey-phase-list" cols={{ base: 1, md: 3 }} component="ol" spacing="lg">
         {candidateJourneyPhases.map((phase, phaseIndex) => (
           <CandidateJourneyPhaseItem {...{ activePhase, localization, phase, phaseIndex }}
             key={phase.id} />

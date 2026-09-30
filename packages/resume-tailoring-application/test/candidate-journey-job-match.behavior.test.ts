@@ -77,6 +77,16 @@ describe('Candidate Journey Job Match', () => {
     system.expectExtractionToBeRejected()
   })
 
+  it('omits an unsupported Practical Constraint without rejecting the analysis', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenExtractionContainsAnInventedPracticalConstraint()
+
+    await system.submitPastedJobPosting()
+
+    system.expectOnlySourceBackedPracticalConstraints()
+  })
+
   it('does not analyze a posting before Critical Ambiguities are resolved', async () => {
     const system = createSystemUnderTest({ session: createSourceIntakeSession() })
     await system.givenCandidateJourneyIsReady()
@@ -271,6 +281,15 @@ class CandidateJourneyJobMatchTestSystem {
     }
   }
 
+  givenExtractionContainsAnInventedPracticalConstraint() {
+    this.#extractedJobPosting = {
+      ...extractedJobPosting,
+      practicalConstraints: [...extractedJobPosting.practicalConstraints, {
+        sourceExcerpt: 'Work from Paris three days per week.', value: 'Lyon',
+      }],
+    }
+  }
+
   givenExtractionContainsAnInventedRequirement() {
     this.#extractedJobPosting = {
       ...extractedJobPosting,
@@ -407,6 +426,13 @@ class CandidateJourneyJobMatchTestSystem {
     const view = this.#readOpenView()
     expect(view.jobMatchFailure).toBe('job-posting-extraction-unavailable')
     expect(view.session.jobMatch?.jobPosting.name).toBe('stable-job-posting.txt')
+  }
+
+  expectOnlySourceBackedPracticalConstraints() {
+    this.#expectCompletedAction()
+    const view = this.#readOpenView()
+    expect(view.jobMatchFailure).toBeNull()
+    expect(view.session.jobMatch?.practicalConstraints).toEqual(extractedJobPosting.practicalConstraints)
   }
 
   expectExtractionToBeRejected() {

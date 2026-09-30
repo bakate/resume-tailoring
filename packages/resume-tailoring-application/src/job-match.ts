@@ -326,12 +326,12 @@ function readSourceBackedExtraction({ content, extraction }: Readonly<{
 }>): ExtractedJobPosting | null {
   if (!hasValidRequirementIds({ requirements: extraction.requirements })) return null
   if (!hasSupportedTargetRole({ content, targetRole: extraction.targetRole })) return null
-  if (!extraction.practicalConstraints.every((constraint) =>
-    hasSourceSupport({ content, excerpt: constraint.sourceExcerpt, value: constraint.value }))) return null
   if (!extraction.requirements.every((requirement) =>
     hasSourceBackedRequirement({ content, requirement }))) return null
   const requirements = normalizeRequirements({ requirements: extraction.requirements })
-  return requirements.length === 0 ? null : { ...extraction, requirements }
+  const practicalConstraints = extraction.practicalConstraints.filter((constraint) =>
+    hasSourceSupport({ content, excerpt: constraint.sourceExcerpt, value: constraint.value }))
+  return requirements.length === 0 ? null : { ...extraction, practicalConstraints, requirements }
 }
 
 function hasSourceBackedRequirement({ content, requirement }: Readonly<{

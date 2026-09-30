@@ -1937,3 +1937,9 @@ h1 {
   font-size: var(--mantine-font-size-xs);
   margin-top: var(--mantine-spacing-xs);
 }
+
+.candidate-journey-phase-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}

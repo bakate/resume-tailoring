@@ -245,20 +245,21 @@ function PreparationFeedback({ candidateJourney, localization, localFailure, onR
     <InputFailure {...{ failure, localization }} />
     {preparation?.status === 'awaiting-correction' && preparation.sourceIntake !== null
       ? <CriticalAmbiguityQuestions {...{ candidateJourney, localization, sourceIntake: preparation.sourceIntake }} /> : null}
-    {preparation?.status === 'no-relevant-evidence' ? <Alert color="forest" title={localization.translate('jobMatch.generation.denied')}>
+    {preparation?.status === 'no-relevant-evidence' ? <Alert color="caution" title={localization.translate('jobMatch.generation.denied')}>
       <Text>{localization.translate('jobMatch.generation.normalizedNotice')}</Text>
       <Button mt="sm" disabled={view.operation !== null} onClick={onNormalized}>
         {localization.translate('combinedIntake.normalized')}</Button>
     </Alert> : null}
-    {preparation?.status === 'failed' || preparation?.status === 'interrupted' ? <Alert color="forest">
+    {preparation?.status === 'failed' || preparation?.status === 'interrupted' ? <Alert role="alert"
+      color={preparation.status === 'failed' ? 'danger' : 'caution'}>
       <Text>{localization.translate(preparation.status === 'interrupted' ? 'combinedIntake.interrupted' : 'combinedIntake.failed')}</Text>
       <Button mt="sm" disabled={view.operation !== null}
         onClick={onRetry}>{localization.translate('combinedIntake.retry')}</Button>
     </Alert> : null}
     {preparation?.status === 'prepared' && preparation.sourceIntake !== null && preparation.sourceIntake.criticalAmbiguities.length > 0
-      ? <Alert color="forest">{localization.translate('combinedIntake.omittedAmbiguities')}</Alert> : null}
+      ? <Alert color="informative">{localization.translate('combinedIntake.omittedAmbiguities')}</Alert> : null}
     {preparation?.jobMatch?.analysis.matchBand === 'ambitious' && preparation.status === 'prepared'
-      ? <Alert color="forest">{localization.translate('jobMatch.generation.lowScoreWarning')}</Alert> : null}
+      ? <Alert color="caution">{localization.translate('jobMatch.generation.lowScoreWarning')}</Alert> : null}
   </>
 }
 
