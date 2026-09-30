@@ -292,6 +292,15 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectRejectedSourceFile()
   })
 
+  test('explains a failed posting analysis in a single alert', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'posting-extraction-unavailable' })
+    await system.givenCombinedIntake()
+
+    await system.generateResume()
+
+    await system.expectSinglePostingFailureAlert()
+  })
+
   test('discloses the Processing Policy at the generation action', async ({ page }) => {
     const system = createSystemUnderTest({ page })
 
@@ -306,7 +315,7 @@ function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: P
 }
 
 type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-coverage' | 'no-correspondence'
-  | 'unsafe-output' | 'interrupted' | 'unavailable' | 'pending-writing'
+  | 'unsafe-output' | 'interrupted' | 'unavailable' | 'pending-writing' | 'posting-extraction-unavailable'
 
 class CandidateJourneyTestSystem {
   readonly #page: Page
@@ -327,7 +336,8 @@ class CandidateJourneyTestSystem {
     await this.#page.route('**/api/structured-source-profile-extraction', (route) => route.fulfill({ json: {
       ok: true, value: extractionFor(this.#scenario),
     } }))
-    await this.#page.route('**/api/explainable-job-posting-extraction', (route) => route.fulfill({ json: {
+    await this.#page.route('**/api/explainable-job-posting-extraction', (route) => route.fulfill({ json: this.#scenario === 'posting-extraction-unavailable'
+      ? { ok: false, error: 'job-posting-extraction-unavailable' } : {
       ok: true, value: { targetRole: structuredResumeJobMatch.targetRole, practicalConstraints: [], requirements: requirementsFor(this.#scenario) },
     } }))
     await this.#page.route('**/api/explainable-match-evidence', (route) => route.fulfill({ json: {
@@ -471,7 +481,7 @@ class CandidateJourneyTestSystem {
   }
 
   async resumePreparation() {
-    await this.#page.getByRole('button', { name: 'Retry preparation' }).click()
+    await this.#page.getByRole('button', { name: 'Try again' }).click()
     this.#completedAction = 'resumed'
   }
 
@@ -766,6 +776,16 @@ class CandidateJourneyTestSystem {
     this.#expectAction()
     await expect(this.#page.getByRole('alert')).toContainText('This file cannot be used here.')
     await expect(this.#page.getByRole('textbox', { name: 'Professional text', exact: true })).toBeVisible()
+  }
+
+  async expectSinglePostingFailureAlert() {
+    this.#expectAction()
+    const alert = this.#page.getByRole('alert')
+    await expect(alert).toHaveCount(1)
+    await expect(alert).toContainText('Preparation could not finish.')
+    await expect(alert).toContainText('We could not analyze the job posting.')
+    await expect(alert).toContainText('Your inputs are kept.')
+    await expect(alert.getByRole('button', { name: 'Try again' })).toBeEnabled()
   }
 
   async expectIntakeLockedDuringPreparation() {

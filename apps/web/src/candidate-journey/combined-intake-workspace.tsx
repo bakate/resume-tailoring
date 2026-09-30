@@ -241,20 +241,17 @@ function PreparationFeedback({ candidateJourney, localization, localFailure, onR
   if (view.status !== 'candidate-session-open') return null
   const preparation = view.session.preparation
   const failure = localFailure ?? preparation?.failure ?? null
+  const failedPreparation = localFailure === null && (preparation?.status === 'failed' || preparation?.status === 'interrupted')
   return <>
-    <InputFailure {...{ failure, localization }} />
+    {failedPreparation ? <PreparationFailureAlert {...{ failure, localization, onRetry }}
+      busy={view.operation !== null} hasStableResume={view.session.tailoredResume !== null}
+      interrupted={preparation.status === 'interrupted'} /> : <InputFailure {...{ failure, localization }} />}
     {preparation?.status === 'awaiting-correction' && preparation.sourceIntake !== null
       ? <CriticalAmbiguityQuestions {...{ candidateJourney, localization, sourceIntake: preparation.sourceIntake }} /> : null}
     {preparation?.status === 'no-relevant-evidence' ? <Alert color="caution" title={localization.translate('jobMatch.generation.denied')}>
       <Text>{localization.translate('jobMatch.generation.normalizedNotice')}</Text>
       <Button mt="sm" disabled={view.operation !== null} onClick={onNormalized}>
         {localization.translate('combinedIntake.normalized')}</Button>
-    </Alert> : null}
-    {preparation?.status === 'failed' || preparation?.status === 'interrupted' ? <Alert role="alert"
-      color={preparation.status === 'failed' ? 'danger' : 'caution'}>
-      <Text>{localization.translate(preparation.status === 'interrupted' ? 'combinedIntake.interrupted' : 'combinedIntake.failed')}</Text>
-      <Button mt="sm" disabled={view.operation !== null}
-        onClick={onRetry}>{localization.translate('combinedIntake.retry')}</Button>
     </Alert> : null}
     {preparation?.status === 'prepared' && preparation.sourceIntake !== null && preparation.sourceIntake.criticalAmbiguities.length > 0
       ? <Alert color="informative">{localization.translate('combinedIntake.omittedAmbiguities')}</Alert> : null}
@@ -266,9 +263,41 @@ function PreparationFeedback({ candidateJourney, localization, localFailure, onR
 const preparationFailureKeys = {
   ...sourceIntakeFailureKeys, ...jobMatchFailureKeys,
   'candidate-session-storage-unavailable': 'candidateJourney.storageUnavailable',
-  'unavailable': 'combinedIntake.failed', 'unsupported-content': 'combinedIntake.unsafe',
+  'unavailable': 'combinedIntake.cause.unavailable', 'unsupported-content': 'combinedIntake.unsafe',
   'stale-result': 'combinedIntake.outdated',
 } as const satisfies Record<ResumePreparationFailure, Parameters<Localization['translate']>[0]>
+
+const retryableFailureCauses = {
+  'source-profile-extraction-unavailable': 'combinedIntake.cause.source',
+  'job-posting-extraction-unavailable': 'combinedIntake.cause.posting',
+  'match-evidence-unavailable': 'combinedIntake.cause.evidence',
+  'unavailable': 'combinedIntake.cause.unavailable',
+} as const satisfies Partial<Record<ResumePreparationFailure, Parameters<Localization['translate']>[0]>>
+
+const inputFailures = new Set<ResumePreparationFailure>([
+  'encrypted-document', 'empty-document', 'invalid-document', 'oversized-document', 'scanned-document',
+  'unsupported-document', 'unreadable-document', 'empty-job-posting', 'invalid-job-posting',
+  'oversized-job-posting', 'scanned-job-posting', 'unsupported-job-posting', 'unreadable-job-posting',
+])
+
+function PreparationFailureAlert({ busy, failure, hasStableResume, interrupted, localization, onRetry }: Readonly<{
+  busy: boolean; failure: ResumePreparationFailure | null; hasStableResume: boolean; interrupted: boolean
+  localization: Localization; onRetry: () => void
+}>) {
+  const cause = interrupted || failure === null ? null
+    : localization.translate(failure in retryableFailureCauses
+      ? retryableFailureCauses[failure as keyof typeof retryableFailureCauses] : preparationFailureKeys[failure])
+  const retryable = interrupted || failure === null || !inputFailures.has(failure)
+  return <Alert color={interrupted ? 'caution' : 'danger'} role="alert"
+    title={localization.translate(interrupted ? 'combinedIntake.interruptedTitle' : 'combinedIntake.failedTitle')}>
+    <Stack gap="sm">
+      {cause === null ? null : <Text size="sm">{cause}</Text>}
+      <Text c="dimmed" size="sm">{localization.translate(hasStableResume ? 'combinedIntake.inputsAndResumeKept' : 'combinedIntake.inputsKept')}</Text>
+      {retryable ? <Group><Button disabled={busy} onClick={onRetry} variant="default">
+        {localization.translate('combinedIntake.retry')}</Button></Group> : null}
+    </Stack>
+  </Alert>
+}
 
 function InputFailure({ failure, localization }: Readonly<{ failure: ResumePreparationFailure | null; localization: Localization }>) {
   if (failure === null || failure === 'unavailable') return null
