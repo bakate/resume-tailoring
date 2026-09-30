@@ -181,3 +181,8 @@ function inferTailoredResumeLocale({ content }: Readonly<{ content: string }>): 
 
 const frenchWords: ReadonlySet<string> = new Set(['avec', 'compétences', 'conception', 'dans', 'développeur', 'expérience', 'missions', 'poste', 'pour'])
 const englishWords: ReadonlySet<string> = new Set(['and', 'developer', 'experience', 'for', 'requirements', 'role', 'skills', 'with'])
+
+export type { ResumeEditingState, ResumeFieldLocation, ResumeSectionName } from '@resume-tailoring/domain/tailored-resume'
+
+export { isSupportedResumeFieldText, moveResumeField, readResumeFields, removeResumeField, restoreResumeField, updateResumeField } from './resume-field-editing'
+export type { HiddenResumeField, ResumeFieldReference } from './resume-field-editing'

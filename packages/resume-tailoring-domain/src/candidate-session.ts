@@ -1,7 +1,7 @@
 import type { ProcessingConsent } from './processing-policy'
-import type { SourceIntake } from './source-intake'
+import type { CandidateFactId, SourceIntake } from './source-intake'
 import type { JobMatch } from './job-match'
-import type { TailoredResume } from './tailored-resume'
+import type { TailoredResume, ResumeEditingState, ResumeFieldLocation } from './tailored-resume'
 
 export const candidateJourneyPhases = [
   'source-intake',
@@ -23,6 +23,8 @@ export type CandidateSession = Readonly<{
   sessionId: CandidateSessionId
   sourceIntake: SourceIntake | null
   tailoredResume: TailoredResume | null
+  resumeEditing?: ResumeEditingState
+  resumeFactLocations?: readonly Readonly<{ factId: CandidateFactId; location: ResumeFieldLocation }>[]
   startedAt: number
   version: typeof candidateSessionStorageVersion
 }>

@@ -37,6 +37,21 @@ const consentedCandidateSession = {
 } as const satisfies CandidateSession
 
 describe('browser Candidate Session persistence', () => {
+  it('recovers unresolved edits, hidden entries, and genuine fact restoration destinations', () => {
+    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage() })
+    const field = groupedResumeDocument.valueProposition.paragraphs[0]
+    const location = { kind: 'value-proposition', fieldId: field.id } as const
+    const session: CandidateSession = { ...candidateSession, tailoredResume: { ...groupedResumeDocument,
+      sectionOrder: ['experiences', 'value-proposition', 'skills', 'education', 'languages', 'projects', 'certifications'] },
+      resumeEditing: { revision: 'revision-edited', manuallyEdited: true, unsupportedFieldIds: [field.id],
+        hiddenFields: [{ field: { ...field, text: '' }, location }], hiddenExperiences: [groupedResumeDocument.experiences[0]] },
+      resumeFactLocations: [{ factId: 'source-fact-added', location }],
+    }
+    persistence.save({ session })
+
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session } })
+  })
+
   it('round-trips semantic values, stable identities, prose, and grouped provenance', () => {
     const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage() })
     const session = { ...candidateSession, tailoredResume: groupedResumeDocument }

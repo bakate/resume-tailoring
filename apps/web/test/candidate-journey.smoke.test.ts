@@ -4,12 +4,33 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 
 test.describe('Candidate Journey', () => {
+  test('recovers corrected local contacts after reloading the editor', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGroupedEvidenceIsReadyForPreparation()
+    await system.prepareGroupedResume()
+
+    await system.correctContactAndReload()
+
+    await system.expectCorrectedContactRecovered()
+  })
+
+  test('keeps unresolved wording visible and blocked after reloading', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGroupedEvidenceIsReadyForPreparation()
+    await system.prepareGroupedResume()
+
+    await system.editUnsupportedWordingAndReload()
+
+    await system.expectUnresolvedWordingRecovered()
+  })
+
   test('prepares a grouped semantic preview with a readable mobile order', async ({ page }) => {
     const system = createSystemUnderTest({ page })
     await system.givenGroupedEvidenceIsReadyForPreparation()
 
     await system.prepareGroupedResume()
 
+    await system.expectPreviewFirstReview()
     await system.expectGroupedResumePreview()
   })
 
@@ -19,6 +40,26 @@ test.describe('Candidate Journey', () => {
     await system.prepareGroupedResume()
 
     await system.hideAndRestoreEmployer()
+
+    await system.expectGroupedResumePreview()
+  })
+
+  test('keeps candidate section ordering in the preview', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGroupedEvidenceIsReadyForPreparation()
+    await system.prepareGroupedResume()
+
+    await system.moveExperienceBeforeSummary()
+
+    await system.expectExperienceBeforeSummary()
+  })
+
+  test('restores a complete hidden experience without losing its metadata', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGroupedEvidenceIsReadyForPreparation()
+    await system.prepareGroupedResume()
+
+    await system.hideAndRestoreExperience()
 
     await system.expectGroupedResumePreview()
   })
@@ -254,7 +295,7 @@ class CandidateJourneyTestSystem {
       sourceIntake: structuredResumeSource, jobMatch: structuredResumeJobMatch,
     }
     await this.#page.addInitScript((storedSession) => {
-      if (window.top !== window) return
+      if (window.top !== window || localStorage.getItem('honest-resume:candidate-session') !== null) return
       localStorage.setItem('honest-resume:candidate-session', JSON.stringify(storedSession))
     }, session)
     await this.#page.goto('/')
@@ -266,13 +307,84 @@ class CandidateJourneyTestSystem {
     this.#completedAction = 'grouped-resume-prepared'
   }
 
+  async correctContactAndReload() {
+    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#page.getByLabel('Email', { exact: true }).fill('updated@example.com')
+    await this.#page.reload()
+    this.#completedAction = 'contact-corrected-and-reloaded'
+  }
+
+  async expectCorrectedContactRecovered() {
+    this.#expectCompletedAction('contact-corrected-and-reloaded')
+    await expect(this.#page.frameLocator('iframe').getByText('updated@example.com', { exact: true })).toBeVisible()
+    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await expect(this.#page.getByLabel('Email', { exact: true })).toHaveValue('updated@example.com')
+  }
+
+  async editUnsupportedWordingAndReload() {
+    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
+    await this.#page.getByLabel('Resume Field', { exact: true }).first().fill('Led 100 engineers')
+    await this.#page.getByRole('button', { name: 'Save wording', exact: true }).first().click()
+    await this.#page.reload()
+    this.#completedAction = 'wording-edited-and-reloaded'
+  }
+
+  async expectUnresolvedWordingRecovered() {
+    this.#expectCompletedAction('wording-edited-and-reloaded')
+    await expect(this.#page.frameLocator('iframe').getByText('Led 100 engineers', { exact: true })).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Print current resume', exact: true })).toHaveCount(0)
+    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
+    await expect(this.#page.getByText('This professional edit is not supported by the current Candidate Facts.', { exact: true })).toBeVisible()
+  }
+
+  async expectPreviewFirstReview() {
+    await expect(this.#page.getByRole('button', { name: 'Edit resume', exact: true })).toBeVisible()
+    await expect(this.#page.getByLabel('Resume Field', { exact: true })).toHaveCount(0)
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toHaveCount(0)
+    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await expect(this.#page.getByRole('dialog')).toBeVisible()
+    await this.#page.keyboard.press('Escape')
+    await expect(this.#page.getByRole('dialog')).toHaveCount(0)
+    await expect(this.#page.getByRole('button', { name: 'Edit resume', exact: true })).toBeFocused()
+  }
+
   async hideAndRestoreEmployer() {
+    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Experience', exact: true }).click()
     const employerField = this.#page.locator('textarea').filter({ hasText: 'Northwind' })
     const fieldCard = employerField.locator('xpath=ancestor::*[contains(@class,"mantine-Paper-root")][1]')
     await fieldCard.getByRole('button', { name: 'Hide field', exact: true }).click()
     await expect(this.#page.frameLocator('iframe').getByText('Northwind', { exact: true })).toHaveCount(0)
+    await this.#page.getByRole('tab', { name: 'Restore content', exact: true }).click()
     await this.#page.getByRole('button', { name: 'Restore field', exact: true }).click()
+    await this.#page.keyboard.press('Escape')
     this.#completedAction = 'grouped-resume-prepared'
+  }
+
+  async hideAndRestoreExperience() {
+    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Experience', exact: true }).click()
+    await this.#page.getByRole('button', { name: 'Hide experience', exact: true }).first().click()
+    await expect(this.#page.frameLocator('iframe').getByText('Northwind', { exact: true })).toHaveCount(0)
+    await this.#page.getByRole('tab', { name: 'Restore content', exact: true }).click()
+    await this.#page.getByRole('button', { name: 'Restore experience', exact: true }).click()
+    await this.#page.keyboard.press('Escape')
+  }
+
+  async moveExperienceBeforeSummary() {
+    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Section order', exact: true }).click()
+    const experienceOrder = this.#page.getByRole('tabpanel').getByText('Experience', { exact: true }).locator('..')
+    await experienceOrder.getByRole('button', { name: 'Move up', exact: true }).click()
+    await this.#page.keyboard.press('Escape')
+  }
+
+  async expectExperienceBeforeSummary() {
+    const headings = this.#page.frameLocator('iframe').getByRole('heading', { level: 2 })
+    await expect(headings.nth(0)).toHaveText('Experience')
+    await expect(headings.nth(1)).toHaveText('Summary')
   }
 
   async expectGroupedResumePreview() {
@@ -575,6 +687,8 @@ class CandidateJourneyTestSystem {
 }
 
 type CandidateJourneyAction =
+  | 'contact-corrected-and-reloaded'
+  | 'wording-edited-and-reloaded'
   | 'candidate-journey-opened'
   | 'grouped-resume-prepared'
   | 'candidate-session-deleted'
