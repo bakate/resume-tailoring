@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { groupedResumeDocument } from '@resume-tailoring/application/structured-resume-fixtures'
 
 import {
   candidateSessionDurationMilliseconds,
@@ -204,6 +205,7 @@ function createTestDependencies({
   onMatch, readExtraction, readMatchEvidence, session,
 }: TestDependenciesRequest): CandidateJourneyDependencies {
   return {
+    resumeDocumentPorts: { prepare: ({ revision }) => Promise.resolve({ status: 'prepared', revision, document: groupedResumeDocument }) },
     createSessionId: () => '00000000-0000-4000-8000-000000000042',
     jobPostingDocumentReader: createJobPostingDocumentReader(),
     jobPostingExtractor: { extract: () => Promise.resolve({ ok: true, value: readExtraction() }) },

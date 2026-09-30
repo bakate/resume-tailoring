@@ -170,7 +170,7 @@ function toField({ id, value }: CandidateFact): TailoredResumeField {
   return { id, factIds: [id], text: value }
 }
 
-function inferTailoredResumeLocale({ content }: Readonly<{ content: string }>): TailoredResumeLocale {
+export function inferTailoredResumeLocale({ content }: Readonly<{ content: string }>): TailoredResumeLocale {
   const normalizedContent = content.toLocaleLowerCase('fr')
   const words = normalizedContent.match(/\p{Letter}+/gu) ?? []
   const frenchScore = words.filter((word) => frenchWords.has(word)).length

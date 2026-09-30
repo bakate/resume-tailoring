@@ -1897,3 +1897,9 @@ h1 {
     transition: none;
   }
 }
+
+.combined-intake-document {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}

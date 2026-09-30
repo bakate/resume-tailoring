@@ -1,3 +1,4 @@
+import { createTailoredResume } from '@resume-tailoring/application/tailored-resume'
 import { describe, expect, it } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourneyDependencies, CandidateJourneyView, CandidateSession, ResumeDocumentPorts, ResumeProposalDecision, ResumeLayoutOutcome, ResumeExportEligibility } from '@resume-tailoring/application/candidate-journey'
@@ -140,6 +141,36 @@ describe('Candidate Journey resume editing', () => {
 
     system.expectUnmeasuredCurrentDraft()
   })
+  it('ignores pending layout when combined intake inputs change', async () => {
+    const system = createSystemUnderTest()
+    await system.givenReviewableResume()
+    system.givenPendingLayout()
+    system.givenChangedIntakeInputs()
+
+    await system.completePendingLayout()
+
+    system.expectUnmeasuredCurrentDraft()
+  })
+  it('blocks export of an outdated draft even when its measured layout fits', async () => {
+    const system = createSystemUnderTest()
+    await system.givenReviewableResume()
+    system.givenChangedIntakeInputs()
+    system.givenOnePageLayout()
+
+    await system.assessLayout()
+
+    system.expectUnmeasuredCurrentDraft()
+  })
+  it('keeps pending section validation unresolved after intake changes', async () => {
+    const system = createSystemUnderTest()
+    await system.givenReviewableResume()
+    system.givenPendingSupportedEdit()
+    system.givenChangedIntakeInputs()
+
+    await system.completePendingValidation()
+
+    system.expectPendingEditRemainsUnresolved()
+  })
   it('blocks export without contacts even when the measured document fits', async () => {
     const system = createSystemUnderTest()
     await system.givenReviewableResume()
@@ -247,6 +278,7 @@ class StructuredResumeTestSystem {
   }
 
   async prepareTailoredResume() {
+    await this.givenProcessingConsent()
     this.#journey.startTailoredResumePreparation()
     await this.#expectTailoredResumePrepared()
     this.#outcome = this.#journey.readView()
@@ -432,6 +464,13 @@ class StructuredResumeTestSystem {
   expectCondensationFailure({ reason }: Readonly<{ reason: 'unavailable' | 'unsupported-content' }>) {
     this.expectOriginalDraftWithoutProposal()
     expect(this.#review()?.failure?.reason).toBe(reason)
+  }
+
+  givenChangedIntakeInputs() { this.#journey.invalidateResumeInputs() }
+
+  expectPendingEditRemainsUnresolved() {
+    expect(this.#expectPreparedSession()?.resumeEditing?.unsupportedFieldIds).toHaveLength(1)
+    expect(this.#review()?.assessment?.exportEligibility.status).toBe('blocked')
   }
 
   givenChangedContacts() {
@@ -650,6 +689,8 @@ function createDependencies({ ports }: Readonly<{ ports: Partial<ResumeDocumentP
   let session = createMatchedSession()
   return {
     resumeDocumentPorts: Object.assign(ports, {
+      prepare: ({ candidateFacts, jobMatch, locale, revision }) => Promise.resolve({ status: 'prepared', revision,
+        document: createTailoredResume({ jobMatch, locale, sourceIntake: { ...structuredResumeSource, candidateFacts } }) }),
       proposeCondensation: ({ document, baseRevision }) => Promise.resolve({ status: 'proposed', proposal: {
         id: 'proposal-one', baseRevision, layout: { status: 'unavailable', revision: baseRevision },
         document: { ...document, valueProposition: { ...document.valueProposition, paragraphs:

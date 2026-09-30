@@ -1,3 +1,4 @@
+import { resumePreparationFailures } from '@resume-tailoring/application/candidate-journey'
 import { z } from 'zod'
 
 import {
@@ -27,7 +28,7 @@ const candidateSessionIdPattern = /^candidate-session-[0-9a-f-]+$/u
 const candidateFactIdSchema = z.templateLiteral(['source-fact-', z.string().min(1)])
 const requirementIdSchema = z.templateLiteral(['job-requirement-', z.string().min(1)])
 
-const sourceIntakeSchema = z.strictObject({
+export const sourceIntakeSchema = z.strictObject({
   candidateFacts: z.array(z.strictObject({
     id: candidateFactIdSchema,
     path: z.string().min(1),
@@ -65,7 +66,7 @@ const jobRequirementSchema = z.strictObject({
   value: z.string().min(1),
 })
 
-const jobMatchSchema = z.strictObject({
+export const jobMatchSchema = z.strictObject({
   analysis: z.strictObject({
     criticalRequirementReserve: z.strictObject({
       requirementIds: z.array(requirementIdSchema),
@@ -115,7 +116,7 @@ const tailoredResumeFieldSchema = z.strictObject({
 
 const resumeSectionNameSchema = z.enum(['value-proposition', 'experiences', 'skills', 'education', 'languages', 'projects', 'certifications'])
 
-const tailoredResumeSchema = z.strictObject({
+export const tailoredResumeSchema = z.strictObject({
   sectionOrder: z.array(resumeSectionNameSchema).optional(),
   purpose: z.enum(['tailored', 'normalized']),
   contactDetails: sourceIntakeSchema.shape.contactDetails,
@@ -144,6 +145,15 @@ const tailoredResumeSchema = z.strictObject({
     paragraphs: z.array(tailoredResumeFieldSchema) }),
 })
 
+const storedIntakeDocumentSchema = z.strictObject({ data: z.string(), mediaType: z.string(), name: z.string() })
+const resumePreparationSchema = z.strictObject({
+  revision: z.string().min(1),
+  status: z.enum(['outdated', 'pending', 'interrupted', 'awaiting-correction', 'no-relevant-evidence', 'failed', 'prepared']),
+  sourceDocument: storedIntakeDocumentSchema.nullable(), jobPosting: storedIntakeDocumentSchema.nullable(),
+  locale: z.enum(['en', 'fr']).nullable(), purpose: z.enum(['tailored', 'normalized']),
+  sourceIntake: sourceIntakeSchema.nullable(), jobMatch: jobMatchSchema.nullable(), failure: z.enum(resumePreparationFailures).nullable(),
+})
+
 const resumeFieldLocationSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('value-proposition'), fieldId: z.string() }),
   z.strictObject({ kind: z.literal('experience'), experienceId: z.string(), fieldId: z.string(),
@@ -155,6 +165,9 @@ const resumeFieldLocationSchema = z.discriminatedUnion('kind', [
 ])
 
 export const candidateSessionSchema = z.strictObject({
+  preparedResumeStatus: z.enum(['current', 'outdated']).optional(),
+  preparedResumeRevision: z.string().optional(),
+  preparation: resumePreparationSchema.optional(),
   resumeFactLocations: z.array(z.strictObject({ factId: candidateFactIdSchema, location: resumeFieldLocationSchema })).optional(),
   resumeEditing: z.strictObject({ revision: z.string().min(1), manuallyEdited: z.boolean(),
     unsupportedFieldIds: z.array(z.string()),

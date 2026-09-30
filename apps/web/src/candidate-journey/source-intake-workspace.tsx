@@ -29,15 +29,16 @@ export function SourceIntakeWorkspace({
   const sourceForm = useSourceDocumentForm({ candidateJourney })
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open') return null
+  const sourceIntake = view.session.preparation?.sourceIntake ?? view.session.sourceIntake
   return <Paper aria-busy={view.operation === 'processing-source-document' || view.operation === 'resolving-critical-ambiguity'}
     aria-labelledby="source-intake-title" component="section" className="candidate-journey-workspace"
     p={{ base: 'md', sm: 'xl' }} shadow="xs" withBorder>
     <Stack gap="lg">
       <SourceIntakeHeader localization={localization} />
-      {view.session.sourceIntake === null
+      {sourceIntake === null
         ? <SourceDocumentForm {...{ candidateJourney, localization, sourceForm }} />
         : <SourceIntakeResult {...{
-            candidateJourney, localization, sourceIntake: view.session.sourceIntake,
+            candidateJourney, localization, sourceIntake,
           }} />}
       <SourceIntakeFailure {...{
         failure: sourceForm.localFailure ?? view.sourceIntakeFailure, localization,
@@ -173,7 +174,7 @@ function SourceIntakeResult({
   </Stack>
 }
 
-function CriticalAmbiguityQuestions({
+export function CriticalAmbiguityQuestions({
   candidateJourney,
   localization,
   sourceIntake,
@@ -226,6 +227,9 @@ function DetailedSourceProfile({
 }: Readonly<{ localization: Localization; sourceIntake: SourceIntake }>) {
   const profile = sourceIntake.sourceProfile
   return <Stack aria-label={localization.translate('sourceIntake.detailedProfile')} role="region">
+    <List>{sourceIntake.candidateFacts.map((fact) => <List.Item key={fact.id}>
+      <Text>{fact.value}</Text><Text size="xs" c="dimmed">{fact.path}</Text>
+    </List.Item>)}</List>
     <ProfileSection title={localization.translate('sourceIntake.experiences')}
       values={profile.experiences.map((experience) => (
         formatProfileSummary({ values: [experience.role, experience.organization] })
@@ -256,13 +260,13 @@ function ProfileSection({ title, values }: Readonly<{
   values: readonly string[]
 }>) {
   return <div><Text fw={700}>{title}</Text>
-    {values.length === 0 ? <Text c="dimmed">—</Text> : <List>{values.map((value) => (
-      <List.Item key={value}>{value}</List.Item>
+    {values.length === 0 ? <Text c="dimmed">—</Text> : <List>{values.map((value, valueIndex) => (
+      <List.Item key={`${String(valueIndex)}:${value}`}>{value}</List.Item>
     ))}</List>}
   </div>
 }
 
-function SourceIntakeFailure({
+export function SourceIntakeFailure({
   failure,
   localization,
 }: Readonly<{
@@ -277,7 +281,7 @@ function SourceIntakeFailure({
   </Text>
 }
 
-const sourceIntakeFailureKeys = {
+export const sourceIntakeFailureKeys = {
   'ambiguity-unavailable': 'sourceIntake.failure.ambiguity',
   'candidate-session-storage-unavailable': 'sourceIntake.failure.storage',
   'encrypted-document': 'sourceIntake.failure.encrypted',

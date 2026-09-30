@@ -1,7 +1,7 @@
 import { createPrivacySafeBrowserTelemetry } from '../resume-tailoring/browser-adapters'
 import { createResumeDocumentModelAdapters } from './resume-document-model-adapters'
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
+import { createCandidateJourney, createResumePreparation } from '@resume-tailoring/application/candidate-journey'
 
 import { createBrowserCandidateSessionPersistence } from './browser-candidate-session-persistence'
 import { createOpenAiLanguageModelGateway } from './openai-language-model-gateway'
@@ -26,6 +26,7 @@ export function useCandidateJourney() {
     candidateJourney.readView,
   )
   return {
+    invalidateResumeInputs: candidateJourney.invalidateResumeInputs,
     hideResumeEntry: candidateJourney.hideResumeEntry,
     restoreResumeEntry: candidateJourney.restoreResumeEntry,
     applyValidatedSectionChange: candidateJourney.applyValidatedSectionChange,
@@ -72,7 +73,8 @@ function createBrowserDependencies({ languageModelGateway }: Readonly<{
 }>) {
   return {
     telemetry: createPrivacySafeBrowserTelemetry(),
-    resumeDocumentPorts: createResumeDocumentModelAdapters({ gateway: languageModelGateway }),
+    resumeDocumentPorts: { ...createGatewayResumePreparation(languageModelGateway),
+      ...createResumeDocumentModelAdapters({ gateway: languageModelGateway }) },
     createSessionId: () => crypto.randomUUID(),
     jobPostingDocumentReader: createBrowserJobPostingDocumentReader(),
     jobPostingExtractor: createGatewayJobPostingExtractor({ languageModelGateway }),
@@ -141,4 +143,21 @@ function readProcessingConsent({ candidateJourney }: Readonly<{
 }>) {
   const view = candidateJourney?.readView()
   return view?.status === 'candidate-session-open' ? view.session.processingConsent : null
+}
+
+function createGatewayResumePreparation(gateway: BrowserLanguageModelGateway) {
+  return createResumePreparation({
+    writer: { write: async (input) => {
+      const result = await gateway.writing.process({ operation: 'resume-document-writing', input })
+      return result.ok && result.value.operation === 'resume-document-writing'
+        ? { ok: true, value: result.value.value }
+        : { ok: false, error: { type: 'unavailable', transient: !result.ok && result.error.transient === true } }
+    } },
+    validator: { validate: async (input) => {
+      const result = await gateway.structured.process({ operation: 'resume-document-validation', input })
+      return result.ok && result.value.operation === 'resume-document-validation'
+        ? { ok: true, value: result.value.value }
+        : { ok: false, error: { type: 'unavailable', transient: !result.ok && result.error.transient === true } }
+    } },
+  })
 }

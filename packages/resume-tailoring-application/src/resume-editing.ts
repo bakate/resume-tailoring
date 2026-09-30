@@ -67,7 +67,7 @@ export function readResumeReview({ session, review }: Readonly<{
   const presentIds = new Set(readResumeFields({ resume: session.tailoredResume }).map(({ field }) => field.id))
   const unsupportedFieldIds = editing.unsupportedFieldIds.filter((id) => presentIds.has(id))
   const currentReview = review.proposal !== null && review.proposal.baseRevision !== editing.revision ? emptyResumeReview : review
-  const assessment = currentReview.assessment?.layout.revision === editing.revision ? currentReview.assessment : assessEligibility({ ...draft, unsupportedFieldIds,
+  const assessment = session.preparedResumeStatus !== 'outdated' && currentReview.assessment?.layout.revision === editing.revision ? currentReview.assessment : assessEligibility({ ...draft, unsupportedFieldIds,
     layout: { status: 'unavailable', revision: editing.revision } })
   return { ...currentReview, draft, assessment, recovery: readResumeRecovery({ document: draft.document, editing, session }), manuallyEdited: editing.manuallyEdited,
     unsupportedFieldIds }

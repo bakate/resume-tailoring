@@ -1,3 +1,5 @@
+import type { ResumeDocumentWriter, ResumeDocumentValidator } from '@resume-tailoring/application/candidate-journey'
+import { createBrowserResumeDocumentWriter, createBrowserResumeDocumentValidator } from './browser-resume-document-models'
 import {
   createLanguageModelGateway,
 } from '@resume-tailoring/application/language-model-gateway'
@@ -36,6 +38,7 @@ import {
 } from './browser-job-match-adapters'
 
 type StructuredModelRequest =
+  | ModelRequest<'resume-document-validation', Parameters<ResumeDocumentValidator['validate']>[0]>
   | ModelRequest<'explainable-job-posting-extraction', Parameters<ExplainableJobPostingExtractor['extract']>[0]>
   | ModelRequest<'explainable-match-evidence', Parameters<ExplainableMatchEvidenceMatcher['match']>[0]>
   | ModelRequest<'job-requirement-extraction', Parameters<JobRequirementExtractor['extract']>[0]>
@@ -44,9 +47,11 @@ type StructuredModelRequest =
   | ModelRequest<'source-profile-extraction', Parameters<SourceProfileExtractor['extract']>[0]>
   | ModelRequest<'structured-source-profile-extraction', Parameters<StructuredSourceProfileExtractor['extract']>[0]>
 type WritingModelRequest =
+  | ModelRequest<'resume-document-writing', Parameters<ResumeDocumentWriter['write']>[0]>
   | ModelRequest<'resume-claim-reformulation', Parameters<ResumeClaimWriter['reformulate']>[0]>
   | ModelRequest<'resume-claim-writing', Parameters<ResumeClaimWriter['write']>[0]>
 type StructuredModelValue =
+  | ModelValue<'resume-document-validation', ResumeDocumentValidator['validate']>
   | ModelValue<'explainable-job-posting-extraction', ExplainableJobPostingExtractor['extract']>
   | ModelValue<'explainable-match-evidence', ExplainableMatchEvidenceMatcher['match']>
   | ModelValue<'job-requirement-extraction', JobRequirementExtractor['extract']>
@@ -55,6 +60,7 @@ type StructuredModelValue =
   | ModelValue<'source-profile-extraction', SourceProfileExtractor['extract']>
   | ModelValue<'structured-source-profile-extraction', StructuredSourceProfileExtractor['extract']>
 type WritingModelValue =
+  | ModelValue<'resume-document-writing', ResumeDocumentWriter['write']>
   | ModelValue<'resume-claim-reformulation', ResumeClaimWriter['reformulate']>
   | ModelValue<'resume-claim-writing', ResumeClaimWriter['write']>
 type ModelRequest<TOperation extends string, TInput> = Readonly<{
@@ -75,6 +81,8 @@ export type OpenAiLanguageModelGateway = LanguageModelGateway<
 >
 
 type OpenAiModelAdapters = Readonly<{
+  resumeDocumentWriter: ResumeDocumentWriter
+  resumeDocumentValidator: ResumeDocumentValidator
   explainableJobPostingExtractor: ExplainableJobPostingExtractor
   explainableMatchEvidenceMatcher: ExplainableMatchEvidenceMatcher
   jobRequirementExtractor: JobRequirementExtractor
@@ -132,6 +140,8 @@ function createOpenAiModelAdapters({ request }: Readonly<{
   request: typeof fetch
 }>): OpenAiModelAdapters {
   return {
+    resumeDocumentWriter: createBrowserResumeDocumentWriter({ request }),
+    resumeDocumentValidator: createBrowserResumeDocumentValidator({ request }),
     explainableJobPostingExtractor: createBrowserJobPostingExtractor({ request }),
     explainableMatchEvidenceMatcher: createBrowserJobMatchEvidenceMatcher({ request }),
     jobRequirementExtractor: createBrowserJobRequirementExtractor({ request }),
@@ -149,6 +159,10 @@ type ProcessStructuredRequest = Readonly<{
 }>
 
 async function processStructured({ modelAdapters, modelRequest }: ProcessStructuredRequest) {
+  if (modelRequest.operation === 'resume-document-validation') {
+    const result = await modelAdapters.resumeDocumentValidator.validate(modelRequest.input)
+    return toDocumentGatewayResult({ operation: modelRequest.operation, result })
+  }
   if (modelRequest.operation === 'explainable-job-posting-extraction') {
     return processJobPostingExtraction({ modelAdapters, modelRequest })
   }
@@ -214,6 +228,7 @@ async function processStructuredAnalysis({ modelAdapters, modelRequest }: Readon
   modelAdapters: OpenAiModelAdapters
   modelRequest: Exclude<StructuredModelRequest,
   { readonly operation:
+    | 'resume-document-validation'
     | 'explainable-job-posting-extraction'
     | 'explainable-match-evidence'
     | 'job-requirement-extraction'
@@ -233,6 +248,10 @@ async function processWriting({ modelAdapters, modelRequest }: Readonly<{
   modelAdapters: OpenAiModelAdapters
   modelRequest: WritingModelRequest
 }>): Promise<LanguageModelResult<WritingModelValue>> {
+  if (modelRequest.operation === 'resume-document-writing') {
+    const result = await modelAdapters.resumeDocumentWriter.write(modelRequest.input)
+    return toDocumentGatewayResult({ operation: modelRequest.operation, result })
+  }
   if (modelRequest.operation === 'resume-claim-writing') {
     const result = await modelAdapters.resumeClaimWriter.write(modelRequest.input)
     return toGatewayResult({ operation: modelRequest.operation, result })
@@ -254,3 +273,11 @@ const unavailableResult = {
   ok: false,
   error: { type: 'language-model-unavailable' },
 } as const
+
+function toDocumentGatewayResult<TOperation extends string, TValue>({ operation, result }: Readonly<{
+  operation: TOperation;
+  result: Readonly<{ ok: true; value: TValue }> | Readonly<{ ok: false; error: Readonly<{ transient?: boolean }> }>
+}>): LanguageModelResult<Readonly<{ operation: TOperation; value: TValue }>> {
+  return result.ok ? { ok: true, value: { operation, value: result.value } }
+    : { ok: false, error: { type: 'language-model-unavailable', transient: result.error.transient } }
+}

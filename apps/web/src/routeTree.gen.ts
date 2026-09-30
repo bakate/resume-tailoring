@@ -18,6 +18,8 @@ import { Route as ApiJobRequirementExtractionRouteImport } from './routes/api.jo
 import { Route as ApiMatchAnalysisRouteImport } from './routes/api.match-analysis'
 import { Route as ApiResumeClaimValidationRouteImport } from './routes/api.resume-claim-validation'
 import { Route as ApiResumeClaimWritingRouteImport } from './routes/api.resume-claim-writing'
+import { Route as ApiResumeDocumentValidationRouteImport } from './routes/api.resume-document-validation'
+import { Route as ApiResumeDocumentWritingRouteImport } from './routes/api.resume-document-writing'
 import { Route as ApiSourceProfileExtractionRouteImport } from './routes/api.source-profile-extraction'
 import { Route as ApiStructuredSourceProfileExtractionRouteImport } from './routes/api.structured-source-profile-extraction'
 import { Route as ApiTailoredResumePdfRouteImport } from './routes/api.tailored-resume-pdf'
@@ -71,6 +73,18 @@ const ApiResumeClaimWritingRoute = ApiResumeClaimWritingRouteImport.update({
   path: '/api/resume-claim-writing',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiResumeDocumentValidationRoute =
+  ApiResumeDocumentValidationRouteImport.update({
+    id: '/api/resume-document-validation',
+    path: '/api/resume-document-validation',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiResumeDocumentWritingRoute =
+  ApiResumeDocumentWritingRouteImport.update({
+    id: '/api/resume-document-writing',
+    path: '/api/resume-document-writing',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiSourceProfileExtractionRoute =
   ApiSourceProfileExtractionRouteImport.update({
     id: '/api/source-profile-extraction',
@@ -99,6 +113,8 @@ export interface FileRoutesByFullPath {
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
+  '/api/resume-document-validation': typeof ApiResumeDocumentValidationRoute
+  '/api/resume-document-writing': typeof ApiResumeDocumentWritingRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
   '/api/structured-source-profile-extraction': typeof ApiStructuredSourceProfileExtractionRoute
   '/api/tailored-resume-pdf': typeof ApiTailoredResumePdfRoute
@@ -113,6 +129,8 @@ export interface FileRoutesByTo {
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
+  '/api/resume-document-validation': typeof ApiResumeDocumentValidationRoute
+  '/api/resume-document-writing': typeof ApiResumeDocumentWritingRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
   '/api/structured-source-profile-extraction': typeof ApiStructuredSourceProfileExtractionRoute
   '/api/tailored-resume-pdf': typeof ApiTailoredResumePdfRoute
@@ -128,6 +146,8 @@ export interface FileRoutesById {
   '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
+  '/api/resume-document-validation': typeof ApiResumeDocumentValidationRoute
+  '/api/resume-document-writing': typeof ApiResumeDocumentWritingRoute
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
   '/api/structured-source-profile-extraction': typeof ApiStructuredSourceProfileExtractionRoute
   '/api/tailored-resume-pdf': typeof ApiTailoredResumePdfRoute
@@ -144,6 +164,8 @@ export interface FileRouteTypes {
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
     | '/api/resume-claim-writing'
+    | '/api/resume-document-validation'
+    | '/api/resume-document-writing'
     | '/api/source-profile-extraction'
     | '/api/structured-source-profile-extraction'
     | '/api/tailored-resume-pdf'
@@ -158,6 +180,8 @@ export interface FileRouteTypes {
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
     | '/api/resume-claim-writing'
+    | '/api/resume-document-validation'
+    | '/api/resume-document-writing'
     | '/api/source-profile-extraction'
     | '/api/structured-source-profile-extraction'
     | '/api/tailored-resume-pdf'
@@ -172,6 +196,8 @@ export interface FileRouteTypes {
     | '/api/match-analysis'
     | '/api/resume-claim-validation'
     | '/api/resume-claim-writing'
+    | '/api/resume-document-validation'
+    | '/api/resume-document-writing'
     | '/api/source-profile-extraction'
     | '/api/structured-source-profile-extraction'
     | '/api/tailored-resume-pdf'
@@ -187,6 +213,8 @@ export interface RootRouteChildren {
   ApiMatchAnalysisRoute: typeof ApiMatchAnalysisRoute
   ApiResumeClaimValidationRoute: typeof ApiResumeClaimValidationRoute
   ApiResumeClaimWritingRoute: typeof ApiResumeClaimWritingRoute
+  ApiResumeDocumentValidationRoute: typeof ApiResumeDocumentValidationRoute
+  ApiResumeDocumentWritingRoute: typeof ApiResumeDocumentWritingRoute
   ApiSourceProfileExtractionRoute: typeof ApiSourceProfileExtractionRoute
   ApiStructuredSourceProfileExtractionRoute: typeof ApiStructuredSourceProfileExtractionRoute
   ApiTailoredResumePdfRoute: typeof ApiTailoredResumePdfRoute
@@ -257,6 +285,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiResumeClaimWritingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/resume-document-validation': {
+      id: '/api/resume-document-validation'
+      path: '/api/resume-document-validation'
+      fullPath: '/api/resume-document-validation'
+      preLoaderRoute: typeof ApiResumeDocumentValidationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/resume-document-writing': {
+      id: '/api/resume-document-writing'
+      path: '/api/resume-document-writing'
+      fullPath: '/api/resume-document-writing'
+      preLoaderRoute: typeof ApiResumeDocumentWritingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/source-profile-extraction': {
       id: '/api/source-profile-extraction'
       path: '/api/source-profile-extraction'
@@ -292,6 +334,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMatchAnalysisRoute: ApiMatchAnalysisRoute,
   ApiResumeClaimValidationRoute: ApiResumeClaimValidationRoute,
   ApiResumeClaimWritingRoute: ApiResumeClaimWritingRoute,
+  ApiResumeDocumentValidationRoute: ApiResumeDocumentValidationRoute,
+  ApiResumeDocumentWritingRoute: ApiResumeDocumentWritingRoute,
   ApiSourceProfileExtractionRoute: ApiSourceProfileExtractionRoute,
   ApiStructuredSourceProfileExtractionRoute:
     ApiStructuredSourceProfileExtractionRoute,
