@@ -394,7 +394,9 @@ function normalizeRequirements({ requirements }: Readonly<{
   })).map((requirement) => ({
     ...requirement,
     capability: normalizeCapability({ requirement }),
-    importance: readSourceImportance({ excerpt: requirement.sourceExcerpt }),
+    importance: readSourceImportance({
+      excerpt: requirement.sourceExcerpt, proposedImportance: requirement.importance,
+    }),
     importanceRationale: requirement.sourceExcerpt,
     substitutableGroup: readSourceSubstitutionGroup({ requirement, requirements }),
   }))
@@ -411,8 +413,9 @@ function normalizeCapability({ requirement }: Readonly<{
   }
 }
 
-function readSourceImportance({ excerpt }: Readonly<{
+function readSourceImportance({ excerpt, proposedImportance }: Readonly<{
   excerpt: string
+  proposedImportance: JobRequirement['importance']
 }>): JobRequirement['importance'] {
   const normalizedExcerpt = excerpt.toLocaleLowerCase('en')
     .normalize('NFD').replaceAll(/\p{Diacritic}/gu, '')
@@ -420,8 +423,9 @@ function readSourceImportance({ excerpt }: Readonly<{
   if (complementaryImportanceTerms.some((term) => normalizedExcerpt.includes(term))) {
     return 'complementary'
   }
-  return criticalImportanceTerms.some((term) => normalizedExcerpt.includes(term))
-    ? 'critical' : 'central'
+  if (criticalImportanceTerms.some((term) => normalizedExcerpt.includes(term))) return 'critical'
+  // Without explicit wording, central stays reserved for responsibilities the posting emphasizes.
+  return proposedImportance === 'complementary' ? 'complementary' : 'central'
 }
 
 function readSourceSubstitutionGroup({ requirement, requirements }: Readonly<{

@@ -130,9 +130,9 @@ const extractionInstructions = [
   'Return explicit professional qualifications and expectations in requirements.',
   'Return explicit location, remote-work policy, work authorization, availability, and compensation conditions in practicalConstraints.',
   'Classify each one as required only when mandatory wording is explicit; otherwise use preferred.',
-  'Split compound passages into indivisible requirements.',
+  'Return one requirement per assessable capability: generic duties listed together form one requirement, and distinct technical capabilities stay separate.',
   'Copy sourceExcerpt exactly from the Job Posting for every requirement.',
-  'Copy value as an exact atomic substring of sourceExcerpt for every requirement.',
+  'Copy value as an exact substring of sourceExcerpt for every requirement.',
   'Never infer or add a requirement.',
 ].join(' ')
 
