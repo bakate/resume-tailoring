@@ -24,6 +24,7 @@ import {
 import type { ProfileEnrichmentFactKind } from '@resume-tailoring/application/job-match'
 import type { CandidateFact, SourceIntake } from '@resume-tailoring/application/source-intake'
 import type { Localization } from '../localization/localization'
+import { resumeReviewCopy } from './resume-review-copy'
 import { formatNormalizedSourceResume } from './normalized-source-resume'
 import type { useCandidateJourney } from './use-candidate-journey'
 
@@ -37,7 +38,7 @@ export function JobMatchWorkspace({ candidateJourney, localization }: Readonly<{
   const form = useJobPostingForm({ candidateJourney })
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open' || view.session.sourceIntake === null
-    || view.session.phase !== 'job-match') return null
+    || (view.session.phase !== 'job-match' && view.session.phase !== 'tailored-resume-preparation')) return null
   return <Paper aria-busy={view.operation === 'processing-job-posting' || view.operation === 'processing-profile-enrichment'}
     aria-labelledby="job-match-title" component="section" className="candidate-journey-workspace"
     p={{ base: 'md', sm: 'xl' }} shadow="xs" withBorder>
@@ -208,7 +209,10 @@ function EligibleGenerationDecision({ candidateJourney, jobMatch, localization }
         value={locale ?? 'automatic'} />
       <Button loading={candidateJourney.view.status === 'candidate-session-open'
         ? candidateJourney.view.operation === 'preparing-tailored-resume' : false}
-        onClick={() => { candidateJourney.startTailoredResumePreparation({
+        onClick={() => {
+          const review = candidateJourney.view.status === 'candidate-session-open' ? candidateJourney.view.resumeReview : null
+          if (review?.manuallyEdited === true && !window.confirm(resumeReviewCopy[localization.locale].regenerateWarning)) return
+          candidateJourney.startTailoredResumePreparation({
           ...(locale === null ? {} : { locale }),
         }) }}>
         {localization.translate('jobMatch.generation.tailoredAction')}

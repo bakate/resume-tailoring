@@ -1,6 +1,6 @@
 import { readExperienceFields, readSectionFields } from '@resume-tailoring/application/tailored-resume'
 import type { CandidateFact } from '@resume-tailoring/application/source-intake'
-import type { TailoredResume, TailoredResumeExperience, TailoredResumeSection } from '@resume-tailoring/application/tailored-resume'
+import type { ResumeSectionName, TailoredResume, TailoredResumeExperience, TailoredResumeSection } from '@resume-tailoring/application/tailored-resume'
 import { tailoredResumeDocumentStyles } from './candidate-journey-theme'
 
 export type TailoredResumeExportSource = Readonly<{
@@ -26,11 +26,15 @@ export function renderTailoredResumeDocument({ tailoredResume }: Readonly<{
   const heading = tailoredResume.purpose === 'normalized'
     ? label({ key: 'normalized', locale: tailoredResume.locale }) : tailoredResume.targetRole?.value ?? ''
   const contactDetails = tailoredResume.contactDetails.map(({ value }) => escapeHtml(value)).join(' · ')
-  const sections = [
-    renderValueProposition({ tailoredResume }),
-    renderExperiences({ tailoredResume }),
-    ...tailoredResume.sections.map((section) => renderSection({ section, locale: tailoredResume.locale })),
-  ].join('')
+  const defaultOrder: readonly ResumeSectionName[] = ['value-proposition', 'experiences',
+    ...tailoredResume.sections.map(({ section }) => section)]
+  const sectionOrder = [...new Set([...(tailoredResume.sectionOrder ?? []), ...defaultOrder])]
+  const sections = sectionOrder.map((sectionName) => {
+    if (sectionName === 'value-proposition') return renderValueProposition({ tailoredResume })
+    if (sectionName === 'experiences') return renderExperiences({ tailoredResume })
+    const section = tailoredResume.sections.find(({ section }) => section === sectionName)
+    return section === undefined ? '' : renderSection({ section, locale: tailoredResume.locale })
+  }).join('')
   return `<!doctype html><html lang="${tailoredResume.locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${tailoredResumeDocumentStyles}</style></head><body><main class="resume-page"><header><h1>${escapeHtml(title)}</h1><p>${escapeHtml(heading)}</p><address>${contactDetails}</address></header>${sections}</main></body></html>`
 }
 

@@ -35,6 +35,7 @@ export type TailoredResumeSection = Readonly<{
 }>
 
 export type TailoredResume = Readonly<{
+  sectionOrder?: readonly ResumeSectionName[]
   purpose: 'tailored' | 'normalized'
   contactDetails: readonly LocalContactDetail[]
   experiences: readonly TailoredResumeExperience[]
@@ -47,3 +48,21 @@ export type TailoredResume = Readonly<{
     paragraphs: readonly TailoredResumeField[]
   }>
 }>
+
+export type ResumeSectionName = 'value-proposition' | 'experiences' | TailoredResumeSection['section']
+
+export type ResumeEditingState = Readonly<{
+  revision: string
+  unsupportedFieldIds: readonly string[]
+  manuallyEdited: boolean
+  hiddenExperiences?: readonly TailoredResumeExperience[]
+  hiddenFields: readonly Readonly<{ field: TailoredResumeField; location: ResumeFieldLocation }>[]
+}>
+
+type ExperienceValue = Exclude<keyof TailoredResumeExperience, 'id' | 'chronology'>
+export type ResumeFieldLocation = Readonly<
+  | { kind: 'value-proposition'; fieldId: string }
+  | { kind: 'experience'; experienceId: string; fieldName: ExperienceValue; fieldId: string }
+  | { kind: 'section'; section: Exclude<TailoredResumeSection['section'], 'skills'>; fieldId: string }
+  | { kind: 'skill-group'; groupId: string; fieldName: 'category' | 'items'; fieldId: string }
+>

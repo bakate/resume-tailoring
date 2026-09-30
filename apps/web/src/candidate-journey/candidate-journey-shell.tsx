@@ -31,6 +31,7 @@ import { useCandidateJourney } from './use-candidate-journey'
 import { SourceIntakeWorkspace } from './source-intake-workspace'
 import { JobMatchWorkspace } from './job-match-workspace'
 import { TailoredResumeWorkspace } from './tailored-resume-workspace'
+import { resumeReviewCopy } from './resume-review-copy'
 
 export function CandidateJourneyShell() {
   const localizationResult = useLocalization()
@@ -55,12 +56,22 @@ function LocalizedCandidateJourneyShell({ localization }: LocalizationProps) {
         <CandidateJourneyStatusAnnouncements {...{ activePhase, candidateJourney, localization }} />
         <CandidateJourneyProgress {...{ candidateJourney, localization }} />
         <SourceIntakeWorkspace {...{ candidateJourney, localization }} />
-        <JobMatchWorkspace {...{ candidateJourney, localization }} />
-        <TailoredResumeWorkspace {...{ candidateJourney, localization }} />
+        <ResumeAndAnalysis {...{ candidateJourney, localization }} />
         <CandidateJourneyPhaseList {...{ activePhase, localization }} />
       </Stack></Container></AppShell.Main>
     </AppShell>
   )
+}
+
+function ResumeAndAnalysis(props: LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) {
+  const { view } = props.candidateJourney
+  if (view.status !== 'candidate-session-open' || view.session.tailoredResume === null) {
+    return <JobMatchWorkspace {...props} />
+  }
+  return <><TailoredResumeWorkspace {...props} /><details>
+    <summary>{resumeReviewCopy[props.localization.locale].analysis}</summary>
+    <JobMatchWorkspace {...props} />
+  </details></>
 }
 
 type LocalizationProps = Readonly<{ localization: Localization }>

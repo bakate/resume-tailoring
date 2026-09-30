@@ -110,10 +110,13 @@ const jobMatchSchema = z.strictObject({
 const tailoredResumeFieldSchema = z.strictObject({
   id: z.string().min(1),
   factIds: z.array(candidateFactIdSchema).min(1),
-  text: z.string().min(1),
+  text: z.string(),
 })
 
+const resumeSectionNameSchema = z.enum(['value-proposition', 'experiences', 'skills', 'education', 'languages', 'projects', 'certifications'])
+
 const tailoredResumeSchema = z.strictObject({
+  sectionOrder: z.array(resumeSectionNameSchema).optional(),
   purpose: z.enum(['tailored', 'normalized']),
   contactDetails: sourceIntakeSchema.shape.contactDetails,
   experiences: z.array(z.strictObject({
@@ -138,10 +141,26 @@ const tailoredResumeSchema = z.strictObject({
   })])),
   targetRole: jobMatchSchema.shape.targetRole,
   valueProposition: z.strictObject({ kind: z.enum(['evidence-excerpts', 'prose']),
-    paragraphs: z.array(tailoredResumeFieldSchema).max(4) }),
+    paragraphs: z.array(tailoredResumeFieldSchema) }),
 })
 
+const resumeFieldLocationSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('value-proposition'), fieldId: z.string() }),
+  z.strictObject({ kind: z.literal('experience'), experienceId: z.string(), fieldId: z.string(),
+    fieldName: z.enum(['role', 'organization', 'startDate', 'endDate', 'context', 'achievements']) }),
+  z.strictObject({ kind: z.literal('section'), fieldId: z.string(),
+    section: z.enum(['certifications', 'education', 'languages', 'projects']) }),
+  z.strictObject({ kind: z.literal('skill-group'), fieldId: z.string(), groupId: z.string(),
+    fieldName: z.enum(['category', 'items']) }),
+])
+
 export const candidateSessionSchema = z.strictObject({
+  resumeFactLocations: z.array(z.strictObject({ factId: candidateFactIdSchema, location: resumeFieldLocationSchema })).optional(),
+  resumeEditing: z.strictObject({ revision: z.string().min(1), manuallyEdited: z.boolean(),
+    unsupportedFieldIds: z.array(z.string()),
+    hiddenExperiences: tailoredResumeSchema.shape.experiences.optional(), hiddenFields: z.array(z.strictObject({
+      field: tailoredResumeFieldSchema, location: resumeFieldLocationSchema,
+    })) }).optional(),
   expiresAt: z.number().int().positive(),
   jobMatch: jobMatchSchema.nullable(),
   phase: z.enum(candidateJourneyPhases),

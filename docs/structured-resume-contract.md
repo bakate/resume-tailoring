@@ -109,3 +109,37 @@ or rejection, and leave restored evidence intact during overflow. The prose
 variant renders paragraphs; the prefactor emits `evidence-excerpts` until BAK-57
 provides validated writing. Keep these expectations in each consumer's public
 seam tests without importing machine internals or requiring production adapters.
+
+
+## BAK-58 editing and recovery
+
+The Candidate Journey now owns the edited document, unsupported field identities,
+hidden content, and a fresh revision after each content change. The editor uses
+`readView().resumeReview` and domain-named actions; React owns only the open panel
+and unsaved input text. Existing version-six sessions remain readable because
+editing metadata and section order are optional additions. Interrupted validation
+restores its saved unresolved fields, with no apparently running operation.
+
+One transient proposal and layout assessment remain outside persisted session
+data. Contacts, edits, restorations, source changes, posting changes, and
+regeneration invalidate old results. Validation must echo the exact requested
+section change. Accepting a proposal creates another current revision and requires
+a new layout assessment; rejecting or failing never replaces the draft.
+
+Explicitly attested additions retain a restoration destination alongside their
+Candidate Fact. They remain recoverable after regeneration without keeping a
+history of document versions. Hiding a parent experience does not discard its
+individually hidden fields. The public recovery projection contains hidden
+fields, hidden experiences, and omitted attested facts.
+
+The browser production adapters implement semantic section validation and
+writing-role condensation using the policy-bearing gateway. Identity and contact
+values do not enter these professional operations. Condensation retains all
+field identities and fact references, and validates both support and preservation
+of meaning before exposing its proposal.
+
+Layout remains a port supplied by BAK-59. With no measurement adapter, the review
+reports unavailable layout and blocks export. BAK-58 tests use the shared
+one-page, two-page, overflow, and unavailable fixtures; they do not represent
+actual Chromium page measurements. Restoring content never invokes automatic
+pruning or smaller typography. BAK-60 owns integrated PDF qualification.

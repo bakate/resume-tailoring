@@ -1,3 +1,5 @@
+import { createPrivacySafeBrowserTelemetry } from '../resume-tailoring/browser-adapters'
+import { createResumeDocumentModelAdapters } from './resume-document-model-adapters'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 
@@ -24,6 +26,21 @@ export function useCandidateJourney() {
     candidateJourney.readView,
   )
   return {
+    hideResumeEntry: candidateJourney.hideResumeEntry,
+    restoreResumeEntry: candidateJourney.restoreResumeEntry,
+    applyValidatedSectionChange: candidateJourney.applyValidatedSectionChange,
+    attestResumeField: candidateJourney.attestResumeField,
+    editResumeField: candidateJourney.editResumeField,
+    hideResumeField: candidateJourney.hideResumeField,
+    restoreResumeField: candidateJourney.restoreResumeField,
+    restoreSourceFact: candidateJourney.restoreSourceFact,
+    moveResumeField: candidateJourney.moveResumeField,
+    reorderResumeSections: candidateJourney.reorderResumeSections,
+    updateResumeContacts: candidateJourney.updateResumeContacts,
+    proposeResumeCondensation: candidateJourney.proposeResumeCondensation,
+    acceptResumeCondensation: candidateJourney.acceptResumeCondensation,
+    rejectResumeCondensation: candidateJourney.rejectResumeCondensation,
+    assessResumeLayout: candidateJourney.assessResumeLayout,
     confirmProfileEnrichment: candidateJourney.confirmProfileEnrichment,
     deleteCandidateSession: candidateJourney.deleteCandidateSession,
     grantProcessingConsent: candidateJourney.grantProcessingConsent,
@@ -54,6 +71,8 @@ function createBrowserDependencies({ languageModelGateway }: Readonly<{
   languageModelGateway: BrowserLanguageModelGateway
 }>) {
   return {
+    telemetry: createPrivacySafeBrowserTelemetry(),
+    resumeDocumentPorts: createResumeDocumentModelAdapters({ gateway: languageModelGateway }),
     createSessionId: () => crypto.randomUUID(),
     jobPostingDocumentReader: createBrowserJobPostingDocumentReader(),
     jobPostingExtractor: createGatewayJobPostingExtractor({ languageModelGateway }),
