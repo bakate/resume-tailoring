@@ -33,6 +33,9 @@ describe('OpenAI Job Posting extraction representative evaluation', () => {
       evaluation.requirements.filter(({ value }) => includesTerm({ term: capability, value })))
     expect(requirementsPerCapability.map((requirements) => requirements.length))
       .toEqual(fixture.technicalCapabilities.map(() => 1))
+    expect(new Set(requirementsPerCapability.flat().map(({ id }) => id)).size,
+      'Expected each technical capability in its own Job Requirement')
+      .toBe(fixture.technicalCapabilities.length)
     expect(requirementsPerCapability.flat().map(({ importance }) => importance))
       .toEqual(fixture.technicalCapabilities.map(() => 'critical'))
   }, 60_000)
@@ -129,7 +132,11 @@ type EvaluationMetric = Readonly<{
   outputTokens: number
 }>
 
-const emptyMetric = { inputTokens: 0, latencyMilliseconds: 0, outputTokens: 0 } as const
+const emptyMetric = {
+  inputTokens: Number.POSITIVE_INFINITY,
+  latencyMilliseconds: Number.POSITIVE_INFINITY,
+  outputTokens: Number.POSITIVE_INFINITY,
+} as const
 
 const usageSchema = z.object({
   usage: z.object({ input_tokens: z.number(), output_tokens: z.number() }),

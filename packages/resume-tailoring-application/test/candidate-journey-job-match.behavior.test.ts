@@ -537,6 +537,8 @@ class CandidateJourneyJobMatchTestSystem {
       ['Kafka', 'central'],
       ['TypeScript', 'critical'],
       ['Go', 'complementary'],
+      ['plusieurs équipes produit', 'central'],
+      ['SQL', 'critical'],
     ])
   }
 
@@ -853,10 +855,13 @@ const frenchJobRequirements = [
     'No degree is required.'),
 ] as const
 
+const frenchEmphasizedResponsibilityExcerpt =
+  'Votre mission principale est de piloter plusieurs équipes produit.'
 const genericDutiesExcerpt = 'Define features, ensure quality and collaborate with product managers.'
 const emphasizedResponsibilitiesJobPostingText = [
   'Your core mission is to own the payments platform architecture.',
   genericDutiesExcerpt, 'Experience with Kafka.', 'TypeScript is required.', 'Go is a plus.',
+  frenchEmphasizedResponsibilityExcerpt, 'La maîtrise de SQL est requise.',
 ].join('\n')
 const emphasizedResponsibilitiesJobRequirements = [
   createRequirement('1', 'ownership', 'payments platform architecture', 'central',
@@ -867,6 +872,10 @@ const emphasizedResponsibilitiesJobRequirements = [
   createRequirement('3', 'technical-expertise', 'Kafka', 'critical', 'Experience with Kafka.'),
   createRequirement('4', 'technical-expertise', 'TypeScript', 'central', 'TypeScript is required.'),
   createRequirement('5', 'technical-expertise', 'Go', 'central', 'Go is a plus.'),
+  createRequirement('6', 'leadership', 'plusieurs équipes produit', 'central',
+    frenchEmphasizedResponsibilityExcerpt),
+  createRequirement('7', 'technical-expertise', 'SQL', 'complementary',
+    'La maîtrise de SQL est requise.'),
 ] as const
 
 const emptyMatchEvidenceMatcher = { match: () => Promise.resolve({

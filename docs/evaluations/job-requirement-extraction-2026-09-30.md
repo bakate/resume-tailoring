@@ -46,6 +46,11 @@ Critical keeps its explicit-wording rule, so the model cannot make a requirement
 mandatory wording. Complementary keeps its preference rule. The only new outcome is the third
 row: a listed but not emphasized duty is weighted one instead of two.
 
+Preference and mandatory wording are matched as whole words, allowing French agreement endings
+such as "requise" or "souhaitée". Before this change they were matched as substrings, so "plus"
+inside "plusieurs" turned an emphasized French responsibility into a complementary requirement,
+overriding the model's central proposal.
+
 Effect on the Match Score denominator: grouping one sentence of four or five generic duties
 turns eight to ten weight points (four or five central requirements weighted two) into a single
 requirement. That requirement weighs one when complementary, or two when the posting emphasizes
@@ -59,7 +64,7 @@ for responsibilities the Job Posting emphasizes" covers these rules.
 | --- | --- |
 | One sentence of generic duties yields one requirement (EN) | "define features", "ensure quality", and "collaborate with product managers" are cited by exactly one requirement, whose excerpt contains all three and which is complementary. The emphasized core mission is central, and "Strong TypeScript experience is required" is critical. |
 | Une phrase de missions génériques produit une seule exigence (FR) | Same expectations for "définirez les fonctionnalités, garantirez la qualité et collaborerez avec les product managers". The "mission principale" is central, and "La maîtrise de React est obligatoire" is critical. |
-| Distinct technical capabilities in one sentence stay separate | "Production experience with PostgreSQL, Kafka and Kubernetes is required" yields exactly one requirement per technology, each critical. |
+| Distinct technical capabilities in one sentence stay separate | "Production experience with PostgreSQL, Kafka and Kubernetes is required" yields exactly one requirement per technology, three distinct requirements in total, each critical. A single merged requirement fails. |
 
 Each case runs the live extractor through the application Job Match, so results include the same
 source-backing checks and importance normalization the Candidate sees. Each case also enforces a
