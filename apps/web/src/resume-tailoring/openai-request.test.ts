@@ -51,6 +51,42 @@ describe('OpenAI request policy', () => {
     writeLog.mockRestore()
   })
 
+  it('reports the provider error code and parameter of a rejected request without its message', async () => {
+    const writeLog = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const requester = createOpenAiRequester({
+      apiKey: 'test-api-key',
+      request: () => Promise.resolve(Response.json({ error: {
+        code: 'invalid_json_schema', message: 'Private Candidate history is invalid', param: 'text.format.schema',
+      } }, { status: 400 })),
+    })
+
+    const result = await requester.send({ body: {}, operation: 'resume-document-writing' })
+
+    expect(result).toEqual({ ok: false, error: { status: 400, type: 'upstream-invalid-request' } })
+    const serializedMetric = String(writeLog.mock.calls.at(0)?.at(0))
+    expect(serializedMetric).toContain('"upstreamErrorCode":"invalid_json_schema"')
+    expect(serializedMetric).toContain('"upstreamErrorParam":"text.format.schema"')
+    expect(serializedMetric).not.toContain('Private Candidate history')
+    writeLog.mockRestore()
+  })
+
+  it('omits provider error details that are not identifier-like', async () => {
+    const writeLog = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const requester = createOpenAiRequester({
+      apiKey: 'test-api-key',
+      request: () => Promise.resolve(Response.json({ error: {
+        code: 'Private Candidate history', param: null,
+      } }, { status: 400 })),
+    })
+
+    await requester.send({ body: {}, operation: 'resume-document-writing' })
+
+    const serializedMetric = String(writeLog.mock.calls.at(0)?.at(0))
+    expect(serializedMetric).not.toContain('upstreamError')
+    expect(serializedMetric).not.toContain('Private Candidate history')
+    writeLog.mockRestore()
+  })
+
   it('classifies provider rate limits and preserves Retry-After', async () => {
     const requester = createOpenAiRequester({
       apiKey: 'test-api-key',

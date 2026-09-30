@@ -60,6 +60,7 @@ async function sendOpenAiRequest({
       cause: readUpstreamFailure({ status: responseResult.value.status }), operation,
       retryAfter: responseResult.value.headers.get('retry-after') ?? undefined,
       requestCharacterCount, startedAtMilliseconds, status: responseResult.value.status,
+      ...await readUpstreamErrorIdentifiers({ response: responseResult.value }),
     })
   }
   return readOpenAiResponse({ operation, requestCharacterCount, response: responseResult.value, startedAtMilliseconds })
@@ -101,6 +102,25 @@ async function readOpenAiResponse({
   }
 }
 
+// Only identifier-like code and param values are logged; provider messages may echo Candidate content.
+async function readUpstreamErrorIdentifiers({ response }: Readonly<{ response: Response }>) {
+  try {
+    const { error } = await response.json() as { error?: { code?: unknown; param?: unknown } }
+    const upstreamErrorCode = readErrorIdentifier({ value: error?.code })
+    const upstreamErrorParam = readErrorIdentifier({ value: error?.param })
+    return {
+      ...(upstreamErrorCode === undefined ? {} : { upstreamErrorCode }),
+      ...(upstreamErrorParam === undefined ? {} : { upstreamErrorParam }),
+    }
+  } catch {
+    return {}
+  }
+}
+
+function readErrorIdentifier({ value }: Readonly<{ value: unknown }>) {
+  return typeof value === 'string' && /^[\w.[\]$-]{1,120}$/u.test(value) ? value : undefined
+}
+
 function readFailureCause({ error }: Readonly<{ error: unknown }>) {
   return error instanceof DOMException && error.name === 'TimeoutError'
     ? 'timeout' as const
@@ -114,6 +134,8 @@ function recordFailure({
   retryAfter,
   startedAtMilliseconds,
   status,
+  upstreamErrorCode,
+  upstreamErrorParam,
 }: Readonly<{
   cause: OpenAiRequestFailure['type']
   operation: OpenAiOperation
@@ -121,12 +143,16 @@ function recordFailure({
   retryAfter?: string
   startedAtMilliseconds: number
   status?: number
+  upstreamErrorCode?: string
+  upstreamErrorParam?: string
 }>) {
   const durationMilliseconds = Math.max(0, Date.now() - startedAtMilliseconds)
   const dimensions = {
     cause, durationMilliseconds, operation, requestCharacterCount,
     ...(retryAfter === undefined ? {} : { retryAfter }),
     ...(status === undefined ? {} : { status }),
+    ...(upstreamErrorCode === undefined ? {} : { upstreamErrorCode }),
+    ...(upstreamErrorParam === undefined ? {} : { upstreamErrorParam }),
   }
   console.info(JSON.stringify({
     category: 'privacy-safe-openai-request', metric: 'failed', value: 1, dimensions,
