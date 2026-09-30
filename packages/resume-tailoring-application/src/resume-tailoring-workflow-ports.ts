@@ -211,10 +211,9 @@ export type MatchEvidenceMatcher = {
 }
 
 export type ProposedFactMatch = Readonly<{
+  factExcerpt: string
   factId: SourceProfileFactId
-  factTerm: string
-  relationship: 'exact' | 'controlled'
-  requirementTerm: string
+  requirementExcerpt: string
 }>
 
 export type ProposedMatchEvidence = Readonly<{

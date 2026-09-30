@@ -286,7 +286,7 @@ export function createQualificationFixture({
   const proposedEvidence = fact === undefined || !includeEvidence ? [] : [{
     coverage,
     factMatches: [{
-      factId: fact.id, factTerm: requirementTerm, relationship: 'exact' as const, requirementTerm,
+      factExcerpt: requirementTerm, factId: fact.id, requirementExcerpt: requirementTerm,
     }],
     requirementId,
   }]

@@ -212,7 +212,7 @@ function createDependencies({ options, events }: Readonly<{
   let session: CandidateSession | null = options.session === 'expiring' ? { expiresAt: startedAt, startedAt,
     sessionId: 'candidate-session-00000000-0000-4000-8000-000000000060', version: candidateSessionStorageVersion,
     phase: 'source-intake', processingConsent: null, sourceIntake: null, jobMatch: null, tailoredResume: null } : null
-  const factMatch = { factId: 'source-fact-skills-0-name-0', factTerm: 'React', requirementTerm: 'React', relationship: 'exact' } as const
+  const factMatch = { factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' } as const
   return {
     createSessionId: () => crypto.randomUUID(), now: () => startedAt,
     telemetry: { record: (event) => { events.push(event); return Promise.resolve({ ok: true, value: undefined }) } },

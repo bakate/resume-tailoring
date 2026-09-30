@@ -45,7 +45,7 @@ describe('OpenAI explainable Job Match adapters', () => {
     expect(result).toEqual({ ok: true, value: evidenceProposal })
   })
 
-  it('rejects evidence that references an unknown Candidate Fact', async () => {
+  it('discards relevance that references an unknown Candidate Fact and keeps valid evidence', async () => {
     const matcher = createOpenAiJobMatchEvidenceMatcher({
       apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
       request: createRecordedRequest({
@@ -59,32 +59,63 @@ describe('OpenAI explainable Job Match adapters', () => {
 
     const result = await matcher.match(matchRequest)
 
-    expect(result).toEqual({ ok: true, value: { evidence: [], relevance: [] } })
+    expect(result).toEqual({ ok: true, value: { evidence: evidenceProposal.evidence, relevance: [] } })
   })
 
-  it('rejects relevance that does not prove equivalent evidence terms', async () => {
+  it('requests evidence excerpts per side without an exact-versus-controlled relationship', async () => {
+    const requests: Request[] = []
+    const matcher = createOpenAiJobMatchEvidenceMatcher({
+      apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
+      request: createRecordedRequest({ output: evidenceProposal, requests }),
+    })
+
+    await matcher.match(matchRequest)
+
+    const body = await requests[0]?.json() as { text: { format: { name: string; schema: unknown; strict: boolean } } }
+    expect(body.text.format).toMatchObject({ name: 'explainable_match_evidence', strict: true })
+    expect(JSON.stringify(body.text.format.schema)).toContain('"factExcerpt"')
+    expect(JSON.stringify(body.text.format.schema)).toContain('"requirementExcerpt"')
+    expect(JSON.stringify(body.text.format.schema)).not.toContain('relationship')
+  })
+
+  it('accepts a reformulated capability quoted verbatim from both sides', async () => {
+    const reformulatedProposal = {
+      evidence: [{ coverage: 'covered', factMatches: [reformulatedFactMatch], requirementId: 'job-requirement-web' }],
+      relevance: [{ factMatch: reformulatedFactMatch, requirementId: 'job-requirement-web' }],
+    } as const
+    const matcher = createOpenAiJobMatchEvidenceMatcher({
+      apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
+      request: createRecordedRequest({ output: reformulatedProposal, requests: [] }),
+    })
+
+    const result = await matcher.match(fullStackMatchRequest)
+
+    expect(result).toEqual({ ok: true, value: reformulatedProposal })
+  })
+
+  it('discards only the proposals whose excerpts are not verbatim', async () => {
     const matcher = createOpenAiJobMatchEvidenceMatcher({
       apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
       request: createRecordedRequest({
         output: {
-          ...evidenceProposal,
-          relevance: [{
-            factMatch: {
-              ...evidenceProposal.relevance[0].factMatch,
-              factTerm: 'UI library',
-              relationship: 'controlled',
-              requirementTerm: 'deployment process',
-            },
-            requirementId: 'job-requirement-1',
-          }],
+          evidence: [
+            { coverage: 'covered', factMatches: [{ ...reformulatedFactMatch, factExcerpt: 'Angular applications' }],
+              requirementId: 'job-requirement-web' },
+            ...evidenceProposal.evidence,
+          ],
+          relevance: [
+            { factMatch: { ...reformulatedFactMatch, requirementExcerpt: 'mobile applications' },
+              requirementId: 'job-requirement-web' },
+            ...evidenceProposal.relevance,
+          ],
         },
         requests: [],
       }),
     })
 
-    const result = await matcher.match(matchRequest)
+    const result = await matcher.match(fullStackMatchRequest)
 
-    expect(result).toEqual({ ok: true, value: { evidence: [], relevance: [] } })
+    expect(result).toEqual({ ok: true, value: evidenceProposal })
   })
 
   it('records how many proposed links survive sanitization without Candidate content', async () => {
@@ -107,7 +138,7 @@ describe('OpenAI explainable Job Match adapters', () => {
     expect(records).toContainEqual({
       category: 'privacy-safe-openai-request', metric: 'sanitized', value: 1,
       dimensions: { operation: 'explainable-match-evidence', proposedRelevance: 1, keptRelevance: 0,
-        proposedEvidence: evidenceProposal.evidence.length, keptEvidence: 0 },
+        proposedEvidence: evidenceProposal.evidence.length, keptEvidence: evidenceProposal.evidence.length },
     })
   })
 
@@ -183,21 +214,33 @@ const matchRequest = {
 const evidenceProposal = {
   evidence: [{
     coverage: 'covered',
-    factMatches: [{
-      factId: 'source-fact-1',
-      factTerm: 'TypeScript',
-      relationship: 'exact',
-      requirementTerm: 'TypeScript',
-    }],
+    factMatches: [{ factExcerpt: 'TypeScript', factId: 'source-fact-1', requirementExcerpt: 'TypeScript' }],
     requirementId: 'job-requirement-1',
   }],
   relevance: [{
-    factMatch: {
-      factId: 'source-fact-1',
-      factTerm: 'TypeScript',
-      relationship: 'exact',
-      requirementTerm: 'TypeScript',
-    },
+    factMatch: { factExcerpt: 'TypeScript', factId: 'source-fact-1', requirementExcerpt: 'TypeScript' },
     requirementId: 'job-requirement-1',
   }],
+} as const
+
+const fullStackMatchRequest = {
+  candidateFacts: [
+    ...matchRequest.candidateFacts,
+    { id: 'source-fact-2', kind: 'experience', value: 'Built end-to-end Next.js applications for 40 clients' },
+  ],
+  requirements: [...matchRequest.requirements, {
+    ...matchRequest.requirements[0],
+    capability: { dimension: 'execution', name: 'Web application development' },
+    id: 'job-requirement-web' as const,
+    importance: 'central',
+    importanceRationale: 'The posting lists it among the main duties.',
+    sourceExcerpt: 'Design, build and maintain web applications.',
+    value: 'Design, build and maintain web applications',
+  }],
+} as const
+
+const reformulatedFactMatch = {
+  factExcerpt: 'end-to-end Next.js applications',
+  factId: 'source-fact-2',
+  requirementExcerpt: 'build and maintain web applications',
 } as const

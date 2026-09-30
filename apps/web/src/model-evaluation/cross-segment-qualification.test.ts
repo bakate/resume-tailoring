@@ -58,10 +58,7 @@ describe('cross-segment qualification harness', () => {
     }))
   })
 
-  // Known failed gate (BAK-60): technology-29 "technical discovery and quota support" is rejected because the
-  // matching engine splits requirement clauses on "and". The held-out scenario must not be used to tune the engine;
-  // `it.fails` reports the failure and will flag the test once a development-driven fix makes the split pass.
-  it.fails('qualifies the untuned held-out corpus globally and per role family', () => {
+  it('qualifies the untuned held-out corpus globally and per role family', () => {
     const report = qualifyCrossSegmentCorpus({
       corpus: crossSegmentQualificationCorpus,
       split: 'held-out',

@@ -87,6 +87,26 @@ describe('Candidate Journey Job Match', () => {
     system.expectOnlySupportedRelevantFacts()
   })
 
+  it('keeps valid Match Evidence when another proposed evidence link is unsupported', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenMatchEvidenceIncludesAnUnsupportedEvidenceLink()
+
+    await system.submitPastedJobPosting()
+
+    system.expectOnlySupportedMatchEvidence()
+  })
+
+  it('treats Candidate Facts cited by accepted Match Evidence as relevant', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenMatchEvidenceWithoutRelevanceLinks()
+
+    await system.submitPastedJobPosting()
+
+    system.expectEvidencedCandidateFactsToBeRelevant()
+  })
+
   it('omits an unsupported Practical Constraint without rejecting the analysis', async () => {
     const system = createSystemUnderTest()
     await system.givenCandidateJourneyIsReadyForJobMatch()
@@ -316,6 +336,20 @@ class CandidateJourneyJobMatchTestSystem {
     }
   }
 
+  givenMatchEvidenceIncludesAnUnsupportedEvidenceLink() {
+    this.#matchEvidence = {
+      ...matchEvidenceProposal,
+      evidence: [
+        createEvidence('3', 'source-fact-2', 'covered', 'architecture', 'Kubernetes architecture'),
+        ...matchEvidenceProposal.evidence,
+      ],
+    }
+  }
+
+  givenMatchEvidenceWithoutRelevanceLinks() {
+    this.#matchEvidence = { ...matchEvidenceProposal, relevance: [] }
+  }
+
   givenEnrichedOperationalRiskEvidenceMatches() {
     this.#matchEvidence = enrichedMatchEvidenceProposal
   }
@@ -452,6 +486,25 @@ class CandidateJourneyJobMatchTestSystem {
     expect(view.jobMatchFailure).toBeNull()
     expect(view.session.jobMatch?.analysis.relevantFactIds).toEqual(
       matchEvidenceProposal.relevance.map(({ factMatch }) => factMatch.factId))
+  }
+
+  expectOnlySupportedMatchEvidence() {
+    this.#expectCompletedAction()
+    const view = this.#readOpenView()
+    expect(view.jobMatchFailure).toBeNull()
+    expect(view.session.jobMatch?.analysis.evidence.map(({ requirementId }) => requirementId)).toEqual(
+      matchEvidenceProposal.evidence.map(({ requirementId }) => requirementId))
+  }
+
+  expectEvidencedCandidateFactsToBeRelevant() {
+    this.#expectCompletedAction()
+    const view = this.#readOpenView()
+    expect(view.jobMatchFailure).toBeNull()
+    expect(view.session.jobMatch?.analysis).toMatchObject({
+      generationEligibility: 'eligible',
+      relevantFactIds: matchEvidenceProposal.evidence.flatMap(({ factMatches }) =>
+        factMatches.map(({ factId }) => factId)),
+    })
   }
 
   expectOnlySourceBackedPracticalConstraints() {
@@ -868,12 +921,12 @@ function createEvidence(
   requirementId: string,
   factId: string,
   coverage: MatchEvidenceProposal['evidence'][number]['coverage'],
-  requirementTerm: string,
-  factTerm: string,
+  requirementExcerpt: string,
+  factExcerpt: string,
 ) {
   return {
     coverage,
-    factMatches: [{ factId, factTerm, relationship: 'controlled', requirementTerm }],
+    factMatches: [{ factExcerpt, factId, requirementExcerpt }],
     requirementId: `job-requirement-${requirementId}`,
   } as const
 }
@@ -881,11 +934,11 @@ function createEvidence(
 function createRelevance(
   requirementId: string,
   factId: string,
-  requirementTerm: string,
-  factTerm: string,
+  requirementExcerpt: string,
+  factExcerpt: string,
 ) {
   return {
-    factMatch: { factId, factTerm, relationship: 'controlled', requirementTerm },
+    factMatch: { factExcerpt, factId, requirementExcerpt },
     requirementId: `job-requirement-${requirementId}`,
   } as const
 }

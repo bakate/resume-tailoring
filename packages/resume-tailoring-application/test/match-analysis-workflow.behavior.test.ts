@@ -137,19 +137,6 @@ describe('Match Analysis workflow', () => {
     system.expectFabricatedMatchEvidenceToBeRejected()
   })
 
-  it('rejects an uncontrolled implicit qualification proposed by the matcher', async () => {
-    const system = createSystemUnderTest()
-
-    // Given
-    system.givenTheMatcherInfersLeadershipFromAProgrammingSkill()
-
-    // Action
-    await system.analyzeMatch()
-
-    // Then
-    system.expectFabricatedMatchEvidenceToBeRejected()
-  })
-
   it('rejects a technology inferred only from a role title', async () => {
     const system = createSystemUnderTest()
 
@@ -160,7 +147,7 @@ describe('Match Analysis workflow', () => {
     await system.analyzeMatch()
 
     // Then
-    system.expectFabricatedMatchEvidenceToBeRejected()
+    system.expectProposedMatchEvidenceToBeDiscarded()
   })
 
   it('rejects a technology found only in a role title beside other evidence', async () => {
@@ -172,7 +159,7 @@ describe('Match Analysis workflow', () => {
     system.givenTheMatcherMatchesTypeScript()
     await system.analyzeMatch()
 
-    system.expectFabricatedMatchEvidenceToBeRejected()
+    system.expectProposedMatchEvidenceToBeDiscarded()
   })
 
   it('rejects a role-title technology beside same-clause evidence for another capability', async () => {
@@ -186,7 +173,7 @@ describe('Match Analysis workflow', () => {
     system.givenTheMatcherMatchesTypeScript()
     await system.analyzeMatch()
 
-    system.expectFabricatedMatchEvidenceToBeRejected()
+    system.expectProposedMatchEvidenceToBeDiscarded()
   })
 
   it('accepts same-clause technology evidence when the capability has its own evidence verb', async () => {
@@ -222,7 +209,7 @@ describe('Match Analysis workflow', () => {
     system.givenTheMatcherMatchesTypeScript()
     await system.analyzeMatch()
 
-    system.expectFabricatedMatchEvidenceToBeRejected()
+    system.expectProposedMatchEvidenceToBeDiscarded()
   })
 
   it('awards half weight when evidence covers the capability but not the required duration', async () => {
@@ -294,7 +281,7 @@ describe('Match Analysis workflow', () => {
     system.givenTheMatcherMatchesTypeScript()
     await system.analyzeMatch()
 
-    system.expectFabricatedMatchEvidenceToBeRejected()
+    system.expectProposedMatchEvidenceToBeDiscarded()
   })
 
   it('does not send match inputs after a processing notice becomes stale', async () => {
@@ -313,18 +300,6 @@ describe('Match Analysis workflow', () => {
     system.expectCurrentProcessingConsentToBeRequired()
   })
 
-  it('does not treat React as proof of React Native', async () => {
-    const system = createSystemUnderTest({
-      facts: [createReactFact({ value: 'Used React' })],
-      jobRequirements: [createReactRequirement({ value: 'Know React Native' })],
-    })
-
-    system.givenTheMatcherMatchesReact()
-    await system.analyzeMatch()
-
-    system.expectFabricatedMatchEvidenceToBeRejected()
-  })
-
   it('binds a required duration to the matching skill', async () => {
     const system = createSystemUnderTest({
       facts: [createTypeScriptFact({
@@ -336,10 +311,10 @@ describe('Match Analysis workflow', () => {
     system.givenTheMatcherMatchesTypeScript()
     await system.analyzeMatch()
 
-    system.expectFabricatedMatchEvidenceToBeRejected()
+    system.expectProposedMatchEvidenceToBeDiscarded()
   })
 
-  it('binds qualitative seniority to the matching skill', async () => {
+  it('downgrades coverage when seniority belongs to another skill', async () => {
     const system = createSystemUnderTest({
       facts: [createTypeScriptFact({
         value: 'Senior Java developer. Used TypeScript',
@@ -350,19 +325,7 @@ describe('Match Analysis workflow', () => {
     system.givenTheMatcherMatchesTypeScript()
     await system.analyzeMatch()
 
-    system.expectFabricatedMatchEvidenceToBeRejected()
-  })
-
-  it('does not erase a required technology version', async () => {
-    const system = createSystemUnderTest({
-      facts: [createReactFact({ value: 'Used React 17' })],
-      jobRequirements: [createReactRequirement({ value: 'Know React 18' })],
-    })
-
-    system.givenTheMatcherMatchesReact()
-    await system.analyzeMatch()
-
-    system.expectFabricatedMatchEvidenceToBeRejected()
+    system.expectTypeScriptRequirementToBePartiallyCovered()
   })
 
   it('adds a Candidate-authored fact and refreshes Match Analysis atomically', async () => {
@@ -487,10 +450,9 @@ class MatchAnalysisWorkflowTestSystem {
           coverage: 'covered',
           requirementId: 'job-requirement-typescript',
           factMatches: [{
+            factExcerpt: 'TypeScript',
             factId: 'source-fact-enrichment',
-            factTerm: 'TypeScript',
-            relationship: 'exact',
-            requirementTerm: 'TypeScript',
+            requirementExcerpt: 'TypeScript',
           }],
         }],
         relevantFactIds: ['source-fact-enrichment'],
@@ -512,10 +474,9 @@ class MatchAnalysisWorkflowTestSystem {
           coverage: 'covered',
           requirementId: 'job-requirement-french',
           factMatches: [{
+            factExcerpt: 'Français',
             factId: 'source-fact-french',
-            factTerm: 'Français',
-            relationship: 'controlled',
-            requirementTerm: 'French',
+            requirementExcerpt: 'French',
           }],
         }],
         relevantFactIds: ['source-fact-french'],
@@ -554,33 +515,12 @@ class MatchAnalysisWorkflowTestSystem {
           coverage: 'covered',
           requirementId: 'job-requirement-leadership',
           factMatches: [{
+            factExcerpt: 'Led',
             factId: 'source-fact-unverified-leadership',
-            factTerm: 'Led',
-            relationship: 'controlled',
-            requirementTerm: 'leadership',
+            requirementExcerpt: 'leadership',
           }],
         }],
         relevantFactIds: ['source-fact-unverified-leadership'],
-      },
-    }
-  }
-
-  givenTheMatcherInfersLeadershipFromAProgrammingSkill() {
-    this.#matcherResult = {
-      ok: true,
-      value: {
-        improvementOpportunities: [],
-        evidence: [{
-          coverage: 'covered',
-          requirementId: 'job-requirement-leadership',
-          factMatches: [{
-            factId: 'source-fact-typescript',
-            factTerm: 'TypeScript',
-            relationship: 'controlled',
-            requirementTerm: 'leadership',
-          }],
-        }],
-        relevantFactIds: ['source-fact-typescript'],
       },
     }
   }
@@ -594,10 +534,9 @@ class MatchAnalysisWorkflowTestSystem {
           coverage: 'covered',
           requirementId: 'job-requirement-typescript',
           factMatches: [{
+            factExcerpt: 'TypeScript',
             factId: 'source-fact-role-title',
-            factTerm: 'TypeScript',
-            relationship: 'controlled',
-            requirementTerm: 'TS',
+            requirementExcerpt: 'TS',
           }],
         }],
         relevantFactIds: ['source-fact-role-title'],
@@ -614,10 +553,9 @@ class MatchAnalysisWorkflowTestSystem {
           coverage: 'covered',
           requirementId: 'job-requirement-typescript',
           factMatches: [{
+            factExcerpt: 'TypeScript',
             factId: 'source-fact-typescript',
-            factTerm: 'TypeScript',
-            relationship: 'exact',
-            requirementTerm: 'TypeScript',
+            requirementExcerpt: 'TypeScript',
           }],
         }],
         relevantFactIds: ['source-fact-typescript'],
@@ -634,36 +572,15 @@ class MatchAnalysisWorkflowTestSystem {
           coverage: 'partially-covered',
           requirementId: 'job-requirement-typescript',
           factMatches: [{
+            factExcerpt: 'TypeScript',
             factId: 'source-fact-typescript',
-            factTerm: 'TypeScript',
-            relationship: 'exact',
-            requirementTerm: 'TypeScript',
+            requirementExcerpt: 'TypeScript',
           }],
         }],
         relevantFactIds: ['source-fact-typescript'],
       },
     } as const
     this.#matcherResult = matcherResult
-  }
-
-  givenTheMatcherMatchesReact() {
-    this.#matcherResult = {
-      ok: true,
-      value: {
-        improvementOpportunities: [],
-        evidence: [{
-          coverage: 'covered',
-          requirementId: 'job-requirement-react',
-          factMatches: [{
-            factId: 'source-fact-react',
-            factTerm: 'React',
-            relationship: 'exact',
-            requirementTerm: 'React',
-          }],
-        }],
-        relevantFactIds: ['source-fact-react'],
-      },
-    }
   }
 
   givenTheMatcherMatchesRxJs() {
@@ -675,10 +592,9 @@ class MatchAnalysisWorkflowTestSystem {
           coverage: 'covered',
           requirementId: 'job-requirement-rxjs',
           factMatches: [{
+            factExcerpt: 'RxJS',
             factId: 'source-fact-rxjs',
-            factTerm: 'RxJS',
-            relationship: 'exact',
-            requirementTerm: 'RxJS',
+            requirementExcerpt: 'RxJS',
           }],
         }],
         relevantFactIds: ['source-fact-rxjs'],
@@ -695,15 +611,13 @@ class MatchAnalysisWorkflowTestSystem {
           coverage: 'covered',
           requirementId: 'job-requirement-typescript',
           factMatches: [{
-            factId: 'source-fact-typescript', factTerm: 'TypeScript',
-            relationship: 'controlled', requirementTerm: 'TS',
+            factExcerpt: 'TypeScript', factId: 'source-fact-typescript', requirementExcerpt: 'TS',
           }],
         }, {
           coverage: 'covered',
           requirementId: 'job-requirement-leadership',
           factMatches: [{
-            factId: 'source-fact-typescript', factTerm: 'TypeScript',
-            relationship: 'controlled', requirementTerm: 'leadership',
+            factExcerpt: 'Led teams', factId: 'source-fact-typescript', requirementExcerpt: 'leadership',
           }],
         }],
         relevantFactIds: ['source-fact-typescript'],
@@ -720,19 +634,17 @@ class MatchAnalysisWorkflowTestSystem {
           coverage: 'covered',
           requirementId: 'job-requirement-typescript',
           factMatches: [{
+            factExcerpt: 'TypeScript',
             factId: 'source-fact-typescript',
-            factTerm: 'TypeScript',
-            relationship: 'controlled',
-            requirementTerm: 'TS',
+            requirementExcerpt: 'TS',
           }],
         }, {
           coverage: 'covered',
           requirementId: 'job-requirement-french',
           factMatches: [{
+            factExcerpt: 'Français',
             factId: 'source-fact-french',
-            factTerm: 'Français',
-            relationship: 'controlled',
-            requirementTerm: 'French',
+            requirementExcerpt: 'French',
           }],
         }],
         relevantFactIds: ['source-fact-typescript', 'source-fact-french'],
@@ -932,6 +844,10 @@ class MatchAnalysisWorkflowTestSystem {
     })
   }
 
+  expectProposedMatchEvidenceToBeDiscarded() {
+    expect(this.#readMatchAnalysis()).toMatchObject({ evidence: [], matchScore: 0 })
+  }
+
   expectFabricatedMatchEvidenceToBeRejected() {
     expect(this.#readActionResult()).toEqual({
       ok: false,
@@ -1090,26 +1006,6 @@ function createTypeScriptFact({ value }: Readonly<{ value: string }>): SourcePro
 function createTypeScriptRequirement({ value }: Readonly<{ value: string }>): JobRequirement {
   return {
     id: 'job-requirement-typescript',
-    groupId: 'job-requirement-group-technical',
-    classification: 'required',
-    sourceExcerpt: value,
-    value,
-  }
-}
-
-function createReactFact({ value }: Readonly<{ value: string }>): SourceProfileFact {
-  return {
-    id: 'source-fact-react',
-    kind: 'experience',
-    propositionKey: 'proposition-experience-react',
-    status: 'verified',
-    value,
-  }
-}
-
-function createReactRequirement({ value }: Readonly<{ value: string }>): JobRequirement {
-  return {
-    id: 'job-requirement-react',
     groupId: 'job-requirement-group-technical',
     classification: 'required',
     sourceExcerpt: value,

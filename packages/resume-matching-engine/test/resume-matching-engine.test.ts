@@ -35,10 +35,7 @@ describe('resume matching engine', () => {
     const result = validateRelevantFactProposals({
       candidateFacts,
       proposals: [{
-        factMatch: {
-          factId: 'fact-typescript', factTerm: 'TypeScript', relationship: 'exact',
-          requirementTerm: 'TypeScript',
-        },
+        factMatch: { factExcerpt: 'TypeScript', factId: 'fact-typescript', requirementExcerpt: 'TypeScript' },
         requirementId: 'requirement-typescript',
       }],
       requirements,
@@ -47,31 +44,35 @@ describe('resume matching engine', () => {
     expect(result).toEqual(['fact-typescript'])
   })
 
-  it('rejects unsupported relevance references', () => {
+  it('discards only the relevance proposals whose excerpts are not verbatim', () => {
     const result = validateRelevantFactProposals({
-      candidateFacts,
-      proposals: [{
-        factMatch: {
-          factId: 'fact-typescript', factTerm: 'TypeScript', relationship: 'exact',
-          requirementTerm: 'French',
+      candidateFacts: [...candidateFacts, { id: 'fact-french', kind: 'language', value: 'Français courant' }],
+      proposals: [
+        {
+          factMatch: { factExcerpt: 'Rust', factId: 'fact-typescript', requirementExcerpt: 'TypeScript' },
+          requirementId: 'requirement-typescript',
         },
-        requirementId: 'requirement-french',
-      }],
+        {
+          factMatch: { factExcerpt: 'Français', factId: 'fact-french', requirementExcerpt: 'French' },
+          requirementId: 'requirement-french',
+        },
+      ],
       requirements,
     })
 
-    expect(result).toBeNull()
+    expect(result).toEqual(['fact-french'])
   })
 
   it.each([
     "maîtrise de l'anglais un atout.",
     "l'anglais est souhaité",
     'anglais : un plus',
-  ])('accepts a language requirement phrased with elisions and importance markers: %s', (value) => {
+    "maîtrise de l'anglais technique",
+  ])('accepts a requirement excerpt quoted from a longer requirement: %s', (value) => {
     const result = validateRelevantFactProposals({
       candidateFacts: [{ id: 'fact-english', kind: 'language', value: 'Anglais' }],
       proposals: [{
-        factMatch: { factId: 'fact-english', factTerm: 'Anglais', relationship: 'exact', requirementTerm: 'anglais' },
+        factMatch: { factExcerpt: 'Anglais', factId: 'fact-english', requirementExcerpt: 'anglais' },
         requirementId: 'requirement-english',
       }],
       requirements: [{
@@ -83,20 +84,187 @@ describe('resume matching engine', () => {
     expect(result).toEqual(['fact-english'])
   })
 
-  it('still rejects a term that covers only part of the requirement concept', () => {
-    const result = validateRelevantFactProposals({
-      candidateFacts: [{ id: 'fact-english', kind: 'language', value: 'Anglais' }],
-      proposals: [{
-        factMatch: { factId: 'fact-english', factTerm: 'Anglais', relationship: 'exact', requirementTerm: 'anglais' },
-        requirementId: 'requirement-english',
-      }],
-      requirements: [{
-        capability: { dimension: 'technical-expertise', name: 'Anglais technique' }, id: 'requirement-english',
-        importance: 'central', sourceExcerpt: "maîtrise de l'anglais technique", value: "maîtrise de l'anglais technique",
-      }],
+  it('covers a reformulated capability with verbatim excerpts from both sides', () => {
+    const result = analyzeResumeMatch(reformulatedCapabilityInputs)
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toMatchObject({
+      evidence: [{ coverage: 'covered', factIds: ['fact-nextjs'], requirementId: 'requirement-web-applications' }],
+      matchScore: 100,
+      relevantFactIds: ['fact-nextjs'],
+    })
+  })
+
+  it('covers a translated capability without a controlled-term alias table', () => {
+    const result = analyzeResumeMatch({
+      ...translatedLanguageInputs,
+      proposedEvidence: [createEvidence({
+        coverage: 'covered', factExcerpt: 'Français courant', factId: 'fact-french',
+        requirementExcerpt: 'French', requirementId: 'requirement-french',
+      })],
     })
 
-    expect(result).toBeNull()
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.matchScore).toBe(25)
+  })
+
+  it.each([
+    { case: 'a fact excerpt absent from the Candidate Fact', factExcerpt: 'Angular', requirementExcerpt: 'French' },
+    { case: 'a requirement excerpt absent from the Job Requirement', factExcerpt: 'Français', requirementExcerpt: 'English' },
+    { case: 'a partial word', factExcerpt: 'Franç', requirementExcerpt: 'French' },
+  ])('rejects $case', ({ factExcerpt, requirementExcerpt }) => {
+    const result = analyzeResumeMatch({
+      ...translatedLanguageInputs,
+      proposedEvidence: [createEvidence({
+        coverage: 'covered', factExcerpt, factId: 'fact-french',
+        requirementExcerpt, requirementId: 'requirement-french',
+      })],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toMatchObject({ evidence: [], matchScore: 0 })
+  })
+
+  it.each([
+    {
+      case: 'a negated fact',
+      fact: { id: 'fact-trap', kind: 'experience', value: 'No production experience with React' },
+      factExcerpt: 'React', requirementExcerpt: 'React', requirementValue: 'Build interfaces with React',
+    },
+    {
+      case: 'a role title offered as proof',
+      fact: { id: 'fact-trap', kind: 'experience', value: 'Senior TypeScript Developer at Acme' },
+      factExcerpt: 'TypeScript Developer', requirementExcerpt: 'TypeScript', requirementValue: 'Know TypeScript',
+    },
+    {
+      case: 'an explicit duration the fact does not reach',
+      fact: { id: 'fact-trap', kind: 'experience', value: '5 years of Java. Used TypeScript' },
+      factExcerpt: 'Used TypeScript', requirementExcerpt: 'TypeScript', requirementValue: '5 years of TypeScript',
+    },
+    {
+      case: 'an explicit scale the fact does not reach',
+      fact: { id: 'fact-trap', kind: 'experience', value: 'Operated a platform serving 20k users' },
+      factExcerpt: 'Operated a platform', requirementExcerpt: 'Operate a platform',
+      requirementValue: 'Operate a platform serving 1 million users',
+    },
+  ] as const)('rejects covered evidence from $case', ({ fact, factExcerpt, requirementExcerpt, requirementValue }) => {
+    const result = analyzeResumeMatch({
+      candidateFacts: [fact],
+      proposedEvidence: [createEvidence({
+        coverage: 'covered', factExcerpt, factId: fact.id, requirementExcerpt, requirementId: 'requirement-trap',
+      })],
+      relevantFactIds: [],
+      requirements: [createRoleNeutralRequirement({
+        capabilityName: requirementExcerpt, requirementId: 'requirement-trap', term: requirementValue,
+      })],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toMatchObject({ evidence: [], matchScore: 0, relevantFactIds: [] })
+  })
+
+  it.each([
+    { factValue: 'Built TypeScript services', requirementValue: 'Senior TypeScript engineering' },
+    { factValue: 'Built TypeScript services', requirementValue: 'TypeScript in production' },
+    { factValue: 'Junior TypeScript engineering', requirementValue: 'Lead TypeScript engineering' },
+  ])('downgrades covered evidence to partial coverage when the fact lacks the qualifier in "$requirementValue"', ({
+    factValue, requirementValue,
+  }) => {
+    const result = analyzeResumeMatch({
+      candidateFacts: [{ id: 'fact-typescript', kind: 'experience', value: factValue }],
+      proposedEvidence: [createEvidence({
+        coverage: 'covered', factExcerpt: 'TypeScript', factId: 'fact-typescript',
+        requirementExcerpt: 'TypeScript', requirementId: 'requirement-typescript',
+      })],
+      relevantFactIds: ['fact-typescript'],
+      requirements: [{ ...requirements[0], value: requirementValue }],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toMatchObject({
+      evidence: [{ coverage: 'partially-covered', factIds: ['fact-typescript'] }],
+      matchScore: 50,
+    })
+  })
+
+  it('keeps full coverage when the fact shows a higher career level than required', () => {
+    const result = analyzeResumeMatch({
+      candidateFacts: [{ id: 'fact-typescript', kind: 'experience', value: 'Led TypeScript engineering as staff engineer' }],
+      proposedEvidence: [createEvidence({
+        coverage: 'covered', factExcerpt: 'TypeScript engineering as staff engineer', factId: 'fact-typescript',
+        requirementExcerpt: 'TypeScript engineering', requirementId: 'requirement-typescript',
+      })],
+      relevantFactIds: ['fact-typescript'],
+      requirements: [{ ...requirements[0], value: 'Senior TypeScript engineering' }],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.evidence).toMatchObject([{ coverage: 'covered' }])
+  })
+
+  it('accepts partial coverage for a behavioral capability that a role only implies', () => {
+    const result = analyzeResumeMatch({
+      candidateFacts: [{ id: 'fact-delivery', kind: 'experience', value: 'Coordinated weekly releases with product managers' }],
+      proposedEvidence: [createEvidence({
+        coverage: 'partially-covered', factExcerpt: 'Coordinated weekly releases with product managers',
+        factId: 'fact-delivery', requirementExcerpt: 'stakeholder communication', requirementId: 'requirement-communication',
+      })],
+      relevantFactIds: [],
+      requirements: [createRoleNeutralRequirement({
+        capabilityName: 'Stakeholder communication', requirementId: 'requirement-communication',
+        term: 'Strong stakeholder communication',
+      })],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toMatchObject({ matchScore: 50, relevantFactIds: ['fact-delivery'] })
+  })
+
+  it('discards each invalid evidence proposal and keeps the rest of the Match Analysis', () => {
+    const result = analyzeResumeMatch({
+      ...reformulatedCapabilityInputs,
+      proposedEvidence: [
+        createEvidence({
+          coverage: 'covered', factExcerpt: 'invented excerpt', factId: 'fact-nextjs',
+          requirementExcerpt: 'web applications', requirementId: 'requirement-web-applications',
+        }),
+        ...reformulatedCapabilityInputs.proposedEvidence,
+        createEvidence({
+          coverage: 'covered', factExcerpt: 'Next.js', factId: 'fact-unknown',
+          requirementExcerpt: 'web applications', requirementId: 'requirement-web-applications',
+        }),
+        createEvidence({
+          coverage: 'covered', factExcerpt: 'Next.js', factId: 'fact-nextjs',
+          requirementExcerpt: 'web applications', requirementId: 'requirement-unknown',
+        }),
+      ],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toMatchObject({
+      evidence: [{ coverage: 'covered', factIds: ['fact-nextjs'], requirementId: 'requirement-web-applications' }],
+      matchScore: 100,
+    })
+  })
+
+  it('rejects a proposal that cites the same Candidate Fact twice for one requirement', () => {
+    const [proposal] = reformulatedCapabilityInputs.proposedEvidence
+    const result = analyzeResumeMatch({
+      ...reformulatedCapabilityInputs,
+      proposedEvidence: [{ ...proposal, factMatches: [...proposal.factMatches, ...proposal.factMatches] }],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toMatchObject({ evidence: [], matchScore: 0 })
   })
 
   it('calculates a Match Analysis from importance-weighted evidence coverage', () => {
@@ -193,10 +361,9 @@ describe('resume matching engine', () => {
   it('rejects full coverage when evidence has the same capability at incomplete scope', () => {
     const result = analyzeResumeMatch(incompleteFullCoverageInputs)
 
-    expect(result).toEqual({
-      error: { type: 'invalid-match-input' },
-      ok: false,
-    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toMatchObject({ evidence: [], matchScore: 0 })
   })
 
   it('grants partial coverage and raises a reserve for an incompletely covered critical requirement', () => {
@@ -213,15 +380,6 @@ describe('resume matching engine', () => {
       matchBand: 'credible',
       matchBandQualification: 'critical-requirement-reserve',
       matchScore: 50,
-    })
-  })
-
-  it('rejects a controlled synonym when the proposal claims an exact relationship', () => {
-    const result = analyzeResumeMatch(falseExactSynonymInputs)
-
-    expect(result).toEqual({
-      error: { type: 'invalid-match-input' },
-      ok: false,
     })
   })
 
@@ -282,7 +440,7 @@ const duplicateCapabilityInputs = {
   requirements: [
     requirements[0],
     {
-      capability: { dimension: 'technical-expertise', name: 'TS' },
+      capability: { dimension: 'technical-expertise', name: 'Typescript' },
       id: 'requirement-typescript-duplicate',
       importance: 'central',
       sourceExcerpt: 'You must know TypeScript.',
@@ -372,6 +530,36 @@ const allComplementaryInputs = {
   requirements: [requirements[1]],
 } as const satisfies MatchInputs
 
+const reformulatedCapabilityInputs = {
+  candidateFacts: [{
+    id: 'fact-nextjs',
+    kind: 'experience',
+    value: 'Delivered end-to-end Next.js features from database schema to deployed interface',
+  }],
+  proposedEvidence: [createEvidence({
+    coverage: 'covered',
+    factExcerpt: 'end-to-end Next.js features',
+    factId: 'fact-nextjs',
+    requirementExcerpt: 'design, build and maintain web applications',
+    requirementId: 'requirement-web-applications',
+  })],
+  relevantFactIds: [],
+  requirements: [{
+    capability: { dimension: 'execution', name: 'Web application development' },
+    id: 'requirement-web-applications',
+    importance: 'central',
+    sourceExcerpt: 'You will design, build and maintain web applications.',
+    value: 'Design, build and maintain web applications',
+  }],
+} as const satisfies MatchInputs
+
+const translatedLanguageInputs = {
+  candidateFacts: [{ id: 'fact-french', kind: 'language', value: 'Français courant' }],
+  proposedEvidence: [],
+  relevantFactIds: [],
+  requirements: [requirements[1]],
+} as const satisfies MatchInputs
+
 const limitedTypeScriptFacts = [{
   id: 'fact-typescript',
   kind: 'skill',
@@ -402,28 +590,6 @@ const partialCriticalCoverageInputs = {
   })],
 } as const satisfies MatchInputs
 
-const falseExactSynonymInputs = {
-  candidateFacts: [{ id: 'fact-typescript', kind: 'skill', value: 'Used TypeScript' }],
-  proposedEvidence: [{
-    coverage: 'covered',
-    factMatches: [{
-      factId: 'fact-typescript',
-      factTerm: 'TypeScript',
-      relationship: 'exact',
-      requirementTerm: 'TS',
-    }],
-    requirementId: 'requirement-typescript',
-  }],
-  relevantFactIds: ['fact-typescript'],
-  requirements: [{
-    capability: { dimension: 'technical-expertise', name: 'TypeScript' },
-    id: 'requirement-typescript',
-    importance: 'central',
-    sourceExcerpt: 'TS is required.',
-    value: 'Know TS',
-  }],
-} as const satisfies MatchInputs
-
 const coveredCriticalDuplicateInputs = {
   ...weightedMatchInputs,
   requirements: [
@@ -438,19 +604,22 @@ const coveredCriticalDuplicateInputs = {
   ],
 } as const satisfies MatchInputs
 
-function createEvidence({ coverage, factId, requirementId, term }: Readonly<{
+function createEvidence({
+  coverage, factExcerpt, factId, requirementExcerpt, requirementId, term,
+}: Readonly<{
   coverage: ProposedMatchEvidence['coverage']
+  factExcerpt?: string
   factId: string
+  requirementExcerpt?: string
   requirementId: string
-  term: string
+  term?: string
 }>): ProposedMatchEvidence {
   return {
     coverage,
     factMatches: [{
+      factExcerpt: factExcerpt ?? term ?? '',
       factId,
-      factTerm: term,
-      relationship: 'exact',
-      requirementTerm: term,
+      requirementExcerpt: requirementExcerpt ?? term ?? '',
     }],
     requirementId,
   }

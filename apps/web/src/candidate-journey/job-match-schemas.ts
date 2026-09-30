@@ -79,11 +79,12 @@ export const matchEvidenceRequestSchema = z.strictObject({
   requirements: z.array(matchingRequirementSchema).min(1).max(100),
 })
 
+const evidenceExcerptSchema = z.string().min(2).max(200)
+
 const proposedFactMatchSchema = z.strictObject({
+  factExcerpt: evidenceExcerptSchema,
   factId: candidateFactIdSchema,
-  factTerm: z.string().min(2).max(100),
-  relationship: z.enum(['controlled', 'exact']),
-  requirementTerm: z.string().min(2).max(100),
+  requirementExcerpt: evidenceExcerptSchema,
 })
 
 export const matchEvidenceProposalSchema = z.strictObject({

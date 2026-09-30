@@ -16,10 +16,9 @@ const sourceProfileFactIdSchema = z.templateLiteral(['source-fact-', z.string().
 export const sourceProfileFactMaximumCount = 500
 
 const proposedFactMatchSchema = z.object({
+  factExcerpt: z.string().min(2).max(200),
   factId: sourceProfileFactIdSchema,
-  factTerm: z.string().min(2).max(100),
-  relationship: z.enum(['exact', 'controlled']),
-  requirementTerm: z.string().min(2).max(100),
+  requirementExcerpt: z.string().min(2).max(200),
 })
 
 const proposedMatchEvidenceSchema = z.object({

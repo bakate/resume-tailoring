@@ -7,7 +7,7 @@ import type {
   ProposedMatchEvidence,
   ProposedRelevantFact,
 } from '@resume-tailoring/matching-engine'
-import { validateMatchEvidence, validateRelevantFactProposals } from '@resume-tailoring/matching-engine'
+import { validateRelevantFactProposals } from '@resume-tailoring/matching-engine'
 import type { CandidateFact } from '@resume-tailoring/domain/source-intake'
 import type {
   JobMatch,
@@ -204,15 +204,12 @@ async function analyzeCandidateFacts({
     { candidateFacts: engineFacts, requirements },
   )
   if (!proposalResult.ok) return proposalResult
-  const relevantFactIds = [...new Set(proposalResult.value.relevance.flatMap((proposal) =>
-    validateRelevantFactProposals({ candidateFacts: engineFacts, proposals: [proposal], requirements }) ?? []))]
-  const proposedEvidence = proposalResult.value.evidence.filter((evidence) =>
-    evidence.factMatches.every(({ factId }) => relevantFactIds.includes(factId))
-    && validateMatchEvidence({ candidateFacts: engineFacts, proposedEvidence: [evidence], requirements }) !== null)
   const analysisResult = analyzeResumeMatch({
     candidateFacts: engineFacts,
-    proposedEvidence,
-    relevantFactIds,
+    proposedEvidence: proposalResult.value.evidence,
+    relevantFactIds: validateRelevantFactProposals({
+      candidateFacts: engineFacts, proposals: proposalResult.value.relevance, requirements,
+    }),
     requirements,
   })
   if (!analysisResult.ok) return matchEvidenceUnavailableResult

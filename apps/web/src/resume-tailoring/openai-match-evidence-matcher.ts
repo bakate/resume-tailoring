@@ -184,18 +184,17 @@ function parseMatchEvidence({
 }
 
 const matchingInstructions = [
-  'Return evidence only when one or more Candidate Facts explicitly support a Job Requirement.',
-  'Use covered when the evidence satisfies the complete requirement, including duration and qualitative constraints.',
-  'Use partially-covered when the evidence proves the same concrete skill or concept but falls short of an explicit duration, level, scale, or qualitative constraint.',
-  'Omit every unsupported requirement; never award partial coverage for a merely adjacent or transferable skill.',
-  'You may recognize controlled synonyms and translations with the same concrete meaning.',
-  'For each fact link, quote the shortest exact contiguous requirementTerm and factTerm that name the same skill or concept; never quote a full sentence when a shorter term exists.',
-  'Use exact only when the normalized quoted terms are identical; otherwise use controlled.',
+  'Judge whether Candidate Facts show the same capability as each Job Requirement, even in different words or another language.',
+  'Use covered when Candidate Facts show the same capability at its full scope, including any explicit duration, scale, level, seniority, or production constraint.',
+  "Use partially-covered when the same capability appears at incomplete scope, or when a behavioral capability is only implied by a role's responsibilities.",
+  'A related but distinct capability, such as another technology in the same domain, leaves the requirement not covered: omit evidence for it.',
+  'Never offer a role title alone, a negated fact, or a duration or scale that the fact does not state as evidence.',
+  'For each fact link, copy a short contiguous factExcerpt verbatim from the Candidate Fact and a short contiguous requirementExcerpt verbatim from the Job Requirement value; the two excerpts may use different words.',
+  'When the requirement states a duration or scale, include the duration or scale stated by the fact in its factExcerpt.',
   'Do not calculate or combine employment date ranges to prove a duration; omit duration coverage unless one Candidate Fact explicitly states enough duration.',
   'Return relevantFactIds only for Candidate Facts relevant enough to support an honest Tailored Resume.',
   'Return no relevantFactIds when the declared material cannot support an honest Tailored Resume.',
   'Return at most three concise improvementOpportunities for useful keywords or conventions that are not explicit requirements; these observations never affect evidence.',
-  'Do not treat a role, a transferable skill, or qualitative seniority as implicit proof.',
   'Never invent identifiers, qualifications, facts, or partial credit.',
 ].join(' ')
 
@@ -228,12 +227,11 @@ const matchEvidenceResponseFormat = {
               items: {
                 type: 'object',
                 additionalProperties: false,
-                required: ['factId', 'factTerm', 'relationship', 'requirementTerm'],
+                required: ['factExcerpt', 'factId', 'requirementExcerpt'],
                 properties: {
+                  factExcerpt: { type: 'string', minLength: 2, maxLength: 200 },
                   factId: { type: 'string', pattern: '^source-fact-.+$' },
-                  factTerm: { type: 'string', minLength: 2, maxLength: 100 },
-                  relationship: { type: 'string', enum: ['exact', 'controlled'] },
-                  requirementTerm: { type: 'string', minLength: 2, maxLength: 100 },
+                  requirementExcerpt: { type: 'string', minLength: 2, maxLength: 200 },
                 },
               },
             },

@@ -1,7 +1,7 @@
 import { validateMatchEvidence } from './evidence-validation'
 
 export { validateMatchEvidence, validateRelevantFactProposals } from './evidence-validation'
-import { canonicalizeKnownTerm } from './text-normalization'
+import { normalizeText } from './text-normalization'
 
 export const capabilityDimensions = [
   'technical-expertise',
@@ -44,11 +44,12 @@ export type JobRequirement = Readonly<{
   value: string
 }>
 
+// Short contiguous excerpts quoted verbatim from each side; they may reformulate or
+// translate each other and are verified structurally, not compared as terms (ADR-0015).
 export type ProposedFactMatch = Readonly<{
+  factExcerpt: string
   factId: string
-  factTerm: string
-  relationship: 'controlled' | 'exact'
-  requirementTerm: string
+  requirementExcerpt: string
 }>
 
 export type ProposedMatchEvidence = Readonly<{
@@ -114,10 +115,15 @@ export function analyzeResumeMatch({
     proposedEvidence,
     requirements,
   })
-  if (evidence === null || !hasValidRelevantFacts({ candidateFacts, evidence, relevantFactIds })) {
+  const evidencedRelevantFactIds = [...new Set([
+    ...relevantFactIds, ...evidence.flatMap(({ factIds }) => factIds),
+  ])]
+  if (new Set(relevantFactIds).size !== relevantFactIds.length || !hasValidRelevantFacts({
+    candidateFacts, evidence, relevantFactIds: evidencedRelevantFactIds,
+  })) {
     return { error: { type: 'invalid-match-input' }, ok: false }
   }
-  return createSuccessfulResult({ evidence, relevantFactIds, requirements })
+  return createSuccessfulResult({ evidence, relevantFactIds: evidencedRelevantFactIds, requirements })
 }
 
 export function restoreResumeMatch({
@@ -277,16 +283,16 @@ function groupRequirements({ requirements }: Readonly<{
 
 function readRequirementGroupKey({ requirement }: Readonly<{ requirement: JobRequirement }>) {
   if (requirement.substitutableGroup !== undefined) {
-    return `substitute:${canonicalizeKnownTerm({ value: requirement.substitutableGroup })}`
+    return `substitute:${normalizeText({ value: requirement.substitutableGroup })}`
   }
-  return `capability:${requirement.capability.dimension}:${canonicalizeKnownTerm({
+  return `capability:${requirement.capability.dimension}:${normalizeText({
     value: requirement.capability.name,
   })}`
 }
 
 function readGroupCapabilities({ group }: Readonly<{ group: readonly JobRequirement[] }>) {
   const capabilityByIdentity = new Map(group.map(({ capability }) => [
-    `${capability.dimension}:${canonicalizeKnownTerm({ value: capability.name })}`,
+    `${capability.dimension}:${normalizeText({ value: capability.name })}`,
     capability,
   ]))
   return [...capabilityByIdentity.values()]
