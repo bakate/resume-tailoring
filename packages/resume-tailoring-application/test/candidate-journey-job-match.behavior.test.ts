@@ -77,6 +77,16 @@ describe('Candidate Journey Job Match', () => {
     system.expectExtractionToBeRejected()
   })
 
+  it('keeps valid relevance when another proposed relevance link is unsupported', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenMatchEvidenceIncludesAnUnsupportedRelevanceLink()
+
+    await system.submitPastedJobPosting()
+
+    system.expectOnlySupportedRelevantFacts()
+  })
+
   it('omits an unsupported Practical Constraint without rejecting the analysis', async () => {
     const system = createSystemUnderTest()
     await system.givenCandidateJourneyIsReadyForJobMatch()
@@ -298,6 +308,14 @@ class CandidateJourneyJobMatchTestSystem {
     }
   }
 
+  givenMatchEvidenceIncludesAnUnsupportedRelevanceLink() {
+    this.#matchEvidence = {
+      ...matchEvidenceProposal,
+      relevance: [...matchEvidenceProposal.relevance,
+        createRelevance('1', 'source-fact-3', 'Mentor', 'TypeScript')],
+    }
+  }
+
   givenEnrichedOperationalRiskEvidenceMatches() {
     this.#matchEvidence = enrichedMatchEvidenceProposal
   }
@@ -426,6 +444,14 @@ class CandidateJourneyJobMatchTestSystem {
     const view = this.#readOpenView()
     expect(view.jobMatchFailure).toBe('job-posting-extraction-unavailable')
     expect(view.session.jobMatch?.jobPosting.name).toBe('stable-job-posting.txt')
+  }
+
+  expectOnlySupportedRelevantFacts() {
+    this.#expectCompletedAction()
+    const view = this.#readOpenView()
+    expect(view.jobMatchFailure).toBeNull()
+    expect(view.session.jobMatch?.analysis.relevantFactIds).toEqual(
+      matchEvidenceProposal.relevance.map(({ factMatch }) => factMatch.factId))
   }
 
   expectOnlySourceBackedPracticalConstraints() {
