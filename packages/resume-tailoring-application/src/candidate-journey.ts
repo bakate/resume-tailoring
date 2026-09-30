@@ -830,3 +830,11 @@ function canSubmitJobPosting({ session }: Readonly<{
     && session.sourceIntake !== null
     && session.sourceIntake.criticalAmbiguities.length === 0
 }
+
+// Contract vocabulary consumed by BAK-57/58/59 through this existing public seam.
+export type {
+  ProfessionalResumeDocument, ResumeCondensationOutcome, ResumeCondensationProposal,
+  ResumeDocumentPorts, ResumeDocumentReview, ResumeDraft, ResumeExportBlocker, ResumeExportEligibility,
+  ResumeLayoutAssessment, ResumeLayoutOutcome, ResumeOperationFailure, ResumePreparationOutcome, ResumePreparationRequest,
+  ResumeProposalDecision, ResumeProposalDecisionOutcome, ResumeSectionChange, ResumeSectionChangeOutcome,
+} from './structured-resume-contract'

@@ -9,7 +9,7 @@ The person evaluating an opportunity and generating a resume from their own prof
 _Avoid_: User, applicant, profile owner
 
 **Candidate Journey**:
-The Candidate's progression through Source Intake, Job Match, and Tailored Resume Preparation.
+The Candidate's progression from a Source Document and Job Posting to a reviewable resume result, either a Tailored Resume or a Normalized Resume, with Source Intake, Job Match, and Tailored Resume Preparation as its underlying phases.
 _Avoid_: Workflow, wizard, four-step journey
 
 **Source Intake**:
@@ -17,7 +17,7 @@ The Candidate Journey phase in which the Candidate supplies professional evidenc
 _Avoid_: Source Profile step, profile review step
 
 **Job Match**:
-The Candidate Journey phase in which one Job Posting is compared with Candidate Facts to produce a Match Analysis and a generation decision.
+The Candidate Journey phase in which one Job Posting is compared with Candidate Facts to produce a Match Analysis and Generation Eligibility.
 _Avoid_: Job Posting step, Match Analysis step
 
 **Tailored Resume Preparation**:
@@ -27,22 +27,6 @@ _Avoid_: Resume Claims step, Tailored Resume step
 **Candidate Session**:
 The private, browser-local workspace in which one Candidate can reuse one Source Profile for multiple Job Postings for 24 hours.
 _Avoid_: Account, server profile
-
-**Candidate Journey**:
-The three-phase progression through Source Intake, Job Match, and Tailored Resume Preparation.
-_Avoid_: Wizard, four-step workflow
-
-**Source Intake**:
-The Candidate Journey phase that receives a Source Document, obtains Processing Consent, builds the Source Profile, and requests only targeted Critical Ambiguity resolution.
-_Avoid_: Source Profile Review, fact verification step
-
-**Job Match**:
-The Candidate Journey phase that receives one Job Posting and produces its Match Analysis without requiring a separate requirement-review ceremony.
-_Avoid_: Job Posting Review, scoring step
-
-**Tailored Resume Preparation**:
-The Candidate Journey phase that creates, validates, edits, previews, and exports one Tailored Resume for the current Job Posting.
-_Avoid_: Claim curation, bullet generation
 
 ## Processing and privacy
 
@@ -155,6 +139,10 @@ _Avoid_: Model score, suitability decision
 **Tailored Resume**:
 A complete, ATS-first resume that selects, orders, translates, and reformulates only supported Candidate evidence for one Job Posting, using one page by default and two when relevant evidence requires it.
 _Avoid_: Generated bullets, optimized CV, complete career history
+
+**Normalized Resume**:
+A complete resume organized from supported Candidate evidence without claiming adaptation to a particular Job Posting.
+_Avoid_: Tailored Resume, matched resume, fallback match
 
 **Resume Field**:
 A structured Tailored Resume value whose professional content retains direct provenance to one or more Candidate Facts.

@@ -20,13 +20,13 @@ describe('Tailored Resume field editing', () => {
       resume,
     })
 
-    expect(editedResume.valueProposition[0]).toEqual({
-      factIds: ['source-fact-typescript'], text: 'TypeScript APIs',
+    expect(editedResume.valueProposition.paragraphs[0]).toEqual({
+      id: 'summary-typescript', factIds: ['source-fact-typescript'], text: 'TypeScript APIs',
     })
   })
 
   it('identifies unsupported professional wording at the field', () => {
-    const field = resume.valueProposition[0]
+    const field = resume.valueProposition.paragraphs[0]
 
     expect(isSupportedResumeFieldText({
       candidateFacts, field, text: 'Invented revenue growth',
@@ -43,9 +43,9 @@ describe('Tailored Resume field editing', () => {
     })
     const movedResume = moveResumeField({ direction: 'down', location: reference.location, resume })
 
-    expect(hiddenResume.valueProposition).toHaveLength(1)
-    expect(restoredResume.valueProposition).toContainEqual(reference.field)
-    expect(movedResume.valueProposition[1]).toEqual(reference.field)
+    expect(hiddenResume.valueProposition.paragraphs).toHaveLength(1)
+    expect(restoredResume.valueProposition.paragraphs).toContainEqual(reference.field)
+    expect(movedResume.valueProposition.paragraphs[1]).toEqual(reference.field)
   })
 })
 
@@ -54,14 +54,15 @@ const candidateFacts = [
 ] as const
 
 const resume = {
+  purpose: 'tailored',
   contactDetails: [{ kind: 'email', value: 'candidate@example.com' }],
   experiences: [],
   identity: { kind: 'personal-information', value: 'Candidate' },
   locale: 'en',
   sections: [],
   targetRole: null,
-  valueProposition: [
-    { factIds: ['source-fact-typescript'], text: 'TypeScript' },
-    { factIds: ['source-fact-typescript'], text: 'APIs' },
-  ],
+  valueProposition: { kind: 'evidence-excerpts', paragraphs: [
+    { id: 'summary-typescript', factIds: ['source-fact-typescript'], text: 'TypeScript' },
+    { id: 'summary-apis', factIds: ['source-fact-typescript'], text: 'APIs' },
+  ] },
 } as const

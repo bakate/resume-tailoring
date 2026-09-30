@@ -108,24 +108,37 @@ const jobMatchSchema = z.strictObject({
 })
 
 const tailoredResumeFieldSchema = z.strictObject({
+  id: z.string().min(1),
   factIds: z.array(candidateFactIdSchema).min(1),
   text: z.string().min(1),
 })
 
 const tailoredResumeSchema = z.strictObject({
+  purpose: z.enum(['tailored', 'normalized']),
   contactDetails: sourceIntakeSchema.shape.contactDetails,
   experiences: z.array(z.strictObject({
+    id: z.string().min(1),
     chronology: z.enum(['context', 'earlier', 'relevant']),
-    fields: z.array(tailoredResumeFieldSchema),
+    role: tailoredResumeFieldSchema.nullable(),
+    organization: tailoredResumeFieldSchema.nullable(),
+    startDate: tailoredResumeFieldSchema.nullable(),
+    endDate: tailoredResumeFieldSchema.nullable(),
+    context: tailoredResumeFieldSchema.nullable(),
+    achievements: z.array(tailoredResumeFieldSchema),
   })),
   identity: sourceIntakeSchema.shape.contactDetails.element.nullable(),
   locale: z.enum(['en', 'fr']),
-  sections: z.array(z.strictObject({
+  sections: z.array(z.discriminatedUnion('section', [z.strictObject({
+    section: z.literal('skills'),
+    groups: z.array(z.strictObject({ id: z.string().min(1),
+      category: tailoredResumeFieldSchema.nullable(), items: z.array(tailoredResumeFieldSchema) })),
+  }), z.strictObject({
     fields: z.array(tailoredResumeFieldSchema),
-    section: z.enum(['certifications', 'education', 'languages', 'projects', 'skills']),
-  })),
+    section: z.enum(['certifications', 'education', 'languages', 'projects']),
+  })])),
   targetRole: jobMatchSchema.shape.targetRole,
-  valueProposition: z.array(tailoredResumeFieldSchema).max(4),
+  valueProposition: z.strictObject({ kind: z.enum(['evidence-excerpts', 'prose']),
+    paragraphs: z.array(tailoredResumeFieldSchema).max(4) }),
 })
 
 export const candidateSessionSchema = z.strictObject({

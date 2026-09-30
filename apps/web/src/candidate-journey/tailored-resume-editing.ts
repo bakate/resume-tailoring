@@ -1,121 +1,136 @@
 import type { CandidateFact } from '@resume-tailoring/application/source-intake'
-import type {
-  TailoredResume,
-  TailoredResumeField,
-  TailoredResumeSection,
-} from '@resume-tailoring/application/tailored-resume'
+import type { TailoredResume, TailoredResumeExperience, TailoredResumeField, TailoredResumeSection } from '@resume-tailoring/application/tailored-resume'
 
+type ExperienceValue = Exclude<keyof TailoredResumeExperience, 'id' | 'chronology'>
 export type ResumeFieldLocation = Readonly<
-  | { kind: 'value-proposition'; fieldIndex: number }
-  | { kind: 'experience'; experienceIndex: number; fieldIndex: number }
-  | { kind: 'section'; section: TailoredResumeSection['section']; fieldIndex: number }
+  | { kind: 'value-proposition'; fieldId: string }
+  | { kind: 'experience'; experienceId: string; fieldName: ExperienceValue; fieldId: string }
+  | { kind: 'section'; section: Exclude<TailoredResumeSection['section'], 'skills'>; fieldId: string }
+  | { kind: 'skill-group'; groupId: string; fieldName: 'category' | 'items'; fieldId: string }
 >
-
 export type ResumeFieldReference = Readonly<{
   field: TailoredResumeField
   key: string
   location: ResumeFieldLocation
 }>
+export type HiddenResumeField = Pick<ResumeFieldReference, 'field' | 'location'>
 
-export type HiddenResumeField = Readonly<{
-  field: TailoredResumeField
-  location: ResumeFieldLocation
-}>
+type FieldTransform = (fields: readonly TailoredResumeField[]) => readonly TailoredResumeField[]
 
 export function readResumeFields({ resume }: Readonly<{ resume: TailoredResume }>) {
-  const valueProposition = resume.valueProposition.map((field, fieldIndex) =>
-    createReference({ field, location: { kind: 'value-proposition', fieldIndex } }))
-  const experiences = resume.experiences.flatMap((experience, experienceIndex) => experience.fields
-    .map((field, fieldIndex) => createReference({
-      field, location: { kind: 'experience', experienceIndex, fieldIndex },
-    })))
-  const sections = resume.sections.flatMap((section) => section.fields.map((field, fieldIndex) =>
-    createReference({
-      field, location: { kind: 'section', section: section.section, fieldIndex },
-    })))
-  return [...valueProposition, ...experiences, ...sections]
+  return [
+    ...resume.valueProposition.paragraphs.map((field) => createReference({
+      field, location: { kind: 'value-proposition', fieldId: field.id },
+    })),
+    ...resume.experiences.flatMap((experience) => readExperienceReferences({ experience })),
+    ...resume.sections.flatMap((section) => readSectionReferences({ section })),
+  ]
+}
+
+function readSectionReferences({ section }: Readonly<{ section: TailoredResumeSection }>) {
+  if (section.section !== 'skills') return section.fields.map((field) => createReference({
+    field, location: { kind: 'section', section: section.section, fieldId: field.id },
+  }))
+  return section.groups.flatMap((group) => {
+    const category = group.category === null ? [] : [createReference({ field: group.category,
+      location: { kind: 'skill-group', groupId: group.id, fieldName: 'category', fieldId: group.category.id } })]
+    return [...category, ...group.items.map((field) => createReference({ field,
+      location: { kind: 'skill-group', groupId: group.id, fieldName: 'items', fieldId: field.id } }))]
+  })
+}
+
+function readExperienceReferences({ experience }: Readonly<{ experience: TailoredResumeExperience }>) {
+  return (['role', 'organization', 'startDate', 'endDate', 'context', 'achievements'] as const)
+    .flatMap((fieldName) => {
+      const fields = readExperienceValues({ experience, fieldName })
+      return fields.map((field) => createReference({ field, location: {
+        kind: 'experience', experienceId: experience.id, fieldName, fieldId: field.id,
+      } }))
+    })
 }
 
 export function updateResumeField({ field, location, resume }: Readonly<{
-  field: TailoredResumeField
-  location: ResumeFieldLocation
-  resume: TailoredResume
+  field: TailoredResumeField; location: ResumeFieldLocation; resume: TailoredResume
 }>) {
-  if (location.kind === 'value-proposition') {
-    return { ...resume, valueProposition: replaceAt({
-      items: resume.valueProposition, index: location.fieldIndex, value: field,
-    }) }
-  }
-  if (location.kind === 'experience') {
-    return { ...resume, experiences: resume.experiences.map((experience, experienceIndex) =>
-      experienceIndex === location.experienceIndex ? { ...experience, fields: replaceAt({
-        items: experience.fields, index: location.fieldIndex, value: field,
-      }) } : experience) }
-  }
-  return { ...resume, sections: resume.sections.map((section) => section.section === location.section
-    ? { ...section, fields: replaceAt({ items: section.fields, index: location.fieldIndex, value: field }) }
-    : section) }
+  return transformFields({ resume, location, transform: (fields) => fields.map((current) =>
+    current.id === location.fieldId ? { ...field, id: current.id } : current) })
 }
 
 export function removeResumeField({ location, resume }: Readonly<{
-  location: ResumeFieldLocation
-  resume: TailoredResume
+  location: ResumeFieldLocation; resume: TailoredResume
 }>) {
-  if (location.kind === 'value-proposition') {
-    return { ...resume, valueProposition: removeAt({ items: resume.valueProposition, index: location.fieldIndex }) }
-  }
-  if (location.kind === 'experience') {
-    return { ...resume, experiences: resume.experiences.map((experience, experienceIndex) =>
-      experienceIndex === location.experienceIndex ? { ...experience, fields: removeAt({
-        items: experience.fields, index: location.fieldIndex,
-      }) } : experience) }
-  }
-  return { ...resume, sections: resume.sections.map((section) => section.section === location.section
-    ? { ...section, fields: removeAt({ items: section.fields, index: location.fieldIndex }) }
-    : section) }
+  return transformFields({ resume, location,
+    transform: (fields) => fields.filter(({ id }) => id !== location.fieldId) })
 }
 
 export function restoreResumeField({ hiddenField, resume }: Readonly<{
-  hiddenField: HiddenResumeField
-  resume: TailoredResume
+  hiddenField: HiddenResumeField; resume: TailoredResume
 }>) {
-  const { field, location } = hiddenField
-  if (location.kind === 'value-proposition') {
-    return { ...resume, valueProposition: [...resume.valueProposition, field] }
-  }
-  if (location.kind === 'experience') {
-    return { ...resume, experiences: resume.experiences.map((experience, experienceIndex) =>
-      experienceIndex === location.experienceIndex ? { ...experience, fields: [...experience.fields, field] } : experience) }
-  }
-  return { ...resume, sections: resume.sections.map((section) => section.section === location.section
-    ? { ...section, fields: [...section.fields, field] } : section) }
+  return transformFields({ resume, location: hiddenField.location, transform: (fields) =>
+    fields.some(({ id }) => id === hiddenField.field.id) ? fields : [...fields, hiddenField.field] })
 }
 
 export function moveResumeField({ direction, location, resume }: Readonly<{
-  direction: 'up' | 'down'
-  location: ResumeFieldLocation
-  resume: TailoredResume
+  direction: 'up' | 'down'; location: ResumeFieldLocation; resume: TailoredResume
 }>) {
+  return transformFields({ resume, location, transform: (fields) => {
+    const index = fields.findIndex(({ id }) => id === location.fieldId)
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    const target = fields[targetIndex]
+    const source = fields[index]
+    if (source === undefined || target === undefined) return fields
+    return fields.map((field, fieldIndex) => fieldIndex === index ? target
+      : fieldIndex === targetIndex ? source : field)
+  } })
+}
+
+function transformFields({ location, resume, transform }: Readonly<{
+  location: ResumeFieldLocation; resume: TailoredResume; transform: FieldTransform
+}>): TailoredResume {
   if (location.kind === 'value-proposition') {
-    return { ...resume, valueProposition: moveAt({
-      items: resume.valueProposition, index: location.fieldIndex, direction,
-    }) }
+    return { ...resume, valueProposition: { ...resume.valueProposition, paragraphs: transform(resume.valueProposition.paragraphs) } }
   }
   if (location.kind === 'experience') {
-    return { ...resume, experiences: resume.experiences.map((experience, experienceIndex) =>
-      experienceIndex === location.experienceIndex ? { ...experience, fields: moveAt({
-        items: experience.fields, index: location.fieldIndex, direction,
-      }) } : experience) }
+    return { ...resume, experiences: resume.experiences.map((experience) =>
+      experience.id === location.experienceId ? transformExperience({ experience, location, transform }) : experience) }
   }
+  if (location.kind === 'skill-group') return transformSkillGroup({ resume, location, transform })
   return { ...resume, sections: resume.sections.map((section) => section.section === location.section
-    ? { ...section, fields: moveAt({ items: section.fields, index: location.fieldIndex, direction }) }
-    : section) }
+    ? { ...section, fields: transform(section.fields) } : section) }
+}
+
+function transformSkillGroup({ resume, location, transform }: Readonly<{
+  resume: TailoredResume; location: Extract<ResumeFieldLocation, { kind: 'skill-group' }>; transform: FieldTransform
+}>): TailoredResume {
+  return { ...resume, sections: resume.sections.map((section) => section.section !== 'skills' ? section
+    : { ...section, groups: section.groups.map((group) => {
+      if (group.id !== location.groupId) return group
+      if (location.fieldName === 'items') return { ...group, items: transform(group.items) }
+      const fields = group.category === null ? [] : [group.category]
+      return { ...group, category: transform(fields)[0] ?? null }
+    }) }) }
+}
+
+function transformExperience({ experience, location, transform }: Readonly<{
+  experience: TailoredResumeExperience
+  location: Extract<ResumeFieldLocation, { kind: 'experience' }>
+  transform: FieldTransform
+}>): TailoredResumeExperience {
+  const fields = transform(readExperienceValues({ experience, fieldName: location.fieldName }))
+  return location.fieldName === 'achievements' ? { ...experience, achievements: fields }
+    : { ...experience, [location.fieldName]: fields[0] ?? null }
+}
+
+function readExperienceValues({ experience, fieldName }: Readonly<{
+  experience: TailoredResumeExperience; fieldName: ExperienceValue
+}>) {
+  if (fieldName === 'achievements') return experience.achievements
+  const field = experience[fieldName]
+  return field === null ? [] : [field]
 }
 
 export function isSupportedResumeFieldText({ candidateFacts, field, text }: Readonly<{
-  candidateFacts: readonly CandidateFact[]
-  field: TailoredResumeField
-  text: string
+  candidateFacts: readonly CandidateFact[]; field: TailoredResumeField; text: string
 }>) {
   const normalizedText = normalize(text)
   if (normalizedText.length === 0) return false
@@ -126,42 +141,10 @@ export function isSupportedResumeFieldText({ candidateFacts, field, text }: Read
   })
 }
 
-function createReference({ field, location }: Readonly<{
-  field: TailoredResumeField
-  location: ResumeFieldLocation
-}>): ResumeFieldReference {
-  return { field, key: createFieldKey({ location }), location }
-}
-
-function createFieldKey({ location }: Readonly<{ location: ResumeFieldLocation }>) {
-  return JSON.stringify(location)
+function createReference({ field, location }: HiddenResumeField): ResumeFieldReference {
+  return { field, key: field.id, location }
 }
 
 function normalize(value: string) {
   return value.trim().replace(/\s+/gu, ' ').toLocaleLowerCase()
-}
-
-function replaceAt<TValue>({ index, items, value }: Readonly<{
-  index: number
-  items: readonly TValue[]
-  value: TValue
-}>) {
-  return items.map((item, itemIndex) => itemIndex === index ? value : item)
-}
-
-function removeAt<TValue>({ index, items }: Readonly<{ index: number; items: readonly TValue[] }>) {
-  return items.filter((item, itemIndex) => itemIndex !== index)
-}
-
-function moveAt<TValue>({ direction, index, items }: Readonly<{
-  direction: 'up' | 'down'
-  index: number
-  items: readonly TValue[]
-}>) {
-  const targetIndex = direction === 'up' ? index - 1 : index + 1
-  const target = items[targetIndex]
-  const source = items[index]
-  if (source === undefined || target === undefined) return items
-  return items.map((item, itemIndex) => itemIndex === index ? target
-    : itemIndex === targetIndex ? source : item)
 }

@@ -63,7 +63,7 @@ function EditableTailoredResume({ candidateFacts, localization, tailoredResume }
   const [identity, setIdentity] = useState(tailoredResume.identity)
   const [contactDetails, setContactDetails] = useState(tailoredResume.contactDetails)
   const unsupportedFieldCount = unsupportedKeys.length
-  const updateField = (location: ResumeFieldLocation, field: TailoredResume['valueProposition'][number]) => {
+  const updateField = (location: ResumeFieldLocation, field: TailoredResume['valueProposition']['paragraphs'][number]) => {
     setResume((currentResume) => updateResumeField({ field, location, resume: currentResume }))
   }
   const changeField = (reference: ReturnType<typeof readResumeFields>[number], text: string) => {
