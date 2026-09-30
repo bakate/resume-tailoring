@@ -79,8 +79,8 @@ The unambiguous role title copied from an exact Job Posting excerpt and used as 
 _Avoid_: Inferred title, desired role, generated headline
 
 **Job Requirement**:
-An explicit qualification, responsibility, or expectation extracted from a Job Posting, backed by an exact source excerpt, assigned a Capability Dimension, and reviewed with a Requirement Importance.
-_Avoid_: Keyword, hidden criterion
+One assessable capability that a Job Posting explicitly asks for, as a qualification, responsibility, or expectation, backed by an exact source excerpt, assigned a Capability Dimension, and reviewed with a Requirement Importance. Generic duties listed together in one sentence form a single Job Requirement rather than one per phrase.
+_Avoid_: Keyword, hidden criterion, sentence fragment
 
 **Capability Dimension**:
 A role-neutral area in which a Job Requirement asks for evidence: technical expertise, execution, ownership, leadership, strategy, stakeholder communication, or operational risk. Dimensions organize analysis without assigning a fixed Candidate persona.
@@ -95,12 +95,16 @@ The scoring unit formed by semantically duplicate or explicitly substitutable Jo
 _Avoid_: Requirement cluster, keyword bucket
 
 **Requirement Coverage**:
-The evidence-backed assessment of a Job Requirement as covered, partially covered, or not covered; partial coverage requires evidence of the same capability at incomplete scope. These states contribute respectively all, half, or none of the requirement's effective weight to the Match Score.
-_Avoid_: Model confidence, semantic similarity
+The evidence-backed assessment of a Job Requirement as covered, partially covered, or not covered. A requirement is covered when Candidate Facts show the same capability, even in different words. It is partially covered when the same capability appears at incomplete scope, or when a behavioral capability is only implied by a role's responsibilities. A related but distinct capability, such as another technology in the same domain, leaves the requirement not covered. These states contribute respectively all, half, or none of the requirement's effective weight to the Match Score.
+_Avoid_: Model confidence, keyword equality
 
 **Match Evidence**:
-The explicit relationship between one covered or partially covered Job Requirement and one or more Candidate Facts that support it.
-_Avoid_: Keyword match, inferred match
+The explicit relationship between one covered or partially covered Job Requirement and one or more Candidate Facts that support it. The relationship may rest on reformulation or translation, but always cites text that exists in both the Job Requirement and the Candidate Facts.
+_Avoid_: Keyword match, invented match
+
+**Adjacent Evidence**:
+A Candidate Fact showing a related but distinct capability for an uncovered Job Requirement, such as another technology in the same domain. It is shown to the Candidate alongside the gap, never changes Requirement Coverage or the Match Score, and never lets the Tailored Resume claim the requested capability.
+_Avoid_: Partial coverage, transferable proof
 
 **Match Score**:
 The percentage expressing how strongly the Source Profile's Candidate Facts cover the explicit professional requirements of a Job Posting. Critical, central, and complementary requirements have base weights of three, two, and one; duplicates are grouped, complementary influence is capped at 25 percent, and Requirement Coverage contributes all, half, or none of the effective weight. The score does not estimate hiring probability.
