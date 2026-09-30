@@ -83,7 +83,16 @@ export async function requestOpenAiJobMatchEvidence({
   })
   if (!response.ok) return response
   const parsedResponse = parseResponse({ matchRequest, value: response.value })
-  if (parsedResponse.ok) return parsedResponse
+  if (parsedResponse.ok) {
+    console.info(JSON.stringify({
+      category: 'privacy-safe-openai-request',
+      metric: 'accepted',
+      value: 1,
+      dimensions: { operation: 'explainable-match-evidence',
+        relevance: parsedResponse.value.relevance.length, evidence: parsedResponse.value.evidence.length },
+    }))
+    return parsedResponse
+  }
   return sanitizeResponse({ matchRequest, value: response.value }) ?? parsedResponse
 }
 
@@ -186,7 +195,9 @@ function sanitizeResponse({ matchRequest, value }: Readonly<{
     category: 'privacy-safe-openai-request',
     metric: 'sanitized',
     value: 1,
-    dimensions: { operation: 'explainable-match-evidence' },
+    dimensions: { operation: 'explainable-match-evidence',
+      proposedRelevance: proposal.data.relevance.length, keptRelevance: relevance.length,
+      proposedEvidence: proposal.data.evidence.length, keptEvidence: evidence.length },
   }))
   return { ok: true, value: { evidence, relevance } } as const
 }

@@ -178,7 +178,7 @@ function canonicalizeControlledTerm({ value }: Readonly<{ value: string }>) {
 }
 
 function isConstraintContextTerm({ term }: Readonly<{ term: string }>) {
-  return controlledContextTerms.has(term)
+  return controlledContextTerms.has(term) || elidedArticleTerms.has(term) || importanceMarkerTerms.has(term)
     || qualitativeRequirementTerms.includes(term as typeof qualitativeRequirementTerms[number])
 }
 
@@ -352,6 +352,13 @@ const controlledContextTerms = new Set([
   'in', 'know', 'knowledge', 'la', 'language', 'le', 'les', 'level', 'maitrise', 'maitriser',
   'for', 'of', 'pour', 'proficiency', 'speak', 'spoken', 'sur', 'un', 'une', 'use', 'used',
   'using', 'with',
+])
+
+// French elisions (l'anglais, d'expérience, qu'un) leave a detached article after normalization.
+// "c" and "n" are excluded: "langage C" is a concept and "n'" carries negation.
+const elidedArticleTerms = new Set(['d', 'j', 'l', 'qu'])
+const importanceMarkerTerms = new Set([
+  'apprecie', 'appreciee', 'atout', 'bonus', 'est', 'idealement', 'plus', 'preferred', 'souhaite', 'souhaitee',
 ])
 
 const nonEvidenceTerms = new Set([
