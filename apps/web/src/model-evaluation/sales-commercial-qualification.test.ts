@@ -39,8 +39,6 @@ describe('sales and commercial qualification corpus', () => {
       matchEvidencePrecision: { passed: true, threshold: 0.98, value: 1 },
       meanMatchScoreError: { passed: true, threshold: 5, value: 0 },
       maximumMatchScoreError: { passed: true, threshold: 10, value: 0 },
-      pdfExportValidity: { passed: true, threshold: 1, value: 1 },
-      provenanceSafety: { passed: true, threshold: 1, value: 1 },
       validEvidenceRecall: { passed: true, threshold: 0.9, value: 1 },
     })
   })

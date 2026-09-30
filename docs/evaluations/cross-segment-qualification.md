@@ -33,13 +33,28 @@ Run the deterministic qualification tests with:
 pnpm --filter @resume-tailoring/web exec vitest run src/model-evaluation/cross-segment-qualification.test.ts
 ```
 
-`qualifyCrossSegmentCorpus` reports independent gates globally and for each role
-family. The thresholds follow the MVP specification: 95% extraction recall and
-precision, 98% Match Evidence precision, 90% valid-evidence recall, at most five
-points mean Match Score error, at most ten points error for any scenario, zero
-unsupported Tailored Resume claims, and 100% valid exportable PDFs. The matching
-assertions execute the provider-neutral deterministic matching engine; no live model
-provider call is needed.
+`qualifyCrossSegmentCorpus` reports independent matching gates globally and for each
+role family: 95% extraction recall and precision, 98% Match Evidence precision, 90%
+valid-evidence recall, at most five points mean Match Score error, and at most ten
+points error for any scenario. The matching assertions execute the provider-neutral
+deterministic matching engine; no live model provider call is needed. The development
+split qualifies. The held-out split is asserted separately and currently fails in the
+technology role family (see the BAK-60 qualification record); it is marked `it.fails`
+rather than tuned.
+
+`qualifyCrossSegmentDocuments` measures the two document gates that were previously
+fixture booleans: zero unsupported resume claims and 100% valid exportable PDFs. For
+each scenario it writes a reference document from the scenario's Candidate Facts,
+checks every professional field with the application claim validator, and renders it
+through the production Puppeteer renderer (A4, embedded fonts, reading order, at most
+two pages, export eligibility). It does not measure live writing quality; that remains
+the job of the live model evaluation and the human reference review.
+
+Run every deterministic and rendered qualification gate with:
+
+```sh
+pnpm test:qualification
+```
 
 Run the independent general-management qualification with:
 

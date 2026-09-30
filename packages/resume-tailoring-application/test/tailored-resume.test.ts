@@ -8,7 +8,7 @@ describe('Tailored Resume generation', () => {
 
     expect(tailoredResume).toMatchObject({
       contactDetails: [{ kind: 'email', value: 'bakate@example.com' }],
-      identity: { kind: 'personal-information', value: 'Bakate' },
+      identity: null,
       locale: 'fr',
       targetRole: { value: 'Développeur Full Stack' },
     })

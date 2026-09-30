@@ -14,6 +14,7 @@
     "test": "turbo run test",
     "test:e2e:compatibility": "pnpm --filter @resume-tailoring/web test:e2e:compatibility",
     "test:evaluation": "pnpm --filter @resume-tailoring/web test:evaluation",
+    "test:qualification": "pnpm --filter @resume-tailoring/web test:qualification",
     "test:e2e": "pnpm --filter @resume-tailoring/web test:e2e",
     "typecheck": "turbo run typecheck"
   },

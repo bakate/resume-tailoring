@@ -21,6 +21,8 @@ export const resumeReviewCopy = {
     certifications: 'Certifications', languages: 'Languages', projects: 'Projects', analysis: 'Review match analysis',
     saved: 'Resume updated.', hiddenNotice: 'Content hidden from the resume.', restored: 'Content restored.', ordered: 'Order updated.',
     regenerate: 'Regenerate resume', regenerateWarning: 'Regenerating replaces your manual edits. Continue?',
+    usability: 'Can you apply with this PDF without restructuring it?', usable: 'Yes, usable as is',
+    needsRewriting: 'No, it needs structural rewriting', usabilityRecorded: 'Thank you. Only your answer was recorded, never your resume content.',
   },
   fr: {
     previewTitle: 'Aperçu du CV adapté', preview: 'Aperçu de ton CV', description: 'Relis le document. Ouvre l’éditeur lorsque tu souhaites modifier quelque chose.',
@@ -44,6 +46,8 @@ export const resumeReviewCopy = {
     certifications: 'Certifications', languages: 'Langues', projects: 'Projets', analysis: 'Consulter l’analyse de correspondance',
     saved: 'CV mis à jour.', hiddenNotice: 'Contenu masqué dans le CV.', restored: 'Contenu restauré.', ordered: 'Ordre mis à jour.',
     regenerate: 'Régénérer le CV', regenerateWarning: 'La régénération remplace tes modifications manuelles. Continuer ?',
+    usability: 'Peux-tu candidater avec ce PDF sans le restructurer ?', usable: 'Oui, utilisable tel quel',
+    needsRewriting: 'Non, il doit être restructuré', usabilityRecorded: 'Merci. Seule ta réponse a été enregistrée, jamais le contenu de ton CV.',
   },
 } as const
 

@@ -46,6 +46,8 @@ export function useCandidateJourney() {
     assessResumeLayout: candidateJourney.assessResumeLayout,
     confirmProfileEnrichment: candidateJourney.confirmProfileEnrichment,
     deleteCandidateSession: candidateJourney.deleteCandidateSession,
+    rateResumeUsefulness: candidateJourney.rateResumeUsefulness,
+    recordResumeDownload: candidateJourney.recordResumeDownload,
     grantProcessingConsent: candidateJourney.grantProcessingConsent,
     languageModelGateway: candidateJourneySystem.languageModelGateway,
     resolveCriticalAmbiguity: candidateJourney.resolveCriticalAmbiguity,
