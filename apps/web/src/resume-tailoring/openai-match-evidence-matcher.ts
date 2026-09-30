@@ -12,6 +12,7 @@ import {
   sourceProfileFactMaximumCount,
 } from './match-analysis-schemas'
 import { createOpenAiRequester, createOpenAiRequestDeadline } from './openai-request'
+import { evidenceExcerptLength, requirementCoverageInstructions } from './requirement-coverage-instructions'
 
 type OpenAiMatcherDependencies = Readonly<{
   apiKey: string
@@ -184,22 +185,18 @@ function parseMatchEvidence({
 }
 
 const matchingInstructions = [
-  'Return evidence only when one or more Candidate Facts explicitly support a Job Requirement.',
-  'Use covered when the evidence satisfies the complete requirement, including duration and qualitative constraints.',
-  'Use partially-covered when the evidence proves the same concrete skill or concept but falls short of an explicit duration, level, scale, or qualitative constraint.',
-  'Omit every unsupported requirement; never award partial coverage for a merely adjacent or transferable skill.',
-  'You may recognize controlled synonyms and translations with the same concrete meaning.',
-  'For each fact link, quote the shortest exact contiguous requirementTerm and factTerm that name the same skill or concept; never quote a full sentence when a shorter term exists.',
-  'Use exact only when the normalized quoted terms are identical; otherwise use controlled.',
-  'Do not calculate or combine employment date ranges to prove a duration; omit duration coverage unless one Candidate Fact explicitly states enough duration.',
+  ...requirementCoverageInstructions,
   'Return relevantFactIds only for Candidate Facts relevant enough to support an honest Tailored Resume.',
   'Return no relevantFactIds when the declared material cannot support an honest Tailored Resume.',
   'Return at most three concise improvementOpportunities for useful keywords or conventions that are not explicit requirements; these observations never affect evidence.',
-  'Do not treat a role, a transferable skill, or qualitative seniority as implicit proof.',
   'Never invent identifiers, qualifications, facts, or partial credit.',
 ].join(' ')
 
-const matchEvidenceResponseFormat = {
+const excerptJsonSchema = {
+  type: 'string', minLength: evidenceExcerptLength.minimum, maxLength: evidenceExcerptLength.maximum,
+} as const
+
+export const matchEvidenceResponseFormat = {
   type: 'json_schema',
   name: 'match_evidence',
   strict: true,
@@ -228,12 +225,11 @@ const matchEvidenceResponseFormat = {
               items: {
                 type: 'object',
                 additionalProperties: false,
-                required: ['factId', 'factTerm', 'relationship', 'requirementTerm'],
+                required: ['factExcerpt', 'factId', 'requirementExcerpt'],
                 properties: {
+                  factExcerpt: excerptJsonSchema,
                   factId: { type: 'string', pattern: '^source-fact-.+$' },
-                  factTerm: { type: 'string', minLength: 2, maxLength: 100 },
-                  relationship: { type: 'string', enum: ['exact', 'controlled'] },
-                  requirementTerm: { type: 'string', minLength: 2, maxLength: 100 },
+                  requirementExcerpt: excerptJsonSchema,
                 },
               },
             },

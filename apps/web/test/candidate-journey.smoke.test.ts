@@ -840,7 +840,7 @@ function requirementsFor(scenario: Scenario) {
 
 function matchFor(scenario: Scenario) {
   if (scenario === 'no-correspondence') return { evidence: [], relevance: [] }
-  const factMatch = { factId: 'source-fact-skills-0-name-0', factTerm: 'React', requirementTerm: 'React', relationship: 'exact' }
+  const factMatch = { factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' }
   return { evidence: [{ requirementId: 'job-requirement-react', coverage: 'covered', factMatches: [factMatch] }],
     relevance: [{ requirementId: 'job-requirement-react', factMatch }] }
 }

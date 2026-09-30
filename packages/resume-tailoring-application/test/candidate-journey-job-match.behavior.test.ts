@@ -77,6 +77,20 @@ describe('Candidate Journey Job Match', () => {
     system.expectExtractionToBeRejected()
   })
 
+  it('covers a requirement that a Next.js Source Profile proves in different words', async () => {
+    const system = createSystemUnderTest({ session: createNextJsSourceProfileSession() })
+
+    // Given
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenAFullStackJobPostingReformulatingNextJsWork()
+
+    // Action
+    await system.submitPastedJobPosting()
+
+    // Then
+    system.expectReformulatedFullStackRequirementToBeCovered()
+  })
+
   it('keeps valid relevance when another proposed relevance link is unsupported', async () => {
     const system = createSystemUnderTest()
     await system.givenCandidateJourneyIsReadyForJobMatch()
@@ -85,6 +99,26 @@ describe('Candidate Journey Job Match', () => {
     await system.submitPastedJobPosting()
 
     system.expectOnlySupportedRelevantFacts()
+  })
+
+  it('keeps valid Match Evidence when another proposed evidence link is unsupported', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenMatchEvidenceIncludesAnUnsupportedEvidenceLink()
+
+    await system.submitPastedJobPosting()
+
+    system.expectOnlySupportedMatchEvidence()
+  })
+
+  it('treats Candidate Facts cited by accepted Match Evidence as relevant', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenMatchEvidenceWithoutRelevanceLinks()
+
+    await system.submitPastedJobPosting()
+
+    system.expectEvidencedCandidateFactsToBeRelevant()
   })
 
   it('omits an unsupported Practical Constraint without rejecting the analysis', async () => {
@@ -245,6 +279,7 @@ class CandidateJourneyJobMatchTestSystem {
   readonly #candidateJourney: CandidateJourney
   #directJobMatch: Awaited<ReturnType<typeof createJobMatch>> | null = null
   #extractedJobPosting: ExtractedJobPosting = extractedJobPosting
+  #jobPostingText = jobPostingText
   #matchRequestCount = 0
   #matchEvidence: MatchEvidenceProposal = matchEvidenceProposal
   #completedAction: JobMatchAction | null = null
@@ -308,12 +343,32 @@ class CandidateJourneyJobMatchTestSystem {
     }
   }
 
+  givenAFullStackJobPostingReformulatingNextJsWork() {
+    this.#jobPostingText = fullStackJobPostingText
+    this.#extractedJobPosting = fullStackJobPosting
+    this.#matchEvidence = fullStackMatchEvidenceProposal
+  }
+
   givenMatchEvidenceIncludesAnUnsupportedRelevanceLink() {
     this.#matchEvidence = {
       ...matchEvidenceProposal,
       relevance: [...matchEvidenceProposal.relevance,
         createRelevance('1', 'source-fact-3', 'Mentor', 'TypeScript')],
     }
+  }
+
+  givenMatchEvidenceIncludesAnUnsupportedEvidenceLink() {
+    this.#matchEvidence = {
+      ...matchEvidenceProposal,
+      evidence: [
+        createEvidence('3', 'source-fact-2', 'covered', 'architecture', 'Kubernetes architecture'),
+        ...matchEvidenceProposal.evidence,
+      ],
+    }
+  }
+
+  givenMatchEvidenceWithoutRelevanceLinks() {
+    this.#matchEvidence = { ...matchEvidenceProposal, relevance: [] }
   }
 
   givenEnrichedOperationalRiskEvidenceMatches() {
@@ -332,6 +387,7 @@ class CandidateJourneyJobMatchTestSystem {
     this.#candidateJourney.submitJobPosting({ document: createJobPostingDocument({
       mediaType: 'text/plain',
       name: 'pasted-job-posting.txt',
+      text: this.#jobPostingText,
     }) })
     this.#view = await this.#waitForCompletedJobMatch()
     this.#completedAction = 'job-posting-submitted'
@@ -452,6 +508,36 @@ class CandidateJourneyJobMatchTestSystem {
     expect(view.jobMatchFailure).toBeNull()
     expect(view.session.jobMatch?.analysis.relevantFactIds).toEqual(
       matchEvidenceProposal.relevance.map(({ factMatch }) => factMatch.factId))
+  }
+
+  expectReformulatedFullStackRequirementToBeCovered() {
+    this.#expectCompletedAction()
+    const view = this.#readOpenView()
+    expect(view.jobMatchFailure).toBeNull()
+    expect(view.session.jobMatch?.analysis).toMatchObject({
+      evidence: [{ coverage: 'covered', factIds: ['source-fact-1'], requirementId: 'job-requirement-1' }],
+      matchScore: 100,
+      relevantFactIds: ['source-fact-1'],
+    })
+  }
+
+  expectOnlySupportedMatchEvidence() {
+    this.#expectCompletedAction()
+    const view = this.#readOpenView()
+    expect(view.jobMatchFailure).toBeNull()
+    expect(view.session.jobMatch?.analysis.evidence.map(({ requirementId }) => requirementId)).toEqual(
+      matchEvidenceProposal.evidence.map(({ requirementId }) => requirementId))
+  }
+
+  expectEvidencedCandidateFactsToBeRelevant() {
+    this.#expectCompletedAction()
+    const view = this.#readOpenView()
+    expect(view.jobMatchFailure).toBeNull()
+    expect(view.session.jobMatch?.analysis).toMatchObject({
+      generationEligibility: 'eligible',
+      relevantFactIds: matchEvidenceProposal.evidence.flatMap(({ factMatches }) =>
+        factMatches.map(({ factId }) => factId)),
+    })
   }
 
   expectOnlySourceBackedPracticalConstraints() {
@@ -692,6 +778,20 @@ function createJobMatchSession(): CandidateSession {
   }
 }
 
+function createNextJsSourceProfileSession(): CandidateSession {
+  const session = createJobMatchSession()
+  return {
+    ...session,
+    sourceIntake: session.sourceIntake === null ? null : {
+      ...session.sourceIntake,
+      candidateFacts: [{
+        id: 'source-fact-1', path: 'experiences.0.achievements.0', status: 'attested',
+        value: 'Built end-to-end Next.js applications with a Node.js API',
+      }],
+    },
+  }
+}
+
 function createSourceIntakeSession(): CandidateSession {
   const session = createJobMatchSession()
   return {
@@ -709,11 +809,12 @@ function createSourceIntakeSession(): CandidateSession {
   }
 }
 
-function createJobPostingDocument({ mediaType, name }: Readonly<{
+function createJobPostingDocument({ mediaType, name, text = jobPostingText }: Readonly<{
   mediaType: string
   name: string
+  text?: string
 }>) {
-  return { bytes: new TextEncoder().encode(jobPostingText), mediaType, name }
+  return { bytes: new TextEncoder().encode(text), mediaType, name }
 }
 
 function hasCompletedJobMatch({ view }: Readonly<{ view: CandidateJourneyView }>) {
@@ -792,6 +893,28 @@ function createRequirement(
   } as const
 }
 
+const fullStackJobPostingText = [
+  'Développeur Full Stack',
+  'Concevoir, développer et maintenir des applications web.',
+].join('\n')
+
+const fullStackJobPosting = {
+  practicalConstraints: [],
+  requirements: [{
+    ...createRequirement('1', 'technical-expertise', 'Web application development', 'critical',
+      'Concevoir, développer et maintenir des applications web.'),
+    value: 'Concevoir, développer et maintenir des applications web',
+  }],
+  targetRole: { sourceExcerpt: 'Développeur Full Stack', value: 'Développeur Full Stack' },
+} as const satisfies ExtractedJobPosting
+
+const fullStackMatchEvidenceProposal = {
+  evidence: [createEvidence('1', 'source-fact-1', 'covered',
+    'développer et maintenir des applications web', 'Built end-to-end Next.js applications')],
+  relevance: [createRelevance('1', 'source-fact-1',
+    'développer et maintenir des applications web', 'Built end-to-end Next.js applications')],
+} as const satisfies MatchEvidenceProposal
+
 const frenchAlternativeExcerpt = 'AWS ou GCP est requis.'
 const frenchJobPostingText = [
   'Kotlin est obligatoire.', "Rust n'est pas obligatoire.", frenchAlternativeExcerpt,
@@ -868,12 +991,12 @@ function createEvidence(
   requirementId: string,
   factId: string,
   coverage: MatchEvidenceProposal['evidence'][number]['coverage'],
-  requirementTerm: string,
-  factTerm: string,
+  requirementExcerpt: string,
+  factExcerpt: string,
 ) {
   return {
     coverage,
-    factMatches: [{ factId, factTerm, relationship: 'controlled', requirementTerm }],
+    factMatches: [{ factExcerpt, factId, requirementExcerpt }],
     requirementId: `job-requirement-${requirementId}`,
   } as const
 }
@@ -881,11 +1004,11 @@ function createEvidence(
 function createRelevance(
   requirementId: string,
   factId: string,
-  requirementTerm: string,
-  factTerm: string,
+  requirementExcerpt: string,
+  factExcerpt: string,
 ) {
   return {
-    factMatch: { factId, factTerm, relationship: 'controlled', requirementTerm },
+    factMatch: { factExcerpt, factId, requirementExcerpt },
     requirementId: `job-requirement-${requirementId}`,
   } as const
 }

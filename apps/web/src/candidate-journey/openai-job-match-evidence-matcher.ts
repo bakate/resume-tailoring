@@ -10,6 +10,7 @@ import {
   createOpenAiRequester,
   type OpenAiRequestFailure,
 } from '../resume-tailoring/openai-request'
+import { requirementCoverageInstructions } from '../resume-tailoring/requirement-coverage-instructions'
 import {
   matchEvidenceProposalSchema,
   matchEvidenceResponseFormat,
@@ -42,8 +43,6 @@ type InvalidModelOutputCause =
   | 'invalid-response-shape'
   | 'invalid-schema'
   | 'missing-output-text'
-  | 'invalid-relevance'
-  | 'unknown-reference'
 
 export async function requestOpenAiJobMatchEvidence({
   apiKey, matchRequest, model, reasoningEffort, request = fetch,
@@ -82,18 +81,7 @@ export async function requestOpenAiJobMatchEvidence({
     operation: 'explainable-match-evidence',
   })
   if (!response.ok) return response
-  const parsedResponse = parseResponse({ matchRequest, value: response.value })
-  if (parsedResponse.ok) {
-    console.info(JSON.stringify({
-      category: 'privacy-safe-openai-request',
-      metric: 'accepted',
-      value: 1,
-      dimensions: { operation: 'explainable-match-evidence',
-        relevance: parsedResponse.value.relevance.length, evidence: parsedResponse.value.evidence.length },
-    }))
-    return parsedResponse
-  }
-  return sanitizeResponse({ matchRequest, value: response.value }) ?? parsedResponse
+  return parseResponse({ matchRequest, value: response.value })
 }
 
 function createRequestBody({ matchRequest, model, reasoningEffort, repairInstruction }: Readonly<{
@@ -132,13 +120,7 @@ function parseResponse({ matchRequest, value }: Readonly<{
   }
   const proposal = matchEvidenceProposalSchema.safeParse(parsedValue)
   if (!proposal.success) return createInvalidModelOutputResult({ cause: 'invalid-schema' })
-  if (!hasKnownReferences({ matchRequest, proposal: proposal.data })) {
-    return createInvalidModelOutputResult({ cause: 'unknown-reference' })
-  }
-  if (!hasValidRelevantFacts({ matchRequest, proposal: proposal.data })) {
-    return createInvalidModelOutputResult({ cause: 'invalid-relevance' })
-  }
-  return { ok: true, value: proposal.data } as const
+  return sanitizeProposal({ matchRequest, proposal: proposal.data })
 }
 
 function createInvalidModelOutputResult({ cause }: Readonly<{ cause: InvalidModelOutputCause }>) {
@@ -151,53 +133,22 @@ function createInvalidModelOutputResult({ cause }: Readonly<{ cause: InvalidMode
   return invalidModelOutputResult
 }
 
-function hasKnownReferences({ matchRequest, proposal }: Readonly<{
+// Each proposal is verified structurally and kept or discarded on its own (ADR-0015).
+function sanitizeProposal({ matchRequest, proposal }: Readonly<{
   matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
   proposal: z.infer<typeof matchEvidenceProposalSchema>
 }>) {
-  const factIds = new Set(matchRequest.candidateFacts.map(({ id }) => id))
-  const requirementIds = new Set(matchRequest.requirements.map(({ id }) => id))
-  const relevantFactIds = new Set(proposal.relevance.map(({ factMatch }) => factMatch.factId))
-  return proposal.relevance.every(({ factMatch, requirementId }) =>
-    factIds.has(factMatch.factId) && requirementIds.has(requirementId))
-    && proposal.evidence.every((evidence) => requirementIds.has(evidence.requirementId)
-      && evidence.factMatches.every(({ factId }) => relevantFactIds.has(factId)))
-}
-
-function hasValidRelevantFacts({ matchRequest, proposal }: Readonly<{
-  matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
-  proposal: z.infer<typeof matchEvidenceProposalSchema>
-}>) {
-  return validateRelevantFactProposals({
-    candidateFacts: matchRequest.candidateFacts,
-    proposals: proposal.relevance,
-    requirements: matchRequest.requirements,
-  }) !== null
-}
-
-function sanitizeResponse({ matchRequest, value }: Readonly<{
-  matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
-  value: unknown
-}>) {
-  const outputTextResult = readOutputText({ value })
-  if (!outputTextResult.ok) return null
-  let parsedValue: unknown
-  try {
-    parsedValue = JSON.parse(outputTextResult.value) as unknown
-  } catch {
-    return null
-  }
-  const proposal = matchEvidenceProposalSchema.safeParse(parsedValue)
-  if (!proposal.success) return null
-  const relevance = filterValidRelevance({ matchRequest, proposal: proposal.data })
-  const evidence = filterValidEvidence({ matchRequest, proposal: proposal.data, relevance })
+  const relevance = filterValidRelevance({ matchRequest, proposal })
+  const evidence = filterValidEvidence({ matchRequest, proposal })
+  const isComplete = relevance.length === proposal.relevance.length
+    && evidence.length === proposal.evidence.length
   console.info(JSON.stringify({
     category: 'privacy-safe-openai-request',
-    metric: 'sanitized',
+    metric: isComplete ? 'accepted' : 'sanitized',
     value: 1,
     dimensions: { operation: 'explainable-match-evidence',
-      proposedRelevance: proposal.data.relevance.length, keptRelevance: relevance.length,
-      proposedEvidence: proposal.data.evidence.length, keptEvidence: evidence.length },
+      proposedRelevance: proposal.relevance.length, keptRelevance: relevance.length,
+      proposedEvidence: proposal.evidence.length, keptEvidence: evidence.length },
   }))
   return { ok: true, value: { evidence, relevance } } as const
 }
@@ -206,41 +157,32 @@ function filterValidRelevance({ matchRequest, proposal }: Readonly<{
   matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
   proposal: z.infer<typeof matchEvidenceProposalSchema>
 }>) {
-  const factIds = new Set(matchRequest.candidateFacts.map(({ id }) => id))
-  const requirementIds = new Set(matchRequest.requirements.map(({ id }) => id))
   const references = new Set<string>()
   return proposal.relevance.filter((relevance) => {
     const reference = `${relevance.requirementId}:${relevance.factMatch.factId}`
-    if (!factIds.has(relevance.factMatch.factId)
-      || !requirementIds.has(relevance.requirementId)
-      || references.has(reference)) return false
-    references.add(reference)
-    return validateRelevantFactProposals({
+    if (references.has(reference) || validateRelevantFactProposals({
       candidateFacts: matchRequest.candidateFacts,
       proposals: [relevance],
       requirements: matchRequest.requirements,
-    }) !== null
+    }).length === 0) return false
+    references.add(reference)
+    return true
   })
 }
 
-function filterValidEvidence({ matchRequest, proposal, relevance }: Readonly<{
+function filterValidEvidence({ matchRequest, proposal }: Readonly<{
   matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
   proposal: z.infer<typeof matchEvidenceProposalSchema>
-  relevance: z.infer<typeof matchEvidenceProposalSchema>['relevance']
 }>) {
-  const relevantFactIds = new Set(relevance.map(({ factMatch }) => factMatch.factId))
-  const requirementIds = new Set(matchRequest.requirements.map(({ id }) => id))
-  const references = new Set<string>()
+  const requirementIds = new Set<string>()
   return proposal.evidence.filter((evidence) => {
-    if (!requirementIds.has(evidence.requirementId)
-      || references.has(evidence.requirementId)
-      || !evidence.factMatches.every(({ factId }) => relevantFactIds.has(factId))) return false
-    references.add(evidence.requirementId)
-    return validateMatchEvidence({
+    if (requirementIds.has(evidence.requirementId) || validateMatchEvidence({
       candidateFacts: matchRequest.candidateFacts,
       proposedEvidence: [evidence],
       requirements: matchRequest.requirements,
-    }) !== null
+    }).length === 0) return false
+    requirementIds.add(evidence.requirementId)
+    return true
   })
 }
 
@@ -262,13 +204,8 @@ function readOutputText({ value }: Readonly<{ value: unknown }>) {
 }
 
 const matchingInstructions = [
-  'Propose evidence only when Candidate Facts explicitly support the same concrete capability as a Job Requirement.',
-  'Use covered only when the complete scope, duration, level, scale, and qualitative constraints are supported.',
-  'Use partially-covered only for the same capability at incomplete scope; reject adjacent or transferable capabilities.',
-  'Quote the shortest exact contiguous factTerm and requirementTerm that identify the same capability.',
-  'Use exact for identical normalized terms and controlled only for genuine synonyms or translations.',
-  'Return relevance links only for facts relevant enough to support an honest Tailored Resume.',
-  'Every relevance link must quote equivalent contiguous fact and requirement terms.',
+  ...requirementCoverageInstructions,
+  'Return relevance links for Candidate Facts relevant enough to support an honest Tailored Resume, with the same verbatim excerpts.',
   'Never calculate a score, importance, Match Band, or Generation Eligibility.',
   'Never invent identifiers, facts, requirements, or evidence.',
 ].join(' ')

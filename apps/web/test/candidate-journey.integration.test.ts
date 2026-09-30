@@ -678,7 +678,7 @@ const firstPosting = 'Frontend Engineer. React is required.'
 const secondPosting = 'Accessibility Lead. React is required. Inclusive product delivery matters.'
 const correctedSummary = 'Built accessible billing screens with React.'
 const candidateContent = ['Northwind', 'Contoso', 'billing', 'Alex', 'Morgan', 'example.com', 'Frontend', 'Accessibility'] as const
-const reactMatch = { factId: 'source-fact-skills-0-name-0', factTerm: 'React', requirementTerm: 'React', relationship: 'exact' } as const
+const reactMatch = { factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' } as const
 
 const denseTopics = ['checkout', 'invoicing', 'refunds', 'onboarding', 'reporting', 'search', 'navigation', 'settings',
   'notifications', 'permissions', 'exports', 'imports', 'dashboards', 'forms', 'tables', 'charts', 'filters', 'tooltips',

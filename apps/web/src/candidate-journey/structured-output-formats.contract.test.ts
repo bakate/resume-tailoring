@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { jobPostingExtractionResponseFormat, matchEvidenceResponseFormat } from './job-match-schemas'
 import { professionalResumeDocumentSchema, resumeDocumentValidationSchema, resumeStructuredOutputFormat } from './resume-document-schemas'
 import { structuredSourceProfileResponseFormat } from './structured-source-profile-schema'
+import { matchEvidenceResponseFormat as legacyMatchEvidenceResponseFormat } from '../resume-tailoring/openai-match-evidence-matcher'
 
 const structuredOutputFormats = {
   'job posting extraction': jobPostingExtractionResponseFormat,
   'match evidence': matchEvidenceResponseFormat,
+  'legacy match analysis evidence': legacyMatchEvidenceResponseFormat,
   'resume document validation': resumeStructuredOutputFormat({ name: 'resume_document_validation', schema: resumeDocumentValidationSchema }),
   'resume document writing': resumeStructuredOutputFormat({ name: 'resume_document_writing', schema: professionalResumeDocumentSchema }),
   'structured source profile': structuredSourceProfileResponseFormat,

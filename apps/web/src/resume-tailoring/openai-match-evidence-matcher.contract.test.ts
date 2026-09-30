@@ -41,12 +41,11 @@ describe('OpenAI Match Evidence matcher contract', () => {
       ],
       text: { format: { type: 'json_schema', name: 'match_evidence', strict: true } },
     })
-    expect(JSON.stringify(requestBody)).toMatch(/controlled synonyms and translations/iu)
-    expect(JSON.stringify(requestBody)).toMatch(/shortest exact contiguous/iu)
+    expect(JSON.stringify(requestBody)).toMatch(/same capability as each Job Requirement, even in different words/iu)
+    expect(JSON.stringify(requestBody)).toMatch(/behavioral capability is only implied by a role's responsibilities/iu)
+    expect(JSON.stringify(requestBody)).toMatch(/related but distinct capability.*leaves the requirement not covered/iu)
     expect(JSON.stringify(requestBody)).toMatch(/do not calculate or combine employment date ranges/iu)
-    expect(JSON.stringify(requestBody)).toMatch(
-      /role, a transferable skill, or qualitative seniority as implicit proof/iu,
-    )
+    expect(JSON.stringify(requestBody)).not.toMatch(/relationship/iu)
     expect(signals).toEqual([expect.any(AbortSignal)])
   })
 
@@ -60,10 +59,9 @@ describe('OpenAI Match Evidence matcher contract', () => {
           coverage: 'covered',
           requirementId: 'job-requirement-invented',
           factMatches: [{
+            factExcerpt: 'TypeScript',
             factId: 'source-fact-invented',
-            factTerm: 'TypeScript',
-            relationship: 'exact',
-            requirementTerm: 'TypeScript',
+            requirementExcerpt: 'TypeScript',
           }],
         }],
         improvementOpportunities: [],
@@ -150,10 +148,9 @@ function createAnalysis({ requirements: inputRequirements }: Readonly<{
       coverage: 'covered' as const,
       requirementId: id,
       factMatches: [{
+        factExcerpt: 'TypeScript',
         factId: 'source-fact-typescript' as const,
-        factTerm: 'TypeScript',
-        relationship: 'exact' as const,
-        requirementTerm: 'TypeScript',
+        requirementExcerpt: 'TypeScript',
       }],
     })),
     improvementOpportunities: [],
@@ -184,10 +181,9 @@ const expectedAnalysis = {
     coverage: 'covered',
     requirementId: 'job-requirement-typescript',
     factMatches: [{
+      factExcerpt: 'TypeScript',
       factId: 'source-fact-typescript',
-      factTerm: 'TypeScript',
-      relationship: 'controlled',
-      requirementTerm: 'TS',
+      requirementExcerpt: 'TS',
     }],
   }],
   improvementOpportunities: [],

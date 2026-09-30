@@ -6,7 +6,7 @@ import type {
   ProposedMatchEvidence,
   ProposedRelevantFact,
 } from './resume-matching-engine'
-import { canonicalizeKnownTerm, foldText, normalizeText } from './text-normalization'
+import { foldText, normalizeText } from './text-normalization'
 
 export function validateMatchEvidence({
   candidateFacts,
@@ -16,15 +16,16 @@ export function validateMatchEvidence({
   candidateFacts: readonly CandidateFact[]
   proposedEvidence: readonly ProposedMatchEvidence[]
   requirements: readonly JobRequirement[]
-}>) {
+}>): readonly MatchEvidence[] {
   const requirementById = new Map(requirements.map((requirement) => [requirement.id, requirement]))
   const candidateFactById = new Map(candidateFacts.map((fact) => [fact.id, fact]))
-  const referencedRequirementIds = new Set<string>()
-  const evidence = proposedEvidence.map((proposal) => validateEvidenceProposal({
-    candidateFactById, proposal, referencedRequirementIds, requirementById,
-  }))
-  const validEvidence = evidence.filter((item) => item !== null)
-  return proposedEvidence.length > 0 && validEvidence.length === 0 ? null : validEvidence
+  const evidenceByRequirementId = new Map<string, MatchEvidence>()
+  for (const proposal of proposedEvidence) {
+    if (evidenceByRequirementId.has(proposal.requirementId)) continue
+    const evidence = validateEvidenceProposal({ candidateFactById, proposal, requirementById })
+    if (evidence !== null) evidenceByRequirementId.set(proposal.requirementId, evidence)
+  }
+  return [...evidenceByRequirementId.values()]
 }
 
 export function validateRelevantFactProposals({
@@ -33,226 +34,165 @@ export function validateRelevantFactProposals({
   candidateFacts: readonly CandidateFact[]
   proposals: readonly ProposedRelevantFact[]
   requirements: readonly JobRequirement[]
-}>) {
+}>): readonly string[] {
   const candidateFactById = new Map(candidateFacts.map((fact) => [fact.id, fact]))
   const requirementById = new Map(requirements.map((requirement) => [requirement.id, requirement]))
-  const references = new Set<string>()
-  const relevantFactIds = proposals.map((proposal) => validateRelevanceProposal({
-    candidateFactById, proposal, references, requirementById,
-  }))
-  if (relevantFactIds.some((factId) => factId === null)) return null
-  return [...new Set(relevantFactIds)] as string[]
+  return [...new Set(proposals.flatMap((proposal) => {
+    const fact = candidateFactById.get(proposal.factMatch.factId)
+    const requirement = requirementById.get(proposal.requirementId)
+    return fact !== undefined && requirement !== undefined
+      && provesRelevance({ fact, factMatch: proposal.factMatch, requirement }) ? [fact.id] : []
+  }))]
 }
 
-function validateRelevanceProposal({
-  candidateFactById, proposal, references, requirementById,
-}: Readonly<{
-  candidateFactById: ReadonlyMap<string, CandidateFact>
-  proposal: ProposedRelevantFact
-  references: Set<string>
-  requirementById: ReadonlyMap<string, JobRequirement>
-}>) {
-  const fact = candidateFactById.get(proposal.factMatch.factId)
-  const requirement = requirementById.get(proposal.requirementId)
-  const reference = `${proposal.requirementId}:${proposal.factMatch.factId}`
-  if (fact === undefined || requirement === undefined || references.has(reference)) return null
-  references.add(reference)
-  return provesRelevance({ fact, factMatch: proposal.factMatch, requirement }) ? fact.id : null
-}
-
-type EvidenceProposalValidation = Readonly<{
+function validateEvidenceProposal({ candidateFactById, proposal, requirementById }: Readonly<{
   candidateFactById: ReadonlyMap<string, CandidateFact>
   proposal: ProposedMatchEvidence
-  referencedRequirementIds: Set<string>
   requirementById: ReadonlyMap<string, JobRequirement>
-}>
-
-function validateEvidenceProposal({
-  candidateFactById, proposal, referencedRequirementIds, requirementById,
-}: EvidenceProposalValidation): MatchEvidence | null {
+}>): MatchEvidence | null {
   const requirement = requirementById.get(proposal.requirementId)
-  if (requirement === undefined || referencedRequirementIds.has(proposal.requirementId)) return null
-  referencedRequirementIds.add(proposal.requirementId)
-  if (!hasValidFactMatches({
-    coverage: proposal.coverage,
-    candidateFactById,
-    factMatches: proposal.factMatches,
-    requirement,
-  })) {
+  const factIds = proposal.factMatches.map(({ factId }) => factId)
+  if (requirement === undefined || factIds.length === 0 || new Set(factIds).size !== factIds.length) {
     return null
   }
-  return { coverage: proposal.coverage, requirementId: proposal.requirementId,
-    factIds: proposal.factMatches.map(({ factId }) => factId) }
-}
-
-function hasValidFactMatches({ candidateFactById, coverage, factMatches, requirement }: Readonly<{
-  candidateFactById: ReadonlyMap<string, CandidateFact>
-  coverage: ProposedMatchEvidence['coverage']
-  factMatches: readonly ProposedFactMatch[]
-  requirement: JobRequirement
-}>) {
-  if (factMatches.length === 0) return false
-  const factIds = new Set(factMatches.map(({ factId }) => factId))
-  if (factIds.size !== factMatches.length) return false
-  return factMatches.every((factMatch) => {
+  const supports = proposal.factMatches.map((factMatch) => {
     const fact = candidateFactById.get(factMatch.factId)
-    return fact !== undefined && provesRequirement({ coverage, factMatch, fact, requirement })
+    return fact === undefined ? null : readEvidenceSupport({ fact, factMatch, requirement })
   })
+  if (supports.some((support) => support === null)) return null
+  const weakestSupport = evidenceSupports.findLast((support) => supports.includes(support)) ?? 'full'
+  if (proposal.coverage === 'covered' && weakestSupport === 'short-quantity') return null
+  return {
+    coverage: proposal.coverage === 'covered' && weakestSupport === 'full' ? 'covered' : 'partially-covered',
+    factIds,
+    requirementId: proposal.requirementId,
+  }
 }
 
-type RequirementProof = Readonly<{
-  coverage: ProposedMatchEvidence['coverage']
+type RequirementProofInput = Readonly<{
   fact: CandidateFact
   factMatch: ProposedFactMatch
   requirement: JobRequirement
 }>
 
-function provesRequirement({ coverage, fact, factMatch, requirement }: RequirementProof) {
-  if (!provesRelevance({ fact, factMatch, requirement })) return false
-  const satisfiesConstraints = satisfiesRequirementConstraints({
-    fact,
-    factTerm: factMatch.factTerm,
-    requirement,
-    requirementTerm: factMatch.requirementTerm,
+// How far one cited fact supports its requirement, from strongest to weakest: full coverage,
+// a missing qualitative qualifier, or an explicit duration or scale that the fact does not reach.
+const evidenceSupports = ['full', 'missing-qualifier', 'short-quantity'] as const
+type EvidenceSupport = typeof evidenceSupports[number]
+
+function readEvidenceSupport({ fact, factMatch, requirement }: RequirementProofInput): EvidenceSupport | null {
+  if (!provesRelevance({ fact, factMatch, requirement })) return null
+  const factContext = readExcerptContext({
+    excerpt: factMatch.factExcerpt, separatorPattern: constraintSeparatorPattern, value: fact.value,
   })
-  return coverage === 'covered' ? satisfiesConstraints : !satisfiesConstraints
-}
-
-function provesRelevance({ fact, factMatch, requirement }: Omit<RequirementProof, 'coverage'>) {
-  if (!containsProposedTerms({ fact, factMatch, requirement })) return false
-  const factTerm = normalizeTerm({ value: factMatch.factTerm })
-  const requirementTerm = normalizeTerm({ value: factMatch.requirementTerm })
-  if (rejectsCandidateFact({ fact, factTerm, originalFactTerm: factMatch.factTerm })) return false
-  if (!representsCompleteRequirementConcept({ requirement, requirementTerm })) return false
-  return hasEquivalentEvidenceTerms({
-    factTerm,
-    relationship: factMatch.relationship,
-    requirementTerm,
+  const requirementContext = readExcerptContext({
+    excerpt: factMatch.requirementExcerpt, separatorPattern: sentenceSeparatorPattern, value: requirement.value,
   })
+  if (!reachesQuantities({ factContext, requirementContext })) return 'short-quantity'
+  return showsQualitativeConstraints({ factContext, requirementContext }) ? 'full' : 'missing-qualifier'
 }
 
-function containsProposedTerms({ fact, factMatch, requirement }: Omit<RequirementProof, 'coverage'>) {
-  return containsTerm({ content: fact.value, term: factMatch.factTerm })
-    && containsTerm({ content: requirement.value, term: factMatch.requirementTerm })
+function provesRelevance({ fact, factMatch, requirement }: RequirementProofInput) {
+  return containsTerm({ content: fact.value, term: factMatch.factExcerpt })
+    && containsTerm({ content: requirement.value, term: factMatch.requirementExcerpt })
+    && !rejectsCandidateFact({ fact, factExcerpt: factMatch.factExcerpt })
 }
 
-function rejectsCandidateFact({ fact, factTerm, originalFactTerm }: Readonly<{
+function rejectsCandidateFact({ fact, factExcerpt }: Readonly<{
   fact: CandidateFact
-  factTerm: string
-  originalFactTerm: string
+  factExcerpt: string
 }>) {
-  if (nonEvidenceTerms.has(factTerm) || hasNegatedEvidence({ fact })) return true
-  return fact.kind === 'experience' && isLikelyRoleTitle({
-    factTerm: originalFactTerm, value: fact.value,
-  })
+  if (nonEvidenceTerms.has(normalizeText({ value: factExcerpt }))) return true
+  const clause = readExcerptContext({ excerpt: factExcerpt, separatorPattern: clauseSeparatorPattern, value: fact.value })
+  if (isNegatedBeforeExcerpt({ clause, factExcerpt })) return true
+  return fact.kind === 'experience' && isLikelyRoleTitle({ factContext: clause, factExcerpt })
 }
 
-function hasEquivalentEvidenceTerms({ factTerm, relationship, requirementTerm }: Readonly<{
-  factTerm: string
-  relationship: ProposedFactMatch['relationship']
-  requirementTerm: string
+function isNegatedBeforeExcerpt({ clause, factExcerpt }: Readonly<{ clause: string; factExcerpt: string }>) {
+  const normalizedClause = ` ${normalizeText({ value: clause })} `
+  const excerptIndex = normalizedClause.indexOf(` ${normalizeText({ value: factExcerpt })} `)
+  const precedingText = normalizedClause.slice(0, excerptIndex + 1)
+  return negativeTerms.some((negativeTerm) => precedingText.includes(` ${negativeTerm} `))
+}
+
+// Returns the smallest run of segments of `value` that contains the excerpt. The separator
+// pattern has one capture group, so `split` keeps each separator at an odd index between segments.
+function readExcerptContext({ excerpt, separatorPattern, value }: Readonly<{
+  excerpt: string
+  separatorPattern: RegExp
+  value: string
 }>) {
-  if (factTerm === requirementTerm) return true
-  return relationship === 'controlled'
-    && canonicalizeKnownTerm({ value: factTerm })
-      === canonicalizeKnownTerm({ value: requirementTerm })
+  const parts = value.split(separatorPattern)
+  const segmentCount = Math.ceil(parts.length / 2)
+  for (let width = 1; width <= segmentCount; width += 1) {
+    for (let first = 0; first + width <= segmentCount; first += 1) {
+      const context = parts.slice(first * 2, (first + width) * 2 - 1).join('')
+      if (containsTerm({ content: context, term: excerpt })) return context
+    }
+  }
+  return value
 }
 
-function representsCompleteRequirementConcept({ requirement, requirementTerm }: Readonly<{
-  requirement: JobRequirement
-  requirementTerm: string
-}>) {
-  const requirementClause = readTermClause({
-    term: requirementTerm,
-    value: requirement.value,
-  })
-  return requirementClause !== null
-    && canonicalizeControlledTerm({ value: requirementClause })
-      === canonicalizeControlledTerm({ value: requirementTerm })
-}
-
-function canonicalizeControlledTerm({ value }: Readonly<{ value: string }>) {
-  const valueWithoutScales = normalizeScaleText({ value }).replaceAll(scalePattern, ' ')
-  return normalizeTerm({ value: valueWithoutScales }).replaceAll(durationPattern, ' ').split(' ')
-    .filter((term) => term.length > 0 && !isConstraintContextTerm({ term })).join(' ')
-}
-
-function isConstraintContextTerm({ term }: Readonly<{ term: string }>) {
-  return controlledContextTerms.has(term) || elidedArticleTerms.has(term) || importanceMarkerTerms.has(term)
-    || qualitativeRequirementTerms.includes(term as typeof qualitativeRequirementTerms[number])
-}
-
-function hasNegatedEvidence({ fact }: Readonly<{ fact: CandidateFact }>) {
-  return negativeTerms.some((negativeTerm) => containsTerm({
-    content: fact.value,
-    term: negativeTerm,
-  }))
-}
-
-function satisfiesRequirementConstraints({ fact, factTerm, requirement, requirementTerm }: Readonly<{
-  fact: CandidateFact
-  factTerm: string
-  requirement: JobRequirement
-  requirementTerm: string
-}>) {
-  const factClause = readTermClause({ term: factTerm, value: fact.value })
-  const requirementClause = readTermClause({ term: requirementTerm, value: requirement.value })
-  if (factClause === null || requirementClause === null) return false
-  const hasQualifiers = satisfiesQualitativeConstraints({ factClause, requirementClause })
-  return hasQualifiers && satisfiesDurationConstraint({
-    factTerm, factValue: factClause, requirementTerm, requirementValue: requirementClause,
-  }) && satisfiesScaleConstraint({
-    factTerm, factValue: factClause, requirementTerm, requirementValue: requirementClause,
-  })
-}
-
-function satisfiesQualitativeConstraints({ factClause, requirementClause }: Readonly<{
-  factClause: string
-  requirementClause: string
+function showsQualitativeConstraints({ factContext, requirementContext }: Readonly<{
+  factContext: string
+  requirementContext: string
 }>) {
   return qualitativeRequirementTerms.every((qualifier) =>
-    !containsTerm({ content: requirementClause, term: qualifier })
-    || containsTerm({ content: factClause, term: qualifier })
-    || satisfiesLevelConstraint({ factClause, requiredLevel: qualifier }))
+    !requiresQualifier({ qualifier, requirementContext })
+    || containsTerm({ content: factContext, term: qualifier })
+    || satisfiesLevelConstraint({ factContext, requiredLevel: qualifier }))
 }
 
-function satisfiesLevelConstraint({ factClause, requiredLevel }: Readonly<{
-  factClause: string
+function requiresQualifier({ qualifier, requirementContext }: Readonly<{
+  qualifier: string
+  requirementContext: string
+}>) {
+  if (!containsTerm({ content: requirementContext, term: qualifier })) return false
+  // "Lead the migration" asks for an activity, not a lead-level role.
+  return qualifier !== 'lead' || !leadAsVerbPattern.test(` ${normalizeText({ value: requirementContext })} `)
+}
+
+function satisfiesLevelConstraint({ factContext, requiredLevel }: Readonly<{
+  factContext: string
   requiredLevel: string
 }>) {
   const requiredRank = careerLevelRanks.get(requiredLevel)
   if (requiredRank === undefined) return false
   const factRank = careerLevelTerms.reduce((highestRank, level) =>
-    containsTerm({ content: factClause, term: level })
+    containsTerm({ content: factContext, term: level })
       ? Math.max(highestRank, careerLevelRanks.get(level) ?? 0) : highestRank, 0)
   return factRank >= requiredRank
 }
 
-function satisfiesDurationConstraint({
-  factTerm, factValue, requirementTerm, requirementValue,
-}: Readonly<{
-  factTerm: string
-  factValue: string
-  requirementTerm: string
-  requirementValue: string
+function reachesQuantities({ factContext, requirementContext }: Readonly<{
+  factContext: string
+  requirementContext: string
 }>) {
-  const requiredMonths = readDurationInMonths({ term: requirementTerm, value: requirementValue })
+  return reachesDuration({ factContext, requirementContext }) && reachesScales({ factContext, requirementContext })
+}
+
+function reachesDuration({ factContext, requirementContext }: Readonly<{
+  factContext: string
+  requirementContext: string
+}>) {
+  const requiredMonths = readLongestDurationInMonths({ value: requirementContext })
   if (requiredMonths === null) return true
-  const factMonths = readDurationInMonths({ term: factTerm, value: factValue })
+  const factMonths = readLongestDurationInMonths({ value: factContext })
   return factMonths !== null && factMonths >= requiredMonths
 }
 
-function readTermClause({ term, value }: Readonly<{ term: string; value: string }>) {
-  return value.split(clauseSeparatorPattern)
-    .find((clause) => containsTerm({ content: clause, term })) ?? null
+function readLongestDurationInMonths({ value }: Readonly<{ value: string }>) {
+  const months = readDurations({ value: normalizeText({ value }) }).map((duration) => duration.months)
+  return months.length === 0 ? null : Math.max(...months)
 }
 
-function readDurationInMonths({ term, value }: Readonly<{ term: string; value: string }>) {
-  const normalizedValue = normalizeTerm({ value })
-  const termIndex = normalizedValue.indexOf(normalizeTerm({ value: term }))
-  if (termIndex < 0) return null
-  return readDurations({ value: normalizedValue }).toSorted((left, right) =>
-    Math.abs(left.index - termIndex) - Math.abs(right.index - termIndex))[0]?.months ?? null
+function reachesScales({ factContext, requirementContext }: Readonly<{
+  factContext: string
+  requirementContext: string
+}>) {
+  const factScales = readScales({ value: normalizeScaleText({ value: factContext }) })
+  return readScales({ value: normalizeScaleText({ value: requirementContext }) }).every((requiredScale) =>
+    factScales.some(({ amount, unit }) => unit === requiredScale.unit && amount >= requiredScale.amount))
 }
 
 function readDurations({ value }: Readonly<{ value: string }>) {
@@ -262,31 +202,8 @@ function readDurations({ value }: Readonly<{ value: string }>) {
     if (!Number.isFinite(amount) || unit === undefined) return []
     const months = unit.startsWith('year') || unit.startsWith('yr')
       || unit.startsWith('an') ? amount * 12 : amount
-    return [{ index: match.index, months }]
+    return [{ months }]
   })
-}
-
-function satisfiesScaleConstraint({
-  factTerm, factValue, requirementTerm, requirementValue,
-}: Readonly<{
-  factTerm: string
-  factValue: string
-  requirementTerm: string
-  requirementValue: string
-}>) {
-  const requiredScale = readNearestScale({ term: requirementTerm, value: requirementValue })
-  if (requiredScale === null) return true
-  const factScale = readNearestScale({ term: factTerm, value: factValue })
-  return factScale !== null && factScale.unit === requiredScale.unit
-    && factScale.amount >= requiredScale.amount
-}
-
-function readNearestScale({ term, value }: Readonly<{ term: string; value: string }>) {
-  const normalizedValue = normalizeScaleText({ value })
-  const termIndex = normalizedValue.indexOf(normalizeTerm({ value: term }))
-  if (termIndex < 0) return null
-  return readScales({ value: normalizedValue }).toSorted((left, right) =>
-    Math.abs(left.index - termIndex) - Math.abs(right.index - termIndex))[0] ?? null
 }
 
 function readScales({ value }: Readonly<{ value: string }>) {
@@ -295,8 +212,7 @@ function readScales({ value }: Readonly<{ value: string }>) {
     const magnitude = match[2]
     const unit = match[3]
     if (!Number.isFinite(baseAmount) || unit === undefined) return []
-    return [{ amount: baseAmount * readScaleMultiplier({ magnitude }), index: match.index,
-      unit: normalizeScaleUnit({ unit }) }]
+    return [{ amount: baseAmount * readScaleMultiplier({ magnitude }), unit: normalizeScaleUnit({ unit }) }]
   })
 }
 
@@ -305,32 +221,31 @@ function normalizeScaleUnit({ unit }: Readonly<{ unit: string }>) {
 }
 
 function normalizeScaleText({ value }: Readonly<{ value: string }>) {
-  return foldText({ value }).replaceAll(/(\d),(\d)/gu, '$1.$2')
+  return foldText({ value }).replaceAll(thousandsSeparatorPattern, '').replaceAll(/(\d),(\d)/gu, '$1.$2')
     .replaceAll(/[^a-z0-9+#.]+/gu, ' ').trim()
 }
 
-function isLikelyRoleTitle({ factTerm, value }: Readonly<{
-  factTerm: string
-  value: string
+function isLikelyRoleTitle({ factContext, factExcerpt }: Readonly<{
+  factContext: string
+  factExcerpt: string
 }>) {
-  const factClause = readTermClause({ term: factTerm, value })
-  if (factClause === null || !hasTitleLikeStart({ factClause, factTerm })) return false
-  const words = factClause.match(/\p{L}[\p{L}\p{M}+#.-]*/gu) ?? []
-  const titleWords = words.filter((word) => !titleConnectorTerms.has(normalizeTerm({ value: word })))
+  if (!hasTitleLikeStart({ factContext, factExcerpt })) return false
+  const words = factContext.match(/\p{L}[\p{L}\p{M}+#.-]*/gu) ?? []
+  const titleWords = words.filter((word) => !titleConnectorTerms.has(normalizeText({ value: word })))
   if (titleWords.length === 0) return false
   const titleCaseWords = titleWords.filter((word) => /^\p{Lu}/u.test(word))
   return titleCaseWords.length / titleWords.length >= 0.75
 }
 
-function hasTitleLikeStart({ factClause, factTerm }: Readonly<{
-  factClause: string
-  factTerm: string
+function hasTitleLikeStart({ factContext, factExcerpt }: Readonly<{
+  factContext: string
+  factExcerpt: string
 }>) {
-  const normalizedClause = normalizeTerm({ value: factClause })
-  const normalizedFactTerm = normalizeTerm({ value: factTerm })
-  return normalizedClause === normalizedFactTerm
-    || normalizedClause.startsWith(`${normalizedFactTerm} `)
-    || careerLevelTerms.some((level) => normalizedClause.startsWith(`${level} `))
+  const normalizedContext = normalizeText({ value: factContext })
+  const normalizedExcerpt = normalizeText({ value: factExcerpt })
+  return normalizedContext === normalizedExcerpt
+    || normalizedContext.startsWith(`${normalizedExcerpt} `)
+    || careerLevelTerms.some((level) => normalizedContext.startsWith(`${level} `))
 }
 
 function readScaleMultiplier({ magnitude }: Readonly<{ magnitude: string | undefined }>) {
@@ -340,26 +255,10 @@ function readScaleMultiplier({ magnitude }: Readonly<{ magnitude: string | undef
 }
 
 function containsTerm({ content, term }: Readonly<{ content: string; term: string }>) {
-  const normalizedContent = ` ${normalizeTerm({ value: content })} `
-  const normalizedTerm = normalizeTerm({ value: term })
+  const normalizedContent = ` ${normalizeText({ value: content })} `
+  const normalizedTerm = normalizeText({ value: term })
   return normalizedTerm.length > 1 && normalizedContent.includes(` ${normalizedTerm} `)
 }
-
-const normalizeTerm = normalizeText
-const controlledContextTerms = new Set([
-  'a', 'appliquer', 'assurer', 'au', 'aux', 'avoir', 'connaitre', 'courant', 'courante',
-  'dans', 'de', 'des', 'disposer', 'du', 'en', 'etre', 'experience', 'faire', 'fluent',
-  'in', 'know', 'knowledge', 'la', 'language', 'le', 'les', 'level', 'maitrise', 'maitriser',
-  'for', 'of', 'pour', 'proficiency', 'speak', 'spoken', 'sur', 'un', 'une', 'use', 'used',
-  'using', 'with',
-])
-
-// French elisions (l'anglais, d'expérience, qu'un) leave a detached article after normalization.
-// "c" and "n" are excluded: "langage C" is a concept and "n'" carries negation.
-const elidedArticleTerms = new Set(['d', 'j', 'l', 'qu'])
-const importanceMarkerTerms = new Set([
-  'apprecie', 'appreciee', 'atout', 'bonus', 'est', 'idealement', 'plus', 'preferred', 'souhaite', 'souhaitee',
-])
 
 const nonEvidenceTerms = new Set([
   'advanced', 'expert', 'junior', 'lead', 'mid level', 'senior',
@@ -369,12 +268,20 @@ const qualitativeRequirementTerms = [
   'advanced', 'expert', 'junior', 'lead', 'mid', 'middle', 'principal', 'production', 'senior',
   'staff',
 ] as const
-const careerLevelTerms = ['junior', 'mid', 'middle', 'senior', 'lead', 'staff', 'principal'] as const
 const careerLevelRanks = new Map<string, number>([
   ['junior', 1], ['mid', 2], ['middle', 2], ['senior', 3],
   ['lead', 4], ['staff', 4], ['principal', 5],
 ])
-const clauseSeparatorPattern = /[,;\n]|[.!?](?:\s+|$)|\b(?:and|et|qui|who)\b/iu
-const durationPattern = /\b(\d+)\s*\+?\s*(years?|yrs?|ans?|months?|mois)\b/gu
+const careerLevelTerms = [...careerLevelRanks.keys()]
+const clauseSeparatorPattern = /(,(?!\d)|[;\n]|[.!?](?:\s+|$)|\b(?:and|et|qui|who)\b)/iu
+// Constraints stay bound across relative clauses ("Senior engineer who built…"), and a
+// comma between digits separates thousands, not clauses.
+const constraintSeparatorPattern = /(,(?!\d)|[;\n]|[.!?](?:\s+|$)|\b(?:and|et)\b)/iu
+const sentenceSeparatorPattern = /([;\n]|[.!?](?:\s+|$))/u
+const leadAsVerbPattern = / lead (?:a|an|our|the|their|your|d|des|l|la|le|les|un|une) /u
+// A range such as "3-5 years" or "3 à 5 ans" requires its lower bound.
+const durationPattern = /\b(\d+)(?:\s+(?:to\s+|a\s+)?\d+)?\s*\+?\s*(years?|yrs?|ans?|months?|mois)\b/gu
+// "20,000" and "20 000" are one number; "1,5" stays a decimal comma.
+const thousandsSeparatorPattern = /(?<=\d)[,\s](?=\d{3}(?!\d))/gu
 const scalePattern = /\b(\d+(?:[.,]\d+)?)\s*(k|m|millions?|thousands?)?\s*(users?|requests?|transactions?|people|engineers?|developers?)\b/gu
 const titleConnectorTerms = new Set(['at', 'chez', 'de', 'of'])
