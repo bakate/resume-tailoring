@@ -9,7 +9,15 @@ The resume matching engine now checks Match Evidence and relevance links by stru
 - Both identifiers must exist.
 - A Candidate Fact may be cited at most once per Job Requirement.
 - The quoted fact excerpt must appear verbatim in the Candidate Fact, and the quoted requirement excerpt must appear verbatim in the Job Requirement. Both sides go through the existing text normalization.
-- The existing traps still reject a link: a negated fact, a role title offered as proof, and an explicit duration or scale that the fact does not reach.
+- The existing traps still reject a link:
+  - a negated fact, meaning a negation that precedes the cited excerpt in its clause;
+  - a role title offered as proof;
+  - an explicit duration or scale that the fact does not reach.
+- A covered link whose fact does not reach an explicit duration or scale is rejected. A partially covered link is still accepted, as before, because the same capability at incomplete scope is partially covered.
+- Durations, scales and qualifiers are bound to context:
+  - on the fact side, to the clauses around the fact excerpt, where relative clauses such as "who" and "qui" stay attached;
+  - on the requirement side, to the sentence containing the requirement excerpt.
+  - "Lead" followed by a determiner ("Lead the migration") is read as an activity, not a career level.
 - Normalized term equality, the complete-concept rule, and the controlled-term alias table are removed.
 - A covered link is downgraded to partially covered when the Job Requirement names a qualitative qualifier (level, seniority, production) that the cited fact does not show.
 - Each invalid proposal is discarded on its own, and the rest of the Match Analysis is kept.
@@ -33,17 +41,19 @@ The suite replaces `resume-tailoring/openai-match-evidence-matcher.evaluation.te
 | REST API development proven by RESTful endpoint work | positive | covered |
 | Automated testing proven by Playwright and Vitest work | positive | covered |
 | French mentoring requirement proven by English coaching evidence | positive | covered |
-| Java/JEE and Angular against TypeScript and React | trap | uncovered ×2 |
+| Java/JEE and Angular against TypeScript and React | trap | not covered ×2 |
 | Unsupported five-year duration | trap | partially covered at most |
-| Technology present only in a role title | trap | uncovered |
-| Negated technology experience | trap | uncovered |
-| React offered as proof of React Native | trap | uncovered |
+| Technology present only in a role title | trap | not covered |
+| Negated technology experience | trap | not covered |
+| React offered as proof of React Native | trap | not covered |
 | Java duration offered as TypeScript duration | trap | partially covered at most |
 | Java seniority offered as TypeScript seniority | trap | partially covered at most |
-| Leadership inferred from a programming skill | trap | uncovered |
-| React 17 offered as proof of React 18 | trap | uncovered |
+| Leadership inferred from a programming skill | trap | not covered |
+| React 17 offered as proof of React 18 | trap | not covered |
 
-The duration and seniority traps allow partial coverage. Under the Requirement Coverage rules, the same capability at incomplete scope is partially covered. They fail if they are marked covered.
+The duration and seniority traps allow partial coverage, because the same capability at incomplete scope is partially covered. They fail if they are marked covered.
+
+A stricter reading of user story 8 ("stay uncovered when my facts do not state enough") would reject a partial link when the fact states no duration or scale at all. I tried that rule and reverted it. It breaks the sales corpus fixtures `sales-06`, `sales-17` and `sales-20`. They expect partial coverage when the duration is stated in another sentence ("3 years") or in words ("six mois"). The corpora must still pass without unjustified changes to expected outcomes. That decision belongs to the spec owner.
 
 ### Result
 
@@ -70,6 +80,7 @@ These tests used to rely on lexical proof. They now follow ADR-0015:
 | Legacy workflow: Java seniority offered as TypeScript seniority | whole analysis rejected | partially covered | A missing qualifier downgrades coverage instead of rejecting it. |
 | Legacy workflow: React as proof of React Native, React 17 as proof of React 18, leadership from a programming skill | rejected by lexical rules | removed from engine tests and added as live-evaluation traps | These are semantic judgments. The engine cannot make them without lexical rules, so the model evaluation enforces them. |
 | Adapter: evidence whose fact had no matching relevance link | discarded | kept | Facts cited by accepted Match Evidence count as relevant. |
+| Engine: duplicate relevant Candidate Fact identifiers | whole analysis rejected | deduplicated | This follows individual rejection. The IDs themselves are still validated. |
 
 ## Commands
 

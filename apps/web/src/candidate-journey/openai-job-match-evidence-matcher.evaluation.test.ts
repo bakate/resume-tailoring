@@ -58,7 +58,7 @@ type EvaluationOutcome = Awaited<ReturnType<typeof evaluateCase>>
 function summarizeOutcomes({ outcomes }: Readonly<{ outcomes: readonly EvaluationOutcome[] }>) {
   const assessments = outcomes.flatMap(({ coverageByRequirementId, evaluationCase }) =>
     evaluationCase.requirements.map(({ expectation, id }) => ({
-      caseName: evaluationCase.name, coverage: coverageByRequirementId.get(id) ?? 'uncovered', expectation, id,
+      caseName: evaluationCase.name, coverage: coverageByRequirementId.get(id) ?? 'not-covered', expectation, id,
     })))
   const expectedCoverage = assessments.filter(({ expectation }) => expectation === 'covered')
   const foundCoverage = expectedCoverage.filter(({ coverage }) => coverage === 'covered')
@@ -67,7 +67,7 @@ function summarizeOutcomes({ outcomes }: Readonly<{ outcomes: readonly Evaluatio
     cases: outcomes.map(({ evaluationCase, metrics }) => ({ metrics, name: evaluationCase.name })),
     expectedCoverageRecall: expectedCoverage.length === 0 ? 1 : foundCoverage.length / expectedCoverage.length,
     trapViolations: assessments.filter(({ coverage, expectation }) =>
-      (expectation === 'uncovered' && coverage !== 'uncovered')
+      (expectation === 'not-covered' && coverage !== 'not-covered')
       || (expectation === 'partially-covered-at-most' && coverage === 'covered')),
   }
 }
@@ -105,7 +105,7 @@ function createRequirement({ capabilityName, id, value }: EvaluationRequirement)
 
 type EvaluationRequirement = Readonly<{
   capabilityName: string
-  expectation: 'covered' | 'partially-covered-at-most' | 'uncovered'
+  expectation: 'covered' | 'partially-covered-at-most' | 'not-covered'
   id: `job-requirement-${string}`
   value: string
 }>
@@ -199,8 +199,8 @@ const evaluationCases: readonly EvaluationCase[] = [
       { id: 'source-fact-typescript-react', kind: 'experience', value: 'Built TypeScript and React single-page applications' },
     ],
     requirements: [
-      { capabilityName: 'Java EE', expectation: 'uncovered', id: 'job-requirement-jee', value: 'Develop Java and JEE services' },
-      { capabilityName: 'Angular', expectation: 'uncovered', id: 'job-requirement-angular', value: 'Build Angular interfaces' },
+      { capabilityName: 'Java EE', expectation: 'not-covered', id: 'job-requirement-jee', value: 'Develop Java and JEE services' },
+      { capabilityName: 'Angular', expectation: 'not-covered', id: 'job-requirement-angular', value: 'Build Angular interfaces' },
     ],
   },
   {
@@ -215,21 +215,21 @@ const evaluationCases: readonly EvaluationCase[] = [
     name: 'technology present only in a role title',
     candidateFacts: [{ id: 'source-fact-role', kind: 'experience', value: 'Senior TypeScript Developer at Acme' }],
     requirements: [{
-      capabilityName: 'TypeScript', expectation: 'uncovered', id: 'job-requirement-role', value: 'Know TypeScript',
+      capabilityName: 'TypeScript', expectation: 'not-covered', id: 'job-requirement-role', value: 'Know TypeScript',
     }],
   },
   {
     name: 'negated technology experience',
     candidateFacts: [{ id: 'source-fact-negation', kind: 'experience', value: 'No production experience with React' }],
     requirements: [{
-      capabilityName: 'React', expectation: 'uncovered', id: 'job-requirement-negation', value: 'Production React experience',
+      capabilityName: 'React', expectation: 'not-covered', id: 'job-requirement-negation', value: 'Production React experience',
     }],
   },
   {
     name: 'React offered as proof of React Native',
     candidateFacts: [{ id: 'source-fact-react', kind: 'experience', value: 'Used React' }],
     requirements: [{
-      capabilityName: 'React Native', expectation: 'uncovered', id: 'job-requirement-react-native', value: 'Know React Native',
+      capabilityName: 'React Native', expectation: 'not-covered', id: 'job-requirement-react-native', value: 'Know React Native',
     }],
   },
   {
@@ -252,14 +252,14 @@ const evaluationCases: readonly EvaluationCase[] = [
     name: 'leadership inferred from a programming skill',
     candidateFacts: [{ id: 'source-fact-skill', kind: 'skill', value: 'TypeScript' }],
     requirements: [{
-      capabilityName: 'Leadership', expectation: 'uncovered', id: 'job-requirement-leadership', value: 'Demonstrate leadership',
+      capabilityName: 'Leadership', expectation: 'not-covered', id: 'job-requirement-leadership', value: 'Demonstrate leadership',
     }],
   },
   {
     name: 'React 17 offered as proof of React 18',
     candidateFacts: [{ id: 'source-fact-react-version', kind: 'experience', value: 'Used React 17' }],
     requirements: [{
-      capabilityName: 'React 18', expectation: 'uncovered', id: 'job-requirement-react-version', value: 'Know React 18',
+      capabilityName: 'React 18', expectation: 'not-covered', id: 'job-requirement-react-version', value: 'Know React 18',
     }],
   },
 ]

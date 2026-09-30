@@ -11,14 +11,18 @@ import {
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import { z } from 'zod'
 
+import { evidenceExcerptLength } from './requirement-coverage-instructions'
+
 const jobRequirementIdSchema = z.templateLiteral(['job-requirement-', z.string().min(1)])
 const sourceProfileFactIdSchema = z.templateLiteral(['source-fact-', z.string().min(1)])
 export const sourceProfileFactMaximumCount = 500
 
+const evidenceExcerptSchema = z.string().min(evidenceExcerptLength.minimum).max(evidenceExcerptLength.maximum)
+
 const proposedFactMatchSchema = z.object({
-  factExcerpt: z.string().min(2).max(200),
+  factExcerpt: evidenceExcerptSchema,
   factId: sourceProfileFactIdSchema,
-  requirementExcerpt: z.string().min(2).max(200),
+  requirementExcerpt: evidenceExcerptSchema,
 })
 
 const proposedMatchEvidenceSchema = z.object({

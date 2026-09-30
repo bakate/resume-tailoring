@@ -5,6 +5,7 @@ import {
   requirementCoverages,
   requirementImportances,
 } from '@resume-tailoring/application/job-match'
+import { evidenceExcerptLength } from '../resume-tailoring/requirement-coverage-instructions'
 
 const requirementIdSchema = z.templateLiteral(['job-requirement-', z.string().min(1)])
 const candidateFactIdSchema = z.templateLiteral(['source-fact-', z.string().min(1)])
@@ -79,7 +80,7 @@ export const matchEvidenceRequestSchema = z.strictObject({
   requirements: z.array(matchingRequirementSchema).min(1).max(100),
 })
 
-const evidenceExcerptSchema = z.string().min(2).max(200)
+const evidenceExcerptSchema = z.string().min(evidenceExcerptLength.minimum).max(evidenceExcerptLength.maximum)
 
 const proposedFactMatchSchema = z.strictObject({
   factExcerpt: evidenceExcerptSchema,

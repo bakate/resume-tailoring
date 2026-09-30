@@ -118,7 +118,7 @@ export function analyzeResumeMatch({
   const evidencedRelevantFactIds = [...new Set([
     ...relevantFactIds, ...evidence.flatMap(({ factIds }) => factIds),
   ])]
-  if (new Set(relevantFactIds).size !== relevantFactIds.length || !hasValidRelevantFacts({
+  if (!hasValidRelevantFacts({
     candidateFacts, evidence, relevantFactIds: evidencedRelevantFactIds,
   })) {
     return { error: { type: 'invalid-match-input' }, ok: false }

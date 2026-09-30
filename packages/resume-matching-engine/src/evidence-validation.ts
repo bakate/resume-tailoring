@@ -55,15 +55,15 @@ function validateEvidenceProposal({ candidateFactById, proposal, requirementById
   if (requirement === undefined || factIds.length === 0 || new Set(factIds).size !== factIds.length) {
     return null
   }
-  const proofs = proposal.factMatches.map((factMatch) => {
+  const supports = proposal.factMatches.map((factMatch) => {
     const fact = candidateFactById.get(factMatch.factId)
-    return fact === undefined ? null : readRequirementProof({ fact, factMatch, requirement })
+    return fact === undefined ? null : readEvidenceSupport({ fact, factMatch, requirement })
   })
-  if (proofs.some((proof) => proof === null)) return null
-  if (proposal.coverage === 'covered' && proofs.some((proof) => proof?.reachesQuantities !== true)) return null
-  const showsQualifiers = proofs.every((proof) => proof?.showsQualifiers === true)
+  if (supports.some((support) => support === null)) return null
+  const weakestSupport = evidenceSupports.findLast((support) => supports.includes(support)) ?? 'full'
+  if (proposal.coverage === 'covered' && weakestSupport === 'short-quantity') return null
   return {
-    coverage: proposal.coverage === 'covered' && showsQualifiers ? 'covered' : 'partially-covered',
+    coverage: proposal.coverage === 'covered' && weakestSupport === 'full' ? 'covered' : 'partially-covered',
     factIds,
     requirementId: proposal.requirementId,
   }
@@ -75,14 +75,21 @@ type RequirementProofInput = Readonly<{
   requirement: JobRequirement
 }>
 
-function readRequirementProof({ fact, factMatch, requirement }: RequirementProofInput) {
+// How far one cited fact supports its requirement, from strongest to weakest: full coverage,
+// a missing qualitative qualifier, or an explicit duration or scale that the fact does not reach.
+const evidenceSupports = ['full', 'missing-qualifier', 'short-quantity'] as const
+type EvidenceSupport = typeof evidenceSupports[number]
+
+function readEvidenceSupport({ fact, factMatch, requirement }: RequirementProofInput): EvidenceSupport | null {
   if (!provesRelevance({ fact, factMatch, requirement })) return null
-  const factContext = readExcerptContext({ excerpt: factMatch.factExcerpt, value: fact.value })
-  return {
-    reachesQuantities: reachesDuration({ factContext, requirementValue: requirement.value })
-      && reachesScale({ factContext, requirementValue: requirement.value }),
-    showsQualifiers: showsQualitativeConstraints({ factContext, requirementValue: requirement.value }),
-  }
+  const factContext = readExcerptContext({
+    excerpt: factMatch.factExcerpt, separatorPattern: constraintSeparatorPattern, value: fact.value,
+  })
+  const requirementContext = readExcerptContext({
+    excerpt: factMatch.requirementExcerpt, separatorPattern: sentenceSeparatorPattern, value: requirement.value,
+  })
+  if (!reachesQuantities({ factContext, requirementContext })) return 'short-quantity'
+  return showsQualitativeConstraints({ factContext, requirementContext }) ? 'full' : 'missing-qualifier'
 }
 
 function provesRelevance({ fact, factMatch, requirement }: RequirementProofInput) {
@@ -95,26 +102,30 @@ function rejectsCandidateFact({ fact, factExcerpt }: Readonly<{
   fact: CandidateFact
   factExcerpt: string
 }>) {
-  if (nonEvidenceTerms.has(normalizeTerm({ value: factExcerpt })) || hasNegatedEvidence({ fact })) return true
-  return fact.kind === 'experience' && isLikelyRoleTitle({
-    factContext: readExcerptContext({ excerpt: factExcerpt, value: fact.value }), factExcerpt,
-  })
+  if (nonEvidenceTerms.has(normalizeTerm({ value: factExcerpt }))) return true
+  const clause = readExcerptContext({ excerpt: factExcerpt, separatorPattern: clauseSeparatorPattern, value: fact.value })
+  if (isNegatedBeforeExcerpt({ clause, factExcerpt })) return true
+  return fact.kind === 'experience' && isLikelyRoleTitle({ factContext: clause, factExcerpt })
 }
 
-function hasNegatedEvidence({ fact }: Readonly<{ fact: CandidateFact }>) {
-  return negativeTerms.some((negativeTerm) => containsTerm({
-    content: fact.value,
-    term: negativeTerm,
-  }))
+function isNegatedBeforeExcerpt({ clause, factExcerpt }: Readonly<{ clause: string; factExcerpt: string }>) {
+  const normalizedClause = ` ${normalizeTerm({ value: clause })} `
+  const excerptIndex = normalizedClause.indexOf(` ${normalizeTerm({ value: factExcerpt })} `)
+  const precedingText = normalizedClause.slice(0, excerptIndex + 1)
+  return negativeTerms.some((negativeTerm) => precedingText.includes(` ${negativeTerm} `))
 }
 
-// The smallest run of clauses containing the excerpt binds durations, scales, and
-// qualifiers to the cited capability instead of to another clause of the same fact.
-function readExcerptContext({ excerpt, value }: Readonly<{ excerpt: string; value: string }>) {
-  const parts = value.split(clauseSeparatorPattern)
-  const clauseCount = Math.ceil(parts.length / 2)
-  for (let width = 1; width <= clauseCount; width += 1) {
-    for (let first = 0; first + width <= clauseCount; first += 1) {
+// Returns the smallest run of segments of `value` that contains the excerpt. The separator
+// pattern has one capture group, so `split` keeps each separator at an odd index between segments.
+function readExcerptContext({ excerpt, separatorPattern, value }: Readonly<{
+  excerpt: string
+  separatorPattern: RegExp
+  value: string
+}>) {
+  const parts = value.split(separatorPattern)
+  const segmentCount = Math.ceil(parts.length / 2)
+  for (let width = 1; width <= segmentCount; width += 1) {
+    for (let first = 0; first + width <= segmentCount; first += 1) {
       const context = parts.slice(first * 2, (first + width) * 2 - 1).join('')
       if (containsTerm({ content: context, term: excerpt })) return context
     }
@@ -122,14 +133,23 @@ function readExcerptContext({ excerpt, value }: Readonly<{ excerpt: string; valu
   return value
 }
 
-function showsQualitativeConstraints({ factContext, requirementValue }: Readonly<{
+function showsQualitativeConstraints({ factContext, requirementContext }: Readonly<{
   factContext: string
-  requirementValue: string
+  requirementContext: string
 }>) {
   return qualitativeRequirementTerms.every((qualifier) =>
-    !containsTerm({ content: requirementValue, term: qualifier })
+    !requiresQualifier({ qualifier, requirementContext })
     || containsTerm({ content: factContext, term: qualifier })
     || satisfiesLevelConstraint({ factContext, requiredLevel: qualifier }))
+}
+
+function requiresQualifier({ qualifier, requirementContext }: Readonly<{
+  qualifier: string
+  requirementContext: string
+}>) {
+  if (!containsTerm({ content: requirementContext, term: qualifier })) return false
+  // "Lead the migration" asks for an activity, not a lead-level role.
+  return qualifier !== 'lead' || !leadAsVerbPattern.test(` ${normalizeTerm({ value: requirementContext })} `)
 }
 
 function satisfiesLevelConstraint({ factContext, requiredLevel }: Readonly<{
@@ -144,11 +164,18 @@ function satisfiesLevelConstraint({ factContext, requiredLevel }: Readonly<{
   return factRank >= requiredRank
 }
 
-function reachesDuration({ factContext, requirementValue }: Readonly<{
+function reachesQuantities({ factContext, requirementContext }: Readonly<{
   factContext: string
-  requirementValue: string
+  requirementContext: string
 }>) {
-  const requiredMonths = readLongestDurationInMonths({ value: requirementValue })
+  return reachesDuration({ factContext, requirementContext }) && reachesScales({ factContext, requirementContext })
+}
+
+function reachesDuration({ factContext, requirementContext }: Readonly<{
+  factContext: string
+  requirementContext: string
+}>) {
+  const requiredMonths = readLongestDurationInMonths({ value: requirementContext })
   if (requiredMonths === null) return true
   const factMonths = readLongestDurationInMonths({ value: factContext })
   return factMonths !== null && factMonths >= requiredMonths
@@ -159,14 +186,13 @@ function readLongestDurationInMonths({ value }: Readonly<{ value: string }>) {
   return months.length === 0 ? null : Math.max(...months)
 }
 
-function reachesScale({ factContext, requirementValue }: Readonly<{
+function reachesScales({ factContext, requirementContext }: Readonly<{
   factContext: string
-  requirementValue: string
+  requirementContext: string
 }>) {
-  const requiredScales = readScales({ value: normalizeScaleText({ value: requirementValue }) })
   const factScales = readScales({ value: normalizeScaleText({ value: factContext }) })
-  return requiredScales.every((requiredScale) => factScales.some((factScale) =>
-    factScale.unit === requiredScale.unit && factScale.amount >= requiredScale.amount))
+  return readScales({ value: normalizeScaleText({ value: requirementContext }) }).every((requiredScale) =>
+    factScales.some(({ amount, unit }) => unit === requiredScale.unit && amount >= requiredScale.amount))
 }
 
 function readDurations({ value }: Readonly<{ value: string }>) {
@@ -249,6 +275,10 @@ const careerLevelRanks = new Map<string, number>([
   ['lead', 4], ['staff', 4], ['principal', 5],
 ])
 const clauseSeparatorPattern = /([,;\n]|[.!?](?:\s+|$)|\b(?:and|et|qui|who)\b)/iu
+// Constraints stay bound across relative clauses ("Senior engineer who built…").
+const constraintSeparatorPattern = /([,;\n]|[.!?](?:\s+|$)|\b(?:and|et)\b)/iu
+const sentenceSeparatorPattern = /([;\n]|[.!?](?:\s+|$))/u
+const leadAsVerbPattern = / lead (?:a|an|our|the|their|your|d|des|l|la|le|les|un|une) /u
 const durationPattern = /\b(\d+)\s*\+?\s*(years?|yrs?|ans?|months?|mois)\b/gu
 const scalePattern = /\b(\d+(?:[.,]\d+)?)\s*(k|m|millions?|thousands?)?\s*(users?|requests?|transactions?|people|engineers?|developers?)\b/gu
 const titleConnectorTerms = new Set(['at', 'chez', 'de', 'of'])

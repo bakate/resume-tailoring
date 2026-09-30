@@ -12,6 +12,7 @@ import {
   sourceProfileFactMaximumCount,
 } from './match-analysis-schemas'
 import { createOpenAiRequester, createOpenAiRequestDeadline } from './openai-request'
+import { evidenceExcerptLength, requirementCoverageInstructions } from './requirement-coverage-instructions'
 
 type OpenAiMatcherDependencies = Readonly<{
   apiKey: string
@@ -184,21 +185,18 @@ function parseMatchEvidence({
 }
 
 const matchingInstructions = [
-  'Judge whether Candidate Facts show the same capability as each Job Requirement, even in different words or another language.',
-  'Use covered when Candidate Facts show the same capability at its full scope, including any explicit duration, scale, level, seniority, or production constraint.',
-  "Use partially-covered when the same capability appears at incomplete scope, or when a behavioral capability is only implied by a role's responsibilities.",
-  'A related but distinct capability, such as another technology in the same domain, leaves the requirement not covered: omit evidence for it.',
-  'Never offer a role title alone, a negated fact, or a duration or scale that the fact does not state as evidence.',
-  'For each fact link, copy a short contiguous factExcerpt verbatim from the Candidate Fact and a short contiguous requirementExcerpt verbatim from the Job Requirement value; the two excerpts may use different words.',
-  'When the requirement states a duration or scale, include the duration or scale stated by the fact in its factExcerpt.',
-  'Do not calculate or combine employment date ranges to prove a duration; omit duration coverage unless one Candidate Fact explicitly states enough duration.',
+  ...requirementCoverageInstructions,
   'Return relevantFactIds only for Candidate Facts relevant enough to support an honest Tailored Resume.',
   'Return no relevantFactIds when the declared material cannot support an honest Tailored Resume.',
   'Return at most three concise improvementOpportunities for useful keywords or conventions that are not explicit requirements; these observations never affect evidence.',
   'Never invent identifiers, qualifications, facts, or partial credit.',
 ].join(' ')
 
-const matchEvidenceResponseFormat = {
+const excerptJsonSchema = {
+  type: 'string', minLength: evidenceExcerptLength.minimum, maxLength: evidenceExcerptLength.maximum,
+} as const
+
+export const matchEvidenceResponseFormat = {
   type: 'json_schema',
   name: 'match_evidence',
   strict: true,
@@ -229,9 +227,9 @@ const matchEvidenceResponseFormat = {
                 additionalProperties: false,
                 required: ['factExcerpt', 'factId', 'requirementExcerpt'],
                 properties: {
-                  factExcerpt: { type: 'string', minLength: 2, maxLength: 200 },
+                  factExcerpt: excerptJsonSchema,
                   factId: { type: 'string', pattern: '^source-fact-.+$' },
-                  requirementExcerpt: { type: 'string', minLength: 2, maxLength: 200 },
+                  requirementExcerpt: excerptJsonSchema,
                 },
               },
             },

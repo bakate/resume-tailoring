@@ -227,6 +227,56 @@ describe('resume matching engine', () => {
     expect(result.value).toMatchObject({ matchScore: 50, relevantFactIds: ['fact-delivery'] })
   })
 
+  it.each([
+    {
+      case: 'a career level stated before a relative clause',
+      factExcerpt: 'built Next.js web applications', factValue: 'Senior engineer who built Next.js web applications',
+      requirementValue: 'Senior web application development',
+    },
+    {
+      case: 'a requirement that uses "lead" as a verb',
+      factExcerpt: 'Next.js web applications', factValue: 'Maintained Next.js web applications',
+      requirementValue: 'Lead the development of a web application',
+    },
+    {
+      case: 'a negation that follows the cited excerpt',
+      factExcerpt: 'Shipped Next.js web applications', factValue: 'Shipped Next.js web applications without downtime',
+      requirementValue: 'Build a web application',
+    },
+    {
+      case: 'a negation in another clause of the fact',
+      factExcerpt: 'Next.js web applications', factValue: 'Built Next.js web applications, never with Angular',
+      requirementValue: 'Build a web application',
+    },
+  ])('keeps full coverage for $case', ({ factExcerpt, factValue, requirementValue }) => {
+    const result = analyzeResumeMatch({
+      candidateFacts: [{ id: 'fact-web', kind: 'experience', value: factValue }],
+      proposedEvidence: [createEvidence({
+        coverage: 'covered', factExcerpt, factId: 'fact-web',
+        requirementExcerpt: 'web application', requirementId: 'requirement-web',
+      })],
+      relevantFactIds: [],
+      requirements: [createRoleNeutralRequirement({
+        capabilityName: 'Web application development', requirementId: 'requirement-web', term: requirementValue,
+      })],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.evidence).toMatchObject([{ coverage: 'covered', factIds: ['fact-web'] }])
+  })
+
+  it('ignores duplicate relevant Candidate Facts instead of rejecting the Match Analysis', () => {
+    const result = analyzeResumeMatch({
+      ...weightedMatchInputs,
+      relevantFactIds: ['fact-typescript', 'fact-typescript'],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.relevantFactIds).toEqual(['fact-typescript'])
+  })
+
   it('discards each invalid evidence proposal and keeps the rest of the Match Analysis', () => {
     const result = analyzeResumeMatch({
       ...reformulatedCapabilityInputs,

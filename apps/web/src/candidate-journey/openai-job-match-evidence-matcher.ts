@@ -10,6 +10,7 @@ import {
   createOpenAiRequester,
   type OpenAiRequestFailure,
 } from '../resume-tailoring/openai-request'
+import { requirementCoverageInstructions } from '../resume-tailoring/requirement-coverage-instructions'
 import {
   matchEvidenceProposalSchema,
   matchEvidenceResponseFormat,
@@ -203,14 +204,7 @@ function readOutputText({ value }: Readonly<{ value: unknown }>) {
 }
 
 const matchingInstructions = [
-  'Judge whether Candidate Facts show the same capability as each Job Requirement, even in different words or another language.',
-  'Use covered when Candidate Facts show the same capability at its full scope, including any explicit duration, scale, level, seniority, or production constraint.',
-  "Use partially-covered when the same capability appears at incomplete scope, or when a behavioral capability is only implied by a role's responsibilities.",
-  'A related but distinct capability, such as another technology in the same domain, leaves the requirement not covered: propose no evidence for it.',
-  'Never offer a role title alone, a negated fact, or a duration or scale that the fact does not state as evidence.',
-  'For each fact link, copy a short contiguous factExcerpt verbatim from the Candidate Fact and a short contiguous requirementExcerpt verbatim from the Job Requirement value; the two excerpts may use different words.',
-  'When the requirement states a duration or scale, include the duration or scale stated by the fact in its factExcerpt.',
-  'Do not calculate or combine employment date ranges to prove a duration.',
+  ...requirementCoverageInstructions,
   'Return relevance links for Candidate Facts relevant enough to support an honest Tailored Resume, with the same verbatim excerpts.',
   'Never calculate a score, importance, Match Band, or Generation Eligibility.',
   'Never invent identifiers, facts, requirements, or evidence.',
