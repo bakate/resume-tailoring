@@ -48,7 +48,15 @@ async function prepareResume({ models, request }: Readonly<{
 
 function professionalWritingInput(request: ResumePreparationRequest): ResumeWritingInput {
   return { candidateFacts: request.candidateFacts.filter(({ status }) => status === 'attested'),
-    jobMatch: request.jobMatch, locale: request.locale, purpose: request.purpose }
+    jobMatch: withAdjacentEvidenceFactsAsRelevant(request.jobMatch), locale: request.locale, purpose: request.purpose }
+}
+
+// Writing may highlight Adjacent Evidence facts, so they reach it as relevant facts; the
+// Match Analysis itself keeps them out of relevance and Generation Eligibility (ADR-0015).
+function withAdjacentEvidenceFactsAsRelevant(jobMatch: ResumeWritingInput['jobMatch']): ResumeWritingInput['jobMatch'] {
+  const relevantFactIds = [...new Set([...jobMatch.analysis.relevantFactIds,
+    ...jobMatch.analysis.adjacentEvidence.flatMap(({ factIds }) => factIds)])]
+  return { ...jobMatch, analysis: { ...jobMatch.analysis, relevantFactIds } }
 }
 
 function createTransientRetry() {

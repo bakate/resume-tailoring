@@ -4,6 +4,7 @@ import {
   analyzeResumeMatch,
   type CandidateFact,
   type JobRequirement,
+  type ProposedAdjacentEvidence,
   type ProposedMatchEvidence,
   validateRelevantFactProposals,
 } from '@resume-tailoring/matching-engine'
@@ -481,6 +482,91 @@ describe('resume matching engine', () => {
       criticalRequirementReserve: { requirementIds: [], status: 'clear' },
     })
   })
+  it('reports Adjacent Evidence next to an uncovered requirement without changing the Match Analysis', () => {
+    const withoutAdjacentEvidence = analyzeResumeMatch(adjacentStackInputs)
+    const result = analyzeResumeMatch({
+      ...adjacentStackInputs, proposedAdjacentEvidence: [adjacentStackEvidence],
+    })
+
+    expect(result.ok && withoutAdjacentEvidence.ok).toBe(true)
+    if (!result.ok || !withoutAdjacentEvidence.ok) return
+    expect(result.value.adjacentEvidence).toEqual([
+      { factIds: ['fact-react', 'fact-typescript'], requirementId: 'requirement-java-stack' },
+    ])
+    expect({ ...result.value, adjacentEvidence: [] }).toEqual(withoutAdjacentEvidence.value)
+    expect(result.value).toMatchObject({
+      criticalRequirementReserve: { requirementIds: ['requirement-java-stack'], status: 'present' },
+      evidence: [],
+      generationEligibility: 'denied',
+      matchScore: 0,
+      relevantFactIds: [],
+    })
+  })
+
+  it.each(['covered', 'partially-covered'] as const)(
+    'discards Adjacent Evidence for a %s requirement',
+    (coverage) => {
+      const result = analyzeResumeMatch({
+        ...weightedMatchInputs,
+        proposedAdjacentEvidence: [{
+          factMatches: [{ factExcerpt: 'TypeScript', factId: 'fact-typescript' }],
+          requirementId: 'requirement-typescript',
+        }],
+        proposedEvidence: [{ ...coveredTypeScriptEvidence, coverage }],
+      })
+
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      expect(result.value.adjacentEvidence).toEqual([])
+    },
+  )
+
+  it.each([
+    {
+      case: 'a fact excerpt absent from the Candidate Fact',
+      factMatches: [{ factExcerpt: 'Vue.js', factId: 'fact-react' }],
+      requirementId: 'requirement-java-stack',
+    },
+    {
+      case: 'an unknown Candidate Fact',
+      factMatches: [{ factExcerpt: 'React', factId: 'fact-unknown' }],
+      requirementId: 'requirement-java-stack',
+    },
+    {
+      case: 'an unknown Job Requirement',
+      factMatches: [{ factExcerpt: 'React', factId: 'fact-react' }],
+      requirementId: 'requirement-unknown',
+    },
+    {
+      case: 'a Candidate Fact cited twice',
+      factMatches: [
+        { factExcerpt: 'React', factId: 'fact-react' },
+        { factExcerpt: 'React', factId: 'fact-react' },
+      ],
+      requirementId: 'requirement-java-stack',
+    },
+    {
+      case: 'a negated fact',
+      factMatches: [{ factExcerpt: 'Spring', factId: 'fact-negated-spring' }],
+      requirementId: 'requirement-java-stack',
+    },
+    {
+      case: 'a role title offered as proof',
+      factMatches: [{ factExcerpt: 'Frontend Developer', factId: 'fact-frontend-title' }],
+      requirementId: 'requirement-java-stack',
+    },
+  ])('rejects Adjacent Evidence citing $case', ({ factMatches, requirementId }) => {
+    const result = analyzeResumeMatch({
+      ...adjacentStackInputs,
+      proposedAdjacentEvidence: [{ factMatches, requirementId }, adjacentStackEvidence],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.adjacentEvidence).toEqual([
+      { factIds: ['fact-react', 'fact-typescript'], requirementId: 'requirement-java-stack' },
+    ])
+  })
 })
 
 const candidateFacts = [
@@ -692,6 +778,32 @@ const coveredCriticalDuplicateInputs = {
     },
   ],
 } as const satisfies MatchInputs
+
+const adjacentStackInputs = {
+  candidateFacts: [
+    { id: 'fact-react', kind: 'experience', value: 'Built customer dashboards with React and Redux' },
+    { id: 'fact-typescript', kind: 'skill', value: 'TypeScript' },
+    { id: 'fact-negated-spring', kind: 'experience', value: 'No experience with Spring' },
+    { id: 'fact-frontend-title', kind: 'experience', value: 'Frontend Developer at Acme' },
+  ],
+  proposedEvidence: [],
+  relevantFactIds: [],
+  requirements: [{
+    capability: { dimension: 'technical-expertise', name: 'Java, JEE and Angular' },
+    id: 'requirement-java-stack',
+    importance: 'critical',
+    sourceExcerpt: 'Java, JEE and Angular are required.',
+    value: 'Develop with Java, JEE and Angular',
+  }],
+} as const satisfies MatchInputs
+
+const adjacentStackEvidence = {
+  factMatches: [
+    { factExcerpt: 'React', factId: 'fact-react' },
+    { factExcerpt: 'TypeScript', factId: 'fact-typescript' },
+  ],
+  requirementId: 'requirement-java-stack',
+} as const satisfies ProposedAdjacentEvidence
 
 function createEvidence({
   coverage, factExcerpt, factId, requirementExcerpt, requirementId, term,

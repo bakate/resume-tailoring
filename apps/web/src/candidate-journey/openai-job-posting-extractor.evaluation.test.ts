@@ -64,7 +64,7 @@ async function evaluateJobPosting({ jobPostingContent }: Readonly<{
       request: createMeasuredRequest({ metrics }),
     }),
     matchEvidenceMatcher: { match: () => Promise.resolve({
-      ok: true, value: { evidence: [], relevance: [] },
+      ok: true, value: { adjacentEvidence: [], evidence: [], relevance: [] },
     }) },
   })
   expect(result.ok, 'Expected a source-backed Job Posting extraction').toBe(true)

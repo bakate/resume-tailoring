@@ -11,9 +11,10 @@ import { z } from 'zod'
 import { createOpenAiJobMatchEvidenceMatcher } from './openai-job-match-evidence-matcher'
 
 // Live evaluation of Requirement Coverage judged by the model and verified by the engine (ADR-0015).
-// Positive cases measure recall; traps must never receive more coverage than the rules allow.
+// Positive cases measure recall; traps must never receive more coverage than the rules allow,
+// and a related but distinct capability must surface as Adjacent Evidence next to its gap.
 describe('OpenAI Job Match evidence live evaluation', () => {
-  it('finds expected coverage and never covers a trap', async () => {
+  it('finds expected coverage, never covers a trap, and reports expected Adjacent Evidence', async () => {
     const outcomes = []
     for (const evaluationCase of evaluationCases) {
       outcomes.push(await evaluateCase({ evaluationCase }))
@@ -24,6 +25,7 @@ describe('OpenAI Job Match evidence live evaluation', () => {
     expect(outcomes.every(({ ok }) => ok)).toBe(true)
     expect(report.expectedCoverageRecall).toBeGreaterThanOrEqual(minimumExpectedCoverageRecall)
     expect(report.trapViolations).toEqual([])
+    expect(report.missingAdjacentEvidence).toEqual([])
   }, 600_000)
 })
 
@@ -38,10 +40,12 @@ async function evaluateCase({ evaluationCase }: Readonly<{ evaluationCase: Evalu
   const requirements = evaluationCase.requirements.map(createRequirement)
   const result = await matcher.match({ candidateFacts: evaluationCase.candidateFacts, requirements })
   if (!result.ok) {
-    return { coverageByRequirementId: new Map<string, RequirementCoverage>(), evaluationCase, metrics, ok: false }
+    return { adjacentRequirementIds: new Set<string>(),
+      coverageByRequirementId: new Map<string, RequirementCoverage>(), evaluationCase, metrics, ok: false }
   }
   const analysis = analyzeResumeMatch({
     candidateFacts: evaluationCase.candidateFacts,
+    proposedAdjacentEvidence: result.value.adjacentEvidence,
     proposedEvidence: result.value.evidence,
     relevantFactIds: validateRelevantFactProposals({
       candidateFacts: evaluationCase.candidateFacts, proposals: result.value.relevance, requirements,
@@ -50,15 +54,18 @@ async function evaluateCase({ evaluationCase }: Readonly<{ evaluationCase: Evalu
   })
   const coverageByRequirementId = new Map<string, RequirementCoverage>(analysis.ok
     ? analysis.value.evidence.map(({ coverage, requirementId }) => [requirementId, coverage] as const) : [])
-  return { coverageByRequirementId, evaluationCase, metrics, ok: analysis.ok }
+  const adjacentRequirementIds = new Set(analysis.ok
+    ? analysis.value.adjacentEvidence.map(({ requirementId }) => requirementId) : [])
+  return { adjacentRequirementIds, coverageByRequirementId, evaluationCase, metrics, ok: analysis.ok }
 }
 
 type EvaluationOutcome = Awaited<ReturnType<typeof evaluateCase>>
 
 function summarizeOutcomes({ outcomes }: Readonly<{ outcomes: readonly EvaluationOutcome[] }>) {
-  const assessments = outcomes.flatMap(({ coverageByRequirementId, evaluationCase }) =>
-    evaluationCase.requirements.map(({ expectation, id }) => ({
-      caseName: evaluationCase.name, coverage: coverageByRequirementId.get(id) ?? 'not-covered', expectation, id,
+  const assessments = outcomes.flatMap(({ adjacentRequirementIds, coverageByRequirementId, evaluationCase }) =>
+    evaluationCase.requirements.map(({ expectation, expectsAdjacentEvidence = false, id }) => ({
+      caseName: evaluationCase.name, coverage: coverageByRequirementId.get(id) ?? 'not-covered', expectation,
+      expectsAdjacentEvidence, hasAdjacentEvidence: adjacentRequirementIds.has(id), id,
     })))
   const expectedCoverage = assessments.filter(({ expectation }) => expectation === 'covered')
   const foundCoverage = expectedCoverage.filter(({ coverage }) => coverage === 'covered')
@@ -66,6 +73,8 @@ function summarizeOutcomes({ outcomes }: Readonly<{ outcomes: readonly Evaluatio
     assessments,
     cases: outcomes.map(({ evaluationCase, metrics }) => ({ metrics, name: evaluationCase.name })),
     expectedCoverageRecall: expectedCoverage.length === 0 ? 1 : foundCoverage.length / expectedCoverage.length,
+    missingAdjacentEvidence: assessments.filter(({ expectsAdjacentEvidence, hasAdjacentEvidence }) =>
+      expectsAdjacentEvidence && !hasAdjacentEvidence),
     trapViolations: assessments.filter(({ coverage, expectation }) =>
       (expectation === 'not-covered' && coverage !== 'not-covered')
       || (expectation === 'partially-covered-at-most' && coverage === 'covered')),
@@ -106,6 +115,7 @@ function createRequirement({ capabilityName, id, value }: EvaluationRequirement)
 type EvaluationRequirement = Readonly<{
   capabilityName: string
   expectation: 'covered' | 'partially-covered-at-most' | 'not-covered'
+  expectsAdjacentEvidence?: true
   id: `job-requirement-${string}`
   value: string
 }>
@@ -194,13 +204,15 @@ const evaluationCases: readonly EvaluationCase[] = [
     }],
   },
   {
-    name: 'another technology in the same domain',
+    name: 'Java, JEE and Angular against TypeScript and React: Adjacent Evidence, never coverage',
     candidateFacts: [
       { id: 'source-fact-typescript-react', kind: 'experience', value: 'Built TypeScript and React single-page applications' },
     ],
     requirements: [
-      { capabilityName: 'Java EE', expectation: 'not-covered', id: 'job-requirement-jee', value: 'Develop Java and JEE services' },
-      { capabilityName: 'Angular', expectation: 'not-covered', id: 'job-requirement-angular', value: 'Build Angular interfaces' },
+      { capabilityName: 'Java EE', expectation: 'not-covered', expectsAdjacentEvidence: true,
+        id: 'job-requirement-jee', value: 'Develop Java and JEE services' },
+      { capabilityName: 'Angular', expectation: 'not-covered', expectsAdjacentEvidence: true,
+        id: 'job-requirement-angular', value: 'Build Angular interfaces' },
     ],
   },
   {

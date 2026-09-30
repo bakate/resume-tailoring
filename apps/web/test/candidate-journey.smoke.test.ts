@@ -167,6 +167,15 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectLowCoveragePreview()
   })
 
+  test('shows Adjacent Evidence next to a gap without presenting it as coverage', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'adjacent-evidence' })
+    await system.givenCombinedIntake()
+
+    await system.generateResume()
+
+    await system.expectAdjacentEvidenceNextToTheGap()
+  })
+
   test('explains no correspondence and offers a non-tailored document', async ({ page }) => {
     const system = createSystemUnderTest({ page, scenario: 'no-correspondence' })
     await system.givenNoCorrespondenceResult()
@@ -314,7 +323,7 @@ function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: P
   return new CandidateJourneyTestSystem(page, scenario)
 }
 
-type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-coverage' | 'no-correspondence'
+type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-coverage' | 'adjacent-evidence' | 'no-correspondence'
   | 'unsafe-output' | 'interrupted' | 'unavailable' | 'pending-writing' | 'posting-extraction-unavailable'
 
 class CandidateJourneyTestSystem {
@@ -725,6 +734,20 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByText('A low Match Score', { exact: false })).toBeVisible()
   }
 
+  async expectAdjacentEvidenceNextToTheGap() {
+    await this.expectGroupedPreview()
+    await this.#page.getByText('Match Analysis and supporting evidence', { exact: true }).click()
+    const gaps = this.#page.getByRole('listitem').filter({ hasText: /^Java/u })
+    await expect(gaps.first()).toContainText(
+      'Related experience you can highlight instead (it does not meet this requirement): TypeScript')
+    await this.#page.getByText('Complete requirement-to-evidence details', { exact: true }).click()
+    const javaDetail = this.#page.locator('.mantine-Paper-root').filter({ hasText: 'Java is required.' }).last()
+    await expect(javaDetail).toContainText('Uncovered')
+    await expect(javaDetail).toContainText('No supporting Candidate Fact.')
+    await expect(javaDetail).toContainText('it does not meet this requirement): TypeScript')
+    await expect(javaDetail.getByText('Covered', { exact: true })).toHaveCount(0)
+  }
+
   async expectNormalizedPreview() {
     this.#expectAction()
     await expect(this.#page.getByText('Non-tailored resume ready', { exact: true })).toBeVisible()
@@ -831,7 +854,7 @@ function extractionFor(scenario: Scenario) {
 }
 
 function requirementsFor(scenario: Scenario) {
-  if (scenario !== 'low-coverage') return structuredResumeJobMatch.requirements
+  if (scenario !== 'low-coverage' && scenario !== 'adjacent-evidence') return structuredResumeJobMatch.requirements
   return [...structuredResumeJobMatch.requirements, ...(['Rust', 'Java'] as const).map((name) => ({
     id: `job-requirement-${name}`, value: name, sourceExcerpt: `${name} is required.`, importance: 'central',
     importanceRationale: 'Explicit requirement', capability: { dimension: 'technical-expertise', name },
@@ -839,10 +862,12 @@ function requirementsFor(scenario: Scenario) {
 }
 
 function matchFor(scenario: Scenario) {
-  if (scenario === 'no-correspondence') return { evidence: [], relevance: [] }
+  if (scenario === 'no-correspondence') return { adjacentEvidence: [], evidence: [], relevance: [] }
   const factMatch = { factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' }
-  return { evidence: [{ requirementId: 'job-requirement-react', coverage: 'covered', factMatches: [factMatch] }],
-    relevance: [{ requirementId: 'job-requirement-react', factMatch }] }
+  return { adjacentEvidence: scenario === 'adjacent-evidence' ? [{ requirementId: 'job-requirement-Java',
+    factMatches: [{ factId: 'source-fact-skills-1-name-0', factExcerpt: 'TypeScript' }] }] : [],
+  evidence: [{ requirementId: 'job-requirement-react', coverage: 'covered', factMatches: [factMatch] }],
+  relevance: [{ requirementId: 'job-requirement-react', factMatch }] }
 }
 
 function writtenDocument({ input, scenario }: Readonly<{ input: ResumeWritingInput; scenario: Scenario }>) {

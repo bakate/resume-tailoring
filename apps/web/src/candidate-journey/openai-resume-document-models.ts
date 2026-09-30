@@ -63,6 +63,7 @@ const writingInstructions = [
   'Keep distinct achievements even when they use the same technology. Purposeful repetition across summary, skills and experience is appropriate.',
   'Keep education, languages, certifications and projects distinct. Preserve complete qualifications and associated institutions without invented levels.',
   'Never add terminology merely because the posting requests it. Unsupported requirements stay gaps.',
+  'Candidate Facts cited in jobMatch.analysis.adjacentEvidence show a related but distinct capability next to an uncovered Job Requirement: you may highlight them in their own words, but never name the uncovered capability or imply the Candidate has it.',
   'For purpose normalized, write a general professional resume without claiming relevance to the posting, use targetRole null and no relevant chronology labels.',
   'For purpose tailored, copy targetRole exactly from jobMatch.targetRole, including null fallback; never invent a title.',
   'Identity and contact details are local exceptions, absent from your input and output. Return only the semantic document.',

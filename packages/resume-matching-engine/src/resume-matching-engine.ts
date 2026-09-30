@@ -1,6 +1,10 @@
-import { validateMatchEvidence } from './evidence-validation'
+import { validateAdjacentEvidence, validateMatchEvidence } from './evidence-validation'
 
-export { validateMatchEvidence, validateRelevantFactProposals } from './evidence-validation'
+export {
+  validateAdjacentEvidence,
+  validateMatchEvidence,
+  validateRelevantFactProposals,
+} from './evidence-validation'
 import { normalizeText } from './text-normalization'
 
 export const capabilityDimensions = [
@@ -63,6 +67,18 @@ export type ProposedRelevantFact = Readonly<{
   requirementId: string
 }>
 
+// A related but distinct capability cited next to an uncovered requirement; it never
+// changes Requirement Coverage, the Match Score, or Generation Eligibility (ADR-0015).
+export type ProposedAdjacentEvidence = Readonly<{
+  factMatches: readonly Readonly<{ factExcerpt: string; factId: string }>[]
+  requirementId: string
+}>
+
+export type AdjacentEvidence = Readonly<{
+  factIds: readonly string[]
+  requirementId: string
+}>
+
 export type MatchEvidence = Readonly<{
   coverage: RequirementCoverage
   factIds: readonly string[]
@@ -78,6 +94,7 @@ export type RequirementGroupAnalysis = Readonly<{
 }>
 
 export type MatchAnalysis = Readonly<{
+  adjacentEvidence: readonly AdjacentEvidence[]
   criticalRequirementReserve: Readonly<{
     requirementIds: readonly string[]
     status: 'clear' | 'present'
@@ -101,11 +118,13 @@ export type MatchAnalysisResult =
 
 export function analyzeResumeMatch({
   candidateFacts,
+  proposedAdjacentEvidence = [],
   proposedEvidence,
   relevantFactIds,
   requirements,
 }: Readonly<{
   candidateFacts: readonly CandidateFact[]
+  proposedAdjacentEvidence?: readonly ProposedAdjacentEvidence[]
   proposedEvidence: readonly ProposedMatchEvidence[]
   relevantFactIds: readonly string[]
   requirements: readonly JobRequirement[]
@@ -123,7 +142,22 @@ export function analyzeResumeMatch({
   })) {
     return { error: { type: 'invalid-match-input' }, ok: false }
   }
-  return createSuccessfulResult({ evidence, relevantFactIds: evidencedRelevantFactIds, requirements })
+  const result = createSuccessfulResult({ evidence, relevantFactIds: evidencedRelevantFactIds, requirements })
+  if (!result.ok) return result
+  return { ok: true, value: { ...result.value, adjacentEvidence: readUncoveredAdjacentEvidence({
+    adjacentEvidence: validateAdjacentEvidence({ candidateFacts, proposedAdjacentEvidence, requirements }),
+    requirementGroups: result.value.requirementGroups,
+  }) } }
+}
+
+function readUncoveredAdjacentEvidence({ adjacentEvidence, requirementGroups }: Readonly<{
+  adjacentEvidence: readonly AdjacentEvidence[]
+  requirementGroups: readonly RequirementGroupAnalysis[]
+}>) {
+  const uncoveredRequirementIds = new Set(requirementGroups
+    .filter(({ coverage }) => coverage === 'uncovered')
+    .flatMap(({ requirementIds }) => requirementIds))
+  return adjacentEvidence.filter(({ requirementId }) => uncoveredRequirementIds.has(requirementId))
 }
 
 export function restoreResumeMatch({
@@ -153,6 +187,7 @@ function createSuccessfulResult({ evidence, relevantFactIds, requirements }: Rea
   const criticalRequirementReserve = readCriticalRequirementReserve({ evidence, requirements })
   const requirementGroups = createRequirementGroupAnalyses({ evidence, requirements })
   return { ok: true, value: {
+    adjacentEvidence: [],
     criticalRequirementReserve,
     evidence,
     generationEligibility: relevantFactIds.length > 0 ? 'eligible' : 'denied',

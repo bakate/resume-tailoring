@@ -67,6 +67,7 @@ const sourceIntake = {
 
 const jobMatch = {
   analysis: {
+    adjacentEvidence: [],
     criticalRequirementReserve: { requirementIds: [], status: 'clear' },
     evidence: [],
     generationEligibility: 'eligible',

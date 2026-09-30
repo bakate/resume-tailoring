@@ -89,6 +89,13 @@ const proposedFactMatchSchema = z.strictObject({
 })
 
 export const matchEvidenceProposalSchema = z.strictObject({
+  adjacentEvidence: z.array(z.strictObject({
+    factMatches: z.array(z.strictObject({
+      factExcerpt: evidenceExcerptSchema,
+      factId: candidateFactIdSchema,
+    })).min(1).max(500),
+    requirementId: requirementIdSchema,
+  })).max(100),
   evidence: z.array(z.strictObject({
     coverage: z.enum(requirementCoverages),
     factMatches: z.array(proposedFactMatchSchema).min(1).max(500),

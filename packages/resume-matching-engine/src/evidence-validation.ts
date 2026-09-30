@@ -1,7 +1,9 @@
 import type {
+  AdjacentEvidence,
   CandidateFact,
   MatchEvidence,
   JobRequirement,
+  ProposedAdjacentEvidence,
   ProposedFactMatch,
   ProposedMatchEvidence,
   ProposedRelevantFact,
@@ -43,6 +45,35 @@ export function validateRelevantFactProposals({
     return fact !== undefined && requirement !== undefined
       && provesRelevance({ fact, factMatch: proposal.factMatch, requirement }) ? [fact.id] : []
   }))]
+}
+
+// Adjacent Evidence follows the same structural rules as Match Evidence, but cites no
+// requirement excerpt and no duration or scale because it never proves coverage (ADR-0015).
+export function validateAdjacentEvidence({
+  candidateFacts, proposedAdjacentEvidence, requirements,
+}: Readonly<{
+  candidateFacts: readonly CandidateFact[]
+  proposedAdjacentEvidence: readonly ProposedAdjacentEvidence[]
+  requirements: readonly JobRequirement[]
+}>): readonly AdjacentEvidence[] {
+  const requirementIds = new Set(requirements.map(({ id }) => id))
+  const candidateFactById = new Map(candidateFacts.map((fact) => [fact.id, fact]))
+  const adjacentEvidenceByRequirementId = new Map<string, AdjacentEvidence>()
+  for (const proposal of proposedAdjacentEvidence) {
+    if (adjacentEvidenceByRequirementId.has(proposal.requirementId)
+      || !requirementIds.has(proposal.requirementId)) continue
+    const factIds = proposal.factMatches.map(({ factId }) => factId)
+    if (factIds.length === 0 || new Set(factIds).size !== factIds.length) continue
+    if (!proposal.factMatches.every(({ factExcerpt, factId }) => {
+      const fact = candidateFactById.get(factId)
+      return fact !== undefined && containsTerm({ content: fact.value, term: factExcerpt })
+        && !rejectsCandidateFact({ fact, factExcerpt })
+    })) continue
+    adjacentEvidenceByRequirementId.set(proposal.requirementId, {
+      factIds, requirementId: proposal.requirementId,
+    })
+  }
+  return [...adjacentEvidenceByRequirementId.values()]
 }
 
 function validateEvidenceProposal({ candidateFactById, proposal, requirementById }: Readonly<{

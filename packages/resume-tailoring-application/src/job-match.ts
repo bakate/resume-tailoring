@@ -4,6 +4,7 @@ import {
 import type {
   CandidateFact as EngineCandidateFact,
   MatchAnalysis as EngineMatchAnalysis,
+  ProposedAdjacentEvidence,
   ProposedMatchEvidence,
   ProposedRelevantFact,
 } from '@resume-tailoring/matching-engine'
@@ -65,6 +66,7 @@ export type JobPostingExtractor = Readonly<{
 }>
 
 export type MatchEvidenceProposal = Readonly<{
+  adjacentEvidence: readonly ProposedAdjacentEvidence[]
   evidence: readonly ProposedMatchEvidence[]
   relevance: readonly ProposedRelevantFact[]
 }>
@@ -206,6 +208,7 @@ async function analyzeCandidateFacts({
   if (!proposalResult.ok) return proposalResult
   const analysisResult = analyzeResumeMatch({
     candidateFacts: engineFacts,
+    proposedAdjacentEvidence: proposalResult.value.adjacentEvidence,
     proposedEvidence: proposalResult.value.evidence,
     relevantFactIds: validateRelevantFactProposals({
       candidateFacts: engineFacts, proposals: proposalResult.value.relevance, requirements,
@@ -244,6 +247,9 @@ function mapMatchAnalysis({ analysis }: Readonly<{
 }>): JobMatch['analysis'] {
   return {
     ...analysis,
+    adjacentEvidence: analysis.adjacentEvidence.map((item) => ({
+      ...item, requirementId: toRequirementId(item.requirementId),
+    })),
     criticalRequirementReserve: {
       ...analysis.criticalRequirementReserve,
       requirementIds: analysis.criticalRequirementReserve.requirementIds.map(toRequirementId),

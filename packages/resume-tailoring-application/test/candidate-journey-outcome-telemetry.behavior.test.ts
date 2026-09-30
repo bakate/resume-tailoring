@@ -228,8 +228,8 @@ function createDependencies({ options, events }: Readonly<{
       value: { text: new TextDecoder().decode(document.bytes) } }) },
     jobPostingExtractor: { extract: () => Promise.resolve({ ok: true, value: structuredResumeJobMatch }) },
     matchEvidenceMatcher: { match: () => Promise.resolve({ ok: true, value: options.correspondence === 'none'
-      ? { evidence: [], relevance: [] }
-      : { evidence: [{ coverage: 'covered', factMatches: [factMatch], requirementId: 'job-requirement-react' }],
+      ? { adjacentEvidence: [], evidence: [], relevance: [] }
+      : { adjacentEvidence: [], evidence: [{ coverage: 'covered', factMatches: [factMatch], requirementId: 'job-requirement-react' }],
         relevance: [{ requirementId: 'job-requirement-react', factMatch }] } }) },
     resumeDocumentPorts: createResumePreparation({
       writer: { write: ({ locale, purpose }) => Promise.resolve({ ok: true, value: {
