@@ -38,7 +38,7 @@ export type ModelEvaluationBaseline = Readonly<{
   }>
 }>
 
-type CalibratedGate = Readonly<{ passed: boolean; threshold: number; value: number }>
+export type CalibratedGate = Readonly<{ passed: boolean; threshold: number; value: number }>
 type UncalibratedGate = Readonly<{
   passed: false
   status: 'not-calibrated'
