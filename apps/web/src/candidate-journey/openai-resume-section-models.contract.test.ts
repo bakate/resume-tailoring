@@ -3,6 +3,7 @@ import { resumeSectionKinds } from '@resume-tailoring/application/candidate-jour
 import type { ResumeSectionContent, ResumeSectionKind, ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
 import { readResumeSection, groupedResumeDocument, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createOpenAiResumeCoherenceChecker, createOpenAiResumeFieldValidator, createOpenAiResumeSectionWriter } from './openai-resume-section-models'
+import { resumeSectionWritingInputSchema } from './resume-document-schemas'
 
 describe('Resume section model adapters', () => {
   it.each(resumeSectionKinds)('writes the %s section under its own strict structured-output schema', async (kind) => {
@@ -37,6 +38,14 @@ describe('Resume section model adapters', () => {
     expect(JSON.parse(request ?? '{}')).toMatchObject({ rejectedFields })
     expect(instructions).toContain('rejectedFields')
     expect(instructions).toContain('Never reuse them as written')
+  })
+
+  it('accepts a writing request from a client loaded before rewrites carried rejected fields', () => {
+    const olderRequest: unknown = JSON.parse(JSON.stringify({ ...writingInput('skills'), rejectedFields: undefined }))
+
+    const parsed = resumeSectionWritingInputSchema.safeParse(olderRequest)
+
+    expect(parsed.success && parsed.data.rejectedFields).toEqual([])
   })
 
   it('validates only the fields of one section against the facts they cite', async () => {
