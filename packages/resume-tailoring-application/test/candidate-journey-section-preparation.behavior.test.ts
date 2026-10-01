@@ -58,7 +58,7 @@ describe('Candidate Journey section-by-section resume preparation', () => {
 
     await system.prepareTailoredResume()
 
-    system.expectPreparationFailure({ reason: 'unavailable', recovery: 'retry' })
+    system.expectPreparationFailure({ reason: 'unsupported-content', recovery: 'retry' })
     system.expectSavedSections({ validated: ['value-proposition', 'experiences.0', 'experiences.1', 'education',
       'languages', 'projects', 'certifications'], failed: ['skills'] })
   })
@@ -89,6 +89,15 @@ describe('Candidate Journey section-by-section resume preparation', () => {
 
     system.expectPreparationFailure({ reason: 'unsupported-content', recovery: 'correct-content' })
     system.expectEveryValidatedSectionKeptVisible()
+  })
+
+  it('asks for a retry when the coherence check itself times out', async () => {
+    const system = createSystemUnderTest({ coherence: 'timeout' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectPreparationFailure({ reason: 'unavailable', recovery: 'retry' })
   })
 
   it('asks for renewed consent when a section model requires it', async () => {
@@ -166,7 +175,7 @@ type TestOptions = Readonly<{
   heldSection?: 'skills'
   skillsValidation?: 'unsupported-once' | 'unsupported-twice'
   skillsWritingFailure?: Exclude<ResumeSectionModelFailure, 'permanent'>
-  coherence?: 'incoherent' | 'incoherent-once'
+  coherence?: 'incoherent' | 'incoherent-once' | 'timeout'
 }>
 
 class SectionPreparationTestSystem {
@@ -438,7 +447,7 @@ function createDependencies({ options, store, models }: Readonly<{
         return Promise.resolve({ ok: true, value: { fields: fields.map(({ id }, index) => ({ fieldId: id,
           supported: !(unsupported && section.kind === 'skills' && index === 0) })) } })
       },
-      checkCoherence: () => Promise.resolve({ ok: true, value: { languageMatches: true,
+      checkCoherence: () => Promise.resolve(options.coherence === 'timeout' ? { ok: false, error: { type: 'timeout' } } : { ok: true, value: { languageMatches: true,
         coherent: options.coherence === undefined || (options.coherence === 'incoherent-once' && coherenceChecks++ > 0) } }),
     }),
     persistence: { delete: () => ({ ok: true, value: null }),

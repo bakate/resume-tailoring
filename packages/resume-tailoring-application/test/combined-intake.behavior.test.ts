@@ -368,7 +368,7 @@ class CombinedIntakeSystem {
   expectUnsafeWordingNotPublished() {
     expect(this.#outcome?.status, 'Request preparation before reading the outcome').toBe('candidate-session-open')
     const view = this.#outcome?.status === 'candidate-session-open' ? this.#outcome : null
-    expect(view?.preparationOutcome).toMatchObject({ status: 'failed', reason: 'unavailable', recovery: 'retry' })
+    expect(view?.preparationOutcome).toMatchObject({ status: 'failed', reason: 'unsupported-content', recovery: 'retry' })
     expect(view?.session.tailoredResume).toBeNull()
   }
 
@@ -464,7 +464,7 @@ class CombinedIntakeSystem {
 
   expectStableResumePreserved() {
     const view = this.#expectOutcomeView()
-    expect(view?.preparationOutcome).toMatchObject({ status: 'failed', reason: 'unavailable', recovery: 'retry' })
+    expect(view?.preparationOutcome).toMatchObject({ status: 'failed', reason: 'unsupported-content', recovery: 'retry' })
     expect(view?.session.tailoredResume).toEqual(this.#stableResume)
     expect(view?.session.sourceIntake?.sourceProfile).toEqual(structuredResumeSource.sourceProfile)
   }

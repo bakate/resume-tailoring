@@ -196,20 +196,21 @@ function readPreparationOutput(context: ResumePreparationMachineContext): Resume
   const failures = context.coherence === null
     ? context.results.flatMap((result) => result.status === 'failed' ? [result.failure] : [])
     : [context.coherence.ok ? 'unsupported' as const : context.coherence.error.type]
-  return readPreparationFailure({ failures, coherenceFailed: context.coherence !== null })
+  return readPreparationFailure({ failures, incoherent: context.coherence?.ok === true })
 }
 
 /**
  * Several sections can fail differently in one preparation (for example one timed out, another is unsupported),
  * but the Candidate sees a single failure with a single recovery action.
  */
-function readPreparationFailure({ failures, coherenceFailed }: Readonly<{
-  failures: readonly ResumeSectionFailure[]; coherenceFailed: boolean
+function readPreparationFailure({ failures, incoherent }: Readonly<{
+  failures: readonly ResumeSectionFailure[]; incoherent: boolean
 }>): ResumeOperationFailure {
-  // Without consent no call can succeed. An incoherent document survives a retry, whereas a retry rewrites only
-  // the sections that failed, so a section that still fails after its rewrite is worth retrying.
+  // Without consent no call can succeed, and an incoherent document survives a retry. A retry rewrites only the
+  // sections that failed, so a section whose wording is still unsupported after its rewrite is worth retrying.
   if (failures.includes('consent-required')) return { status: 'failed', reason: 'processing-consent-required', recovery: 'renew-consent' }
-  if (coherenceFailed) return { status: 'failed', reason: 'unsupported-content', recovery: 'correct-content' }
+  if (incoherent) return { status: 'failed', reason: 'unsupported-content', recovery: 'correct-content' }
+  if (failures.includes('unsupported')) return { status: 'failed', reason: 'unsupported-content', recovery: 'retry' }
   return { status: 'failed', reason: 'unavailable', recovery: 'retry' }
 }
 
