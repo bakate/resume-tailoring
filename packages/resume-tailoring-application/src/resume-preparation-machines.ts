@@ -12,7 +12,7 @@ type ResumeSectionFailure = Exclude<typeof resumeSectionOutcomes[number], 'valid
 
 export type ResumeSectionResult = Readonly<{
   section: ResumeSectionPlanEntry
-  attemptCount: number
+  attempt: number
   durationMilliseconds: number
   usage: ResumeModelUsage
 }> & (Readonly<{ status: 'validated'; content: ResumeSectionContent }>
@@ -82,7 +82,7 @@ function addUsage(total: ResumeModelUsage, usage: ResumeModelUsage | undefined):
 }
 
 function readSectionResult(context: ResumeSectionMachineContext): ResumeSectionResult {
-  const measured = { section: context.writingInput.section, attemptCount: context.attempt, usage: context.usage,
+  const measured = { section: context.writingInput.section, attempt: context.attempt, usage: context.usage,
     durationMilliseconds: Math.max(0, context.now() - context.startedAt) }
   return context.failure === null && context.content !== null
     ? { ...measured, status: 'validated', content: context.content }
@@ -148,6 +148,8 @@ export const resumeSectionMachine = setup({
 export type ResumePreparationMachineInput = Readonly<{
   request: ResumeSectionsRequest
   revision: string
+  /** The saved sections snapshot of an earlier attempt at the same inputs; its validated sections are not written again. */
+  resumeFrom: readonly ResumeSectionSnapshot[]
   models: ResumeSectionModels
   now: () => number
   recordTelemetry: (event: PrivacySafeTelemetryEvent) => void
@@ -194,17 +196,20 @@ function readPreparationOutput(context: ResumePreparationMachineContext): Resume
   const failures = context.coherence === null
     ? context.results.flatMap((result) => result.status === 'failed' ? [result.failure] : [])
     : [context.coherence.ok ? 'unsupported' as const : context.coherence.error.type]
-  return readPreparationFailure(failures)
+  return readPreparationFailure({ failures, coherenceFailed: context.coherence !== null })
 }
 
 /**
  * Several sections can fail differently in one preparation (for example one timed out, another is unsupported),
  * but the Candidate sees a single failure with a single recovery action.
  */
-function readPreparationFailure(failures: readonly ResumeSectionFailure[]): ResumeOperationFailure {
-  // Without consent no call can succeed, and unsupported content survives a retry; only then is retrying useful.
+function readPreparationFailure({ failures, coherenceFailed }: Readonly<{
+  failures: readonly ResumeSectionFailure[]; coherenceFailed: boolean
+}>): ResumeOperationFailure {
+  // Without consent no call can succeed. An incoherent document survives a retry, whereas a retry rewrites only
+  // the sections that failed, so a section that still fails after its rewrite is worth retrying.
   if (failures.includes('consent-required')) return { status: 'failed', reason: 'processing-consent-required', recovery: 'renew-consent' }
-  if (failures.includes('unsupported')) return { status: 'failed', reason: 'unsupported-content', recovery: 'correct-content' }
+  if (coherenceFailed) return { status: 'failed', reason: 'unsupported-content', recovery: 'correct-content' }
   return { status: 'failed', reason: 'unavailable', recovery: 'retry' }
 }
 
@@ -212,8 +217,41 @@ type ResumePreparationEvent =
   | Readonly<{ type: 'SECTION_PROGRESSED'; key: string; status: SectionProgressStatus; attempt: number }>
   | Readonly<{ type: 'SECTION_FINISHED'; result: ResumeSectionResult }>
 
-function readPlannedSections(plan: readonly ResumeSectionPlanEntry[]): readonly ResumeSectionSnapshot[] {
-  return plan.map(({ key, kind }) => ({ key, kind, status: 'planned', attempt: 0 }))
+function readPlannedSections({ plan, restored }: Readonly<{
+  plan: readonly ResumeSectionPlanEntry[]; restored: readonly ResumeSectionResult[]
+}>): readonly ResumeSectionSnapshot[] {
+  return plan.map(({ key, kind }) => {
+    const result = restored.find(({ section }) => section.key === key)
+    return result === undefined ? { key, kind, status: 'planned', attempt: 0 } : readSectionSnapshot(result)
+  })
+}
+
+/**
+ * A validated section is kept when its key is still planned and it still passes the deterministic structure checks,
+ * which include citing only attested Candidate Facts. It is not validated by a model again (ADR-0016).
+ */
+function restoreValidatedSections({ context, plan }: Readonly<{
+  context: ResumePreparationMachineContext; plan: readonly ResumeSectionPlanEntry[]
+}>): readonly ResumeSectionResult[] {
+  return plan.flatMap((section) => {
+    const saved = context.resumeFrom.find(({ key, kind }) => key === section.key && kind === section.kind)
+    const restored = saved === undefined ? null : readRestoredSection({ section, saved })
+    return restored !== null && hasSupportedSectionStructure({ content: restored.content,
+      input: createSectionWritingInput({ request: context.request, section }) }) ? [restored] : []
+  })
+}
+
+function readRestoredSection({ section, saved }: Readonly<{
+  section: ResumeSectionPlanEntry; saved: ResumeSectionSnapshot
+}>): Extract<ResumeSectionResult, { status: 'validated' }> | null {
+  return saved.status === 'validated' ? { section, status: 'validated', content: saved.content, attempt: saved.attempt,
+    durationMilliseconds: 0, usage: noUsage } : null
+}
+
+function readSectionSnapshot(result: ResumeSectionResult): ResumeSectionSnapshot {
+  const { key, kind } = result.section
+  return result.status === 'validated' ? { key, kind, attempt: result.attempt, status: 'validated', content: result.content }
+    : { key, kind, attempt: result.attempt, status: 'failed' }
 }
 
 function readProgressedSections({ context, event }: Readonly<{
@@ -223,16 +261,13 @@ function readProgressedSections({ context, event }: Readonly<{
   return context.sections.map((section): ResumeSectionSnapshot => {
     if (section.key !== key) return section
     if (event.type === 'SECTION_PROGRESSED') return { key, kind: section.kind, status: event.status, attempt: event.attempt }
-    const { result } = event
-    return result.status === 'validated'
-      ? { key, kind: section.kind, status: 'validated', attempt: result.attemptCount, content: result.content }
-      : { key, kind: section.kind, status: 'failed', attempt: result.attemptCount }
+    return readSectionSnapshot(event.result)
   })
 }
 
 function recordSectionResult({ context, result }: Readonly<{ context: ResumePreparationMachineContext; result: ResumeSectionResult }>) {
   context.recordTelemetry({ name: 'resume-section-prepared', sectionKind: result.section.kind,
-    outcome: result.status === 'validated' ? 'validated' : result.failure, attemptCount: result.attemptCount,
+    outcome: result.status === 'validated' ? 'validated' : result.failure, attemptCount: result.attempt,
     durationMilliseconds: result.durationMilliseconds, inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens })
 }
 
@@ -256,8 +291,11 @@ export const resumePreparationMachine = setup({
   },
   actors: { resumeSectionMachine, checkDocumentCoherence },
   actions: {
-    reportSectionsProgressed: sendParent(({ context }: Readonly<{ context: ResumePreparationMachineContext }>) =>
-      ({ type: 'RESUME_SECTIONS_PROGRESSED', sections: context.sections })),
+    // Model qualification runs the machine without a Candidate Journey parent; only the Journey saves the snapshot.
+    reportSectionsProgressed: enqueueActions(({ context, self, enqueue }) => {
+      if (self._parent === undefined) return
+      enqueue.sendParent({ type: 'RESUME_SECTIONS_PROGRESSED', sections: context.sections })
+    }),
     spawnQueuedSections: enqueueActions(({ context, enqueue }) => {
       const running = context.startedKeys.length - context.results.length
       const queued = context.plan.filter(({ key }) => !context.startedKeys.includes(key))
@@ -278,7 +316,9 @@ export const resumePreparationMachine = setup({
     planning: {
       entry: [assign(({ context }) => {
         const plan = planResumeSections(context.request)
-        return { plan, sections: readPlannedSections(plan) }
+        const restored = restoreValidatedSections({ context, plan })
+        return { plan, results: restored, startedKeys: restored.map(({ section }) => section.key),
+          sections: readPlannedSections({ plan, restored }) }
       }), 'reportSectionsProgressed'],
       always: { target: 'writingSections' },
     },

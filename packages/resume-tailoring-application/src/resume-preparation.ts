@@ -9,6 +9,7 @@ export type { ResumeSectionsRequest } from './resume-sections'
  * outside the Candidate Journey, so qualification measures the same planning, concurrency, retries and coherence
  * check a Candidate gets. Behavior tests keep exercising preparation through the Candidate Journey.
  */
-export function prepareResumeSections(input: ResumePreparationMachineInput): Promise<ResumePreparationMachineOutput> {
-  return toPromise(createActor(resumePreparationMachine, { input }).start())
+export function prepareResumeSections(input: Omit<ResumePreparationMachineInput, 'resumeFrom'>): Promise<ResumePreparationMachineOutput> {
+  // Qualification always measures a fresh preparation: no section is restored from a saved snapshot.
+  return toPromise(createActor(resumePreparationMachine, { input: { ...input, resumeFrom: [] } }).start())
 }
