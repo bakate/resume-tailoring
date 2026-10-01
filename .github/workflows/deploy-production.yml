@@ -29,8 +29,12 @@ jobs:
           node-version-file: '.nvmrc'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Install Chrome for PDF integration tests
-        run: pnpm --filter @resume-tailoring/web exec puppeteer browsers install chrome
+      # Like production, Puppeteer runs a system Chromium for PDF rendering: here the image's.
+      - name: Point Puppeteer at the image's Chromium
+        run: |
+          chromium_path=$(pnpm --filter @resume-tailoring/web exec node -e "console.log(require('@playwright/test').chromium.executablePath())")
+          test -x "$chromium_path"
+          printf 'PUPPETEER_EXECUTABLE_PATH=%s\n' "$chromium_path" >> "$GITHUB_ENV"
       - run: pnpm check
       - name: Run the Chromium E2E smoke test
         run: pnpm test:e2e
