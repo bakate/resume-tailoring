@@ -16,6 +16,7 @@
     "./tailored-resume-document": "./src/tailored-resume-document.ts",
     "./tailored-resume": "./src/tailored-resume.ts",
     "./resume-claim-restoration": "./src/resume-claim-restoration.ts",
+    "./resume-preparation": "./src/resume-preparation.ts",
     "./resume-tailoring-workflow-ports": "./src/resume-tailoring-workflow-ports.ts",
     "./resume-tailoring-workflow-testing": "./src/resume-tailoring-workflow-testing.ts",
     "./source-intake": "./src/source-intake.ts",
