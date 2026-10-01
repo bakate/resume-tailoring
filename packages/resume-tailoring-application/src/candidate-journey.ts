@@ -1,7 +1,8 @@
 export { resumePreparationFailures } from '@resume-tailoring/domain/candidate-session'
-export { readProfessionalResumeFields, resumeSectionKinds } from './resume-sections'
-export type { ResumeCoherenceInput, ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput,
-  ResumeModelUsage, ResumeSectionContent, ResumeSectionKind, ResumeSectionModelFailure, ResumeSectionModelResult,
+export { readProfessionalResumeFields, resumeCoherenceIssueKinds, resumeSectionKinds } from './resume-sections'
+export type { ResumeCoherenceInput, ResumeCoherenceIssue, ResumeCoherenceIssueKind, ResumeDocumentCoherence,
+  ResumeFieldRejection, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage, ResumeRejectedField,
+  ResumeSectionContent, ResumeSectionKind, ResumeSectionModelFailure, ResumeSectionModelResult,
   ResumeSectionModels, ResumeSectionPlanEntry, ResumeSectionWritingInput } from './resume-sections'
 import type { ResumeSectionModels } from './resume-sections'
 import { resumePreparationMachine } from './resume-preparation-machines'

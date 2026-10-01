@@ -12,7 +12,7 @@ export type ProfessionalResumeDocument = Omit<TailoredResume, 'identity' | 'cont
 
 export type ResumeOperationFailure = Readonly<{
   status: 'failed'
-  reason: 'processing-consent-required' | 'unavailable' | 'unsupported-content' | 'stale-result'
+  reason: 'processing-consent-required' | 'unavailable' | 'unsupported-content' | 'incoherent-content' | 'stale-result'
   recovery: 'renew-consent' | 'retry' | 'correct-content' | 'retry-current-draft'
 }>
 

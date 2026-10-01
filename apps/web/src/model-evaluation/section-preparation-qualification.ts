@@ -28,7 +28,7 @@ export type SectionPreparationRun = Readonly<{
 }>
 
 /** The coherence check's content-free answer, or why it gave none. */
-export type CoherenceVerdict = ResumeDocumentCoherence | ResumeSectionModelFailure
+export type CoherenceVerdict = Pick<ResumeDocumentCoherence, 'coherent' | 'languageMatches'> | ResumeSectionModelFailure
 
 type SectionLatencyGate = CalibratedGate & Readonly<{ kind: ResumeSectionKind; sampleCount: number }>
 

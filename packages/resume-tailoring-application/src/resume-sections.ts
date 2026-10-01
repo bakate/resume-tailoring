@@ -24,7 +24,9 @@ export type ResumeSectionWritingInput = Readonly<{
   rejectedFields: readonly ResumeRejectedField[]
 }>
 
-export type ResumeRejectedField = Readonly<{ fieldId: string; text: string }>
+/** Why a field was sent back to its writer: unsupported by its facts, or one of the coherence issue kinds. */
+export type ResumeFieldRejection = 'unsupported' | ResumeCoherenceIssueKind
+export type ResumeRejectedField = Readonly<{ fieldId: string; text: string; reason: ResumeFieldRejection }>
 
 export type ResumeFieldValidationInput = Readonly<{
   section: ResumeSectionPlanEntry
@@ -36,7 +38,14 @@ export type ResumeFieldValidationInput = Readonly<{
 export type ResumeFieldValidation = Readonly<{ fields: readonly Readonly<{ fieldId: string; supported: boolean }>[] }>
 
 export type ResumeCoherenceInput = Readonly<{ document: ProfessionalResumeDocument }>
-export type ResumeDocumentCoherence = Readonly<{ coherent: boolean; languageMatches: boolean }>
+export const resumeCoherenceIssueKinds = ['chronology', 'mixed-association', 'redundant', 'skill-category',
+  'duplicated-skill', 'language'] as const
+export type ResumeCoherenceIssueKind = typeof resumeCoherenceIssueKinds[number]
+/** A field of the assembled document that the coherence check objects to; its section is rewritten. */
+export type ResumeCoherenceIssue = Readonly<{ fieldId: string; kind: ResumeCoherenceIssueKind }>
+export type ResumeDocumentCoherence = Readonly<{
+  coherent: boolean; languageMatches: boolean; issues: readonly ResumeCoherenceIssue[]
+}>
 
 export type ResumeSectionModelFailure = 'transient' | 'timeout' | 'permanent' | 'consent-required'
 export type ResumeModelUsage = Readonly<{ inputTokens: number; outputTokens: number }>
@@ -169,7 +178,7 @@ export function readRejectedFields({ content, validation }: Readonly<{
   content: ResumeSectionContent; validation: ResumeFieldValidation
 }>): readonly ResumeRejectedField[] {
   return readSectionContentFields(content).filter(({ id }) => !validation.fields.some(({ fieldId, supported }) =>
-    fieldId === id && supported)).map(({ id, text }) => ({ fieldId: id, text }))
+    fieldId === id && supported)).map(({ id, text }) => ({ fieldId: id, text, reason: 'unsupported' }))
 }
 
 export function citedCandidateFacts({ content, candidateFacts }: Readonly<{
@@ -179,14 +188,27 @@ export function citedCandidateFacts({ content, candidateFacts }: Readonly<{
   return candidateFacts.filter(({ id }) => cited.has(id))
 }
 
-/** Assembles validated sections in plan order; a field identifier reused across sections is made unique. */
-export function assembleResumeDocument({ contents, request }: Readonly<{
+export function assembleResumeDocument(request: Readonly<{
   contents: readonly ResumeSectionContent[]; request: ResumeSectionsRequest
 }>): ProfessionalResumeDocument {
-  const usedIds = new Set<string>()
+  return assembleResumeDocumentWithOrigins(request).document
+}
+
+/** The Resume Section key and the section's own field behind one field id of the assembled document. */
+export type AssembledFieldOrigin = Readonly<{ sectionKey: string; field: TailoredResumeField }>
+
+/**
+ * Assembles validated sections in plan order; a field identifier reused across sections is made unique.
+ * `origins` maps each assembled field id back to its section, so a document-level verdict can reach the section.
+ */
+export function assembleResumeDocumentWithOrigins({ contents, request }: Readonly<{
+  contents: readonly ResumeSectionContent[]; request: ResumeSectionsRequest
+}>): Readonly<{ document: ProfessionalResumeDocument; origins: ReadonlyMap<string, AssembledFieldOrigin> }> {
+  const origins = new Map<string, AssembledFieldOrigin>()
+  // `key` is always the section key: experiences carry it as their id, every other section kind is its own key.
   const unique = (field: TailoredResumeField, key: string): TailoredResumeField => {
-    const id = usedIds.has(field.id) ? `${key}.${field.id}` : field.id
-    usedIds.add(id)
+    const id = origins.has(field.id) ? `${key}.${field.id}` : field.id
+    origins.set(id, { sectionKey: key, field })
     return id === field.id ? field : { ...field, id }
   }
   const uniqueOrNull = (field: TailoredResumeField | null, key: string) => field === null ? null : unique(field, key)
@@ -205,9 +227,9 @@ export function assembleResumeDocument({ contents, request }: Readonly<{
     if (content.kind === 'value-proposition' || content.kind === 'experience') return []
     return [{ section: content.kind, fields: content.fields.map((field) => unique(field, content.kind)) }]
   })
-  return { purpose: request.purpose, locale: request.locale,
+  return { origins, document: { purpose: request.purpose, locale: request.locale,
     targetRole: request.purpose === 'normalized' ? null : request.jobMatch.targetRole,
-    valueProposition: { kind: 'prose', paragraphs }, experiences, sections }
+    valueProposition: { kind: 'prose', paragraphs }, experiences, sections } }
 }
 
 export function readProfessionalResumeFields(document: ProfessionalResumeDocument) {

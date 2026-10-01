@@ -65,6 +65,6 @@ export const resumePreparationFailures = [
   'empty-job-posting', 'invalid-job-posting', 'oversized-job-posting', 'scanned-job-posting',
   'unsupported-job-posting', 'unreadable-job-posting', 'job-posting-extraction-unavailable',
   'match-evidence-unavailable', 'candidate-session-storage-unavailable', 'unavailable',
-  'unsupported-content', 'stale-result',
+  'unsupported-content', 'incoherent-content', 'stale-result',
 ] as const
 export type ResumePreparationFailure = typeof resumePreparationFailures[number]
