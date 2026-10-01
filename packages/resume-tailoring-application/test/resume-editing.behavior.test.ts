@@ -1,9 +1,8 @@
-import { createTailoredResume } from '@resume-tailoring/application/tailored-resume'
 import { describe, expect, it } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourneyDependencies, CandidateJourneyView, CandidateSession, ResumeDocumentPorts, ResumeProposalDecision, ResumeLayoutOutcome, ResumeExportEligibility } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateFact } from '@resume-tailoring/application/source-intake'
-import { resumeLayoutExpectations, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createFixtureResumeSectionModels, resumeLayoutExpectations, writeResumeSectionFromFacts, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 
 type TestPorts = { -readonly [Port in keyof ResumeDocumentPorts]?: ResumeDocumentPorts[Port] }
 type LayoutExample = Readonly<{ layout: ResumeLayoutOutcome; eligibility: ResumeExportEligibility }>
@@ -690,9 +689,10 @@ function createMatchedSession(): CandidateSession {
 function createDependencies({ ports }: Readonly<{ ports: Partial<ResumeDocumentPorts> }>): CandidateJourneyDependencies {
   let session = createMatchedSession()
   return {
+    resumeSectionModels: createFixtureResumeSectionModels({
+      writeSection: (input) => Promise.resolve({ ok: true, value: writeResumeSectionFromFacts(input) }),
+    }),
     resumeDocumentPorts: Object.assign(ports, {
-      prepare: ({ candidateFacts, jobMatch, locale, revision }) => Promise.resolve({ status: 'prepared', revision,
-        document: createTailoredResume({ jobMatch, locale, sourceIntake: { ...structuredResumeSource, candidateFacts } }) }),
       proposeCondensation: ({ document, baseRevision }) => Promise.resolve({ status: 'proposed', proposal: {
         id: 'proposal-one', baseRevision, layout: { status: 'unavailable', revision: baseRevision },
         document: { ...document, valueProposition: { ...document.valueProposition, paragraphs:

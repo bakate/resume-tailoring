@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { groupedResumeDocument } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createFixtureResumeSectionModels, writeResumeSectionFromFacts } from '@resume-tailoring/application/structured-resume-fixtures'
 
 import {
   candidateSessionDurationMilliseconds,
   candidateSessionStorageVersion,
   createCandidateJourney,
-  createResumePreparation,
 } from '@resume-tailoring/application/candidate-journey'
 import type {
   CandidateJourney,
@@ -13,7 +12,7 @@ import type {
   CandidateJourneyView,
   CandidateSession,
   CandidateSessionPersistence,
-  ResumeWritingInput,
+  ResumeSectionWritingInput,
 } from '@resume-tailoring/application/candidate-journey'
 import type {
   ExtractedJobPosting,
@@ -307,7 +306,7 @@ type ResumeWritingMode = 'observed' | 'prepared'
 
 type TestDependenciesRequest = Readonly<{
   onMatch: () => void
-  onResumeWriting: (input: ResumeWritingInput) => void
+  onResumeWriting: (input: ResumeSectionWritingInput) => void
   readMatchEvidence: (request: Parameters<CandidateJourneyDependencies['matchEvidenceMatcher']['match']>[0]) => MatchEvidenceProposal
   readExtraction: () => ExtractedJobPosting
   resumeWriting: ResumeWritingMode
@@ -318,9 +317,11 @@ function createTestDependencies({
   onMatch, onResumeWriting, readExtraction, readMatchEvidence, resumeWriting, session,
 }: TestDependenciesRequest): CandidateJourneyDependencies {
   return {
-    resumeDocumentPorts: resumeWriting === 'observed'
-      ? createObservedResumePreparation({ onResumeWriting })
-      : { prepare: ({ revision }) => Promise.resolve({ status: 'prepared', revision, document: groupedResumeDocument }) },
+    resumeSectionModels: createFixtureResumeSectionModels({ writeSection: (input) => {
+      if (resumeWriting === 'prepared') return Promise.resolve({ ok: true, value: writeResumeSectionFromFacts(input) })
+      onResumeWriting(input)
+      return Promise.resolve({ ok: false, error: { type: 'permanent' } })
+    } }),
     createSessionId: () => '00000000-0000-4000-8000-000000000042',
     jobPostingDocumentReader: createJobPostingDocumentReader(),
     jobPostingExtractor: { extract: () => Promise.resolve({ ok: true, value: readExtraction() }) },
@@ -336,26 +337,13 @@ function createTestDependencies({
   }
 }
 
-function createObservedResumePreparation({ onResumeWriting }: Readonly<{
-  onResumeWriting: (input: ResumeWritingInput) => void
-}>) {
-  return createResumePreparation({
-    validator: { validate: () => Promise.resolve({ ok: false, error: { type: 'unavailable' } }) },
-    writer: { write: (input) => {
-      onResumeWriting(input)
-      return Promise.resolve({ ok: false, error: { type: 'unavailable' } })
-    } },
-  })
-}
-
 class CandidateJourneyJobMatchTestSystem {
   readonly #candidateJourney: CandidateJourney
   #directJobMatch: Awaited<ReturnType<typeof createJobMatch>> | null = null
   #extractedJobPosting: ExtractedJobPosting = extractedJobPosting
   #jobPostingText = jobPostingText
   #matchRequestCount = 0
-  readonly #resumeWritingInputs: ResumeWritingInput[] = []
-  #onResumeWritingStarted: () => void = () => undefined
+  readonly #resumeWritingInputs: ResumeSectionWritingInput[] = []
   #matchEvidence: MatchEvidenceProposal = matchEvidenceProposal
   #completedAction: JobMatchAction | null = null
   #view: CandidateJourneyView | null = null
@@ -371,7 +359,6 @@ class CandidateJourneyJobMatchTestSystem {
         },
         onResumeWriting: (input) => {
           this.#resumeWritingInputs.push(input)
-          this.#onResumeWritingStarted()
         },
         readMatchEvidence: () => this.#matchEvidence,
         readExtraction: () => this.#extractedJobPosting,
@@ -538,11 +525,11 @@ class CandidateJourneyJobMatchTestSystem {
   }
 
   async startTailoredResumeWriting() {
-    const resumeWritingStarted = new Promise<void>((resolve) => {
-      this.#onResumeWritingStarted = resolve
-    })
     this.#candidateJourney.startTailoredResumePreparation()
-    await resumeWritingStarted
+    await expect.poll(() => {
+      const view = this.#candidateJourney.readView()
+      return view.status === 'candidate-session-open' ? view.preparationOutcome : null
+    }).not.toBeNull()
     this.#completedAction = 'tailored-resume-preparation-started'
   }
 
@@ -661,10 +648,12 @@ class CandidateJourneyJobMatchTestSystem {
 
   expectResumeWritingToReceiveAdjacentEvidenceFactsAsRelevant() {
     this.#expectCompletedAction('tailored-resume-preparation-started')
-    const [writingInput] = this.#resumeWritingInputs
-    if (writingInput === undefined) expect.fail('Expected resume writing to receive an input')
-    expect(writingInput.jobMatch.analysis.relevantFactIds).toContain('source-fact-6')
-    expect(writingInput.jobMatch.analysis.generationEligibility).toBe('eligible')
+    const valueProposition = this.#resumeWritingInputs.find(({ section }) => section.kind === 'value-proposition')
+    const skills = this.#resumeWritingInputs.find(({ section }) => section.kind === 'skills')
+    if (valueProposition === undefined || skills === undefined) expect.fail('Expected resume writing to receive section inputs')
+    expect(valueProposition.candidateFacts.map(({ id }) => id)).toContain('source-fact-6')
+    expect(valueProposition.relevantFactIds).toContain('source-fact-6')
+    expect(skills.relevantFactIds).toContain('source-fact-6')
   }
 
   expectOnlySourceBackedPracticalConstraints() {

@@ -17,10 +17,10 @@ export async function processResumeModel<TInput>({ request, schema, processInput
     const parsed = schema.safeParse(JSON.parse(text))
     if (!parsed.success) return failureResponse(400)
     return Response.json(await processInput(parsed.data, environment.value), { headers: privateHeaders })
-  } catch { return failureResponse(502) }
+  } catch { return failureResponse(502, 'transient') }
 }
 
-function failureResponse(status: number) {
-  return Response.json({ ok: false, error: { type: 'unavailable' } }, { status, headers: privateHeaders })
+function failureResponse(status: number, type: 'transient' | 'permanent' = 'permanent') {
+  return Response.json({ ok: false, error: { type } }, { status, headers: privateHeaders })
 }
 const privateHeaders = { 'Cache-Control': 'no-store', Pragma: 'no-cache' }

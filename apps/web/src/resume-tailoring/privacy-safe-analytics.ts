@@ -4,10 +4,14 @@ import {
   correctionKinds,
   journeyPhases,
   matchScoreBands,
+  resumePreparationOutcomes,
+  resumeSectionKinds,
+  resumeSectionOutcomes,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
 
 const matchScoreBandSchema = z.enum(matchScoreBands)
+const metricCountSchema = z.number().int().min(0).max(10_000_000)
 
 export const privacySafeAnalyticsEventSchema = z.discriminatedUnion('name', [
   z.strictObject({ name: z.literal('resume-tailoring-opened') }),
@@ -31,6 +35,21 @@ export const privacySafeAnalyticsEventSchema = z.discriminatedUnion('name', [
   z.strictObject({
     name: z.literal('resume-downloaded'),
     matchScoreBand: matchScoreBandSchema,
+  }),
+  z.strictObject({
+    name: z.literal('resume-section-prepared'),
+    sectionKind: z.enum(resumeSectionKinds),
+    outcome: z.enum(resumeSectionOutcomes),
+    attemptCount: metricCountSchema,
+    durationMilliseconds: metricCountSchema,
+    inputTokens: metricCountSchema,
+    outputTokens: metricCountSchema,
+  }),
+  z.strictObject({
+    name: z.literal('resume-preparation-completed'),
+    outcome: z.enum(resumePreparationOutcomes),
+    durationMilliseconds: metricCountSchema,
+    sectionCount: metricCountSchema,
   }),
 ]) satisfies z.ZodType<PrivacySafeTelemetryEvent>
 

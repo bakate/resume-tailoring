@@ -1,14 +1,15 @@
 import { createPrivacySafeBrowserTelemetry } from '../resume-tailoring/browser-adapters'
 import { createResumeDocumentModelAdapters } from './resume-document-model-adapters'
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { createCandidateJourney, createResumePreparation } from '@resume-tailoring/application/candidate-journey'
+import { createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 
 import { createBrowserResumeDocumentRenderer } from './browser-resume-document-renderer'
 import { createBrowserCandidateSessionPersistence } from './browser-candidate-session-persistence'
 import { createOpenAiLanguageModelGateway } from './openai-language-model-gateway'
 import { createBrowserSourceIntakeDocumentReader } from './source-intake-document-reader'
 import { createBrowserJobPostingDocumentReader } from './job-posting-document-reader'
-import type { CandidateJourney } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateJourney, ResumeSectionModelResult, ResumeSectionModels } from '@resume-tailoring/application/candidate-journey'
+import type { LanguageModelResult } from '@resume-tailoring/application/language-model-gateway'
 import type {
   JobPostingExtractor,
   MatchEvidenceMatcher,
@@ -78,8 +79,8 @@ function createBrowserDependencies({ languageModelGateway }: Readonly<{
   return {
     resumeDocumentRenderer: createBrowserResumeDocumentRenderer(),
     telemetry: createPrivacySafeBrowserTelemetry(),
-    resumeDocumentPorts: { ...createGatewayResumePreparation(languageModelGateway),
-      ...createResumeDocumentModelAdapters({ gateway: languageModelGateway }) },
+    resumeDocumentPorts: createResumeDocumentModelAdapters({ gateway: languageModelGateway }),
+    resumeSectionModels: createGatewayResumeSectionModels(languageModelGateway),
     createSessionId: () => crypto.randomUUID(),
     jobPostingDocumentReader: createBrowserJobPostingDocumentReader(),
     jobPostingExtractor: createGatewayJobPostingExtractor({ languageModelGateway }),
@@ -150,19 +151,29 @@ function readProcessingConsent({ candidateJourney }: Readonly<{
   return view?.status === 'candidate-session-open' ? view.session.processingConsent : null
 }
 
-function createGatewayResumePreparation(gateway: BrowserLanguageModelGateway) {
-  return createResumePreparation({
-    writer: { write: async (input) => {
-      const result = await gateway.writing.process({ operation: 'resume-document-writing', input })
-      return result.ok && result.value.operation === 'resume-document-writing'
-        ? { ok: true, value: result.value.value }
-        : { ok: false, error: { type: 'unavailable', transient: !result.ok && result.error.transient === true } }
-    } },
-    validator: { validate: async (input) => {
-      const result = await gateway.structured.process({ operation: 'resume-document-validation', input })
-      return result.ok && result.value.operation === 'resume-document-validation'
-        ? { ok: true, value: result.value.value }
-        : { ok: false, error: { type: 'unavailable', transient: !result.ok && result.error.transient === true } }
-    } },
-  })
+function createGatewayResumeSectionModels(gateway: BrowserLanguageModelGateway): ResumeSectionModels {
+  return {
+    writeSection: async (input) => toSectionModelResult({ operation: 'resume-section-writing',
+      result: await gateway.writing.process({ operation: 'resume-section-writing', input }) }),
+    validateFields: async (input) => toSectionModelResult({ operation: 'resume-section-validation',
+      result: await gateway.structured.process({ operation: 'resume-section-validation', input }) }),
+    checkCoherence: async (input) => toSectionModelResult({ operation: 'resume-document-coherence',
+      result: await gateway.structured.process({ operation: 'resume-document-coherence', input }) }),
+  }
+}
+
+type GatewayValue = Readonly<{ operation: string; value: unknown; usage?: ResumeSectionModelResult<unknown>['usage'] }>
+
+function toSectionModelResult<TOperation extends string, TResult extends GatewayValue>({ operation, result }: Readonly<{
+  operation: TOperation; result: LanguageModelResult<TResult>
+}>): ResumeSectionModelResult<Extract<TResult, { operation: TOperation }>['value']> {
+  if (!result.ok) return { ok: false, error: { type: result.error.type === 'processing-consent-required' ? 'consent-required'
+    : result.error.cause ?? (result.error.transient === true ? 'transient' : 'permanent') } }
+  if (!isOperation(result.value, operation)) return { ok: false, error: { type: 'permanent' } }
+  return { ok: true, value: result.value.value, ...(result.value.usage === undefined ? {} : { usage: result.value.usage }) }
+}
+
+function isOperation<TOperation extends string, TResult extends GatewayValue>(value: TResult, operation: TOperation):
+  value is Extract<TResult, { operation: TOperation }> {
+  return value.operation === operation
 }

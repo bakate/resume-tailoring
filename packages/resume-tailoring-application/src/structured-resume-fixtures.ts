@@ -1,7 +1,9 @@
+import { createTailoredResume } from './tailored-resume'
 import type { TailoredResume } from './tailored-resume'
 import type { ResumeLayoutOutcome, ResumeExportEligibility, ResumeSectionChange, ResumeSectionChangeOutcome, ResumePreparationOutcome } from './structured-resume-contract'
 import type { JobMatch } from './job-match'
 import type { SourceIntake } from './source-intake'
+import type { ResumeSectionContent, ResumeSectionModels, ResumeSectionPlanEntry, ResumeSectionWritingInput } from './resume-sections'
 
 /** Anonymized evidence shared by preparation, editing, and rendering consumers. */
 export const structuredResumeSource: SourceIntake = {
@@ -118,6 +120,43 @@ export const groupedResumeDocument = {
     { section: 'certifications', fields: [{ id: 'cloud', text: 'Cloud practitioner', factIds: ['source-fact-certifications-0-name-0'] }] },
   ],
 } as const satisfies TailoredResume
+
+/** Section models answering with slices of `groupedResumeDocument`; a test overrides only the behavior it varies. */
+export function createFixtureResumeSectionModels(overrides: Partial<ResumeSectionModels> = {}): ResumeSectionModels {
+  return {
+    writeSection: ({ section }) => Promise.resolve({ ok: true, value: readGroupedResumeSection(section) }),
+    validateFields: ({ fields }) => Promise.resolve({ ok: true,
+      value: { fields: fields.map(({ id }) => ({ fieldId: id, supported: true })) } }),
+    checkCoherence: () => Promise.resolve({ ok: true, value: { coherent: true, languageMatches: true } }),
+    ...overrides,
+  }
+}
+
+export function readGroupedResumeSection(section: ResumeSectionPlanEntry): ResumeSectionContent {
+  return readResumeSection({ document: groupedResumeDocument, section })
+}
+
+/** Writes a section verbatim from the Candidate Facts it received, for suites whose facts are not the grouped fixture. */
+export function writeResumeSectionFromFacts({ section, candidateFacts }: ResumeSectionWritingInput): ResumeSectionContent {
+  return readResumeSection({ section, document: createTailoredResume({ jobMatch: structuredResumeJobMatch,
+    sourceIntake: { ...structuredResumeSource, candidateFacts } }) })
+}
+
+/** Slices one Resume Section out of a complete fixture document, as a section writing call would return it. */
+export function readResumeSection({ document, section }: Readonly<{
+  document: Pick<TailoredResume, 'valueProposition' | 'experiences' | 'sections'>; section: ResumeSectionPlanEntry
+}>): ResumeSectionContent {
+  if (section.kind === 'value-proposition') return { kind: section.kind, paragraphs: document.valueProposition.paragraphs }
+  if (section.kind === 'experience') {
+    const experience = document.experiences.find(({ id }) => id === section.key)
+    if (experience === undefined) throw new Error(`No fixture experience for ${section.key}`)
+    return { kind: section.kind, experience }
+  }
+  const slice = document.sections.find((candidate) => candidate.section === section.kind)
+  if (slice?.section === 'skills') return { kind: 'skills', groups: slice.groups }
+  if (slice === undefined || section.kind === 'skills') throw new Error(`No fixture section for ${section.key}`)
+  return { kind: section.kind, fields: slice.fields }
+}
 
 export const resumeContractRevision = 'candidate-session-fixture:draft-1'
 
