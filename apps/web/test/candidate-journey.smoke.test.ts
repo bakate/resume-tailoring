@@ -560,6 +560,8 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByRole('button', { name: 'Edit resume', exact: true })).toBeVisible()
     await expect(this.#page.getByLabel('Resume Field', { exact: true })).toHaveCount(0)
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeVisible()
+    // Focus return is checked once the page-count check is done; a check still running disables the button (BAK-76).
+    await expect(this.#page.getByText('The current version fits within two pages.', { exact: true }).last()).toBeVisible({ timeout: 30_000 })
     await this.#openEditor()
     await expect(this.#page.getByRole('dialog')).toBeVisible()
     await this.#page.keyboard.press('Escape')
