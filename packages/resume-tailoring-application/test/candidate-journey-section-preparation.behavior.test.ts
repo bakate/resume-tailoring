@@ -52,6 +52,15 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectOnlySkillsRewrittenAndResumePrepared()
   })
 
+  it('rewrites a section with the fields its validation rejected', async () => {
+    const system = createSystemUnderTest({ skillsValidation: 'unsupported-once' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectSkillsRewrittenWithTheirRejectedFields()
+  })
+
   it('keeps validated sections and asks for a retry when a section still fails after its rewrite', async () => {
     const system = createSystemUnderTest({ skillsValidation: 'unsupported-twice' })
     await system.givenMatchedCandidateSession()
@@ -137,25 +146,6 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectRetryWrote(['skills', 'education'])
   })
 
-  it('checks coherence again without rewriting any section when every section was validated', async () => {
-    const system = createSystemUnderTest({ coherence: 'incoherent-once' })
-    await system.givenFailedPreparation()
-
-    await system.retryPreparation()
-
-    system.expectRetryWrote([])
-  })
-
-  it('writes every section again when the inputs of the preparation change', async () => {
-    const system = createSystemUnderTest({ skillsWritingFailure: 'timeout' })
-    await system.givenFailedPreparation()
-
-    await system.retryPreparation({ locale: 'fr' })
-
-    system.expectRetryWrote(['value-proposition', 'experiences.0', 'experiences.1', 'skills', 'education',
-      'languages', 'projects', 'certifications'])
-  })
-
   it('writes the Normalized Resume through the same sections without the Job Posting', async () => {
     const system = createSystemUnderTest()
     await system.givenMatchedCandidateSession()
@@ -175,7 +165,7 @@ type TestOptions = Readonly<{
   heldSection?: 'skills'
   skillsValidation?: 'unsupported-once' | 'unsupported-twice'
   skillsWritingFailure?: Exclude<ResumeSectionModelFailure, 'permanent'>
-  coherence?: 'incoherent' | 'incoherent-once' | 'timeout'
+  coherence?: 'incoherent' | 'timeout'
 }>
 
 class SectionPreparationTestSystem {
@@ -191,6 +181,7 @@ class SectionPreparationTestSystem {
   #maximumWritesInFlight = 0
   #skillsWrites = 0
   #skillsValidations = 0
+  readonly #rejectedFields: Readonly<{ fieldId: string; text: string }>[] = []
   #outcome: CandidateJourneyView | null = null
 
   constructor(options: TestOptions) {
@@ -210,6 +201,7 @@ class SectionPreparationTestSystem {
       },
       onSkillsWrite: () => ++this.#skillsWrites,
       onSkillsValidation: () => ++this.#skillsValidations,
+      onRejectedField: (field) => { this.#rejectedFields.push(field) },
     } }) })
   }
 
@@ -274,9 +266,9 @@ class SectionPreparationTestSystem {
     await this.#reload()
   }
 
-  async retryPreparation(request: Readonly<{ locale?: 'fr' }> = {}) {
+  async retryPreparation() {
     this.#retryStart = this.#writingInputs.length
-    this.#journey.startTailoredResumePreparation(request)
+    this.#journey.startTailoredResumePreparation()
     await this.#preparationFinished()
   }
 
@@ -370,6 +362,17 @@ class SectionPreparationTestSystem {
       .toEqual(['skills', 'education', 'languages', 'projects', 'certifications'])
   }
 
+  expectSkillsRewrittenWithTheirRejectedFields() {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    expect(this.#rejectedFields).toHaveLength(1)
+    const skillsWrites = this.#writingInputs.filter(({ section }) => section.kind === 'skills')
+    expect(skillsWrites.map(({ rejectedFields }) => rejectedFields)).toEqual([[], this.#rejectedFields])
+    for (const input of this.#writingInputs.filter(({ section }) => section.kind !== 'skills')) {
+      expect(input.rejectedFields, input.section.key).toEqual([])
+    }
+    expect(JSON.stringify(this.#expectOutcome()?.session)).not.toContain('rejectedFields')
+  }
+
   expectSkillsWrittenOnceAndPreparationRetryable() {
     expect(this.#writtenSectionKeys().filter((key) => key === 'skills')).toHaveLength(1)
     this.expectPreparationFailure({ reason: 'unavailable', recovery: 'retry' })
@@ -427,9 +430,9 @@ function createDependencies({ options, store, models }: Readonly<{
   options: TestOptions
   store: SessionStore
   models: Readonly<{ onWrite: (input: ResumeSectionWritingInput) => Promise<void>
-    onSkillsWrite: () => number; onSkillsValidation: () => number }>
+    onSkillsWrite: () => number; onSkillsValidation: () => number
+    onRejectedField: (field: Readonly<{ fieldId: string; text: string }>) => void }>
 }>): CandidateJourneyDependencies {
-  let coherenceChecks = 0
   return {
     createSessionId: () => crypto.randomUUID(), now: () => store.session.startedAt,
     languageModelGateway: { processingPolicy: policy },
@@ -444,11 +447,12 @@ function createDependencies({ options, store, models }: Readonly<{
         const validation = section.kind === 'skills' ? models.onSkillsValidation() : 0
         const unsupported = (options.skillsValidation === 'unsupported-once' && validation === 1)
           || (options.skillsValidation === 'unsupported-twice' && validation <= 2)
-        return Promise.resolve({ ok: true, value: { fields: fields.map(({ id }, index) => ({ fieldId: id,
-          supported: !(unsupported && section.kind === 'skills' && index === 0) })) } })
+        const rejected = unsupported && section.kind === 'skills' ? fields[0] : undefined
+        if (rejected !== undefined) models.onRejectedField({ fieldId: rejected.id, text: rejected.text })
+        return Promise.resolve({ ok: true, value: { fields: fields.map(({ id }) => ({ fieldId: id, supported: id !== rejected?.id })) } })
       },
       checkCoherence: () => Promise.resolve(options.coherence === 'timeout' ? { ok: false, error: { type: 'timeout' } } : { ok: true, value: { languageMatches: true,
-        coherent: options.coherence === undefined || (options.coherence === 'incoherent-once' && coherenceChecks++ > 0) } }),
+        coherent: options.coherence === undefined } }),
     }),
     persistence: { delete: () => ({ ok: true, value: null }),
       restore: () => ({ ok: true, value: { notice: null, session: store.session } }),

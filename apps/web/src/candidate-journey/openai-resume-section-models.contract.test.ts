@@ -93,7 +93,7 @@ function sectionFor(kind: ResumeSectionKind) {
 function writingInput(kind: ResumeSectionKind): ResumeSectionWritingInput {
   const section = sectionFor(kind)
   return { section, locale: 'en', purpose: 'tailored', targetRole: 'Frontend Engineer', jobRequirements: ['React'],
-    relevantFactIds: [], candidateFacts: structuredResumeSource.candidateFacts.filter(({ path }) => kind === 'value-proposition'
+    relevantFactIds: [], rejectedFields: [], candidateFacts: structuredResumeSource.candidateFacts.filter(({ path }) => kind === 'value-proposition'
       || path.startsWith(`${section.key}.`)) }
 }
 

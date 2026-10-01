@@ -20,7 +20,11 @@ export type ResumeSectionWritingInput = Readonly<{
   relevantFactIds: readonly CandidateFactId[]
   locale: TailoredResumeLocale
   purpose: 'tailored' | 'normalized'
+  /** Fields of this section's previous attempt that validation rejected; empty on a first write. */
+  rejectedFields: readonly ResumeRejectedField[]
 }>
+
+export type ResumeRejectedField = Readonly<{ fieldId: string; text: string }>
 
 export type ResumeFieldValidationInput = Readonly<{
   section: ResumeSectionPlanEntry
@@ -70,7 +74,7 @@ export function createSectionWritingInput({ request, section }: Readonly<{
   const tailored = request.purpose === 'tailored'
   const relevantFactIds = tailored ? readRelevantFactIds(request.jobMatch) : new Set<string>()
   const candidateFacts = readSectionFacts({ candidateFacts: request.candidateFacts, section })
-  return { section, candidateFacts, locale: request.locale, purpose: request.purpose,
+  return { section, candidateFacts, locale: request.locale, purpose: request.purpose, rejectedFields: [],
     targetRole: tailored ? request.jobMatch.targetRole?.value ?? null : null,
     jobRequirements: tailored ? request.jobMatch.requirements.map(({ value }) => value) : [],
     relevantFactIds: candidateFacts.filter(({ id }) => relevantFactIds.has(id)).map(({ id }) => id) }
@@ -158,6 +162,14 @@ export function isSectionFullyValidated({ content, validation }: Readonly<{
   return validation.fields.length === fields.length
     && new Set(validation.fields.map(({ fieldId }) => fieldId)).size === fields.length
     && fields.every(({ id }) => validation.fields.some(({ fieldId, supported }) => fieldId === id && supported))
+}
+
+/** The fields a validation did not confirm as supported; a field it omitted counts as rejected. */
+export function readRejectedFields({ content, validation }: Readonly<{
+  content: ResumeSectionContent; validation: ResumeFieldValidation
+}>): readonly ResumeRejectedField[] {
+  return readSectionContentFields(content).filter(({ id }) => !validation.fields.some(({ fieldId, supported }) =>
+    fieldId === id && supported)).map(({ id, text }) => ({ fieldId: id, text }))
 }
 
 export function citedCandidateFacts({ content, candidateFacts }: Readonly<{

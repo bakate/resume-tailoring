@@ -3,9 +3,10 @@ import type { ResumeSectionSnapshot } from '@resume-tailoring/domain/candidate-s
 import type { PrivacySafeTelemetryEvent, resumeSectionOutcomes } from './resume-tailoring-workflow-ports'
 import type { ResumeOperationFailure, ResumePreparationOutcome } from './structured-resume-contract'
 import { assembleResumeDocument, citedCandidateFacts, createSectionWritingInput, hasSupportedSectionStructure,
-  isSectionFullyValidated, normalizeSectionContent, planResumeSections, readSectionContentFields } from './resume-sections'
+  isSectionFullyValidated, normalizeSectionContent, planResumeSections, readRejectedFields,
+  readSectionContentFields } from './resume-sections'
 import type { ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage,
-  ResumeSectionContent, ResumeSectionModelResult, ResumeSectionModels, ResumeSectionPlanEntry, ResumeSectionsRequest,
+  ResumeRejectedField, ResumeSectionContent, ResumeSectionModelResult, ResumeSectionModels, ResumeSectionPlanEntry, ResumeSectionsRequest,
   ResumeSectionWritingInput } from './resume-sections'
 
 type ResumeSectionFailure = Exclude<typeof resumeSectionOutcomes[number], 'validated'>
@@ -30,6 +31,7 @@ type ResumeSectionMachineContext = ResumeSectionMachineInput & Readonly<{
   attempt: number
   content: ResumeSectionContent | null
   failure: ResumeSectionFailure | null
+  rejectedFields: readonly ResumeRejectedField[]
   startedAt: number
   usage: ResumeModelUsage
 }>
@@ -46,30 +48,38 @@ async function callModel<TValue>(call: () => Promise<ResumeSectionModelResult<TV
 const writeSection = fromPromise<ResumeSectionModelResult<ResumeSectionContent>, ResumeSectionMachineInput>(
   ({ input }) => callModel(() => input.models.writeSection(input.writingInput)))
 
+// A rewrite after a failed validation learns what was rejected; the text never leaves this section actor.
+function readRewritingInput(context: ResumeSectionMachineContext): ResumeSectionMachineInput {
+  return { ...context, writingInput: { ...context.writingInput, rejectedFields: context.rejectedFields } }
+}
+
 const validateSectionFields = fromPromise<ResumeSectionModelResult<ResumeFieldValidation>, Readonly<{
   models: ResumeSectionModels; input: ResumeFieldValidationInput
 }>>(({ input }) => callModel(() => input.models.validateFields(input.input)))
 
-type SectionStep = Pick<ResumeSectionMachineContext, 'content' | 'failure' | 'usage'>
+type SectionStep = Pick<ResumeSectionMachineContext, 'content' | 'failure' | 'rejectedFields' | 'usage'>
 
 function readWriting({ context, result }: Readonly<{
   context: ResumeSectionMachineContext; result: ResumeSectionModelResult<ResumeSectionContent>
 }>): SectionStep {
   const usage = addUsage(context.usage, result.usage)
-  if (!result.ok) return { content: null, failure: result.error.type, usage }
+  if (!result.ok) return { content: null, failure: result.error.type, rejectedFields: [], usage }
   const { section, purpose } = context.writingInput
   const content = normalizeSectionContent({ content: result.value, purpose, section })
   return hasSupportedSectionStructure({ content, input: context.writingInput })
-    ? { content, failure: null, usage } : { content: null, failure: 'unsupported', usage }
+    ? { content, failure: null, rejectedFields: [], usage } : { content: null, failure: 'unsupported', rejectedFields: [], usage }
 }
 
 function readValidation({ context, result }: Readonly<{
   context: ResumeSectionMachineContext; result: ResumeSectionModelResult<ResumeFieldValidation>
 }>): SectionStep {
   const usage = addUsage(context.usage, result.usage)
-  if (!result.ok) return { content: context.content, failure: result.error.type, usage }
-  return context.content !== null && isSectionFullyValidated({ content: context.content, validation: result.value })
-    ? { content: context.content, failure: null, usage } : { content: context.content, failure: 'unsupported', usage }
+  if (!result.ok) return { content: context.content, failure: result.error.type, rejectedFields: [], usage }
+  if (context.content === null) return { content: null, failure: 'unsupported', rejectedFields: [], usage }
+  return isSectionFullyValidated({ content: context.content, validation: result.value })
+    ? { content: context.content, failure: null, rejectedFields: [], usage }
+    : { content: context.content, failure: 'unsupported', usage,
+      rejectedFields: readRejectedFields({ content: context.content, validation: result.value }) }
 }
 
 function canRewrite({ context, step }: Readonly<{ context: ResumeSectionMachineContext; step: SectionStep }>) {
@@ -101,7 +111,8 @@ export const resumeSectionMachine = setup({
   },
 }).createMachine({
   id: 'resume-section',
-  context: ({ input }) => ({ ...input, attempt: 0, content: null, failure: null, startedAt: input.now(), usage: noUsage }),
+  context: ({ input }) => ({ ...input, attempt: 0, content: null, failure: null, rejectedFields: [],
+    startedAt: input.now(), usage: noUsage }),
   initial: 'planned',
   states: {
     planned: { always: { target: 'writing' } },
@@ -110,7 +121,7 @@ export const resumeSectionMachine = setup({
         { type: 'reportSectionProgressed', params: 'writing' }],
       invoke: {
         src: 'writeSection',
-        input: ({ context }) => context,
+        input: ({ context }) => readRewritingInput(context),
         onDone: [
           { guard: ({ context, event }) => readWriting({ context, result: event.output }).content !== null,
             target: 'validating', actions: assign(({ context, event }) => readWriting({ context, result: event.output })) },

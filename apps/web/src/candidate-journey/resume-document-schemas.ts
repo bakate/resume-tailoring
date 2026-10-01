@@ -27,6 +27,8 @@ export const resumeSectionWritingInputSchema = z.strictObject({
   targetRole: z.string().max(500).nullable(), jobRequirements: z.array(z.string().max(1_000)).max(60),
   relevantFactIds: z.array(sourceIntakeSchema.shape.candidateFacts.element.shape.id).max(500),
   locale: localeSchema, purpose: purposeSchema,
+  // Absent from clients loaded before rewrites learned their rejected fields.
+  rejectedFields: z.array(z.strictObject({ fieldId: z.string().min(1), text: z.string().max(5_000) })).max(200).default([]),
 })
 export const resumeFieldValidationInputSchema = z.strictObject({
   section: sectionSchema, fields: z.array(tailoredResumeFieldSchema).max(200), candidateFacts: candidateFactsSchema,

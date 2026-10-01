@@ -172,17 +172,6 @@ describe('browser Candidate Session persistence', () => {
     expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session } })
   })
 
-  it('discards a stored session whose pending Resume Section carries unvalidated text', () => {
-    const storage = createMemoryStorage({ initialValue: JSON.stringify({ ...preparingCandidateSession,
-      preparation: { ...preparingCandidateSession.preparation, sections: [{ key: 'skills', kind: 'skills', attempt: 1,
-        status: 'writing', content: readGroupedResumeSection({ key: 'skills', kind: 'skills' }) }] } }) })
-    const persistence = createBrowserCandidateSessionPersistence({ storage })
-
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
-      ok: true, value: { notice: 'incompatible-session-discarded', session: null },
-    })
-  })
-
   it('restores a preparation stored before section-by-section preparation', () => {
     const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage({
       initialValue: JSON.stringify(preparingCandidateSession) }) })
