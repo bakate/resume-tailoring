@@ -103,6 +103,7 @@ const sharedWritingInstructions = [
   'relevantFactIds may include Adjacent Evidence: Candidate Facts showing a related but distinct capability next to an uncovered Job Requirement. You may highlight them in their own words, but never name the uncovered capability or imply the Candidate has it.',
   'For purpose normalized, write a general professional resume section without claiming relevance to any posting.',
   'Identity and contact details are local exceptions, absent from your input and output. Return only the requested section.',
+  'rejectedFields lists fields of your previous attempt at this section that validation found unsupported by the Candidate Facts they cited. Never reuse them as written: remove the unsupported proposition or rewrite it so that every proposition is directly supported by the facts you cite.',
 ]
 
 const sectionWritingInstructions: Record<ResumeSectionKind, string> = {
