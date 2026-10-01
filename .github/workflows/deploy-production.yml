@@ -14,6 +14,11 @@ jobs:
   check:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # Ships Chromium and its system libraries, which `playwright install --with-deps`
+    # fetched from a slow apt mirror. Keep the tag on the @playwright/test catalog version.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
     env:
       PUPPETEER_SKIP_DOWNLOAD: 'true'
     steps:
@@ -26,8 +31,6 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Chrome for PDF integration tests
         run: pnpm --filter @resume-tailoring/web exec puppeteer browsers install chrome
-      - name: Install Chromium for the E2E smoke test
-        run: pnpm --filter @resume-tailoring/web exec playwright install --with-deps chromium
       - run: pnpm check
       - name: Run the Chromium E2E smoke test
         run: pnpm test:e2e
