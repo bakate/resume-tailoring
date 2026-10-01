@@ -197,7 +197,7 @@ function failPreparation({ context, detail, recovery }: Readonly<{
   const preparation = { ...context.preparation, status: 'failed' as const, failure: detail }
   savePreparation({ ...context, preparation })
   const reason = detail === 'processing-consent-required' ? detail
-    : detail === 'unsupported-content' || detail === 'stale-result' ? detail : 'unavailable'
+    : detail === 'unsupported-content' || detail === 'incoherent-content' || detail === 'stale-result' ? detail : 'unavailable'
   return { status: 'failed', reason, detail, session: { ...context.session, preparation },
     recovery: recovery ?? (reason === 'processing-consent-required' ? 'renew-consent'
       : reason === 'unsupported-content' ? 'correct-content' : 'retry') }

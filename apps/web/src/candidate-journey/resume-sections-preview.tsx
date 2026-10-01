@@ -22,8 +22,9 @@ export function ResumeSectionsPreview({ candidateJourney, localization }: Resume
   return <Paper aria-busy={pending} aria-labelledby="resume-sections-preview-title" component="section"
     p={{ base: 'md', sm: 'xl' }} shadow="xs" withBorder>
     <Stack gap="lg">
-      <div><Title id="resume-sections-preview-title" order={2}>{localization.translate('resumeSections.title')}</Title>
-        <Text c="dimmed">{localization.translate('resumeSections.description')}</Text></div>
+      <div><Title id="resume-sections-preview-title" order={2}>
+        {localization.translate(pending ? 'resumeSections.title' : 'resumeSections.keptTitle')}</Title>
+        <Text c="dimmed">{localization.translate(pending ? 'resumeSections.description' : 'resumeSections.keptDescription')}</Text></div>
       <Stack className="resume-sections-preview-list" component="ol" gap="lg">
         {groupSections(preparation.sections ?? []).map((group) => <li key={group[0].key}>
           <ResumeSectionGroupPreview {...{ localization, group }} resumeLocale={readResumeLocale(preparation)} /></li>)}

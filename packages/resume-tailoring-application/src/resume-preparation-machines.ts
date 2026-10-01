@@ -2,7 +2,7 @@ import { assign, enqueueActions, fromPromise, sendParent, setup } from 'xstate'
 import type { ResumeSectionSnapshot } from '@resume-tailoring/domain/candidate-session'
 import type { PrivacySafeTelemetryEvent, resumeSectionOutcomes } from './resume-tailoring-workflow-ports'
 import type { ResumeOperationFailure, ResumePreparationOutcome } from './structured-resume-contract'
-import { assembleResumeDocument, citedCandidateFacts, createSectionWritingInput, hasSupportedSectionStructure,
+import { assembleResumeDocumentWithOrigins, citedCandidateFacts, createSectionWritingInput, hasSupportedSectionStructure,
   isSectionFullyValidated, normalizeSectionContent, planResumeSections, readRejectedFields,
   readSectionContentFields } from './resume-sections'
 import type { ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage,
@@ -111,8 +111,9 @@ export const resumeSectionMachine = setup({
   },
 }).createMachine({
   id: 'resume-section',
-  context: ({ input }) => ({ ...input, attempt: 0, content: null, failure: null, rejectedFields: [],
-    startedAt: input.now(), usage: noUsage }),
+  // A section sent back by the coherence check starts with the fields it rejected.
+  context: ({ input }) => ({ ...input, attempt: 0, content: null, failure: null,
+    rejectedFields: input.writingInput.rejectedFields, startedAt: input.now(), usage: noUsage }),
   initial: 'planned',
   states: {
     planned: { always: { target: 'writing' } },
@@ -172,6 +173,8 @@ type ResumePreparationMachineContext = ResumePreparationMachineInput & Readonly<
   startedKeys: readonly string[]
   results: readonly ResumeSectionResult[]
   coherence: ResumeSectionModelResult<ResumeDocumentCoherence> | null
+  /** Rejected fields per section key from the coherence check; only the first rejection triggers a rewrite. */
+  coherenceRejections: Readonly<Record<string, readonly ResumeRejectedField[]>> | null
   startedAt: number
 }>
 
@@ -179,13 +182,58 @@ export type ResumePreparationMachineOutput = Extract<ResumePreparationOutcome, {
 
 const checkDocumentCoherence = fromPromise<ResumeSectionModelResult<ResumeDocumentCoherence>, Readonly<{
   models: ResumeSectionModels; context: ResumePreparationMachineContext
-}>>(({ input }) => callModel(() => input.models.checkCoherence({ document: assembleDocument(input.context) })))
+}>>(({ input }) => callModel(() => input.models.checkCoherence({ document: assembleDocument(input.context).document })))
 
 function assembleDocument(context: ResumePreparationMachineContext) {
-  return assembleResumeDocument({ request: context.request, contents: context.plan.flatMap(({ key }) => {
+  return assembleResumeDocumentWithOrigins({ request: context.request, contents: context.plan.flatMap(({ key }) => {
     const result = context.results.find(({ section }) => section.key === key)
     return result?.status === 'validated' ? [result.content] : []
   }) })
+}
+
+/** Groups the fields a failed coherence check named by the section they came from; unknown ids are ignored. */
+function readCoherenceRejections({ context, coherence }: Readonly<{
+  context: ResumePreparationMachineContext; coherence: ResumeSectionModelResult<ResumeDocumentCoherence>
+}>): Readonly<Record<string, readonly ResumeRejectedField[]>> {
+  if (!coherence.ok || coherencePassed(coherence)) return {}
+  const { origins } = assembleDocument(context)
+  const rejections: Record<string, ResumeRejectedField[]> = {}
+  for (const issue of coherence.value.issues) {
+    const origin = origins.get(issue.fieldId)
+    if (origin === undefined) continue
+    const fields = rejections[origin.sectionKey] ?? []
+    if (!fields.some(({ fieldId }) => fieldId === origin.field.id)) {
+      fields.push({ fieldId: origin.field.id, text: origin.field.text, reason: issue.kind })
+    }
+    rejections[origin.sectionKey] = fields
+  }
+  return rejections
+}
+
+function hasCoherenceRejections(rejections: Readonly<Record<string, readonly ResumeRejectedField[]>>) {
+  return Object.keys(rejections).length > 0
+}
+
+/** Sends the rejected sections back to writing: their results and snapshots return to planned, the others stay. */
+function readCoherenceRewrite({ context, coherence }: Readonly<{
+  context: ResumePreparationMachineContext; coherence: ResumeSectionModelResult<ResumeDocumentCoherence>
+}>): Partial<ResumePreparationMachineContext> {
+  const coherenceRejections = readCoherenceRejections({ context, coherence })
+  const rejected = (key: string) => key in coherenceRejections
+  return { coherence: null, coherenceRejections,
+    results: context.results.filter(({ section }) => !rejected(section.key)),
+    startedKeys: context.startedKeys.filter((key) => !rejected(key)),
+    sections: context.sections.map((section): ResumeSectionSnapshot => rejected(section.key)
+      ? { key: section.key, kind: section.kind, status: 'planned', attempt: 0 } : section) }
+}
+
+/** A section still rejected after its rewrite is saved as failed, so a retry writes it again and keeps the others. */
+function readCoherenceFailure({ context, coherence }: Readonly<{
+  context: ResumePreparationMachineContext; coherence: ResumeSectionModelResult<ResumeDocumentCoherence>
+}>): Partial<ResumePreparationMachineContext> {
+  const rejections = readCoherenceRejections({ context, coherence })
+  return { coherence, sections: context.sections.map((section): ResumeSectionSnapshot => section.key in rejections
+    ? { key: section.key, kind: section.kind, status: 'failed', attempt: section.attempt } : section) }
 }
 
 function everySectionFinished(context: ResumePreparationMachineContext) {
@@ -202,25 +250,30 @@ function coherencePassed(coherence: ResumePreparationMachineContext['coherence']
 
 function readPreparationOutput(context: ResumePreparationMachineContext): ResumePreparationMachineOutput {
   if (everySectionValidated(context) && coherencePassed(context.coherence)) {
-    return { status: 'prepared', revision: context.revision, document: assembleDocument(context) }
+    return { status: 'prepared', revision: context.revision, document: assembleDocument(context).document }
   }
-  const failures = context.coherence === null
-    ? context.results.flatMap((result) => result.status === 'failed' ? [result.failure] : [])
-    : [context.coherence.ok ? 'unsupported' as const : context.coherence.error.type]
-  return readPreparationFailure({ failures, incoherent: context.coherence?.ok === true })
+  return readPreparationFailure(readPreparationFailures(context))
 }
+
+function readPreparationFailures(context: ResumePreparationMachineContext): readonly PreparationFailureCause[] {
+  const { coherence } = context
+  if (coherence === null) return context.results.flatMap((result) => result.status === 'failed' ? [result.failure] : [])
+  if (!coherence.ok) return [coherence.error.type]
+  // A rejection naming no field of the document gives nothing to rewrite; checking again may name one.
+  return [hasCoherenceRejections(readCoherenceRejections({ context, coherence })) ? 'incoherent' : 'transient']
+}
+
+type PreparationFailureCause = ResumeSectionFailure | 'incoherent'
 
 /**
  * Several sections can fail differently in one preparation (for example one timed out, another is unsupported),
  * but the Candidate sees a single failure with a single recovery action.
  */
-function readPreparationFailure({ failures, incoherent }: Readonly<{
-  failures: readonly ResumeSectionFailure[]; incoherent: boolean
-}>): ResumeOperationFailure {
-  // Without consent no call can succeed, and an incoherent document survives a retry. A retry rewrites only the
-  // sections that failed, so a section whose wording is still unsupported after its rewrite is worth retrying.
+function readPreparationFailure(failures: readonly PreparationFailureCause[]): ResumeOperationFailure {
+  // Without consent no call can succeed. A retry rewrites only the sections that failed, including those the
+  // coherence check still rejected, so unsupported or incoherent wording is worth retrying.
   if (failures.includes('consent-required')) return { status: 'failed', reason: 'processing-consent-required', recovery: 'renew-consent' }
-  if (incoherent) return { status: 'failed', reason: 'unsupported-content', recovery: 'correct-content' }
+  if (failures.includes('incoherent')) return { status: 'failed', reason: 'incoherent-content', recovery: 'retry' }
   if (failures.includes('unsupported')) return { status: 'failed', reason: 'unsupported-content', recovery: 'retry' }
   return { status: 'failed', reason: 'unavailable', recovery: 'retry' }
 }
@@ -315,14 +368,16 @@ export const resumePreparationMachine = setup({
       for (const section of queued) {
         enqueue.spawnChild('resumeSectionMachine', { id: `resume-section:${section.key}`, input: {
           models: context.models, now: context.now,
-          writingInput: createSectionWritingInput({ request: context.request, section }) } })
+          writingInput: { ...createSectionWritingInput({ request: context.request, section }),
+            rejectedFields: context.coherenceRejections?.[section.key] ?? [] } } })
       }
       if (queued.length > 0) enqueue.assign({ startedKeys: [...context.startedKeys, ...queued.map(({ key }) => key)] })
     }),
   },
 }).createMachine({
   id: 'resume-preparation',
-  context: ({ input }) => ({ ...input, plan: [], sections: [], startedKeys: [], results: [], coherence: null, startedAt: input.now() }),
+  context: ({ input }) => ({ ...input, plan: [], sections: [], startedKeys: [], results: [], coherence: null,
+    coherenceRejections: null, startedAt: input.now() }),
   initial: 'planning',
   states: {
     planning: {
@@ -357,7 +412,12 @@ export const resumePreparationMachine = setup({
         onDone: [
           { guard: ({ context, event }) => everySectionValidated(context) && coherencePassed(event.output),
             target: 'prepared', actions: assign({ coherence: ({ event }) => event.output }) },
-          { target: 'failed', actions: assign({ coherence: ({ event }) => event.output }) },
+          { guard: ({ context, event }) => context.coherenceRejections === null
+            && hasCoherenceRejections(readCoherenceRejections({ context, coherence: event.output })),
+          target: 'writingSections', actions: [assign(({ context, event }) => readCoherenceRewrite({ context, coherence: event.output })),
+            'reportSectionsProgressed'] },
+          { target: 'failed', actions: [assign(({ context, event }) => readCoherenceFailure({ context, coherence: event.output })),
+            'reportSectionsProgressed'] },
         ],
       },
     },

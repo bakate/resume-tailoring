@@ -38,8 +38,8 @@ describe('Resume section model adapters', () => {
     expect(body).toMatchObject({ model: 'structured-role', text: { format: { name: 'resume_section_validation', strict: true } } })
   })
 
-  it('checks the assembled document for coherence and language only', async () => {
-    const coherence = { coherent: false, languageMatches: true }
+  it('checks the assembled document for coherence and language and names the fields to rewrite', async () => {
+    const coherence = { coherent: false, languageMatches: true, issues: [{ fieldId: 'summary-0', kind: 'redundant' }] }
     const checker = createOpenAiResumeCoherenceChecker({ ...structuredRole,
       request: () => Promise.resolve(Response.json(modelResponse(coherence))) })
 

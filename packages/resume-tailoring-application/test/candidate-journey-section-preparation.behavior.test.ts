@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourney, CandidateJourneyDependencies, CandidateJourneyView, CandidateSession,
-  ResumeSectionModelFailure, ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
+  ResumeCoherenceInput, ResumeDocumentCoherence, ResumeRejectedField, ResumeSectionModelFailure, ResumeSectionWritingInput,
+} from '@resume-tailoring/application/candidate-journey'
 import { createFixtureResumeSectionModels, readGroupedResumeSection, structuredResumeJobMatch,
   structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 
@@ -90,13 +91,42 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectOnlySkillsRewrittenAndResumePrepared()
   })
 
-  it('asks for a content correction when the assembled resume is not coherent', async () => {
-    const system = createSystemUnderTest({ coherence: 'incoherent' })
+  it('rewrites only the sections the coherence check rejects, with the fields it named', async () => {
+    const system = createSystemUnderTest({ coherence: 'redundant-projects-once' })
     await system.givenMatchedCandidateSession()
 
     await system.prepareTailoredResume()
 
-    system.expectPreparationFailure({ reason: 'unsupported-content', recovery: 'correct-content' })
+    system.expectOnlyProjectsRewrittenWithTheRedundantFieldAndResumePrepared()
+  })
+
+  it('keeps the other sections and asks for a retry when the resume is still incoherent after the rewrite', async () => {
+    const system = createSystemUnderTest({ coherence: 'redundant-projects-twice' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectPreparationFailure({ reason: 'incoherent-content', recovery: 'retry' })
+    system.expectSavedSections({ validated: ['value-proposition', 'experiences.0', 'experiences.1', 'skills', 'education',
+      'languages', 'certifications'], failed: ['projects'] })
+  })
+
+  it('rewrites only the sections the coherence check rejected when an incoherent preparation is retried', async () => {
+    const system = createSystemUnderTest({ coherence: 'redundant-projects-twice' })
+    await system.givenFailedPreparation()
+
+    await system.retryPreparation()
+
+    system.expectRetryWrote(['projects'])
+  })
+
+  it('asks to retry the check when the coherence check rejects the resume without naming a known field', async () => {
+    const system = createSystemUnderTest({ coherence: 'unnamed-issue' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectPreparationFailure({ reason: 'unavailable', recovery: 'retry' })
     system.expectEveryValidatedSectionKeptVisible()
   })
 
@@ -165,7 +195,7 @@ type TestOptions = Readonly<{
   heldSection?: 'skills'
   skillsValidation?: 'unsupported-once' | 'unsupported-twice'
   skillsWritingFailure?: Exclude<ResumeSectionModelFailure, 'permanent'>
-  coherence?: 'incoherent' | 'timeout'
+  coherence?: 'redundant-projects-once' | 'redundant-projects-twice' | 'unnamed-issue' | 'timeout'
 }>
 
 class SectionPreparationTestSystem {
@@ -181,7 +211,8 @@ class SectionPreparationTestSystem {
   #maximumWritesInFlight = 0
   #skillsWrites = 0
   #skillsValidations = 0
-  readonly #rejectedFields: Readonly<{ fieldId: string; text: string }>[] = []
+  #coherenceChecks = 0
+  readonly #rejectedFields: ResumeRejectedField[] = []
   #outcome: CandidateJourneyView | null = null
 
   constructor(options: TestOptions) {
@@ -202,6 +233,7 @@ class SectionPreparationTestSystem {
       onSkillsWrite: () => ++this.#skillsWrites,
       onSkillsValidation: () => ++this.#skillsValidations,
       onRejectedField: (field) => { this.#rejectedFields.push(field) },
+      onCoherenceCheck: () => ++this.#coherenceChecks,
     } }) })
   }
 
@@ -344,7 +376,7 @@ class SectionPreparationTestSystem {
     const sections = this.#expectOutcome()?.session.preparation?.sections ?? []
     expect(sections).toHaveLength(8)
     expect(sections.every((section) => section.status === 'validated' && section.content.kind === section.kind)).toBe(true)
-    expect(this.#store.session.preparation).toMatchObject({ status: 'failed', failure: 'unsupported-content', sections })
+    expect(this.#store.session.preparation).toMatchObject({ status: 'failed', failure: 'unavailable', sections })
   }
 
   expectAtMostFourSectionsInFlight() {
@@ -370,6 +402,15 @@ class SectionPreparationTestSystem {
     for (const input of this.#writingInputs.filter(({ section }) => section.kind !== 'skills')) {
       expect(input.rejectedFields, input.section.key).toEqual([])
     }
+    expect(JSON.stringify(this.#expectOutcome()?.session)).not.toContain('rejectedFields')
+  }
+
+  expectOnlyProjectsRewrittenWithTheRedundantFieldAndResumePrepared() {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    expect(this.#writingInputs).toHaveLength(9)
+    const projectsWrites = this.#writingInputs.filter(({ section }) => section.key === 'projects')
+    expect(projectsWrites.map(({ rejectedFields }) => rejectedFields)).toEqual([[], this.#rejectedFields])
+    expect(this.#rejectedFields).toEqual([expect.objectContaining({ reason: 'redundant' })])
     expect(JSON.stringify(this.#expectOutcome()?.session)).not.toContain('rejectedFields')
   }
 
@@ -431,7 +472,7 @@ function createDependencies({ options, store, models }: Readonly<{
   store: SessionStore
   models: Readonly<{ onWrite: (input: ResumeSectionWritingInput) => Promise<void>
     onSkillsWrite: () => number; onSkillsValidation: () => number
-    onRejectedField: (field: Readonly<{ fieldId: string; text: string }>) => void }>
+    onRejectedField: (field: ResumeRejectedField) => void; onCoherenceCheck: () => number }>
 }>): CandidateJourneyDependencies {
   return {
     createSessionId: () => crypto.randomUUID(), now: () => store.session.startedAt,
@@ -448,11 +489,14 @@ function createDependencies({ options, store, models }: Readonly<{
         const unsupported = (options.skillsValidation === 'unsupported-once' && validation === 1)
           || (options.skillsValidation === 'unsupported-twice' && validation <= 2)
         const rejected = unsupported && section.kind === 'skills' ? fields[0] : undefined
-        if (rejected !== undefined) models.onRejectedField({ fieldId: rejected.id, text: rejected.text })
+        if (rejected !== undefined) models.onRejectedField({ fieldId: rejected.id, text: rejected.text, reason: 'unsupported' })
         return Promise.resolve({ ok: true, value: { fields: fields.map(({ id }) => ({ fieldId: id, supported: id !== rejected?.id })) } })
       },
-      checkCoherence: () => Promise.resolve(options.coherence === 'timeout' ? { ok: false, error: { type: 'timeout' } } : { ok: true, value: { languageMatches: true,
-        coherent: options.coherence === undefined } }),
+      checkCoherence: ({ document }) => {
+        if (options.coherence === 'timeout') return Promise.resolve({ ok: false, error: { type: 'timeout' } })
+        return Promise.resolve({ ok: true, value: readCoherence({ coherence: options.coherence, check: models.onCoherenceCheck(),
+          document, onRejectedField: models.onRejectedField }) })
+      },
     }),
     persistence: { delete: () => ({ ok: true, value: null }),
       restore: () => ({ ok: true, value: { notice: null, session: store.session } }),
@@ -463,6 +507,20 @@ function createDependencies({ options, store, models }: Readonly<{
     sourceDocumentReader: { read: () => Promise.resolve({ ok: true, value: { pageCount: null, text: '' } }) },
     sourceProfileExtractor: { extract: () => Promise.resolve({ ok: false, error: 'source-profile-extraction-unavailable' }) },
   }
+}
+
+function readCoherence({ coherence, check, document, onRejectedField }: Readonly<{
+  coherence: TestOptions['coherence']; check: number; document: ResumeCoherenceInput['document']
+  onRejectedField: (field: ResumeRejectedField) => void
+}>): ResumeDocumentCoherence {
+  const coherent = { coherent: true, languageMatches: true, issues: [] }
+  if (coherence === 'unnamed-issue') return { ...coherent, coherent: false, issues: [{ fieldId: 'unknown-field', kind: 'redundant' }] }
+  const rejections = coherence === 'redundant-projects-once' ? 1 : coherence === 'redundant-projects-twice' ? 2 : 0
+  // The Projects entry repeats an experience achievement in the assembled document.
+  const field = document.sections.flatMap((section) => section.section === 'projects' ? section.fields : [])[0]
+  if (check > rejections || field === undefined) return coherent
+  onRejectedField({ fieldId: field.id, text: field.text, reason: 'redundant' })
+  return { ...coherent, coherent: false, issues: [{ fieldId: field.id, kind: 'redundant' }] }
 }
 
 const policy = { provider: 'Test', purposes: [], retentionPolicy: 'None',

@@ -17,7 +17,7 @@ export async function routeResumeSectionModels(page: Page, { write = writeFixtur
     return route.fulfill({ json: { ok: true, value: { fields: input.fields.map(({ id }) => ({ fieldId: id, supported: supported() })) } } })
   })
   await page.route('**/api/resume-document-coherence', (route) => route.fulfill({ json: { ok: true,
-    value: { coherent: true, languageMatches: true } } }))
+    value: { coherent: true, languageMatches: true, issues: [] } } }))
 }
 
 export function writeFixtureSection(input: ResumeSectionWritingInput, achievements?: readonly TailoredResumeField[]): ResumeSectionContent {

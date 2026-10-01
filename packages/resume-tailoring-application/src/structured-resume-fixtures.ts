@@ -127,7 +127,7 @@ export function createFixtureResumeSectionModels(overrides: Partial<ResumeSectio
     writeSection: ({ section }) => Promise.resolve({ ok: true, value: readGroupedResumeSection(section) }),
     validateFields: ({ fields }) => Promise.resolve({ ok: true,
       value: { fields: fields.map(({ id }) => ({ fieldId: id, supported: true })) } }),
-    checkCoherence: () => Promise.resolve({ ok: true, value: { coherent: true, languageMatches: true } }),
+    checkCoherence: () => Promise.resolve({ ok: true, value: { coherent: true, languageMatches: true, issues: [] } }),
     ...overrides,
   }
 }

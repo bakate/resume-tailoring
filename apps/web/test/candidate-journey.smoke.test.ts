@@ -3,7 +3,7 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
-import type { ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
+import type { ResumeCoherenceInput, ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
 import { routeResumeSectionModels, writeFixtureSection } from './resume-section-model-routes'
 
 test.describe('Candidate Journey preview-first preparation', () => {
@@ -230,6 +230,15 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectUnsafeOutputRejected()
   })
 
+  test('explains a resume that stays incoherent and keeps its checked sections', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'incoherent' })
+    await system.givenCombinedIntake()
+
+    await system.generateResume()
+
+    await system.expectIncoherentSectionsExplained()
+  })
+
   test('recovers interrupted preparation after reload', async ({ page }) => {
     const system = createSystemUnderTest({ page, scenario: 'interrupted' })
     await system.givenInterruptedPreparation()
@@ -346,6 +355,7 @@ function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: P
 
 type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-coverage' | 'adjacent-evidence' | 'no-correspondence'
   | 'unsafe-output' | 'interrupted' | 'unavailable' | 'pending-writing' | 'posting-extraction-unavailable' | 'held-skills'
+  | 'incoherent'
 
 class CandidateJourneyTestSystem {
   readonly #page: Page
@@ -384,6 +394,14 @@ class CandidateJourneyTestSystem {
       }
       if (this.#scenario === 'unavailable') return route.fulfill({ json: { ok: false, error: { type: 'permanent' } } })
       return route.fallback()
+    })
+    await this.#page.route('**/api/resume-document-coherence', (route) => {
+      if (this.#scenario !== 'incoherent') return route.fallback()
+      // The Value Proposition keeps repeating an experience achievement, before and after its rewrite.
+      const { document } = route.request().postDataJSON() as ResumeCoherenceInput
+      const fieldId = document.valueProposition.paragraphs[0]?.id ?? 'missing-field'
+      return route.fulfill({ json: { ok: true, value: { coherent: false, languageMatches: true,
+        issues: [{ fieldId, kind: 'redundant' }] } } })
     })
   }
 
@@ -781,6 +799,16 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.locator('iframe')).toBeVisible()
     await expect(this.#page.frameLocator('iframe').getByText('Développement d’interfaces de facturation accessibles.', { exact: true })).toBeVisible()
     await expect(this.#page.frameLocator('iframe').getByText('Northwind', { exact: true })).toBeVisible()
+  }
+
+  async expectIncoherentSectionsExplained() {
+    this.#expectAction()
+    await expect(this.#page.getByText('Some sections repeated or contradicted one another', { exact: false })).toBeVisible()
+    const keptSections = this.#page.getByRole('region', { name: 'Checked sections kept' })
+    await expect(keptSections.getByText('could not be prepared', { exact: false })).toBeVisible()
+    await expect(keptSections.getByRole('heading', { name: 'Experience' })).toBeVisible()
+    await expect(this.#page.getByRole('heading', { name: 'Your resume is taking shape' })).toHaveCount(0)
+    await expect(this.#page.getByRole('button', { name: 'Try again' })).toBeEnabled()
   }
 
   async expectUnsafeOutputRejected() {

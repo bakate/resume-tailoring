@@ -264,6 +264,7 @@ const preparationFailureKeys = {
   ...sourceIntakeFailureKeys, ...jobMatchFailureKeys,
   'candidate-session-storage-unavailable': 'candidateJourney.storageUnavailable',
   'unavailable': 'combinedIntake.cause.unavailable', 'unsupported-content': 'combinedIntake.unsafe',
+  'incoherent-content': 'combinedIntake.incoherent',
   'stale-result': 'combinedIntake.outdated',
 } as const satisfies Record<ResumePreparationFailure, Parameters<Localization['translate']>[0]>
 
