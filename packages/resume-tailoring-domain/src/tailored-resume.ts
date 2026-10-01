@@ -51,6 +51,17 @@ export type TailoredResume = Readonly<{
 
 export type ResumeSectionName = 'value-proposition' | 'experiences' | TailoredResumeSection['section']
 
+export const resumeSectionKinds = ['value-proposition', 'experience', 'skills', 'education', 'languages',
+  'projects', 'certifications'] as const
+export type ResumeSectionKind = typeof resumeSectionKinds[number]
+type FieldSectionKind = Exclude<ResumeSectionKind, 'value-proposition' | 'experience' | 'skills'>
+
+export type ResumeSectionContent =
+  | Readonly<{ kind: 'value-proposition'; paragraphs: readonly TailoredResumeField[] }>
+  | Readonly<{ kind: 'experience'; experience: TailoredResumeExperience }>
+  | Readonly<{ kind: 'skills'; groups: readonly TailoredResumeSkillGroup[] }>
+  | Readonly<{ kind: FieldSectionKind; fields: readonly TailoredResumeField[] }>
+
 export type ResumeEditingState = Readonly<{
   revision: string
   unsupportedFieldIds: readonly string[]

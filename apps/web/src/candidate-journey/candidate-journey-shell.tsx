@@ -30,6 +30,7 @@ import { CombinedIntakeWorkspace } from './combined-intake-workspace'
 import { SourceIntakeWorkspace } from './source-intake-workspace'
 import { JobMatchWorkspace } from './job-match-workspace'
 import { TailoredResumeWorkspace } from './tailored-resume-workspace'
+import { ResumeSectionsPreview } from './resume-sections-preview'
 
 export function CandidateJourneyShell() {
   const localizationResult = useLocalization()
@@ -52,6 +53,7 @@ function LocalizedCandidateJourneyShell({ localization }: LocalizationProps) {
         <CandidateJourneyIntroduction {...{ candidateJourney, localization }} />
         <CandidateJourneyStatusAnnouncements {...{ activePhase, candidateJourney, localization }} />
         <CandidateJourneyProgress {...{ candidateJourney, localization }} />
+        <ResumeSectionsPreview {...{ candidateJourney, localization }} />
         <TailoredResumeWorkspace {...{ candidateJourney, localization }} />
         <CombinedIntakeWorkspace {...{ candidateJourney, localization }} />
         <ResultDisclosures {...{ candidateJourney, localization }} />
@@ -308,11 +310,13 @@ type CandidateJourneyOperation = Exclude<
 function readOperationKey({ candidateJourney, operation }: Readonly<{
   candidateJourney: CandidateJourneyController; operation: CandidateJourneyOperation
 }>) {
-  const phase = candidateJourney.view.status === 'candidate-session-open' ? candidateJourney.view.preparationPhase : null
-  if (phase === null) return operationTranslationKeys[operation]
+  const { view } = candidateJourney
+  const phase = view.status === 'candidate-session-open' ? view.preparationPhase : null
+  const writingSections = view.status === 'candidate-session-open' && operation === 'preparing-tailored-resume'
+    && view.session.preparation?.status === 'pending' && view.session.preparation.sections !== undefined
+  if (phase === null) return writingSections ? 'combinedIntake.writing' : operationTranslationKeys[operation]
   return ({ 'extracting-source': 'candidateJourney.operation.extractSourceProfile',
-    'extracting-posting': 'combinedIntake.extractingPosting', matching: 'combinedIntake.matching',
-    writing: 'combinedIntake.writing', validating: 'combinedIntake.validating' } as const)[phase]
+    'extracting-posting': 'combinedIntake.extractingPosting', matching: 'combinedIntake.matching' } as const)[phase]
 }
 
 const operationTranslationKeys: Readonly<Record<CandidateJourneyOperation, Parameters<

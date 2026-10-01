@@ -24,6 +24,25 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectAtMostFourSectionsInFlight()
   })
 
+  it('reveals each validated Resume Section while a slower section is still a placeholder', async () => {
+    const system = createSystemUnderTest({ heldSection: 'skills' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResumeWhileSkillsAreHeld()
+
+    system.expectValidatedSectionsRevealedAroundTheSkillsPlaceholder()
+  })
+
+  it('keeps export unavailable until the held section and the coherence check finish', async () => {
+    const system = createSystemUnderTest({ heldSection: 'skills' })
+    await system.givenMatchedCandidateSession()
+    await system.prepareTailoredResumeWhileSkillsAreHeld()
+
+    await system.releaseHeldSection()
+
+    system.expectCompleteResumePreparedWithEverySectionValidated()
+  })
+
   it('rewrites only the section whose validation failed and prepares the whole resume', async () => {
     const system = createSystemUnderTest({ skillsValidation: 'unsupported-once' })
     await system.givenMatchedCandidateSession()
@@ -67,6 +86,7 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     await system.prepareTailoredResume()
 
     system.expectPreparationFailure({ reason: 'unsupported-content', recovery: 'correct-content' })
+    system.expectEveryValidatedSectionKeptVisible()
   })
 
   it('asks for renewed consent when a section model requires it', async () => {
@@ -94,6 +114,7 @@ function createSystemUnderTest(options: TestOptions = {}) {
 
 type TestOptions = Readonly<{
   writing?: 'slow'
+  heldSection?: 'skills'
   skillsValidation?: 'unsupported-once' | 'unsupported-always'
   skillsWritingFailure?: Exclude<ResumeSectionModelFailure, 'permanent'>
   coherence?: 'incoherent'
@@ -103,6 +124,8 @@ class SectionPreparationTestSystem {
   readonly #journey: CandidateJourney
   readonly #writingInputs: ResumeSectionWritingInput[] = []
   readonly #pendingWrites: (() => void)[] = []
+  readonly #persisted: { session: CandidateSession | null } = { session: null }
+  #releaseHeldSection: (() => void) | null = null
   #writesInFlight = 0
   #maximumWritesInFlight = 0
   #skillsValidations = 0
@@ -115,10 +138,11 @@ class SectionPreparationTestSystem {
         this.#writesInFlight += 1
         this.#maximumWritesInFlight = Math.max(this.#maximumWritesInFlight, this.#writesInFlight)
         if (options.writing === 'slow') await new Promise<void>((resolve) => { this.#pendingWrites.push(resolve) })
+        if (options.heldSection === input.section.kind) await new Promise<void>((resolve) => { this.#releaseHeldSection = resolve })
         this.#writesInFlight -= 1
       },
       onSkillsValidation: () => ++this.#skillsValidations,
-    } }) })
+    }, persisted: this.#persisted }) })
   }
 
   async givenMatchedCandidateSession() {
@@ -144,6 +168,22 @@ class SectionPreparationTestSystem {
       await new Promise((resolve) => setTimeout(resolve, 0))
     }
     this.#outcome = this.#journey.readView()
+  }
+
+  async prepareTailoredResumeWhileSkillsAreHeld() {
+    this.#journey.startTailoredResumePreparation()
+    await expect.poll(() => this.#readSections().filter(({ status }) => status === 'validated').length).toBe(7)
+    this.#outcome = this.#journey.readView()
+  }
+
+  async releaseHeldSection() {
+    if (this.#releaseHeldSection === null) expect.fail('Hold a section before releasing it')
+    this.#releaseHeldSection()
+    await this.#preparationFinished()
+  }
+
+  #readSections() {
+    return this.#readOpenView().session.preparation?.sections ?? []
   }
 
   async #preparationFinished() {
@@ -180,6 +220,35 @@ class SectionPreparationTestSystem {
       locale: 'en', purpose: 'tailored' })
     expect(JSON.stringify(this.#writingInputs)).not.toContain(structuredResumeJobMatch.jobPosting.originalContent)
     expect(JSON.stringify(this.#writingInputs)).not.toContain('Alex Morgan')
+  }
+
+  expectValidatedSectionsRevealedAroundTheSkillsPlaceholder() {
+    const view = this.#expectOutcome()
+    expect(view?.operation).toBe('preparing-tailored-resume')
+    expect(view?.session.tailoredResume).toBeNull()
+    const sections = view?.session.preparation?.sections ?? []
+    expect(sections.map(({ key, status }) => [key, status])).toEqual([['value-proposition', 'validated'],
+      ['experiences.0', 'validated'], ['experiences.1', 'validated'], ['skills', 'writing'], ['education', 'validated'],
+      ['languages', 'validated'], ['projects', 'validated'], ['certifications', 'validated']])
+    expect(sections.find(({ key }) => key === 'skills')).not.toHaveProperty('content')
+    expect(sections.find(({ key }) => key === 'education')).toMatchObject({ attempt: 1,
+      content: readGroupedResumeSection({ key: 'education', kind: 'education' }) })
+    expect(this.#persisted.session?.preparation?.sections).toEqual(sections)
+  }
+
+  expectCompleteResumePreparedWithEverySectionValidated() {
+    const view = this.#expectOutcome()
+    expect(view?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    expect(view?.session.tailoredResume?.sections.map(({ section }) => section))
+      .toEqual(['skills', 'education', 'languages', 'projects', 'certifications'])
+    expect(view?.session.preparation?.sections?.every(({ status }) => status === 'validated')).toBe(true)
+  }
+
+  expectEveryValidatedSectionKeptVisible() {
+    const sections = this.#expectOutcome()?.session.preparation?.sections ?? []
+    expect(sections).toHaveLength(8)
+    expect(sections.every((section) => section.status === 'validated' && section.content.kind === section.kind)).toBe(true)
+    expect(this.#persisted.session?.preparation).toMatchObject({ status: 'failed', failure: 'unsupported-content', sections })
   }
 
   expectAtMostFourSectionsInFlight() {
@@ -228,9 +297,10 @@ function createMatchedSession(): CandidateSession {
   }
 }
 
-function createDependencies({ options, models }: Readonly<{
+function createDependencies({ options, models, persisted }: Readonly<{
   options: TestOptions
   models: Readonly<{ onWrite: (input: ResumeSectionWritingInput) => Promise<void>; onSkillsValidation: () => number }>
+  persisted: { session: CandidateSession | null }
 }>): CandidateJourneyDependencies {
   let session = createMatchedSession()
   let skillsWrites = 0
@@ -255,7 +325,7 @@ function createDependencies({ options, models }: Readonly<{
     }),
     persistence: { delete: () => ({ ok: true, value: null }),
       restore: () => ({ ok: true, value: { notice: null, session } }),
-      save: ({ session: nextSession }) => { session = nextSession; return { ok: true, value: nextSession } } },
+      save: ({ session: nextSession }) => { session = nextSession; persisted.session = nextSession; return { ok: true, value: nextSession } } },
     jobPostingDocumentReader: { read: () => Promise.resolve({ ok: true, value: { text: '' } }) },
     jobPostingExtractor: { extract: () => Promise.resolve({ ok: false, error: 'job-posting-extraction-unavailable' }) },
     matchEvidenceMatcher: { match: () => Promise.resolve({ ok: false, error: 'match-evidence-unavailable' }) },

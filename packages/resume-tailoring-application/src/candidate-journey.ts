@@ -37,6 +37,7 @@ import {
 import type {
   CandidateSession,
   CandidateJourneyPhase,
+  ResumeSectionSnapshot,
 } from '@resume-tailoring/domain/candidate-session'
 import { hasProcessingConsentForPolicy } from '@resume-tailoring/domain/processing-policy'
 import type { ProcessingPolicy } from '@resume-tailoring/domain/processing-policy'
@@ -72,7 +73,7 @@ export {
   hasValidCandidateSessionLifetime,
 } from '@resume-tailoring/domain/candidate-session'
 export type { CandidateJourneyPhase, CandidateSession }
-export type { StoredIntakeDocument, ResumePreparationFailure } from '@resume-tailoring/domain/candidate-session'
+export type { StoredIntakeDocument, ResumePreparationFailure, ResumeSectionSnapshot } from '@resume-tailoring/domain/candidate-session'
 
 export type CandidateSessionNotice =
   | 'deleted'
@@ -147,6 +148,7 @@ type CandidateJourneyEvent =
   | Readonly<{ type: 'RENDER_RESUME_DOCUMENT'; input: ResumeRenderInput }>
   | Readonly<{ type: 'INVALIDATE_RESUME_INPUTS' }>
   | Readonly<{ type: 'PREPARATION_PROGRESS'; phase: PreparationPhase; session: CandidateSession }>
+  | Readonly<{ type: 'RESUME_SECTIONS_PROGRESSED'; sections: readonly ResumeSectionSnapshot[] }>
   | Readonly<{ type: 'SAVE_RESUME'; session: CandidateSession; baseRevision: string; correctionKind?: ResumeCorrectionKind }>
   | Readonly<{ type: 'REPORT_RESUME'; review: ResumeReviewState; baseRevision: string }>
   | Readonly<{ type: 'UPDATE_RESUME_CONTACTS'; contacts: ResumeContacts }>
@@ -679,6 +681,10 @@ const candidateJourneyMachine = setup({
           },
         },
         preparingResume: {
+          entry: [({ context }) => { recordJourneyPhase({ context, phase: 'tailored-resume-preparation' }) },
+            assign({ preparationPhase: null })],
+          on: { RESUME_SECTIONS_PROGRESSED: { actions: assign(({ context, event }) =>
+            saveResumeSectionsProgress({ context, sections: event.sections })) } },
           invoke: {
             src: 'resumePreparationMachine',
             input: ({ context }) => readResumePreparationInput(context),
@@ -1140,15 +1146,32 @@ function recordSessionExpiration({ context }: Readonly<{ context: CandidateJourn
   recordTelemetry({ dependencies: context.dependencies, event: { name: 'candidate-session-expired' } })
 }
 
-function recordJourneyPhase({ context, phase }: Readonly<{ context: CandidateJourneyContext; phase: PreparationPhase }>) {
+function recordJourneyPhase({ context, phase }: Readonly<{
+  context: CandidateJourneyContext; phase: PreparationPhase | 'tailored-resume-preparation'
+}>) {
   const reached = readJourneyPhase(phase)
   if (context.preparationPhase !== null && readJourneyPhase(context.preparationPhase) === reached) return
   recordTelemetry({ dependencies: context.dependencies, event: { name: 'candidate-journey-phase-reached', phase: reached } })
 }
 
-function readJourneyPhase(phase: PreparationPhase): CandidateJourneyPhase {
+function readJourneyPhase(phase: PreparationPhase | 'tailored-resume-preparation'): CandidateJourneyPhase {
   if (phase === 'extracting-source') return 'source-intake'
-  return phase === 'extracting-posting' || phase === 'matching' ? 'job-match' : 'tailored-resume-preparation'
+  return phase === 'extracting-posting' || phase === 'matching' ? 'job-match' : phase
+}
+
+/**
+ * The Journey stays the only writer of the Candidate Session (ADR-0011): each snapshot reported by the
+ * preparation machine is saved with the preparation, which also keeps validated sections after a failure.
+ */
+function saveResumeSectionsProgress({ context, sections }: Readonly<{
+  context: CandidateJourneyContext; sections: readonly ResumeSectionSnapshot[]
+}>): Partial<CandidateJourneyContext> {
+  const { preparedInputs, session, dependencies } = context
+  if (preparedInputs === null || session === null || session.expiresAt <= dependencies.now()) return {}
+  const preparation = { ...preparedInputs.preparation, sections }
+  const progressed = { ...session, preparation }
+  dependencies.persistence.save({ session: progressed })
+  return { preparedInputs: { ...preparedInputs, preparation }, session: progressed }
 }
 
 function recordResumeOutcome({ dependencies, event, view }: Readonly<{

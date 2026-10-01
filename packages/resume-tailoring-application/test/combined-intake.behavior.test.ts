@@ -240,7 +240,7 @@ class CombinedIntakeSystem {
       jobPosting: documentFromText(structuredResumeJobMatch.jobPosting.originalContent) })
     await expect.poll(() => {
       const view = this.#journey.readView()
-      return view.status === 'candidate-session-open' ? view.preparationPhase : null
+      return view.status === 'candidate-session-open' ? view.session.preparation?.sections?.[0]?.status : null
     }).toBe('writing')
   }
 
@@ -329,7 +329,7 @@ class CombinedIntakeSystem {
       jobPosting: documentFromText(structuredResumeJobMatch.jobPosting.originalContent) })
     await expect.poll(() => {
       const view = this.#journey.readView()
-      return view.status === 'candidate-session-open' ? view.preparationPhase : null
+      return view.status === 'candidate-session-open' ? view.session.preparation?.sections?.[0]?.status : null
     }).toBe('writing')
     this.#journey = createCandidateJourney({ dependencies: this.#dependencies })
     this.#journey.start()

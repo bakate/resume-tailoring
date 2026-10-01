@@ -3,6 +3,7 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import type { ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
 import { routeResumeSectionModels, writeFixtureSection } from './resume-section-model-routes'
 
 test.describe('Candidate Journey preview-first preparation', () => {
@@ -265,6 +266,27 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectDeletedSession()
   })
 
+  test('reveals a validated section while another is still a placeholder', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'held-skills' })
+    await system.givenCombinedIntake()
+
+    await system.generateResume()
+
+    await system.expectSectionRevealedBesideTheSkillsPlaceholder()
+  })
+
+  test('downloads the complete preview once the last section is validated', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'held-skills' })
+    await system.givenCombinedIntake()
+    await system.generateResume()
+    await system.givenHeldSkillsSectionReleased()
+    await system.givenRequiredContactsArePresent()
+
+    await system.downloadCurrentResume()
+
+    await system.expectCurrentResumePdfDownloaded()
+  })
+
   test('locks the intake while the resume is being prepared', async ({ page }) => {
     const system = createSystemUnderTest({ page, scenario: 'pending-writing' })
     await system.givenCombinedIntake()
@@ -323,7 +345,7 @@ function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: P
 }
 
 type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-coverage' | 'adjacent-evidence' | 'no-correspondence'
-  | 'unsafe-output' | 'interrupted' | 'unavailable' | 'pending-writing' | 'posting-extraction-unavailable'
+  | 'unsafe-output' | 'interrupted' | 'unavailable' | 'pending-writing' | 'posting-extraction-unavailable' | 'held-skills'
 
 class CandidateJourneyTestSystem {
   readonly #page: Page
@@ -331,6 +353,8 @@ class CandidateJourneyTestSystem {
   #downloadPath: string | null = null
   #scenario: Scenario
   #completedAction: string | null = null
+  #releaseHeldSkills: () => void = () => undefined
+  readonly #heldSkills = new Promise<void>((resolve) => { this.#releaseHeldSkills = resolve })
 
   constructor(page: Page, scenario: Scenario) {
     this.#page = page; this.#scenario = scenario
@@ -355,6 +379,9 @@ class CandidateJourneyTestSystem {
     await this.#page.route('**/api/resume-section-writing', (route) => {
       if (this.#scenario === 'interrupted') return route.abort()
       if (this.#scenario === 'pending-writing') return new Promise<void>(() => undefined)
+      if (this.#scenario === 'held-skills' && (route.request().postDataJSON() as ResumeSectionWritingInput).section.kind === 'skills') {
+        return this.#heldSkills.then(() => route.fallback())
+      }
       if (this.#scenario === 'unavailable') return route.fulfill({ json: { ok: false, error: { type: 'permanent' } } })
       return route.fallback()
     })
@@ -802,6 +829,24 @@ class CandidateJourneyTestSystem {
     await expect(alert).toContainText('We could not analyze the job posting.')
     await expect(alert).toContainText('Your inputs are kept.')
     await expect(alert.getByRole('button', { name: 'Try again' })).toBeEnabled()
+  }
+
+  async expectSectionRevealedBesideTheSkillsPlaceholder() {
+    this.#expectAction()
+    const preview = this.#page.getByRole('region', { name: 'Your resume is taking shape' })
+    await expect(preview.getByRole('region', { name: 'Education' })).toContainText('Computer Science degree')
+    await expect(preview.getByRole('region', { name: 'Skills' })).toContainText('Writing Skills…')
+    await expect(preview.getByRole('region', { name: 'Skills' })).not.toContainText('React')
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toHaveCount(0)
+    await expect(this.#page.getByRole('button', { name: 'Check page count', exact: true })).toHaveCount(0)
+  }
+
+  async givenHeldSkillsSectionReleased() {
+    await this.expectSectionRevealedBesideTheSkillsPlaceholder()
+    this.#releaseHeldSkills()
+    await expect(this.#page.getByRole('region', { name: 'Your resume is taking shape' })).toHaveCount(0)
+    await this.#showDocumentText()
+    await expect(this.#page.frameLocator('iframe').getByText('React', { exact: false }).first()).toBeVisible()
   }
 
   async expectIntakeLockedDuringPreparation() {

@@ -18,7 +18,8 @@ export type CombinedIntakeRequest = Readonly<{
   purpose?: 'tailored' | 'normalized'
   correction?: Readonly<{ ambiguityId: `critical-ambiguity-${string}`; answer: string }>
 }>
-export type PreparationPhase = 'extracting-source' | 'extracting-posting' | 'matching' | 'writing' | 'validating'
+/** Progress before the Resume Sections are written; the sections snapshot reports the rest (ADR-0016). */
+export type PreparationPhase = 'extracting-source' | 'extracting-posting' | 'matching'
 export type CombinedIntakeOutcome =
   | Readonly<{ status: 'prepared'; session: CandidateSession; revision: string }>
   | Readonly<{ status: 'no-relevant-evidence'; alternative: 'normalized'; revision: string; session: CandidateSession }>
@@ -124,7 +125,6 @@ function prepareDocument(context: PreparationContext): CombinedIntakeOutcome | P
   if (purpose === 'tailored' && jobMatch.analysis.generationEligibility === 'denied') return noCorrespondence(context)
   if (context.dependencies.resumeSectionModels === undefined) return failPreparation({ context, detail: 'unavailable' })
   if (context.signal?.aborted === true) return unavailable
-  reportProgress({ context, phase: 'writing' })
   return { status: 'inputs-prepared', session: context.session, preparation: context.preparation, request: {
     candidateFacts: safeCandidateFacts(sourceIntake), jobMatch, purpose,
     locale: context.preparation.locale ?? inferTailoredResumeLocale({ content: jobMatch.jobPosting.originalContent }),

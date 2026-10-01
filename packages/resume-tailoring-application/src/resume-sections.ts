@@ -1,23 +1,15 @@
 import type { JobMatch } from '@resume-tailoring/domain/job-match'
 import type { CandidateFact, CandidateFactId } from '@resume-tailoring/domain/source-intake'
 import { readExperienceFields, readSectionFields } from './tailored-resume'
-import type { TailoredResumeExperience, TailoredResumeField, TailoredResumeLocale, TailoredResumeSection,
-  TailoredResumeSkillGroup } from './tailored-resume'
+import type { TailoredResumeExperience, TailoredResumeField, TailoredResumeLocale, TailoredResumeSection } from './tailored-resume'
 import type { ProfessionalResumeDocument } from './structured-resume-contract'
+import type { ResumeSectionContent, ResumeSectionKind } from '@resume-tailoring/domain/tailored-resume'
 
-export const resumeSectionKinds = ['value-proposition', 'experience', 'skills', 'education', 'languages',
-  'projects', 'certifications'] as const
-export type ResumeSectionKind = typeof resumeSectionKinds[number]
-type FieldSectionKind = Exclude<ResumeSectionKind, 'value-proposition' | 'experience' | 'skills'>
+export { resumeSectionKinds } from '@resume-tailoring/domain/tailored-resume'
+export type { ResumeSectionContent, ResumeSectionKind } from '@resume-tailoring/domain/tailored-resume'
 
 /** One Resume Section of the deterministic section plan; experiences are keyed `experiences.N`. */
 export type ResumeSectionPlanEntry = Readonly<{ key: string; kind: ResumeSectionKind }>
-
-export type ResumeSectionContent =
-  | Readonly<{ kind: 'value-proposition'; paragraphs: readonly TailoredResumeField[] }>
-  | Readonly<{ kind: 'experience'; experience: TailoredResumeExperience }>
-  | Readonly<{ kind: 'skills'; groups: readonly TailoredResumeSkillGroup[] }>
-  | Readonly<{ kind: FieldSectionKind; fields: readonly TailoredResumeField[] }>
 
 /** Only what the section may cite (every fact for the Value Proposition): never the Job Posting text or Match Analysis details. */
 export type ResumeSectionWritingInput = Readonly<{

@@ -1,4 +1,5 @@
 import { assign, enqueueActions, fromPromise, sendParent, setup } from 'xstate'
+import type { ResumeSectionSnapshot } from '@resume-tailoring/domain/candidate-session'
 import type { PrivacySafeTelemetryEvent, resumeSectionOutcomes } from './resume-tailoring-workflow-ports'
 import type { ResumeOperationFailure, ResumePreparationOutcome } from './structured-resume-contract'
 import { assembleResumeDocument, citedCandidateFacts, createSectionWritingInput, hasSupportedSectionStructure,
@@ -16,6 +17,8 @@ export type ResumeSectionResult = Readonly<{
   usage: ResumeModelUsage
 }> & (Readonly<{ status: 'validated'; content: ResumeSectionContent }>
   | Readonly<{ status: 'failed'; failure: ResumeSectionFailure }>)
+
+type SectionProgressStatus = 'writing' | 'validating'
 
 type ResumeSectionMachineInput = Readonly<{
   writingInput: ResumeSectionWritingInput
@@ -93,6 +96,8 @@ export const resumeSectionMachine = setup({
   actions: {
     reportSectionFinished: sendParent(({ context }: Readonly<{ context: ResumeSectionMachineContext }>) =>
       ({ type: 'SECTION_FINISHED', result: readSectionResult(context) })),
+    reportSectionProgressed: sendParent(({ context }: Readonly<{ context: ResumeSectionMachineContext }>, status: SectionProgressStatus) =>
+      ({ type: 'SECTION_PROGRESSED', key: context.writingInput.section.key, status, attempt: context.attempt })),
   },
 }).createMachine({
   id: 'resume-section',
@@ -101,7 +106,8 @@ export const resumeSectionMachine = setup({
   states: {
     planned: { always: { target: 'writing' } },
     writing: {
-      entry: assign({ attempt: ({ context }) => context.attempt + 1, content: null, failure: null }),
+      entry: [assign({ attempt: ({ context }) => context.attempt + 1, content: null, failure: null }),
+        { type: 'reportSectionProgressed', params: 'writing' }],
       invoke: {
         src: 'writeSection',
         input: ({ context }) => context,
@@ -116,6 +122,7 @@ export const resumeSectionMachine = setup({
       },
     },
     validating: {
+      entry: { type: 'reportSectionProgressed', params: 'validating' },
       invoke: {
         src: 'validateSectionFields',
         input: ({ context }) => {
@@ -148,6 +155,7 @@ export type ResumePreparationMachineInput = Readonly<{
 
 type ResumePreparationMachineContext = ResumePreparationMachineInput & Readonly<{
   plan: readonly ResumeSectionPlanEntry[]
+  sections: readonly ResumeSectionSnapshot[]
   startedKeys: readonly string[]
   results: readonly ResumeSectionResult[]
   coherence: ResumeSectionModelResult<ResumeDocumentCoherence> | null
@@ -200,6 +208,28 @@ function readPreparationFailure(failures: readonly ResumeSectionFailure[]): Resu
   return { status: 'failed', reason: 'unavailable', recovery: 'retry' }
 }
 
+type ResumePreparationEvent =
+  | Readonly<{ type: 'SECTION_PROGRESSED'; key: string; status: SectionProgressStatus; attempt: number }>
+  | Readonly<{ type: 'SECTION_FINISHED'; result: ResumeSectionResult }>
+
+function readPlannedSections(plan: readonly ResumeSectionPlanEntry[]): readonly ResumeSectionSnapshot[] {
+  return plan.map(({ key, kind }) => ({ key, kind, status: 'planned', attempt: 0 }))
+}
+
+function readProgressedSections({ context, event }: Readonly<{
+  context: ResumePreparationMachineContext; event: ResumePreparationEvent
+}>): readonly ResumeSectionSnapshot[] {
+  const key = event.type === 'SECTION_PROGRESSED' ? event.key : event.result.section.key
+  return context.sections.map((section): ResumeSectionSnapshot => {
+    if (section.key !== key) return section
+    if (event.type === 'SECTION_PROGRESSED') return { key, kind: section.kind, status: event.status, attempt: event.attempt }
+    const { result } = event
+    return result.status === 'validated'
+      ? { key, kind: section.kind, status: 'validated', attempt: result.attemptCount, content: result.content }
+      : { key, kind: section.kind, status: 'failed', attempt: result.attemptCount }
+  })
+}
+
 function recordSectionResult({ context, result }: Readonly<{ context: ResumePreparationMachineContext; result: ResumeSectionResult }>) {
   context.recordTelemetry({ name: 'resume-section-prepared', sectionKind: result.section.kind,
     outcome: result.status === 'validated' ? 'validated' : result.failure, attemptCount: result.attemptCount,
@@ -222,10 +252,12 @@ export const resumePreparationMachine = setup({
     context: ResumePreparationMachineContext
     input: ResumePreparationMachineInput
     output: ResumePreparationMachineOutput
-    events: Readonly<{ type: 'SECTION_FINISHED'; result: ResumeSectionResult }>
+    events: ResumePreparationEvent
   },
   actors: { resumeSectionMachine, checkDocumentCoherence },
   actions: {
+    reportSectionsProgressed: sendParent(({ context }: Readonly<{ context: ResumePreparationMachineContext }>) =>
+      ({ type: 'RESUME_SECTIONS_PROGRESSED', sections: context.sections })),
     spawnQueuedSections: enqueueActions(({ context, enqueue }) => {
       const running = context.startedKeys.length - context.results.length
       const queued = context.plan.filter(({ key }) => !context.startedKeys.includes(key))
@@ -240,20 +272,27 @@ export const resumePreparationMachine = setup({
   },
 }).createMachine({
   id: 'resume-preparation',
-  context: ({ input }) => ({ ...input, plan: [], startedKeys: [], results: [], coherence: null, startedAt: input.now() }),
+  context: ({ input }) => ({ ...input, plan: [], sections: [], startedKeys: [], results: [], coherence: null, startedAt: input.now() }),
   initial: 'planning',
   states: {
     planning: {
-      entry: assign({ plan: ({ context }) => planResumeSections(context.request) }),
+      entry: [assign(({ context }) => {
+        const plan = planResumeSections(context.request)
+        return { plan, sections: readPlannedSections(plan) }
+      }), 'reportSectionsProgressed'],
       always: { target: 'writingSections' },
     },
     writingSections: {
       entry: 'spawnQueuedSections',
-      on: { SECTION_FINISHED: { actions: [
-        assign({ results: ({ context, event }) => [...context.results, event.result] }),
-        ({ context, event }) => { recordSectionResult({ context, result: event.result }) },
-        'spawnQueuedSections',
-      ] } },
+      on: {
+        SECTION_PROGRESSED: { actions: [assign({ sections: readProgressedSections }), 'reportSectionsProgressed'] },
+        SECTION_FINISHED: { actions: [
+          assign({ results: ({ context, event }) => [...context.results, event.result], sections: readProgressedSections }),
+          ({ context, event }) => { recordSectionResult({ context, result: event.result }) },
+          'reportSectionsProgressed',
+          'spawnQueuedSections',
+        ] },
+      },
       always: [
         { guard: ({ context }) => everySectionValidated(context), target: 'checkingCoherence' },
         { guard: ({ context }) => everySectionFinished(context), target: 'failed' },
