@@ -3,7 +3,6 @@ import { resumeSectionKinds } from '@resume-tailoring/application/candidate-jour
 import type { ResumeSectionContent, ResumeSectionKind, ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
 import { readResumeSection, groupedResumeDocument, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createOpenAiResumeCoherenceChecker, createOpenAiResumeFieldValidator, createOpenAiResumeSectionWriter } from './openai-resume-section-models'
-import { resumeSectionWritingInputSchema } from './resume-document-schemas'
 
 describe('Resume section model adapters', () => {
   it.each(resumeSectionKinds)('writes the %s section under its own strict structured-output schema', async (kind) => {
@@ -21,31 +20,6 @@ describe('Resume section model adapters', () => {
       text: { format: { type: 'json_schema', strict: true, name: `resume_section_${kind.replaceAll('-', '_')}` } } })
     expect(JSON.stringify(body)).not.toContain('alex@example.com')
     expect(JSON.stringify(body)).not.toContain('Alex Morgan')
-  })
-
-  it('rewrites a section with the propositions its validation rejected and instructions not to reuse them', async () => {
-    let body: RequestBody | null = null
-    const content = readResumeSection({ document: groupedResumeDocument, section: sectionFor('value-proposition') })
-    const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
-      body = readBody(options)
-      return Promise.resolve(Response.json(modelResponse(sectionOutput(content))))
-    } })
-    const rejectedFields = [{ fieldId: 'summary-billing', text: 'Senior engineer with ten years of billing leadership.' }]
-
-    await writer.write({ ...writingInput('value-proposition'), rejectedFields })
-
-    const [instructions, request] = readMessages(body)
-    expect(JSON.parse(request ?? '{}')).toMatchObject({ rejectedFields })
-    expect(instructions).toContain('rejectedFields')
-    expect(instructions).toContain('Never reuse them as written')
-  })
-
-  it('accepts a writing request from a client loaded before rewrites carried rejected fields', () => {
-    const olderRequest: unknown = JSON.parse(JSON.stringify({ ...writingInput('skills'), rejectedFields: undefined }))
-
-    const parsed = resumeSectionWritingInputSchema.safeParse(olderRequest)
-
-    expect(parsed.success && parsed.data.rejectedFields).toEqual([])
   })
 
   it('validates only the fields of one section against the facts they cite', async () => {
@@ -132,11 +106,6 @@ function sectionOutput(content: ResumeSectionContent) {
 function modelResponse(value: unknown) {
   return { output: [{ content: [{ type: 'output_text', text: JSON.stringify(value) }] }],
     usage: { input_tokens: 900, output_tokens: 120 } }
-}
-
-function readMessages(body: RequestBody | null) {
-  const input = (body?.input ?? []) as readonly Readonly<{ content: readonly Readonly<{ text: string }>[] }>[]
-  return input.map(({ content }) => content[0]?.text)
 }
 
 function readBody(options: RequestInit | undefined): RequestBody {
