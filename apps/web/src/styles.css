@@ -1943,3 +1943,9 @@ h1 {
   margin: 0;
   padding: 0;
 }
+
+.resume-sections-preview-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}

@@ -1,7 +1,7 @@
 import type { ProcessingConsent } from './processing-policy'
 import type { CandidateFactId, SourceIntake } from './source-intake'
 import type { JobMatch } from './job-match'
-import type { TailoredResume, ResumeEditingState, ResumeFieldLocation } from './tailored-resume'
+import type { TailoredResume, ResumeEditingState, ResumeFieldLocation, ResumeSectionContent, ResumeSectionKind } from './tailored-resume'
 
 export const candidateJourneyPhases = [
   'source-intake',
@@ -50,7 +50,13 @@ export type ResumePreparation = Readonly<{
   sourceIntake: SourceIntake | null
   jobMatch: JobMatch | null
   failure: ResumePreparationFailure | null
+  sections?: readonly ResumeSectionSnapshot[]
 }>
+
+/** One Resume Section as the preparation machine last reported it; text exists only once validated (ADR-0016). */
+export type ResumeSectionSnapshot = Readonly<{ key: string; kind: ResumeSectionKind; attempt: number }> & (
+  | Readonly<{ status: 'planned' | 'writing' | 'validating' | 'failed' }>
+  | Readonly<{ status: 'validated'; content: ResumeSectionContent }>)
 
 export const resumePreparationFailures = [
   'encrypted-document', 'empty-document', 'invalid-document', 'oversized-document',

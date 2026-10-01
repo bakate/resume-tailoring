@@ -1,4 +1,4 @@
-import { resumePreparationFailures } from '@resume-tailoring/application/candidate-journey'
+import { resumePreparationFailures, resumeSectionKinds } from '@resume-tailoring/application/candidate-journey'
 import { z } from 'zod'
 
 import {
@@ -149,6 +149,18 @@ export const tailoredResumeSchema = z.strictObject({
     paragraphs: z.array(tailoredResumeFieldSchema) }),
 })
 
+const resumeSectionContentSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('value-proposition'), paragraphs: z.array(tailoredResumeFieldSchema) }),
+  z.strictObject({ kind: z.literal('experience'), experience: tailoredResumeSchema.shape.experiences.element }),
+  z.strictObject({ kind: z.literal('skills'), groups: tailoredResumeSchema.shape.sections.def.element.options[0].shape.groups }),
+  z.strictObject({ kind: z.enum(['education', 'languages', 'projects', 'certifications']), fields: z.array(tailoredResumeFieldSchema) }),
+])
+const resumeSectionSnapshotSchema = z.discriminatedUnion('status', [
+  z.strictObject({ key: z.string().min(1), kind: z.enum(resumeSectionKinds), attempt: z.number().int().nonnegative(),
+    status: z.enum(['planned', 'writing', 'validating', 'failed']) }),
+  z.strictObject({ key: z.string().min(1), kind: z.enum(resumeSectionKinds), attempt: z.number().int().nonnegative(),
+    status: z.literal('validated'), content: resumeSectionContentSchema }),
+])
 const storedIntakeDocumentSchema = z.strictObject({ data: z.string(), mediaType: z.string(), name: z.string() })
 const resumePreparationSchema = z.strictObject({
   revision: z.string().min(1),
@@ -156,6 +168,7 @@ const resumePreparationSchema = z.strictObject({
   sourceDocument: storedIntakeDocumentSchema.nullable(), jobPosting: storedIntakeDocumentSchema.nullable(),
   locale: z.enum(['en', 'fr']).nullable(), purpose: z.enum(['tailored', 'normalized']),
   sourceIntake: sourceIntakeSchema.nullable(), jobMatch: jobMatchSchema.nullable(), failure: z.enum(resumePreparationFailures).nullable(),
+  sections: z.array(resumeSectionSnapshotSchema).optional(),
 })
 
 const resumeFieldLocationSchema = z.discriminatedUnion('kind', [
