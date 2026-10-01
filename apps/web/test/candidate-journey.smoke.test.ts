@@ -275,6 +275,15 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectSectionRevealedBesideTheSkillsPlaceholder()
   })
 
+  test('heads the progressive preview once per section group in the resume language', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'held-skills' })
+    await system.givenCombinedIntakeInFrench()
+
+    await system.generateResume()
+
+    await system.expectFrenchSectionHeadingsShownOnce()
+  })
+
   test('downloads the complete preview once the last section is validated', async ({ page }) => {
     const system = createSystemUnderTest({ page, scenario: 'held-skills' })
     await system.givenCombinedIntake()
@@ -839,6 +848,19 @@ class CandidateJourneyTestSystem {
     await expect(preview.getByRole('region', { name: 'Skills' })).not.toContainText('React')
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toHaveCount(0)
     await expect(this.#page.getByRole('button', { name: 'Check page count', exact: true })).toHaveCount(0)
+  }
+
+  async expectFrenchSectionHeadingsShownOnce() {
+    this.#expectAction()
+    const preview = this.#page.getByRole('region', { name: 'Your resume is taking shape' })
+    await expect(preview.getByRole('region', { name: 'Formation' })).toBeVisible()
+    await expect(preview.getByRole('heading', { name: 'Profil', exact: true })).toHaveCount(1)
+    await expect(preview.getByRole('heading', { name: 'Expérience', exact: true })).toHaveCount(1)
+    await expect(preview.getByRole('heading', { name: 'Experience', exact: true })).toHaveCount(0)
+    const experiences = preview.getByRole('region', { name: 'Expérience' })
+    await expect(experiences.getByText('Northwind', { exact: false })).toBeVisible()
+    await expect(experiences.getByText('Contoso', { exact: false })).toBeVisible()
+    await expect(preview.getByRole('region', { name: 'Compétences' })).toContainText('Writing Skills…')
   }
 
   async givenHeldSkillsSectionReleased() {

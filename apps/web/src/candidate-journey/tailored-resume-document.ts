@@ -25,7 +25,7 @@ export function renderTailoredResumeDocument({ tailoredResume, photoDataUrl }: R
 }>) {
   const title = tailoredResume.identity?.value ?? 'Tailored Resume'
   const heading = tailoredResume.purpose === 'normalized'
-    ? label({ key: 'normalized', locale: tailoredResume.locale }) : tailoredResume.targetRole?.value ?? ''
+    ? readResumeHeading({ key: 'normalized', locale: tailoredResume.locale }) : tailoredResume.targetRole?.value ?? ''
   const contactDetails = tailoredResume.contactDetails.map(({ value }) => escapeHtml(value)).join(' · ')
   const defaultOrder: readonly ResumeSectionName[] = ['value-proposition', 'experiences',
     ...tailoredResume.sections.map(({ section }) => section)]
@@ -43,7 +43,7 @@ export function renderTailoredResumeDocument({ tailoredResume, photoDataUrl }: R
 
 function renderValueProposition({ tailoredResume }: Readonly<{ tailoredResume: TailoredResume }>) {
   const { kind, paragraphs } = tailoredResume.valueProposition
-  const title = label({ key: 'summary', locale: tailoredResume.locale })
+  const title = readResumeHeading({ key: 'summary', locale: tailoredResume.locale })
   if (kind === 'evidence-excerpts') return renderFieldSection({ fields: paragraphs, title })
   if (paragraphs.length === 0) return ''
   return `<section><h2>${title}</h2>${paragraphs.map(({ text }) => `<p>${escapeHtml(text)}</p>`).join('')}</section>`
@@ -67,7 +67,7 @@ function readProfessionalFields({ tailoredResume }: Readonly<{ tailoredResume: T
 function renderExperiences({ tailoredResume }: Readonly<{ tailoredResume: TailoredResume }>) {
   if (tailoredResume.experiences.length === 0) return ''
   const entries = tailoredResume.experiences.map((experience) => renderExperience({ experience })).join('')
-  return `<section><h2>${label({ key: 'experiences', locale: tailoredResume.locale })}</h2>${entries}</section>`
+  return `<section><h2>${readResumeHeading({ key: 'experiences', locale: tailoredResume.locale })}</h2>${entries}</section>`
 }
 
 function renderExperience({ experience }: Readonly<{ experience: TailoredResumeExperience }>) {
@@ -84,7 +84,7 @@ function renderExperience({ experience }: Readonly<{ experience: TailoredResumeE
 function renderSection({ section, locale }: Readonly<{
   section: TailoredResumeSection; locale: TailoredResume['locale']
 }>) {
-  const title = label({ key: section.section, locale })
+  const title = readResumeHeading({ key: section.section, locale })
   if (section.section !== 'skills') return renderFieldSection({ fields: section.fields, title })
   const groups = section.groups.filter(({ items }) => items.length > 0).map(({ category, items }) => {
     const heading = category === null ? '' : `<h3>${escapeHtml(category.text)}</h3>`
@@ -101,13 +101,16 @@ function renderFieldSection({ fields, title }: Readonly<{
   return `<section><h2>${title}</h2><ul>${fields.map(({ text }) => `<li>${escapeHtml(text)}</li>`).join('')}</ul></section>`
 }
 
-function label({ key, locale }: Readonly<{ key: keyof typeof labels.en; locale: 'en' | 'fr' }>) {
+/** A resume section heading in the resume language, shared by the final document and the progressive preview. */
+export function readResumeHeading({ key, locale }: Readonly<{ key: ResumeHeadingKey; locale: 'en' | 'fr' }>) {
   return labels[locale][key]
 }
 
 function escapeHtml(value: string) {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 }
+
+export type ResumeHeadingKey = keyof typeof labels.en
 
 const labels = {
   en: { normalized: 'Normalized Resume — not tailored', certifications: 'Certifications', education: 'Education', experiences: 'Experience', languages: 'Languages', projects: 'Projects', skills: 'Skills', summary: 'Summary' },
