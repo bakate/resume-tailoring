@@ -533,7 +533,7 @@ class CandidateJourneyTestSystem {
     this.#expectAction()
     await this.#showDocumentText()
     await expect(this.#page.frameLocator('iframe').getByText('updated@example.com', { exact: true })).toBeVisible()
-    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#openEditorAfterReload()
     await expect(this.#page.getByLabel('Email', { exact: true })).toHaveValue('updated@example.com')
   }
 
@@ -551,7 +551,7 @@ class CandidateJourneyTestSystem {
     await this.#showDocumentText()
     await expect(this.#page.frameLocator('iframe').getByText('Led 100 engineers', { exact: true })).toBeVisible()
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeDisabled()
-    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#openEditorAfterReload()
     await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
     await expect(this.#page.getByText('This professional edit is not supported by the current Candidate Facts.', { exact: true })).toBeVisible()
   }
@@ -886,6 +886,15 @@ class CandidateJourneyTestSystem {
     await expect(generate).toBeEnabled()
     await expect(this.#page.getByRole('textbox', { name: 'Professional text' })).toBeVisible()
     await expect(this.#page.getByRole('textbox', { name: 'Job Posting text' })).toBeVisible()
+  }
+
+  // After a reload, the page-count check disables 'Edit resume' while it runs, and a click
+  // queued behind a busy main thread lands on the disabled button and is dropped.
+  async #openEditorAfterReload() {
+    await expect(async () => {
+      await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+      await expect(this.#page.getByRole('dialog')).toBeVisible({ timeout: 1_000 })
+    }).toPass()
   }
 
   async #showDocumentText() {
