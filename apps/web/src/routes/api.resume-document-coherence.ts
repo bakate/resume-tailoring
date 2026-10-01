@@ -1,0 +1,15 @@
+import { createFileRoute } from '@tanstack/react-router'
+import { createCsrfMiddleware } from '@tanstack/react-start'
+import { createOpenAiResumeCoherenceChecker } from '../candidate-journey/openai-resume-section-models'
+import { resumeCoherenceInputSchema } from '../candidate-journey/resume-document-schemas'
+import { processResumeModel } from './-resume-document-model'
+
+export const Route = createFileRoute('/api/resume-document-coherence')({ server: {
+  middleware: [createCsrfMiddleware()], handlers: { POST: ({ request }) => processResumeModel({
+    request, schema: resumeCoherenceInputSchema,
+    processInput: (input, environment) => createOpenAiResumeCoherenceChecker({
+      apiKey: environment.openAiApiKey, model: environment.openAiStructuredModel,
+      reasoningEffort: environment.openAiStructuredReasoningEffort,
+    }).check(input),
+  }) },
+} })

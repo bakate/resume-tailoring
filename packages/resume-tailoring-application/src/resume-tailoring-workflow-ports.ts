@@ -18,6 +18,9 @@ import type {
   SourceDocument,
   SourceDocumentReadFailure,
 } from './resume-tailoring-workflow'
+import { resumeSectionKinds } from './resume-sections'
+
+export { resumeSectionKinds }
 
 export {
   sensitiveContentKinds,
@@ -113,6 +116,10 @@ export const journeyPhases = [
   'job-match',
   'tailored-resume-preparation',
 ] as const
+export const resumeSectionOutcomes = [
+  'validated', 'unsupported', 'transient', 'timeout', 'permanent', 'consent-required',
+] as const
+export const resumePreparationOutcomes = ['prepared', 'failed'] as const
 
 export type MatchScoreBand = typeof matchScoreBands[number]
 
@@ -138,6 +145,21 @@ export type PrivacySafeTelemetryEvent =
   | Readonly<{
       name: 'resume-downloaded'
       matchScoreBand: MatchScoreBand
+    }>
+  | Readonly<{
+      name: 'resume-section-prepared'
+      sectionKind: typeof resumeSectionKinds[number]
+      outcome: typeof resumeSectionOutcomes[number]
+      attemptCount: number
+      durationMilliseconds: number
+      inputTokens: number
+      outputTokens: number
+    }>
+  | Readonly<{
+      name: 'resume-preparation-completed'
+      outcome: typeof resumePreparationOutcomes[number]
+      durationMilliseconds: number
+      sectionCount: number
     }>
 
 export type SourceDocumentReader = {

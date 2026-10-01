@@ -1,8 +1,12 @@
 export { resumePreparationFailures } from '@resume-tailoring/domain/candidate-session'
-export { createResumePreparation, readProfessionalResumeFields } from './resume-preparation'
-export type { ResumeDocumentWriter, ResumeDocumentValidator, ResumeWritingInput, ResumeValidationInput, ResumeDocumentValidation } from './resume-preparation'
-import { prepareCombinedIntake, unavailable } from './combined-intake'
-import type { CombinedIntakeOutcome, CombinedIntakeRequest, PreparationPhase } from './combined-intake'
+export { readProfessionalResumeFields, resumeSectionKinds } from './resume-sections'
+export type { ResumeCoherenceInput, ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput,
+  ResumeModelUsage, ResumeSectionContent, ResumeSectionKind, ResumeSectionModelFailure, ResumeSectionModelResult,
+  ResumeSectionModels, ResumeSectionPlanEntry, ResumeSectionWritingInput } from './resume-sections'
+import type { ResumeSectionModels } from './resume-sections'
+import { resumePreparationMachine } from './resume-preparation-machines'
+import { prepareCombinedIntake, publishResumePreparation, unavailable } from './combined-intake'
+import type { CombinedIntakeOutcome, CombinedIntakeRequest, PreparationPhase, PreparedResumeInputs } from './combined-intake'
 
 import type { MatchScoreBand, PrivacySafeTelemetry, PrivacySafeTelemetryEvent } from './resume-tailoring-workflow-ports'
 import type { ResumeCorrectionKind } from './resume-editing'
@@ -96,6 +100,7 @@ export type CandidateJourneyDependencies = Readonly<{
   resumeDocumentRenderer?: ResumeDocumentRenderer
   telemetry?: PrivacySafeTelemetry
   resumeDocumentPorts?: Partial<ResumeDocumentPorts>
+  resumeSectionModels?: ResumeSectionModels
   createSessionId: () => string
   jobPostingDocumentReader: JobPostingDocumentReader
   jobPostingExtractor: JobPostingExtractor
@@ -127,6 +132,7 @@ type CandidateJourneyContext = Readonly<{
   dependencies: CandidateJourneyDependencies
   preparationOutcome: CombinedIntakeOutcome | null
   preparationPhase: PreparationPhase | null
+  preparedInputs: PreparedResumeInputs | null
   resumeReview: ResumeReviewState
   jobMatchFailure: CandidateJourneyJobMatchFailure | null
   notice: CandidateSessionNotice
@@ -225,7 +231,7 @@ export type CandidateJourney = Readonly<{
   subscribe: (listener: () => void) => () => void
 }>
 
-const generateApplicationResume = fromPromise<CombinedIntakeOutcome, Readonly<{
+const generateApplicationResume = fromPromise<CombinedIntakeOutcome | PreparedResumeInputs, Readonly<{
   dependencies: CandidateJourneyDependencies; request: CombinedIntakeRequest;
   session: CandidateSession | null; onProgress: (phase: PreparationPhase, session: CandidateSession) => void
 }>>(async ({ input, signal }) => {
@@ -472,6 +478,23 @@ function withProcessingConsent({ session, dependencies }: CandidateJourneyContex
   }
 }
 
+function readResumePreparationInput({ dependencies, preparedInputs }: CandidateJourneyContext) {
+  return { request: preparedInputs?.request ?? emptySectionsRequest, revision: preparedInputs?.preparation.revision ?? 'unavailable',
+    models: dependencies.resumeSectionModels ?? unavailableSectionModels, now: dependencies.now,
+    recordTelemetry: (event: PrivacySafeTelemetryEvent) => { recordTelemetry({ dependencies, event }) } }
+}
+
+const unavailableModelResult = Promise.resolve({ ok: false, error: { type: 'permanent' } } as const)
+const unavailableSectionModels: ResumeSectionModels = { writeSection: () => unavailableModelResult,
+  validateFields: () => unavailableModelResult, checkCoherence: () => unavailableModelResult }
+const emptySectionsRequest = { candidateFacts: [], locale: 'en', purpose: 'tailored', jobMatch: {
+  analysis: { adjacentEvidence: [], criticalRequirementReserve: { requirementIds: [], status: 'clear' }, evidence: [],
+    generationEligibility: 'denied', matchBand: 'ambitious', matchBandQualification: null, matchScore: 0,
+    relevantFactIds: [], requirementGroups: [] },
+  jobPosting: { kind: 'pasted-text', name: '', originalContent: '' }, practicalConstraints: [],
+  priorityGapRequirementIds: [], strengthRequirementIds: [], requirements: [], targetRole: null,
+} } as const satisfies PreparedResumeInputs['request']
+
 function invalidateResumeInputs({ session, dependencies }: CandidateJourneyContext) {
   if (session === null || (session.preparedResumeStatus === 'outdated' && (session.preparation === undefined || session.preparation.status === 'outdated'))) return session
   const next: CandidateSession = { ...invalidateEditingRevision(session), preparedResumeStatus: 'outdated',
@@ -484,6 +507,7 @@ function invalidateResumeInputs({ session, dependencies }: CandidateJourneyConte
 const candidateJourneyMachine = setup({
   actors: {
     generateApplicationResume,
+    resumePreparationMachine,
     renderResumeDocument,
     confirmProfileEnrichment,
     deleteCandidateSession,
@@ -510,6 +534,7 @@ const candidateJourneyMachine = setup({
     resumeRendering: null, resumeRenderSequence: 0,
     preparationOutcome: null,
     preparationPhase: null,
+    preparedInputs: null,
     resumeReview: emptyResumeReview,
     jobMatchFailure: null,
     notice: null,
@@ -621,28 +646,52 @@ const candidateJourneyMachine = setup({
       },
     },
     generatingApplicationResume: {
-      entry: assign({ resumeRendering: null, preparationOutcome: null, preparationPhase: null, resumeReview: emptyResumeReview,
+      entry: assign({ resumeRendering: null, preparationOutcome: null, preparationPhase: null, preparedInputs: null, resumeReview: emptyResumeReview,
         session: ({ context }) => context.session === null ? null : invalidateEditingRevision(context.session),
       }),
       after: { candidateSessionExpiration: { target: 'removingCandidateSession', actions: [recordSessionExpiration, assign({ notice: 'expired-session-discarded' })] } },
       on: { INVALIDATE_RESUME_INPUTS: { target: 'candidateSessionAvailable', actions: assign({
-        session: ({ context }) => invalidateResumeInputs(context), preparationPhase: null, preparationOutcome: null, resumeReview: emptyResumeReview,
+        session: ({ context }) => invalidateResumeInputs(context), preparationPhase: null, preparationOutcome: null, preparedInputs: null, resumeReview: emptyResumeReview,
       }) }, PREPARATION_PROGRESS: { actions: [({ context, event }) => { recordJourneyPhase({ context, phase: event.phase }) },
         assign({ preparationPhase: ({ event }) => event.phase, session: ({ event }) => event.session })] },
         DELETE_CANDIDATE_SESSION: { target: 'removingCandidateSession', actions: [recordSessionDeletion, assign({ notice: 'deleted' })] },
       },
-      invoke: {
-        src: 'generateApplicationResume',
-        input: ({ context, event, self }) => ({ dependencies: context.dependencies, session: context.session,
-          request: event.type === 'START_TAILORED_RESUME_PREPARATION' ? event : event.type === 'RESOLVE_CRITICAL_AMBIGUITY' ? { correction: event } : {},
-          onProgress: (phase: PreparationPhase, session: CandidateSession) => { self.send({ type: 'PREPARATION_PROGRESS', phase, session }) },
-        }),
-        onDone: { target: 'candidateSessionAvailable', actions: assign({
-          preparationPhase: null,
-          preparationOutcome: ({ event }) => event.output,
-          session: ({ context, event }) => event.output.session ?? context.session,
-        }) },
-        onError: { target: 'candidateSessionAvailable', actions: assign({ preparationPhase: null, preparationOutcome: unavailable }) },
+      initial: 'preparingInputs',
+      states: {
+        preparingInputs: {
+          invoke: {
+            src: 'generateApplicationResume',
+            input: ({ context, event, self }) => ({ dependencies: context.dependencies, session: context.session,
+              request: event.type === 'START_TAILORED_RESUME_PREPARATION' ? event : event.type === 'RESOLVE_CRITICAL_AMBIGUITY' ? { correction: event } : {},
+              onProgress: (phase: PreparationPhase, session: CandidateSession) => { self.send({ type: 'PREPARATION_PROGRESS', phase, session }) },
+            }),
+            onDone: [{
+              guard: ({ event }) => event.output.status === 'inputs-prepared',
+              target: 'preparingResume',
+              actions: assign(({ event }) => event.output.status === 'inputs-prepared'
+                ? { preparedInputs: event.output, session: event.output.session } : {}),
+            }, { target: '#candidate-journey.candidateSessionAvailable', actions: assign(({ context, event }) => ({
+              preparationPhase: null,
+              preparationOutcome: event.output.status === 'inputs-prepared' ? unavailable : event.output,
+              session: event.output.session ?? context.session,
+            })) }],
+            onError: { target: '#candidate-journey.candidateSessionAvailable', actions: assign({ preparationPhase: null, preparationOutcome: unavailable }) },
+          },
+        },
+        preparingResume: {
+          invoke: {
+            src: 'resumePreparationMachine',
+            input: ({ context }) => readResumePreparationInput(context),
+            onDone: { target: '#candidate-journey.candidateSessionAvailable', actions: assign(({ context, event }) => {
+              const outcome = context.preparedInputs === null ? unavailable : publishResumePreparation({
+                inputs: context.preparedInputs, dependencies: context.dependencies, outcome: event.output })
+              return { preparationPhase: null, preparationOutcome: outcome, preparedInputs: null,
+                session: 'session' in outcome ? outcome.session ?? context.session : context.session }
+            }) },
+            onError: { target: '#candidate-journey.candidateSessionAvailable',
+              actions: assign({ preparationPhase: null, preparationOutcome: unavailable, preparedInputs: null }) },
+          },
+        },
       },
     },
     processingJobPosting: {
@@ -1038,7 +1087,7 @@ function canSubmitJobPosting({ session }: Readonly<{
 export type {
   ProfessionalResumeDocument, ResumeCondensationOutcome, ResumeCondensationProposal,
   ResumeDocumentPorts, ResumeDocumentReview, ResumeDraft, ResumeExportBlocker, ResumeExportEligibility,
-  ResumeLayoutAssessment, ResumeLayoutOutcome, ResumeOperationFailure, ResumePreparationOutcome, ResumePreparationRequest,
+  ResumeLayoutAssessment, ResumeLayoutOutcome, ResumeOperationFailure, ResumePreparationOutcome,
   ResumeProposalDecision, ResumeProposalDecisionOutcome, ResumeSectionChange, ResumeSectionChangeOutcome,
 } from './structured-resume-contract'
 

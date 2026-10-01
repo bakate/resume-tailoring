@@ -2,9 +2,8 @@ import { readFile } from 'node:fs/promises'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { expect, test } from '@playwright/test'
 import type { Page, Request } from '@playwright/test'
-import { groupedResumeDocument, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
-import type { ResumeWritingInput, ResumeValidationInput } from '@resume-tailoring/application/candidate-journey'
-import { readProfessionalResumeFields } from '@resume-tailoring/application/candidate-journey'
+import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { routeResumeSectionModels, writeFixtureSection } from './resume-section-model-routes'
 
 test.describe('Candidate Journey integration qualification', () => {
   test('completes consent, one generation, a supported correction and a validated download', async ({ page }) => {
@@ -651,15 +650,8 @@ class CandidateJourneyIntegrationSystem {
       ok: true, value: { adjacentEvidence: [], evidence: [{ requirementId: 'job-requirement-react', coverage: 'covered', factMatches: [reactMatch] }],
         relevance: [{ requirementId: 'job-requirement-react', factMatch: reactMatch }] },
     } }))
-    await this.#page.route('**/api/resume-document-writing', (route) => {
-      const input = route.request().postDataJSON() as ResumeWritingInput
-      return route.fulfill({ json: { ok: true, value: writtenDocument({ input, source: this.#source }) } })
-    })
-    await this.#page.route('**/api/resume-document-validation', (route) => {
-      const input = route.request().postDataJSON() as ResumeValidationInput
-      return route.fulfill({ json: { ok: true, value: { coherent: true, languageMatches: true,
-        fields: readProfessionalResumeFields(input.document).map(({ id }) => ({ fieldId: id, supported: true })) } } })
-    })
+    await routeResumeSectionModels(this.#page, { write: (input) => writeFixtureSection(input,
+      this.#source === 'dense' ? denseAchievementFields() : undefined) })
     await this.#page.route('**/api/resume-claim-validation', (route) => route.fulfill({ json: {
       ok: true, value: { supported: true, feedback: [] },
     } }))
@@ -691,16 +683,7 @@ const denseSourceProfile = { ...structuredResumeSource.sourceProfile,
 
 function condense(text: string) { return `${text.split(' ').slice(0, 5).join(' ').replace(/,$/, '')}.` }
 
-function writtenDocument({ input, source }: Readonly<{ input: ResumeWritingInput; source: SourceScenario }>) {
-  const achievements = source === 'dense'
-    ? denseAchievements.slice(0, 2).map((text, index) => ({ id: `dense-achievement-${String(index)}`, text,
-      factIds: [`source-fact-experiences-0-achievements-${String(index)}`] }))
-    : groupedResumeDocument.experiences[0].achievements
-  return { purpose: input.purpose, locale: input.locale, targetRole: input.purpose === 'normalized' ? null : input.jobMatch.targetRole,
-    sections: groupedResumeDocument.sections,
-    experiences: groupedResumeDocument.experiences.map((experience, index) => index === 0 ? { ...experience, achievements } : experience),
-    valueProposition: { kind: 'prose', paragraphs: [{ id: 'summary-billing',
-      text: input.locale === 'fr' ? 'Développement d’interfaces de facturation accessibles.' : 'Accessible billing interfaces backed by React experience.',
-      factIds: ['source-fact-experiences-0-achievements-0', 'source-fact-skills-0-name-0'] }] },
-  }
+function denseAchievementFields() {
+  return denseAchievements.slice(0, 2).map((text, index) => ({ id: `dense-achievement-${String(index)}`, text,
+    factIds: [`source-fact-experiences-0-achievements-${String(index)}` as const] }))
 }

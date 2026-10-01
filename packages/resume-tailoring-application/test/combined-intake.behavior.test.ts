@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney, createResumePreparation, readProfessionalResumeFields } from '@resume-tailoring/application/candidate-journey'
+import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourney, CandidateJourneyDependencies, CandidateJourneyView, CandidateSession } from '@resume-tailoring/application/candidate-journey'
-import { groupedResumeDocument, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createFixtureResumeSectionModels, readGroupedResumeSection, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 
 describe('Candidate Journey combined intake', () => {
   it('prepares a written resume from both inputs with one generation action', async () => {
@@ -102,7 +102,7 @@ describe('Candidate Journey combined intake', () => {
     system.expectFrenchDocument()
   })
 
-  it('recovers from one transient writing failure', async () => {
+  it('recovers from one transient section writing failure', async () => {
     const system = createSystemUnderTest({ preparation: 'transient-once' })
     await system.givenConsentedSession()
 
@@ -111,7 +111,7 @@ describe('Candidate Journey combined intake', () => {
     system.expectWrittenResumeAndCompleteSourceProfile()
   })
 
-  it('never retries a second transient failure within the same preparation', async () => {
+  it('never rewrites a section a second time within the same preparation', async () => {
     const system = createSystemUnderTest({ preparation: 'transient-twice' })
     await system.givenConsentedSession()
 
@@ -506,7 +506,7 @@ const policy = { provider: 'Test', purposes: ['Write'], retentionPolicy: 'None',
   storageBehavior: 'Browser-local', transmittedDataCategories: ['Evidence'], version: 'test' } as const
 
 function createDependencies(options: () => TestOptions, writingDelivery: () => Promise<void>): CandidateJourneyDependencies {
-  let writingFailures = 0
+  let valuePropositionFailures = 0
   const startedAt = Date.now()
   let session: CandidateSession | null = { expiresAt: startedAt + candidateSessionDurationMilliseconds, startedAt,
     sessionId: 'candidate-session-00000000-0000-4000-8000-000000000057', version: candidateSessionStorageVersion,
@@ -534,25 +534,28 @@ function createDependencies(options: () => TestOptions, writingDelivery: () => P
       evidence: [{ coverage: 'covered', factMatches: [{ factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' }], requirementId: 'job-requirement-react' }],
       relevance: [{ requirementId: 'job-requirement-react', factMatch: { factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' } }],
     } }) },
-    resumeDocumentPorts: options().preparation === 'no-model' ? undefined : createResumePreparation({
-      writer: { write: async ({ locale, purpose }) => {
+    resumeSectionModels: options().preparation === 'no-model' ? undefined : createFixtureResumeSectionModels({
+      writeSection: async ({ section, locale }) => {
         await writingDelivery()
+        if (options().preparation === 'interrupted') return new Promise(() => undefined)
         const allowance = options().preparation === 'transient-once' ? 1 : options().preparation === 'transient-twice' ? 2 : 0
-        if (writingFailures < allowance) { writingFailures += 1; return Promise.resolve({ ok: false, error: { type: 'unavailable', transient: true } }) }
-        return options().preparation === 'interrupted'
-        ? new Promise(() => undefined) : Promise.resolve({ ok: true, value: {
-          ...groupedResumeDocument, locale, purpose,
-          experiences: groupedResumeDocument.experiences.map((experience) => ({ ...experience,
-            context: options().ambiguity === 'isolated' ? null : experience.context })),
-          valueProposition: { kind: 'prose', paragraphs: [{ id: 'summary-billing',
-            text: options().preparation === 'unsafe' ? 'Led a global team of 100 engineers.' : locale === 'fr' ? 'Développement d’interfaces de facturation accessibles.' : 'Frontend engineer building accessible billing screens.',
-            factIds: ['source-fact-experiences-0-role-0', 'source-fact-experiences-0-achievements-0'] }] },
-        } }) } },
-      validator: { validate: ({ document }) => Promise.resolve({ ok: true, value: {
-        coherent: true, languageMatches: true,
-        fields: readProfessionalResumeFields(document).filter((_field, index) => options().preparation !== 'partial-validation' || index > 0).map(({ id }) => ({ fieldId: id,
-          supported: options().preparation !== 'unsafe' || id !== 'summary-billing' })),
-      } }) },
+        if (section.kind === 'value-proposition' && valuePropositionFailures < allowance) {
+          valuePropositionFailures += 1
+          return { ok: false, error: { type: 'transient' } }
+        }
+        if (section.kind === 'experience' && options().ambiguity === 'isolated') {
+          const content = readGroupedResumeSection(section)
+          return { ok: true, value: content.kind === 'experience' ? { ...content, experience: { ...content.experience, context: null } } : content }
+        }
+        if (section.kind !== 'value-proposition') return { ok: true, value: readGroupedResumeSection(section) }
+        return { ok: true, value: { kind: 'value-proposition', paragraphs: [{ id: 'summary-billing',
+          text: options().preparation === 'unsafe' ? 'Led a global team of 100 engineers.' : locale === 'fr' ? 'Développement d’interfaces de facturation accessibles.' : 'Frontend engineer building accessible billing screens.',
+          factIds: ['source-fact-experiences-0-role-0', 'source-fact-experiences-0-achievements-0'] }] } }
+      },
+      validateFields: ({ section, fields }) => Promise.resolve({ ok: true, value: {
+        fields: fields.filter((_field, index) => options().preparation !== 'partial-validation' || section.kind !== 'value-proposition' || index > 0)
+          .map(({ id }) => ({ fieldId: id, supported: options().preparation !== 'unsafe' || id !== 'summary-billing' })),
+      } }),
     }),
   }
 }

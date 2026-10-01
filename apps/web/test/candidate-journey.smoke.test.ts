@@ -2,9 +2,8 @@ import { readFile } from 'node:fs/promises'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { groupedResumeDocument, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
-import type { ResumeWritingInput, ResumeValidationInput } from '@resume-tailoring/application/candidate-journey'
-import { readProfessionalResumeFields } from '@resume-tailoring/application/candidate-journey'
+import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { routeResumeSectionModels, writeFixtureSection } from './resume-section-model-routes'
 
 test.describe('Candidate Journey preview-first preparation', () => {
   test('downloads the validated PDF shown by the active journey', async ({ page }) => {
@@ -352,18 +351,12 @@ class CandidateJourneyTestSystem {
     await this.#page.route('**/api/explainable-match-evidence', (route) => route.fulfill({ json: {
       ok: true, value: matchFor(this.#scenario),
     } }))
-    await this.#page.route('**/api/resume-document-writing', (route) => {
+    await routeResumeSectionModels(this.#page, { write: writeFixtureSection, supported: () => this.#scenario !== 'unsafe-output' })
+    await this.#page.route('**/api/resume-section-writing', (route) => {
       if (this.#scenario === 'interrupted') return route.abort()
       if (this.#scenario === 'pending-writing') return new Promise<void>(() => undefined)
-      if (this.#scenario === 'unavailable') return route.fulfill({ json: { ok: false, error: { type: 'unavailable' } } })
-      const input = route.request().postDataJSON() as ResumeWritingInput
-      return route.fulfill({ json: { ok: true, value: writtenDocument({ input, scenario: this.#scenario }) } })
-    })
-    await this.#page.route('**/api/resume-document-validation', (route) => {
-      const input = route.request().postDataJSON() as ResumeValidationInput
-      return route.fulfill({ json: { ok: true, value: { coherent: true, languageMatches: true,
-        fields: readProfessionalResumeFields(input.document).map(({ id }) => ({ fieldId: id, supported: this.#scenario !== 'unsafe-output' })),
-      } } })
+      if (this.#scenario === 'unavailable') return route.fulfill({ json: { ok: false, error: { type: 'permanent' } } })
+      return route.fallback()
     })
   }
 
@@ -421,11 +414,11 @@ class CandidateJourneyTestSystem {
 
   async givenFailedResumeWithOptionalCorrection() {
     await this.givenCombinedIntake()
-    await this.#page.route('**/api/resume-document-writing', (route) => route.fulfill({ json: { ok: false, error: { type: 'unavailable' } } }))
+    await this.#page.route('**/api/resume-section-writing', (route) => route.fulfill({ json: { ok: false, error: { type: 'permanent' } } }))
     await this.generateResume()
     await expect(this.#page.getByText('Preparation could not finish.', { exact: false }).first()).toBeVisible()
     await this.#page.getByText('Inspect or enrich your source evidence', { exact: true }).click()
-    await this.#page.unroute('**/api/resume-document-writing')
+    await this.#page.unroute('**/api/resume-section-writing')
     await this.#installModelAdapters()
     await this.#page.route('**/api/structured-source-profile-extraction', (route) => route.fulfill({ json: { ok: false, error: 'source-profile-extraction-unavailable' } }))
   }
@@ -476,7 +469,7 @@ class CandidateJourneyTestSystem {
 
   async givenInterruptedPreparation() {
     await this.givenCombinedIntake()
-    await this.#page.route('**/api/resume-document-writing', async (route) => {
+    await this.#page.route('**/api/resume-section-writing', async (route) => {
       await new Promise((resolve) => { setTimeout(resolve, 2_000) })
       await route.abort().catch(() => undefined)
     })
@@ -484,7 +477,7 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByRole('region', { name: 'Candidate Journey progress' })).toContainText('Writing')
     await this.#page.reload()
     await expect(this.#page.getByText('Generation was interrupted.', { exact: false })).toBeVisible()
-    await this.#page.unroute('**/api/resume-document-writing')
+    await this.#page.unroute('**/api/resume-section-writing')
     this.#scenario = 'normal'
     await this.#installModelAdapters()
   }
@@ -870,17 +863,3 @@ function matchFor(scenario: Scenario) {
   relevance: [{ requirementId: 'job-requirement-react', factMatch }] }
 }
 
-function writtenDocument({ input, scenario }: Readonly<{ input: ResumeWritingInput; scenario: Scenario }>) {
-  if (scenario === 'blocking-ambiguity') return { purpose: input.purpose, locale: input.locale,
-    targetRole: input.jobMatch.targetRole, experiences: [], sections: [],
-    valueProposition: { kind: 'prose', paragraphs: [{ id: 'summary-react', text: 'React experience.', factIds: ['source-fact-skills-0-name-0'] }] } }
-  return { purpose: input.purpose, locale: input.locale, targetRole: input.purpose === 'normalized' ? null : input.jobMatch.targetRole,
-    sections: groupedResumeDocument.sections,
-    experiences: groupedResumeDocument.experiences.map((experience) => ({ ...experience,
-      context: experience.context === null ? null : input.candidateFacts.some(({ id }) => id === experience.context.factIds[0])
-        ? { ...experience.context, text: input.candidateFacts.find(({ id }) => id === experience.context.factIds[0])?.value ?? experience.context.text } : null })),
-    valueProposition: { kind: 'prose', paragraphs: [{ id: 'summary-billing',
-      text: input.locale === 'fr' ? 'Développement d’interfaces de facturation accessibles.' : 'Accessible billing interfaces backed by React experience.',
-      factIds: ['source-fact-experiences-0-achievements-0', 'source-fact-skills-0-name-0'] }] },
-  }
-}

@@ -60,7 +60,7 @@ describe('OpenAI request policy', () => {
       } }, { status: 400 })),
     })
 
-    const result = await requester.send({ body: {}, operation: 'resume-document-writing' })
+    const result = await requester.send({ body: {}, operation: 'resume-section-writing' })
 
     expect(result).toEqual({ ok: false, error: { status: 400, type: 'upstream-invalid-request' } })
     const serializedMetric = String(writeLog.mock.calls.at(0)?.at(0))
@@ -79,7 +79,7 @@ describe('OpenAI request policy', () => {
       } }, { status: 400 })),
     })
 
-    await requester.send({ body: {}, operation: 'resume-document-writing' })
+    await requester.send({ body: {}, operation: 'resume-section-writing' })
 
     const serializedMetric = String(writeLog.mock.calls.at(0)?.at(0))
     expect(serializedMetric).not.toContain('upstreamError')

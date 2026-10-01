@@ -1,6 +1,5 @@
 import type { CandidateFact } from './source-intake'
-import type { JobMatch } from './job-match'
-import type { TailoredResume, TailoredResumeLocale, TailoredResumeSection } from './tailored-resume'
+import type { TailoredResume, TailoredResumeSection } from './tailored-resume'
 
 /** Shared operation vocabulary for the existing Candidate Journey, not another orchestrator. */
 export type ResumeDraft = Readonly<{
@@ -10,15 +9,6 @@ export type ResumeDraft = Readonly<{
 
 /** Identity and contacts never cross professional model ports. */
 export type ProfessionalResumeDocument = Omit<TailoredResume, 'identity' | 'contactDetails'>
-
-export type ResumePreparationRequest = Readonly<{
-  onProgress?: (phase: 'writing' | 'validating') => void
-  candidateFacts: readonly CandidateFact[]
-  jobMatch: JobMatch
-  locale: TailoredResumeLocale
-  purpose: 'tailored' | 'normalized'
-  revision: string
-}>
 
 export type ResumeOperationFailure = Readonly<{
   status: 'failed'
@@ -90,7 +80,6 @@ export type ResumeDocumentReview = Readonly<{
 }>
 
 export type ResumeDocumentPorts = Readonly<{
-  prepare: (request: ResumePreparationRequest) => Promise<ResumePreparationOutcome>
   validateSectionChange: (request: Readonly<{
     candidateFacts: readonly CandidateFact[]
     currentDocument: ProfessionalResumeDocument

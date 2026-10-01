@@ -112,7 +112,7 @@ export const jobMatchSchema = z.strictObject({
   }).nullable(),
 })
 
-const tailoredResumeFieldSchema = z.strictObject({
+export const tailoredResumeFieldSchema = z.strictObject({
   id: z.string().min(1),
   factIds: z.array(candidateFactIdSchema).min(1),
   text: z.string(),

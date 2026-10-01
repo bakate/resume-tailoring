@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { candidateSessionStorageVersion, createCandidateJourney, createResumePreparation, readProfessionalResumeFields } from '@resume-tailoring/application/candidate-journey'
+import { candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourney, CandidateJourneyDependencies, CandidateSession } from '@resume-tailoring/application/candidate-journey'
 import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
-import { groupedResumeDocument, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createFixtureResumeSectionModels, readGroupedResumeSection, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 
 describe('Candidate Journey privacy-safe outcome telemetry', () => {
   it('records journey progression through one generation action without Candidate content', async () => {
@@ -12,6 +12,15 @@ describe('Candidate Journey privacy-safe outcome telemetry', () => {
     await system.generateApplicationResume()
 
     system.expectJourneyProgressionRecorded()
+  })
+
+  it('records each Resume Section and the whole preparation without Candidate content', async () => {
+    const system = createSystemUnderTest()
+    await system.givenNewConsentedSession()
+
+    await system.generateApplicationResume()
+
+    system.expectSectionPreparationMetricsRecorded()
   })
 
   it('records a download of the current resume with only its match band', async () => {
@@ -145,12 +154,24 @@ class OutcomeTelemetrySystem {
   }
 
   expectJourneyProgressionRecorded() {
-    expect(this.#recordedAfterAction()).toEqual([
+    expect(this.#recordedAfterAction().filter(({ name }) => name === 'candidate-journey-phase-reached')).toEqual([
       { name: 'candidate-journey-phase-reached', phase: 'source-intake' },
       { name: 'candidate-journey-phase-reached', phase: 'job-match' },
       { name: 'candidate-journey-phase-reached', phase: 'tailored-resume-preparation' },
     ])
     expect(this.#events[0]).toEqual({ name: 'resume-tailoring-opened' })
+    this.#expectNoCandidateContent()
+  }
+
+  expectSectionPreparationMetricsRecorded() {
+    const recorded = this.#recordedAfterAction()
+    expect(recorded.filter(({ name }) => name === 'resume-section-prepared')).toEqual(
+      ['value-proposition', 'experience', 'experience', 'skills', 'education', 'languages', 'projects', 'certifications']
+        .map((sectionKind) => ({ name: 'resume-section-prepared', sectionKind, outcome: 'validated', attemptCount: 1,
+          durationMilliseconds: 0, inputTokens: 120, outputTokens: 40 })))
+    expect(recorded.filter(({ name }) => name === 'resume-preparation-completed')).toEqual([
+      { name: 'resume-preparation-completed', outcome: 'prepared', durationMilliseconds: 0, sectionCount: 8 },
+    ])
     this.#expectNoCandidateContent()
   }
 
@@ -231,17 +252,13 @@ function createDependencies({ options, events }: Readonly<{
       ? { adjacentEvidence: [], evidence: [], relevance: [] }
       : { adjacentEvidence: [], evidence: [{ coverage: 'covered', factMatches: [factMatch], requirementId: 'job-requirement-react' }],
         relevance: [{ requirementId: 'job-requirement-react', factMatch }] } }) },
-    resumeDocumentPorts: createResumePreparation({
-      writer: { write: ({ locale, purpose }) => Promise.resolve({ ok: true, value: {
-        ...groupedResumeDocument, locale, purpose,
-        valueProposition: { kind: 'prose', paragraphs: [{ id: 'summary-billing',
-          text: 'Frontend engineer building accessible billing screens.',
-          factIds: ['source-fact-experiences-0-role-0', 'source-fact-experiences-0-achievements-0'] }] },
-      } }) },
-      validator: { validate: ({ document }) => Promise.resolve({ ok: true, value: {
-        coherent: true, languageMatches: true,
-        fields: readProfessionalResumeFields(document).map(({ id }) => ({ fieldId: id, supported: true })),
-      } }) },
+    resumeSectionModels: createFixtureResumeSectionModels({
+      writeSection: ({ section }) => Promise.resolve({ ok: true, usage: { inputTokens: 80, outputTokens: 30 },
+        value: section.kind === 'value-proposition' ? { kind: 'value-proposition', paragraphs: [{ id: 'summary-billing',
+          text: 'Frontend engineer building accessible billing screens.', factIds: ['source-fact-skills-0-name-0'] }] }
+          : readGroupedResumeSection(section) }),
+      validateFields: ({ fields }) => Promise.resolve({ ok: true, usage: { inputTokens: 40, outputTokens: 10 },
+        value: { fields: fields.map(({ id }) => ({ fieldId: id, supported: true })) } }),
     }),
   }
 }

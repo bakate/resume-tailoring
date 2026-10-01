@@ -8,6 +8,8 @@ export type { ProcessingConsent, ProcessingPolicy }
 
 export type LanguageModelFailure = Readonly<{
   transient?: boolean
+  /** Distinguishes a timeout, which is never retried, from other unavailability. */
+  cause?: 'transient' | 'timeout' | 'permanent'
   type: 'language-model-unavailable' | 'processing-consent-required'
 }>
 

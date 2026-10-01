@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney, createResumePreparation, readProfessionalResumeFields } from '@resume-tailoring/application/candidate-journey'
+import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourneyDependencies, CandidateJourneyView, CandidateSession } from '@resume-tailoring/application/candidate-journey'
-import { groupedResumeDocument, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createFixtureResumeSectionModels, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 
 describe('Candidate Journey structured resume', () => {
   it('preserves each experience and its evidence through preparation', async () => {
@@ -99,14 +99,7 @@ function createDependencies(): CandidateJourneyDependencies {
   return {
     createSessionId: () => 'unused', now: () => session.startedAt,
     languageModelGateway: { processingPolicy: policy },
-    resumeDocumentPorts: createResumePreparation({
-      writer: { write: () => Promise.resolve({ ok: true, value: { ...groupedResumeDocument,
-        valueProposition: { ...groupedResumeDocument.valueProposition, kind: 'prose' } } }) },
-      validator: { validate: ({ document }) => Promise.resolve({ ok: true, value: {
-        coherent: true, languageMatches: true,
-        fields: readProfessionalResumeFields(document).map(({ id }) => ({ fieldId: id, supported: true })),
-      } }) },
-    }),
+    resumeSectionModels: createFixtureResumeSectionModels(),
     persistence: { delete: () => ({ ok: true, value: null }),
       restore: () => ({ ok: true, value: { notice: null, session } }),
       save: ({ session: nextSession }) => ({ ok: true, value: nextSession }) },

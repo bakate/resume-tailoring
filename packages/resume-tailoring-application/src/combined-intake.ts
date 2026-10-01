@@ -8,6 +8,7 @@ import type { CandidateFact, SourceDocument, SourceIntake } from './source-intak
 import { inferTailoredResumeLocale, readLocalResumeContacts } from './tailored-resume'
 import type { TailoredResumeLocale } from './tailored-resume'
 import type { ResumeOperationFailure, ResumePreparationOutcome } from './structured-resume-contract'
+import type { ResumeSectionsRequest } from './resume-sections'
 
 export type CombinedIntakeRequest = Readonly<{
   grantProcessingConsent?: true
@@ -24,17 +25,22 @@ export type CombinedIntakeOutcome =
   | Readonly<{ status: 'awaiting-correction'; session: CandidateSession }>
   | (ResumeOperationFailure & Readonly<{ session?: CandidateSession; detail?: string }>)
 
+/** Source Intake and Job Match are ready; the Resume Sections are written next by the preparation machine. */
+export type PreparedResumeInputs = Readonly<{
+  status: 'inputs-prepared'; session: CandidateSession; preparation: ResumePreparation; request: ResumeSectionsRequest
+}>
+
 type PreparationContext = Readonly<{
   dependencies: CandidateJourneyDependencies
   session: CandidateSession
   preparation: ResumePreparation
-  signal: AbortSignal
+  signal?: AbortSignal
   onProgress: (phase: PreparationPhase, session: CandidateSession) => void
 }>
 
 export async function prepareCombinedIntake(input: Omit<PreparationContext, 'preparation'> & Readonly<{
   request: CombinedIntakeRequest
-}>): Promise<CombinedIntakeOutcome> {
+}>): Promise<CombinedIntakeOutcome | PreparedResumeInputs> {
   const oversized = input.request.sourceDocument !== undefined && input.request.sourceDocument.bytes.byteLength > maximumSourceDocumentBytes
     ? 'oversized-document' : input.request.jobPosting !== undefined && input.request.jobPosting.bytes.byteLength > maximumJobPostingBytes
       ? 'oversized-job-posting' : null
@@ -79,7 +85,7 @@ function correctSource({ sourceIntake, correction }: Readonly<{
   return result.ok ? result.value : sourceIntake
 }
 
-async function prepareSource(context: PreparationContext): Promise<CombinedIntakeOutcome> {
+async function prepareSource(context: PreparationContext): Promise<CombinedIntakeOutcome | PreparedResumeInputs> {
   if (context.preparation.sourceIntake !== null) return preparePosting(context)
   const document = context.preparation.sourceDocument
   if (document === null) return failPreparation({ context, detail: 'empty-document' })
@@ -91,7 +97,7 @@ async function prepareSource(context: PreparationContext): Promise<CombinedIntak
   return preparePosting(next)
 }
 
-async function preparePosting(context: PreparationContext): Promise<CombinedIntakeOutcome> {
+async function preparePosting(context: PreparationContext): Promise<CombinedIntakeOutcome | PreparedResumeInputs> {
   const source = context.preparation.sourceIntake
   if (source === null) return failPreparation({ context, detail: 'empty-document' })
   if (!hasUsableEvidence(source)) return source.criticalAmbiguities.length > 0
@@ -112,18 +118,25 @@ async function preparePosting(context: PreparationContext): Promise<CombinedInta
   return prepareDocument(next)
 }
 
-async function prepareDocument(context: PreparationContext): Promise<CombinedIntakeOutcome> {
-  const { sourceIntake, jobMatch, revision, purpose } = context.preparation
+function prepareDocument(context: PreparationContext): CombinedIntakeOutcome | PreparedResumeInputs {
+  const { sourceIntake, jobMatch, purpose } = context.preparation
   if (sourceIntake === null || jobMatch === null) return failPreparation({ context, detail: 'unavailable' })
   if (purpose === 'tailored' && jobMatch.analysis.generationEligibility === 'denied') return noCorrespondence(context)
-  if (context.signal.aborted) return unavailable
+  if (context.dependencies.resumeSectionModels === undefined) return failPreparation({ context, detail: 'unavailable' })
+  if (context.signal?.aborted === true) return unavailable
   reportProgress({ context, phase: 'writing' })
-  const outcome = await context.dependencies.resumeDocumentPorts?.prepare?.({
-    candidateFacts: safeCandidateFacts(sourceIntake), jobMatch, purpose, revision,
+  return { status: 'inputs-prepared', session: context.session, preparation: context.preparation, request: {
+    candidateFacts: safeCandidateFacts(sourceIntake), jobMatch, purpose,
     locale: context.preparation.locale ?? inferTailoredResumeLocale({ content: jobMatch.jobPosting.originalContent }),
-    onProgress: (phase) => { reportProgress({ context, phase }) },
-  })
-  return publishDocument({ context, outcome })
+  } }
+}
+
+/** Publishes the outcome of the resume preparation machine as the prepared Tailored Resume. */
+export function publishResumePreparation({ inputs, dependencies, outcome }: Readonly<{
+  inputs: PreparedResumeInputs; dependencies: CandidateJourneyDependencies; outcome: ResumePreparationOutcome | undefined
+}>): CombinedIntakeOutcome {
+  return publishDocument({ context: { dependencies, session: inputs.session, preparation: inputs.preparation,
+    onProgress: () => undefined }, outcome })
 }
 
 function publishDocument({ context, outcome }: Readonly<{
@@ -180,7 +193,7 @@ function savePreparation(context: PreparationContext) {
 }
 
 function canPublish({ dependencies, session, signal }: PreparationContext) {
-  return !signal.aborted && session.expiresAt > dependencies.now()
+  return signal?.aborted !== true && session.expiresAt > dependencies.now()
 }
 
 function reportProgress({ context, phase }: Readonly<{ context: PreparationContext; phase: PreparationPhase }>) {

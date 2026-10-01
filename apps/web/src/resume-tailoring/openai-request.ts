@@ -1,6 +1,7 @@
 type OpenAiOperation =
-  | 'resume-document-writing'
-  | 'resume-document-validation'
+  | 'resume-section-writing'
+  | 'resume-section-validation'
+  | 'resume-document-coherence'
   | 'explainable-job-posting-extraction'
   | 'explainable-match-evidence'
   | 'job-requirement-extraction'
