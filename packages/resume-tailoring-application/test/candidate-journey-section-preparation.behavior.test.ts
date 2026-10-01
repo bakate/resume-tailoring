@@ -52,13 +52,15 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectOnlySkillsRewrittenAndResumePrepared()
   })
 
-  it('asks for a content correction when a section fails validation after its rewrite', async () => {
-    const system = createSystemUnderTest({ skillsValidation: 'unsupported-always' })
+  it('keeps validated sections and asks for a retry when a section still fails after its rewrite', async () => {
+    const system = createSystemUnderTest({ skillsValidation: 'unsupported-twice' })
     await system.givenMatchedCandidateSession()
 
     await system.prepareTailoredResume()
 
-    system.expectPreparationFailure({ reason: 'unsupported-content', recovery: 'correct-content' })
+    system.expectPreparationFailure({ reason: 'unsupported-content', recovery: 'retry' })
+    system.expectSavedSections({ validated: ['value-proposition', 'experiences.0', 'experiences.1', 'education',
+      'languages', 'projects', 'certifications'], failed: ['skills'] })
   })
 
   it('never retries a section whose writing timed out', async () => {
@@ -89,6 +91,15 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectEveryValidatedSectionKeptVisible()
   })
 
+  it('asks for a retry when the coherence check itself times out', async () => {
+    const system = createSystemUnderTest({ coherence: 'timeout' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectPreparationFailure({ reason: 'unavailable', recovery: 'retry' })
+  })
+
   it('asks for renewed consent when a section model requires it', async () => {
     const system = createSystemUnderTest({ skillsWritingFailure: 'consent-required' })
     await system.givenMatchedCandidateSession()
@@ -96,6 +107,53 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     await system.prepareTailoredResume()
 
     system.expectPreparationFailure({ reason: 'processing-consent-required', recovery: 'renew-consent' })
+  })
+
+  it('rewrites only the sections that are not yet validated when a failed preparation is retried', async () => {
+    const system = createSystemUnderTest({ skillsWritingFailure: 'timeout' })
+    await system.givenFailedPreparation()
+
+    await system.retryPreparation()
+
+    system.expectOnlySkillsWrittenOnRetryAndResumePrepared()
+  })
+
+  it('resumes only the pending sections after a reload during preparation', async () => {
+    const system = createSystemUnderTest({ heldSection: 'skills' })
+    await system.givenPreparationInterruptedByReloadWhileSkillsAreHeld()
+
+    await system.retryPreparation()
+
+    system.expectOnlySkillsWrittenOnRetryAndResumePrepared()
+  })
+
+  it('rewrites a saved section that cites a Candidate Fact that is no longer attested', async () => {
+    const system = createSystemUnderTest({ skillsWritingFailure: 'timeout' })
+    await system.givenFailedPreparation()
+    await system.givenReloadWithSavedSectionCitingUnattestedFact('education')
+
+    await system.retryPreparation()
+
+    system.expectRetryWrote(['skills', 'education'])
+  })
+
+  it('checks coherence again without rewriting any section when every section was validated', async () => {
+    const system = createSystemUnderTest({ coherence: 'incoherent-once' })
+    await system.givenFailedPreparation()
+
+    await system.retryPreparation()
+
+    system.expectRetryWrote([])
+  })
+
+  it('writes every section again when the inputs of the preparation change', async () => {
+    const system = createSystemUnderTest({ skillsWritingFailure: 'timeout' })
+    await system.givenFailedPreparation()
+
+    await system.retryPreparation({ locale: 'fr' })
+
+    system.expectRetryWrote(['value-proposition', 'experiences.0', 'experiences.1', 'skills', 'education',
+      'languages', 'projects', 'certifications'])
   })
 
   it('writes the Normalized Resume through the same sections without the Job Posting', async () => {
@@ -115,34 +173,44 @@ function createSystemUnderTest(options: TestOptions = {}) {
 type TestOptions = Readonly<{
   writing?: 'slow'
   heldSection?: 'skills'
-  skillsValidation?: 'unsupported-once' | 'unsupported-always'
+  skillsValidation?: 'unsupported-once' | 'unsupported-twice'
   skillsWritingFailure?: Exclude<ResumeSectionModelFailure, 'permanent'>
-  coherence?: 'incoherent'
+  coherence?: 'incoherent' | 'incoherent-once' | 'timeout'
 }>
 
 class SectionPreparationTestSystem {
-  readonly #journey: CandidateJourney
+  readonly #options: TestOptions
+  // The in-memory persistence a reloaded Candidate Journey restores from.
+  readonly #store: SessionStore = { session: createMatchedSession() }
+  #journey: CandidateJourney
   readonly #writingInputs: ResumeSectionWritingInput[] = []
   readonly #pendingWrites: (() => void)[] = []
-  readonly #persisted: { session: CandidateSession | null } = { session: null }
   #releaseHeldSection: (() => void) | null = null
+  #retryStart = 0
   #writesInFlight = 0
   #maximumWritesInFlight = 0
+  #skillsWrites = 0
   #skillsValidations = 0
   #outcome: CandidateJourneyView | null = null
 
   constructor(options: TestOptions) {
-    this.#journey = createCandidateJourney({ dependencies: createDependencies({ options, models: {
+    this.#options = options
+    this.#journey = this.#createJourney({ heldSection: options.heldSection })
+  }
+
+  #createJourney({ heldSection }: Readonly<{ heldSection: TestOptions['heldSection'] }>) {
+    return createCandidateJourney({ dependencies: createDependencies({ options: this.#options, store: this.#store, models: {
       onWrite: async (input) => {
         this.#writingInputs.push(input)
         this.#writesInFlight += 1
         this.#maximumWritesInFlight = Math.max(this.#maximumWritesInFlight, this.#writesInFlight)
-        if (options.writing === 'slow') await new Promise<void>((resolve) => { this.#pendingWrites.push(resolve) })
-        if (options.heldSection === input.section.kind) await new Promise<void>((resolve) => { this.#releaseHeldSection = resolve })
+        if (this.#options.writing === 'slow') await new Promise<void>((resolve) => { this.#pendingWrites.push(resolve) })
+        if (heldSection === input.section.kind) await new Promise<void>((resolve) => { this.#releaseHeldSection = resolve })
         this.#writesInFlight -= 1
       },
+      onSkillsWrite: () => ++this.#skillsWrites,
       onSkillsValidation: () => ++this.#skillsValidations,
-    }, persisted: this.#persisted }) })
+    } }) })
   }
 
   async givenMatchedCandidateSession() {
@@ -180,6 +248,42 @@ class SectionPreparationTestSystem {
     if (this.#releaseHeldSection === null) expect.fail('Hold a section before releasing it')
     this.#releaseHeldSection()
     await this.#preparationFinished()
+  }
+
+  async givenFailedPreparation() {
+    await this.givenMatchedCandidateSession()
+    await this.prepareTailoredResume()
+    expect(this.#readOpenView().preparationOutcome).toMatchObject({ status: 'failed' })
+  }
+
+  async givenPreparationInterruptedByReloadWhileSkillsAreHeld() {
+    await this.givenMatchedCandidateSession()
+    await this.prepareTailoredResumeWhileSkillsAreHeld()
+    await this.#reload()
+    expect(this.#readOpenView().session.preparation?.status).toBe('interrupted')
+  }
+
+  async givenReloadWithSavedSectionCitingUnattestedFact(key: string) {
+    const preparation = this.#store.session.preparation
+    if (preparation?.sections === undefined) expect.fail('Expected a saved sections snapshot')
+    // A Candidate Fact removed from the Source Intake since the section was validated.
+    const sections = preparation.sections.map((section) => section.key !== key || section.status !== 'validated' ? section
+      : { ...section, content: { kind: 'education' as const, fields: [{ id: 'education-0', text: 'Computer Science degree',
+        factIds: ['source-fact-education-1-qualification-0' as const] }] } })
+    this.#store.session = { ...this.#store.session, preparation: { ...preparation, sections } }
+    await this.#reload()
+  }
+
+  async retryPreparation(request: Readonly<{ locale?: 'fr' }> = {}) {
+    this.#retryStart = this.#writingInputs.length
+    this.#journey.startTailoredResumePreparation(request)
+    await this.#preparationFinished()
+  }
+
+  async #reload() {
+    this.#journey = this.#createJourney({ heldSection: undefined })
+    this.#journey.start()
+    await expect.poll(() => this.#journey.readView().status).toBe('candidate-session-open')
   }
 
   #readSections() {
@@ -233,7 +337,7 @@ class SectionPreparationTestSystem {
     expect(sections.find(({ key }) => key === 'skills')).not.toHaveProperty('content')
     expect(sections.find(({ key }) => key === 'education')).toMatchObject({ attempt: 1,
       content: readGroupedResumeSection({ key: 'education', kind: 'education' }) })
-    expect(this.#persisted.session?.preparation?.sections).toEqual(sections)
+    expect(this.#store.session.preparation?.sections).toEqual(sections)
   }
 
   expectCompleteResumePreparedWithEverySectionValidated() {
@@ -248,7 +352,7 @@ class SectionPreparationTestSystem {
     const sections = this.#expectOutcome()?.session.preparation?.sections ?? []
     expect(sections).toHaveLength(8)
     expect(sections.every((section) => section.status === 'validated' && section.content.kind === section.kind)).toBe(true)
-    expect(this.#persisted.session?.preparation).toMatchObject({ status: 'failed', failure: 'unsupported-content', sections })
+    expect(this.#store.session.preparation).toMatchObject({ status: 'failed', failure: 'unsupported-content', sections })
   }
 
   expectAtMostFourSectionsInFlight() {
@@ -274,7 +378,27 @@ class SectionPreparationTestSystem {
   expectPreparationFailure(failure: Readonly<{ reason: string; recovery: string }>) {
     const view = this.#expectOutcome()
     expect(view?.preparationOutcome).toMatchObject({ status: 'failed', ...failure })
+    // Nothing is published, so no partial Tailored Resume can be rendered or exported.
     expect(view?.session.tailoredResume).toBeNull()
+    expect(view?.session.preparedResumeRevision).toBeUndefined()
+  }
+
+  expectSavedSections(expected: Readonly<{ validated: readonly string[]; failed: readonly string[] }>) {
+    const sections = this.#expectOutcome()?.session.preparation?.sections ?? []
+    expect(sections.filter(({ status }) => status === 'validated').map(({ key }) => key)).toEqual(expected.validated)
+    expect(sections.filter(({ status }) => status === 'failed').map(({ key }) => key)).toEqual(expected.failed)
+    expect(this.#store.session.preparation?.sections).toEqual(sections)
+  }
+
+  expectRetryWrote(keys: readonly string[]) {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    expect(this.#writingInputs.slice(this.#retryStart).map(({ section }) => section.key).sort()).toEqual([...keys].sort())
+  }
+
+  expectOnlySkillsWrittenOnRetryAndResumePrepared() {
+    this.expectRetryWrote(['skills'])
+    expect(this.#expectOutcome()?.session.tailoredResume?.sections.map(({ section }) => section))
+      .toEqual(['skills', 'education', 'languages', 'projects', 'certifications'])
   }
 
   expectNormalizedSectionsWithoutPostingContext() {
@@ -297,35 +421,38 @@ function createMatchedSession(): CandidateSession {
   }
 }
 
-function createDependencies({ options, models, persisted }: Readonly<{
+type SessionStore = { session: CandidateSession }
+
+function createDependencies({ options, store, models }: Readonly<{
   options: TestOptions
-  models: Readonly<{ onWrite: (input: ResumeSectionWritingInput) => Promise<void>; onSkillsValidation: () => number }>
-  persisted: { session: CandidateSession | null }
+  store: SessionStore
+  models: Readonly<{ onWrite: (input: ResumeSectionWritingInput) => Promise<void>
+    onSkillsWrite: () => number; onSkillsValidation: () => number }>
 }>): CandidateJourneyDependencies {
-  let session = createMatchedSession()
-  let skillsWrites = 0
+  let coherenceChecks = 0
   return {
-    createSessionId: () => crypto.randomUUID(), now: () => session.startedAt,
+    createSessionId: () => crypto.randomUUID(), now: () => store.session.startedAt,
     languageModelGateway: { processingPolicy: policy },
     resumeSectionModels: createFixtureResumeSectionModels({
       writeSection: async (input) => {
         await models.onWrite(input)
         const failure = options.skillsWritingFailure
-        if (input.section.kind === 'skills' && failure !== undefined && skillsWrites++ === 0) return { ok: false, error: { type: failure } }
+        if (input.section.kind === 'skills' && failure !== undefined && models.onSkillsWrite() === 1) return { ok: false, error: { type: failure } }
         return { ok: true, value: readGroupedResumeSection(input.section) }
       },
       validateFields: ({ section, fields }) => {
         const validation = section.kind === 'skills' ? models.onSkillsValidation() : 0
-        const unsupported = options.skillsValidation === 'unsupported-always'
-          || (options.skillsValidation === 'unsupported-once' && validation === 1)
+        const unsupported = (options.skillsValidation === 'unsupported-once' && validation === 1)
+          || (options.skillsValidation === 'unsupported-twice' && validation <= 2)
         return Promise.resolve({ ok: true, value: { fields: fields.map(({ id }, index) => ({ fieldId: id,
           supported: !(unsupported && section.kind === 'skills' && index === 0) })) } })
       },
-      checkCoherence: () => Promise.resolve({ ok: true, value: { coherent: options.coherence !== 'incoherent', languageMatches: true } }),
+      checkCoherence: () => Promise.resolve(options.coherence === 'timeout' ? { ok: false, error: { type: 'timeout' } } : { ok: true, value: { languageMatches: true,
+        coherent: options.coherence === undefined || (options.coherence === 'incoherent-once' && coherenceChecks++ > 0) } }),
     }),
     persistence: { delete: () => ({ ok: true, value: null }),
-      restore: () => ({ ok: true, value: { notice: null, session } }),
-      save: ({ session: nextSession }) => { session = nextSession; persisted.session = nextSession; return { ok: true, value: nextSession } } },
+      restore: () => ({ ok: true, value: { notice: null, session: store.session } }),
+      save: ({ session }) => { store.session = session; return { ok: true, value: session } } },
     jobPostingDocumentReader: { read: () => Promise.resolve({ ok: true, value: { text: '' } }) },
     jobPostingExtractor: { extract: () => Promise.resolve({ ok: false, error: 'job-posting-extraction-unavailable' }) },
     matchEvidenceMatcher: { match: () => Promise.resolve({ ok: false, error: 'match-evidence-unavailable' }) },

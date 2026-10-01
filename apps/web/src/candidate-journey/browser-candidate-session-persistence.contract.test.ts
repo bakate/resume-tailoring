@@ -1,4 +1,4 @@
-import { groupedResumeDocument } from '@resume-tailoring/application/structured-resume-fixtures'
+import { groupedResumeDocument, readGroupedResumeSection } from '@resume-tailoring/application/structured-resume-fixtures'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -154,6 +154,43 @@ describe('browser Candidate Session persistence', () => {
       ok: true, value: { notice: null, session: jobMatchCandidateSession },
     })
   })
+
+  it('restores the saved Resume Sections of an interrupted preparation, with text only on validated sections', () => {
+    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage() })
+    const session: CandidateSession = { ...preparingCandidateSession, preparation: { ...preparingCandidateSession.preparation,
+      sections: [
+        { key: 'value-proposition', kind: 'value-proposition', attempt: 1, status: 'validated',
+          content: readGroupedResumeSection({ key: 'value-proposition', kind: 'value-proposition' }) },
+        { key: 'experiences.0', kind: 'experience', attempt: 1, status: 'validated',
+          content: readGroupedResumeSection({ key: 'experiences.0', kind: 'experience' }) },
+        { key: 'skills', kind: 'skills', attempt: 2, status: 'failed' },
+        { key: 'education', kind: 'education', attempt: 0, status: 'writing' },
+        { key: 'languages', kind: 'languages', attempt: 0, status: 'planned' },
+      ] } }
+    persistence.save({ session })
+
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session } })
+  })
+
+  it('discards a stored session whose pending Resume Section carries unvalidated text', () => {
+    const storage = createMemoryStorage({ initialValue: JSON.stringify({ ...preparingCandidateSession,
+      preparation: { ...preparingCandidateSession.preparation, sections: [{ key: 'skills', kind: 'skills', attempt: 1,
+        status: 'writing', content: readGroupedResumeSection({ key: 'skills', kind: 'skills' }) }] } }) })
+    const persistence = createBrowserCandidateSessionPersistence({ storage })
+
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
+      ok: true, value: { notice: 'incompatible-session-discarded', session: null },
+    })
+  })
+
+  it('restores a preparation stored before section-by-section preparation', () => {
+    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage({
+      initialValue: JSON.stringify(preparingCandidateSession) }) })
+
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
+      ok: true, value: { notice: null, session: preparingCandidateSession },
+    })
+  })
 })
 
 const sourceIntakeCandidateSession = {
@@ -222,6 +259,16 @@ const jobMatchCandidateSession = {
     }],
     strengthRequirementIds: ['job-requirement-1'],
     targetRole: null,
+  },
+} as const satisfies CandidateSession
+
+const preparingCandidateSession = {
+  ...jobMatchCandidateSession,
+  phase: 'tailored-resume-preparation',
+  preparation: {
+    revision: 'candidate-session-00000000-0000-4000-8000-000000000038:revision-1', status: 'pending', failure: null,
+    sourceDocument: null, jobPosting: null, locale: 'en', purpose: 'tailored',
+    sourceIntake: jobMatchCandidateSession.sourceIntake, jobMatch: jobMatchCandidateSession.jobMatch,
   },
 } as const satisfies CandidateSession
 

@@ -64,17 +64,30 @@ function createPreparation({ dependencies, request, session }: Readonly<{
   dependencies: CandidateJourneyDependencies; request: CombinedIntakeRequest; session: CandidateSession
 }>): ResumePreparation {
   const previous = session.preparation
+  const locale = request.locale === undefined ? previous?.locale ?? null : request.locale
+  const purpose = request.purpose ?? (request.sourceDocument === undefined && request.jobPosting === undefined ? previous?.purpose : undefined) ?? 'tailored'
+  const reusesInputs = request.sourceDocument === undefined && request.jobPosting === undefined && request.correction === undefined
   const sourceIntake = request.sourceDocument === undefined
     ? previous?.revision === session.preparedResumeRevision ? session.sourceIntake : previous?.sourceIntake ?? session.sourceIntake : null
   return {
     revision: `${session.sessionId}:${dependencies.createSessionId()}`, status: 'pending', failure: null,
     sourceDocument: request.sourceDocument === undefined ? previous?.sourceDocument ?? null : storeDocument(request.sourceDocument),
     jobPosting: request.jobPosting === undefined ? previous?.jobPosting ?? null : storeDocument(request.jobPosting),
-    locale: request.locale === undefined ? previous?.locale ?? null : request.locale, purpose: request.purpose ?? (request.sourceDocument === undefined && request.jobPosting === undefined ? previous?.purpose : undefined) ?? 'tailored',
-    sourceIntake: correctSource({ sourceIntake, correction: request.correction }),
-    jobMatch: request.jobPosting === undefined && request.sourceDocument === undefined && request.correction === undefined
-      ? previous?.jobMatch ?? session.jobMatch : null,
+    locale, purpose, sourceIntake: correctSource({ sourceIntake, correction: request.correction }),
+    jobMatch: reusesInputs ? previous?.jobMatch ?? session.jobMatch : null,
+    ...(reusesInputs && previous !== undefined && canResumeSections({ previous, locale, purpose })
+      ? { sections: previous.sections } : {}),
   }
+}
+
+const resumableStatuses: ReadonlySet<ResumePreparation['status']> = new Set(['pending', 'interrupted', 'failed'])
+
+/** Only an unfinished preparation of the same inputs is resumed; changed inputs write every section again. */
+function canResumeSections({ previous, locale, purpose }: Readonly<{
+  previous: ResumePreparation; locale: ResumePreparation['locale']; purpose: ResumePreparation['purpose']
+}>) {
+  return previous.sections !== undefined && resumableStatuses.has(previous.status)
+    && previous.locale === locale && previous.purpose === purpose
 }
 
 function correctSource({ sourceIntake, correction }: Readonly<{
@@ -142,7 +155,8 @@ export function publishResumePreparation({ inputs, dependencies, outcome }: Read
 function publishDocument({ context, outcome }: Readonly<{
   context: PreparationContext; outcome: ResumePreparationOutcome | undefined
 }>): CombinedIntakeOutcome {
-  if (outcome?.status !== 'prepared') return failPreparation({ context, detail: outcome?.status === 'failed' ? outcome.reason : 'unavailable' })
+  if (outcome?.status !== 'prepared') return outcome?.status === 'failed'
+    ? failPreparation({ context, detail: outcome.reason, recovery: outcome.recovery }) : failPreparation({ context, detail: 'unavailable' })
   if (outcome.revision !== context.preparation.revision) return failPreparation({ context, detail: 'stale-result' })
   const sourceIntake = context.preparation.sourceIntake
   if (sourceIntake === null) return failPreparation({ context, detail: 'unavailable' })
@@ -177,14 +191,16 @@ function awaitCorrection(context: PreparationContext): CombinedIntakeOutcome {
   return { status: 'awaiting-correction', session: { ...context.session, preparation } }
 }
 
-function failPreparation({ context, detail }: Readonly<{ context: PreparationContext; detail: ResumePreparationFailure }>): CombinedIntakeOutcome {
+function failPreparation({ context, detail, recovery }: Readonly<{
+  context: PreparationContext; detail: ResumePreparationFailure; recovery?: ResumeOperationFailure['recovery']
+}>): CombinedIntakeOutcome {
   const preparation = { ...context.preparation, status: 'failed' as const, failure: detail }
   savePreparation({ ...context, preparation })
   const reason = detail === 'processing-consent-required' ? detail
     : detail === 'unsupported-content' || detail === 'stale-result' ? detail : 'unavailable'
   return { status: 'failed', reason, detail, session: { ...context.session, preparation },
-    recovery: reason === 'processing-consent-required' ? 'renew-consent'
-      : reason === 'unsupported-content' ? 'correct-content' : 'retry' }
+    recovery: recovery ?? (reason === 'processing-consent-required' ? 'renew-consent'
+      : reason === 'unsupported-content' ? 'correct-content' : 'retry') }
 }
 
 function savePreparation(context: PreparationContext) {

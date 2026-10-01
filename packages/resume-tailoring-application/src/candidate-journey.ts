@@ -482,6 +482,7 @@ function withProcessingConsent({ session, dependencies }: CandidateJourneyContex
 
 function readResumePreparationInput({ dependencies, preparedInputs }: CandidateJourneyContext) {
   return { request: preparedInputs?.request ?? emptySectionsRequest, revision: preparedInputs?.preparation.revision ?? 'unavailable',
+    resumeFrom: preparedInputs?.preparation.sections ?? [],
     models: dependencies.resumeSectionModels ?? unavailableSectionModels, now: dependencies.now,
     recordTelemetry: (event: PrivacySafeTelemetryEvent) => { recordTelemetry({ dependencies, event }) } }
 }

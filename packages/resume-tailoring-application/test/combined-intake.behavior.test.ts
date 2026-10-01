@@ -83,6 +83,24 @@ describe('Candidate Journey combined intake', () => {
     system.expectStableResumePreserved()
   })
 
+  it('writes every Resume Section again when the Job Posting changes after a failed preparation', async () => {
+    const system = createSystemUnderTest({ preparation: 'unsafe' })
+    await system.givenFailedPreparationWithValidatedSections()
+
+    await system.retryWithAnotherPosting()
+
+    system.expectEverySectionWrittenAgain()
+  })
+
+  it('writes every Resume Section again when the Source Document changes after a failed preparation', async () => {
+    const system = createSystemUnderTest({ preparation: 'unsafe' })
+    await system.givenFailedPreparationWithValidatedSections()
+
+    await system.retryWithAnotherSource()
+
+    system.expectEverySectionWrittenAgain()
+  })
+
   it('can prepare an explicitly normalized resume using the same document contract', async () => {
     const system = createSystemUnderTest({ correspondence: 'none' })
     await system.givenConsentedSession()
@@ -226,10 +244,12 @@ class CombinedIntakeSystem {
   #writingDelivery: Promise<void> = Promise.resolve()
   #releaseWriting: () => void = () => undefined
   #stableResume: CandidateSession['tailoredResume'] = null
+  readonly #writtenSectionKeys: string[] = []
+  #retryStart = 0
 
   constructor(options: TestOptions) {
     this.#options = options
-    this.#dependencies = createDependencies(() => this.#options, () => this.#writingDelivery)
+    this.#dependencies = createDependencies(() => this.#options, () => this.#writingDelivery, this.#writtenSectionKeys)
     this.#journey = createCandidateJourney({ dependencies: this.#dependencies })
   }
 
@@ -348,7 +368,7 @@ class CombinedIntakeSystem {
   expectUnsafeWordingNotPublished() {
     expect(this.#outcome?.status, 'Request preparation before reading the outcome').toBe('candidate-session-open')
     const view = this.#outcome?.status === 'candidate-session-open' ? this.#outcome : null
-    expect(view?.preparationOutcome).toMatchObject({ status: 'failed', reason: 'unsupported-content' })
+    expect(view?.preparationOutcome).toMatchObject({ status: 'failed', reason: 'unsupported-content', recovery: 'retry' })
     expect(view?.session.tailoredResume).toBeNull()
   }
 
@@ -396,6 +416,30 @@ class CombinedIntakeSystem {
     await this.#expectPreparationFinished()
   }
 
+  async givenFailedPreparationWithValidatedSections() {
+    await this.givenConsentedSession()
+    await this.requestResumePreparation()
+    expect(this.#expectOutcomeView()?.session.preparation?.sections?.some(({ status }) => status === 'validated')).toBe(true)
+    this.#options = { ...this.#options, preparation: undefined }
+    this.#retryStart = this.#writtenSectionKeys.length
+  }
+
+  async retryWithAnotherPosting() {
+    this.#journey.startTailoredResumePreparation({ jobPosting: documentFromText(`${structuredResumeJobMatch.jobPosting.originalContent} Remote.`) })
+    await this.#expectPreparationFinished()
+  }
+
+  async retryWithAnotherSource() {
+    this.#journey.startTailoredResumePreparation({ sourceDocument: documentFromText('Updated professional evidence') })
+    await this.#expectPreparationFinished()
+  }
+
+  expectEverySectionWrittenAgain() {
+    expect(this.#expectOutcomeView()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    expect(this.#writtenSectionKeys.slice(this.#retryStart).sort()).toEqual(['certifications', 'education',
+      'experiences.0', 'experiences.1', 'languages', 'projects', 'skills', 'value-proposition'])
+  }
+
   async regenerateUnsafeResume() {
     this.#options = { ...this.#options, preparation: 'unsafe' }
     this.#journey.startTailoredResumePreparation()
@@ -420,7 +464,7 @@ class CombinedIntakeSystem {
 
   expectStableResumePreserved() {
     const view = this.#expectOutcomeView()
-    expect(view?.preparationOutcome).toMatchObject({ status: 'failed', reason: 'unsupported-content' })
+    expect(view?.preparationOutcome).toMatchObject({ status: 'failed', reason: 'unsupported-content', recovery: 'retry' })
     expect(view?.session.tailoredResume).toEqual(this.#stableResume)
     expect(view?.session.sourceIntake?.sourceProfile).toEqual(structuredResumeSource.sourceProfile)
   }
@@ -505,7 +549,8 @@ class CombinedIntakeSystem {
 const policy = { provider: 'Test', purposes: ['Write'], retentionPolicy: 'None',
   storageBehavior: 'Browser-local', transmittedDataCategories: ['Evidence'], version: 'test' } as const
 
-function createDependencies(options: () => TestOptions, writingDelivery: () => Promise<void>): CandidateJourneyDependencies {
+function createDependencies(options: () => TestOptions, writingDelivery: () => Promise<void>,
+  writtenSectionKeys: string[]): CandidateJourneyDependencies {
   let valuePropositionFailures = 0
   const startedAt = Date.now()
   let session: CandidateSession | null = { expiresAt: startedAt + candidateSessionDurationMilliseconds, startedAt,
@@ -536,6 +581,7 @@ function createDependencies(options: () => TestOptions, writingDelivery: () => P
     } }) },
     resumeSectionModels: options().preparation === 'no-model' ? undefined : createFixtureResumeSectionModels({
       writeSection: async ({ section, locale }) => {
+        writtenSectionKeys.push(section.key)
         await writingDelivery()
         if (options().preparation === 'interrupted') return new Promise(() => undefined)
         const allowance = options().preparation === 'transient-once' ? 1 : options().preparation === 'transient-twice' ? 2 : 0
