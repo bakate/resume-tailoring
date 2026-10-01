@@ -10,6 +10,15 @@ Develop observable behavior one tracer bullet at a time through an agreed public
 
 Tests must not import domain internals or inspect orchestration details.
 
+## What deserves a test
+
+Every test runs on each CI build, so a test must protect something:
+
+- Write one test per acceptance criterion and one per bug actually found.
+- Skip a test whose regression an existing test already catches through the same rule or branch.
+- Extend an existing E2E scenario with assertions before adding a new one; each new scenario replays the whole journey.
+- Do not assert instruction wording, schema shapes owned by another ticket, or one-off migration and deploy transitions.
+
 ## Behavior-test structure
 
 Each behavior-test file must:
