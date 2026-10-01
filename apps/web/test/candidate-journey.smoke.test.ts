@@ -266,22 +266,13 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectDeletedSession()
   })
 
-  test('reveals a validated section while another is still a placeholder', async ({ page }) => {
-    const system = createSystemUnderTest({ page, scenario: 'held-skills' })
-    await system.givenCombinedIntake()
-
-    await system.generateResume()
-
-    await system.expectSectionRevealedBesideTheSkillsPlaceholder()
-  })
-
-  test('heads the progressive preview once per section group in the resume language', async ({ page }) => {
+  test('reveals validated sections under resume-language headings while another is still a placeholder', async ({ page }) => {
     const system = createSystemUnderTest({ page, scenario: 'held-skills' })
     await system.givenCombinedIntakeInFrench()
 
     await system.generateResume()
 
-    await system.expectFrenchSectionHeadingsShownOnce()
+    await system.expectFrenchSectionsRevealedBesideTheSkillsPlaceholder()
   })
 
   test('downloads the complete preview once the last section is validated', async ({ page }) => {
@@ -850,17 +841,20 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByRole('button', { name: 'Check page count', exact: true })).toHaveCount(0)
   }
 
-  async expectFrenchSectionHeadingsShownOnce() {
+  async expectFrenchSectionsRevealedBesideTheSkillsPlaceholder() {
     this.#expectAction()
     const preview = this.#page.getByRole('region', { name: 'Your resume is taking shape' })
-    await expect(preview.getByRole('region', { name: 'Formation' })).toBeVisible()
+    await expect(preview.getByRole('region', { name: 'Formation' })).toContainText('Computer Science degree')
     await expect(preview.getByRole('heading', { name: 'Profil', exact: true })).toHaveCount(1)
+    // Consecutive experiences share one heading, as in the final document.
     await expect(preview.getByRole('heading', { name: 'Expérience', exact: true })).toHaveCount(1)
-    await expect(preview.getByRole('heading', { name: 'Experience', exact: true })).toHaveCount(0)
     const experiences = preview.getByRole('region', { name: 'Expérience' })
     await expect(experiences.getByText('Northwind', { exact: false })).toBeVisible()
     await expect(experiences.getByText('Contoso', { exact: false })).toBeVisible()
+    // Status messages stay in the interface language; no skill is shown before validation.
     await expect(preview.getByRole('region', { name: 'Compétences' })).toContainText('Writing Skills…')
+    await expect(preview.getByRole('region', { name: 'Compétences' })).not.toContainText('React')
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toHaveCount(0)
   }
 
   async givenHeldSkillsSectionReleased() {
