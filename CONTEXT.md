@@ -152,6 +152,10 @@ _Avoid_: Tailored Resume, matched resume, fallback match
 A structured Tailored Resume value whose professional content retains direct provenance to one or more Candidate Facts.
 _Avoid_: Free text, generated field
 
+**Resume Section**:
+One planned part of a Tailored Resume, such as the Value Proposition, one experience, or the skills, written and validated on its own before it appears in the preview.
+_Avoid_: Chunk, partial resume, streamed text
+
 **Resume Claim**:
 A concise professional statement within a Resume Field whose meaning, dates, scope, level, and outcomes remain supported by its linked Candidate Facts.
 _Avoid_: Generated statement, inferred claim
