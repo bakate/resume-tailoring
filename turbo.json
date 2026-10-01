@@ -5,7 +5,8 @@
     "CI",
     "npm_lifecycle_event",
     "OPENAI_API_KEY",
-    "OPENAI_STRUCTURED_MODEL"
+    "OPENAI_STRUCTURED_MODEL",
+    "PUPPETEER_EXECUTABLE_PATH"
   ],
   "tasks": {
     "build": {
