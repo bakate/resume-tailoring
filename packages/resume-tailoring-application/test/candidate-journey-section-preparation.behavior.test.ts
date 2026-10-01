@@ -137,25 +137,6 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectRetryWrote(['skills', 'education'])
   })
 
-  it('checks coherence again without rewriting any section when every section was validated', async () => {
-    const system = createSystemUnderTest({ coherence: 'incoherent-once' })
-    await system.givenFailedPreparation()
-
-    await system.retryPreparation()
-
-    system.expectRetryWrote([])
-  })
-
-  it('writes every section again when the inputs of the preparation change', async () => {
-    const system = createSystemUnderTest({ skillsWritingFailure: 'timeout' })
-    await system.givenFailedPreparation()
-
-    await system.retryPreparation({ locale: 'fr' })
-
-    system.expectRetryWrote(['value-proposition', 'experiences.0', 'experiences.1', 'skills', 'education',
-      'languages', 'projects', 'certifications'])
-  })
-
   it('writes the Normalized Resume through the same sections without the Job Posting', async () => {
     const system = createSystemUnderTest()
     await system.givenMatchedCandidateSession()
@@ -175,7 +156,7 @@ type TestOptions = Readonly<{
   heldSection?: 'skills'
   skillsValidation?: 'unsupported-once' | 'unsupported-twice'
   skillsWritingFailure?: Exclude<ResumeSectionModelFailure, 'permanent'>
-  coherence?: 'incoherent' | 'incoherent-once' | 'timeout'
+  coherence?: 'incoherent' | 'timeout'
 }>
 
 class SectionPreparationTestSystem {
@@ -274,9 +255,9 @@ class SectionPreparationTestSystem {
     await this.#reload()
   }
 
-  async retryPreparation(request: Readonly<{ locale?: 'fr' }> = {}) {
+  async retryPreparation() {
     this.#retryStart = this.#writingInputs.length
-    this.#journey.startTailoredResumePreparation(request)
+    this.#journey.startTailoredResumePreparation()
     await this.#preparationFinished()
   }
 
@@ -429,7 +410,6 @@ function createDependencies({ options, store, models }: Readonly<{
   models: Readonly<{ onWrite: (input: ResumeSectionWritingInput) => Promise<void>
     onSkillsWrite: () => number; onSkillsValidation: () => number }>
 }>): CandidateJourneyDependencies {
-  let coherenceChecks = 0
   return {
     createSessionId: () => crypto.randomUUID(), now: () => store.session.startedAt,
     languageModelGateway: { processingPolicy: policy },
@@ -448,7 +428,7 @@ function createDependencies({ options, store, models }: Readonly<{
           supported: !(unsupported && section.kind === 'skills' && index === 0) })) } })
       },
       checkCoherence: () => Promise.resolve(options.coherence === 'timeout' ? { ok: false, error: { type: 'timeout' } } : { ok: true, value: { languageMatches: true,
-        coherent: options.coherence === undefined || (options.coherence === 'incoherent-once' && coherenceChecks++ > 0) } }),
+        coherent: options.coherence === undefined } }),
     }),
     persistence: { delete: () => ({ ok: true, value: null }),
       restore: () => ({ ok: true, value: { notice: null, session: store.session } }),
