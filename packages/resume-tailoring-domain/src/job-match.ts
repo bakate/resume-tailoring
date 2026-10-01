@@ -47,6 +47,12 @@ export type MatchEvidence = Readonly<{
   requirementId: JobRequirementId
 }>
 
+// Shown next to an uncovered Job Requirement; never changes Requirement Coverage (ADR-0015).
+export type AdjacentEvidence = Readonly<{
+  factIds: readonly string[]
+  requirementId: JobRequirementId
+}>
+
 export type RequirementGroupAnalysis = Readonly<{
   capabilities: readonly JobRequirement['capability'][]
   coverage: RequirementCoverage | 'uncovered'
@@ -56,6 +62,7 @@ export type RequirementGroupAnalysis = Readonly<{
 }>
 
 export type ExplainableMatchAnalysis = Readonly<{
+  adjacentEvidence: readonly AdjacentEvidence[]
   criticalRequirementReserve: Readonly<{
     requirementIds: readonly JobRequirementId[]
     status: 'clear' | 'present'

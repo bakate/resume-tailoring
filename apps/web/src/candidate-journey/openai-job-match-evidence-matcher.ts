@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import type { MatchEvidenceMatcher } from '@resume-tailoring/application/job-match'
 import {
+  validateAdjacentEvidence,
   validateMatchEvidence,
   validateRelevantFactProposals,
 } from '@resume-tailoring/matching-engine'
@@ -140,17 +141,21 @@ function sanitizeProposal({ matchRequest, proposal }: Readonly<{
 }>) {
   const relevance = filterValidRelevance({ matchRequest, proposal })
   const evidence = filterValidEvidence({ matchRequest, proposal })
+  const adjacentEvidence = filterValidAdjacentEvidence({ matchRequest, proposal })
   const isComplete = relevance.length === proposal.relevance.length
     && evidence.length === proposal.evidence.length
+    && adjacentEvidence.length === proposal.adjacentEvidence.length
   console.info(JSON.stringify({
     category: 'privacy-safe-openai-request',
     metric: isComplete ? 'accepted' : 'sanitized',
     value: 1,
     dimensions: { operation: 'explainable-match-evidence',
       proposedRelevance: proposal.relevance.length, keptRelevance: relevance.length,
-      proposedEvidence: proposal.evidence.length, keptEvidence: evidence.length },
+      proposedEvidence: proposal.evidence.length, keptEvidence: evidence.length,
+      proposedAdjacentEvidence: proposal.adjacentEvidence.length,
+      keptAdjacentEvidence: adjacentEvidence.length },
   }))
-  return { ok: true, value: { evidence, relevance } } as const
+  return { ok: true, value: { adjacentEvidence, evidence, relevance } } as const
 }
 
 function filterValidRelevance({ matchRequest, proposal }: Readonly<{
@@ -186,6 +191,22 @@ function filterValidEvidence({ matchRequest, proposal }: Readonly<{
   })
 }
 
+function filterValidAdjacentEvidence({ matchRequest, proposal }: Readonly<{
+  matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
+  proposal: z.infer<typeof matchEvidenceProposalSchema>
+}>) {
+  const requirementIds = new Set<string>()
+  return proposal.adjacentEvidence.filter((adjacentEvidence) => {
+    if (requirementIds.has(adjacentEvidence.requirementId) || validateAdjacentEvidence({
+      candidateFacts: matchRequest.candidateFacts,
+      proposedAdjacentEvidence: [adjacentEvidence],
+      requirements: matchRequest.requirements,
+    }).length === 0) return false
+    requirementIds.add(adjacentEvidence.requirementId)
+    return true
+  })
+}
+
 function readOutputText({ value }: Readonly<{ value: unknown }>) {
   const response = openAiResponseSchema.safeParse(value)
   if (!response.success) return { ok: false, error: 'invalid-response-shape' } as const
@@ -205,6 +226,7 @@ function readOutputText({ value }: Readonly<{ value: unknown }>) {
 
 const matchingInstructions = [
   ...requirementCoverageInstructions,
+  'List a related but distinct capability in adjacentEvidence instead, with the requirementId and, for each Candidate Fact, a short contiguous factExcerpt copied verbatim from that fact. Adjacent Evidence never counts as coverage; omit it for covered or partially covered requirements.',
   'Return relevance links for Candidate Facts relevant enough to support an honest Tailored Resume, with the same verbatim excerpts.',
   'Never calculate a score, importance, Match Band, or Generation Eligibility.',
   'Never invent identifiers, facts, requirements, or evidence.',

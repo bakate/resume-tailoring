@@ -648,7 +648,7 @@ class CandidateJourneyIntegrationSystem {
         practicalConstraints: [], requirements: structuredResumeJobMatch.requirements } } })
     })
     await this.#page.route('**/api/explainable-match-evidence', (route) => route.fulfill({ json: {
-      ok: true, value: { evidence: [{ requirementId: 'job-requirement-react', coverage: 'covered', factMatches: [reactMatch] }],
+      ok: true, value: { adjacentEvidence: [], evidence: [{ requirementId: 'job-requirement-react', coverage: 'covered', factMatches: [reactMatch] }],
         relevance: [{ requirementId: 'job-requirement-react', factMatch: reactMatch }] },
     } }))
     await this.#page.route('**/api/resume-document-writing', (route) => {

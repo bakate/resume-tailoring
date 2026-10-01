@@ -5,6 +5,7 @@ import {
   candidateSessionDurationMilliseconds,
   candidateSessionStorageVersion,
   createCandidateJourney,
+  createResumePreparation,
 } from '@resume-tailoring/application/candidate-journey'
 import type {
   CandidateJourney,
@@ -12,6 +13,7 @@ import type {
   CandidateJourneyView,
   CandidateSession,
   CandidateSessionPersistence,
+  ResumeWritingInput,
 } from '@resume-tailoring/application/candidate-journey'
 import type {
   ExtractedJobPosting,
@@ -119,6 +121,35 @@ describe('Candidate Journey Job Match', () => {
     await system.submitPastedJobPosting()
 
     system.expectEvidencedCandidateFactsToBeRelevant()
+  })
+
+  it('shows Adjacent Evidence next to an uncovered Job Requirement only', async () => {
+    const system = createSystemUnderTest()
+
+    // Given
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenMatchEvidenceIncludesAdjacentEvidence()
+
+    // Action
+    await system.submitPastedJobPosting()
+
+    // Then
+    system.expectAdjacentEvidenceWithoutChangingTheMatchAnalysis()
+  })
+
+  it('gives resume writing the Adjacent Evidence facts as relevant facts', async () => {
+    const system = createSystemUnderTest({ resumeWriting: 'observed' })
+
+    // Given
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenMatchEvidenceIncludesAdjacentEvidence()
+    await system.givenAStableMatchAnalysisExists()
+
+    // Action
+    await system.startTailoredResumeWriting()
+
+    // Then
+    system.expectResumeWritingToReceiveAdjacentEvidenceFactsAsRelevant()
   })
 
   it('omits an unsupported Practical Constraint without rejecting the analysis', async () => {
@@ -265,24 +296,31 @@ function createFrenchExtraction(): ExtractedJobPosting {
   }
 }
 
-function createSystemUnderTest({ session = createJobMatchSession() }: Readonly<{
+function createSystemUnderTest({ resumeWriting = 'prepared', session = createJobMatchSession() }: Readonly<{
+  resumeWriting?: ResumeWritingMode
   session?: CandidateSession
 }> = {}) {
-  return new CandidateJourneyJobMatchTestSystem({ session })
+  return new CandidateJourneyJobMatchTestSystem({ resumeWriting, session })
 }
+
+type ResumeWritingMode = 'observed' | 'prepared'
 
 type TestDependenciesRequest = Readonly<{
   onMatch: () => void
+  onResumeWriting: (input: ResumeWritingInput) => void
   readMatchEvidence: (request: Parameters<CandidateJourneyDependencies['matchEvidenceMatcher']['match']>[0]) => MatchEvidenceProposal
   readExtraction: () => ExtractedJobPosting
+  resumeWriting: ResumeWritingMode
   session: CandidateSession
 }>
 
 function createTestDependencies({
-  onMatch, readExtraction, readMatchEvidence, session,
+  onMatch, onResumeWriting, readExtraction, readMatchEvidence, resumeWriting, session,
 }: TestDependenciesRequest): CandidateJourneyDependencies {
   return {
-    resumeDocumentPorts: { prepare: ({ revision }) => Promise.resolve({ status: 'prepared', revision, document: groupedResumeDocument }) },
+    resumeDocumentPorts: resumeWriting === 'observed'
+      ? createObservedResumePreparation({ onResumeWriting })
+      : { prepare: ({ revision }) => Promise.resolve({ status: 'prepared', revision, document: groupedResumeDocument }) },
     createSessionId: () => '00000000-0000-4000-8000-000000000042',
     jobPostingDocumentReader: createJobPostingDocumentReader(),
     jobPostingExtractor: { extract: () => Promise.resolve({ ok: true, value: readExtraction() }) },
@@ -298,24 +336,46 @@ function createTestDependencies({
   }
 }
 
+function createObservedResumePreparation({ onResumeWriting }: Readonly<{
+  onResumeWriting: (input: ResumeWritingInput) => void
+}>) {
+  return createResumePreparation({
+    validator: { validate: () => Promise.resolve({ ok: false, error: { type: 'unavailable' } }) },
+    writer: { write: (input) => {
+      onResumeWriting(input)
+      return Promise.resolve({ ok: false, error: { type: 'unavailable' } })
+    } },
+  })
+}
+
 class CandidateJourneyJobMatchTestSystem {
   readonly #candidateJourney: CandidateJourney
   #directJobMatch: Awaited<ReturnType<typeof createJobMatch>> | null = null
   #extractedJobPosting: ExtractedJobPosting = extractedJobPosting
   #jobPostingText = jobPostingText
   #matchRequestCount = 0
+  readonly #resumeWritingInputs: ResumeWritingInput[] = []
+  #onResumeWritingStarted: () => void = () => undefined
   #matchEvidence: MatchEvidenceProposal = matchEvidenceProposal
   #completedAction: JobMatchAction | null = null
   #view: CandidateJourneyView | null = null
 
-  constructor({ session }: Readonly<{ session: CandidateSession }>) {
+  constructor({ resumeWriting, session }: Readonly<{
+    resumeWriting: ResumeWritingMode
+    session: CandidateSession
+  }>) {
     this.#candidateJourney = createCandidateJourney({
       dependencies: createTestDependencies({
         onMatch: () => {
           this.#matchRequestCount += 1
         },
+        onResumeWriting: (input) => {
+          this.#resumeWritingInputs.push(input)
+          this.#onResumeWritingStarted()
+        },
         readMatchEvidence: () => this.#matchEvidence,
         readExtraction: () => this.#extractedJobPosting,
+        resumeWriting,
         session,
       }),
     })
@@ -394,6 +454,16 @@ class CandidateJourneyJobMatchTestSystem {
     }
   }
 
+  givenMatchEvidenceIncludesAdjacentEvidence() {
+    this.#matchEvidence = {
+      ...matchEvidenceProposal,
+      adjacentEvidence: [
+        createAdjacentEvidence('8', 'source-fact-6', 'Docker Swarm'),
+        createAdjacentEvidence('1', 'source-fact-1', 'TypeScript'),
+      ],
+    }
+  }
+
   givenMatchEvidenceWithoutRelevanceLinks() {
     this.#matchEvidence = { ...matchEvidenceProposal, relevance: [] }
   }
@@ -464,6 +534,15 @@ class CandidateJourneyJobMatchTestSystem {
   async startTailoredResumePreparation() {
     this.#candidateJourney.startTailoredResumePreparation()
     this.#view = await this.#waitForTailoredResumePreparation()
+    this.#completedAction = 'tailored-resume-preparation-started'
+  }
+
+  async startTailoredResumeWriting() {
+    const resumeWritingStarted = new Promise<void>((resolve) => {
+      this.#onResumeWritingStarted = resolve
+    })
+    this.#candidateJourney.startTailoredResumePreparation()
+    await resumeWritingStarted
     this.#completedAction = 'tailored-resume-preparation-started'
   }
 
@@ -565,6 +644,27 @@ class CandidateJourneyJobMatchTestSystem {
       relevantFactIds: matchEvidenceProposal.evidence.flatMap(({ factMatches }) =>
         factMatches.map(({ factId }) => factId)),
     })
+  }
+
+  expectAdjacentEvidenceWithoutChangingTheMatchAnalysis() {
+    this.#expectCompletedAction()
+    const view = this.#readOpenView()
+    expect(view.jobMatchFailure).toBeNull()
+    expect(view.session.jobMatch?.analysis).toMatchObject({
+      adjacentEvidence: [{ factIds: ['source-fact-6'], requirementId: 'job-requirement-8' }],
+      generationEligibility: 'eligible',
+      matchBand: 'credible',
+      matchScore: baselineMatchScore,
+      relevantFactIds: matchEvidenceProposal.relevance.map(({ factMatch }) => factMatch.factId),
+    })
+  }
+
+  expectResumeWritingToReceiveAdjacentEvidenceFactsAsRelevant() {
+    this.#expectCompletedAction('tailored-resume-preparation-started')
+    const [writingInput] = this.#resumeWritingInputs
+    if (writingInput === undefined) expect.fail('Expected resume writing to receive an input')
+    expect(writingInput.jobMatch.analysis.relevantFactIds).toContain('source-fact-6')
+    expect(writingInput.jobMatch.analysis.generationEligibility).toBe('eligible')
   }
 
   expectOnlySourceBackedPracticalConstraints() {
@@ -883,6 +983,7 @@ const candidateFacts = [
   { id: 'source-fact-3', path: 'experiences.0.achievements.0', status: 'attested', value: 'Mentor senior engineers' },
   { id: 'source-fact-4', path: 'experiences.0.achievements.1', status: 'attested', value: 'Owned platform strategy' },
   { id: 'source-fact-5', path: 'experiences.0.achievements.2', status: 'attested', value: 'Presented to executive stakeholders' },
+  { id: 'source-fact-6', path: 'skills.0.name.1', status: 'attested', value: 'Docker Swarm' },
 ] as const
 
 const jobPostingText = [
@@ -952,6 +1053,7 @@ const fullStackJobPosting = {
 } as const satisfies ExtractedJobPosting
 
 const fullStackMatchEvidenceProposal = {
+  adjacentEvidence: [],
   evidence: [createEvidence('1', 'source-fact-1', 'covered',
     'développer et maintenir des applications web', 'Built end-to-end Next.js applications')],
   relevance: [createRelevance('1', 'source-fact-1',
@@ -1001,9 +1103,11 @@ const emphasizedResponsibilitiesJobRequirements = [
     'La maîtrise de SQL est requise.'),
 ] as const
 
+const baselineMatchScore = 60
+
 const emptyMatchEvidenceMatcher = { match: () => Promise.resolve({
   ok: true,
-  value: { evidence: [], relevance: [] },
+  value: { adjacentEvidence: [], evidence: [], relevance: [] },
 } as const) } as const
 
 const unavailableSourceDocumentReader = { read: () => Promise.resolve({
@@ -1017,6 +1121,7 @@ const unavailableSourceProfileExtractor = { extract: () => Promise.resolve({
 } as const) } as const
 
 const matchEvidenceProposal = {
+  adjacentEvidence: [],
   evidence: [
     createEvidence('1', 'source-fact-1', 'covered', 'TypeScript', 'TypeScript'),
     createEvidence('4', 'source-fact-3', 'covered', 'Mentor', 'Mentor'),
@@ -1032,6 +1137,7 @@ const matchEvidenceProposal = {
 } as const satisfies MatchEvidenceProposal
 
 const enrichedMatchEvidenceProposal = {
+  adjacentEvidence: [],
   evidence: [
     ...matchEvidenceProposal.evidence,
     createEvidence('7', 'source-fact-experiences-1-candidate-enrichment-0', 'covered',
@@ -1045,12 +1151,13 @@ const enrichedMatchEvidenceProposal = {
 } as const satisfies MatchEvidenceProposal
 
 const lowMatchEvidenceProposal = {
+  adjacentEvidence: [],
   evidence: [createEvidence('1', 'source-fact-1', 'covered', 'TypeScript', 'TypeScript')],
   relevance: [createRelevance('1', 'source-fact-1', 'TypeScript', 'TypeScript')],
 } as const satisfies MatchEvidenceProposal
 
 const emptyMatchEvidenceProposal = {
-  evidence: [], relevance: [],
+  adjacentEvidence: [], evidence: [], relevance: [],
 } as const satisfies MatchEvidenceProposal
 
 function createEvidence(
@@ -1063,6 +1170,13 @@ function createEvidence(
   return {
     coverage,
     factMatches: [{ factExcerpt, factId, requirementExcerpt }],
+    requirementId: `job-requirement-${requirementId}`,
+  } as const
+}
+
+function createAdjacentEvidence(requirementId: string, factId: string, factExcerpt: string) {
+  return {
+    factMatches: [{ factExcerpt, factId }],
     requirementId: `job-requirement-${requirementId}`,
   } as const
 }

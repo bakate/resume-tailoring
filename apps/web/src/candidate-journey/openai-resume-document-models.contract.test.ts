@@ -19,6 +19,24 @@ describe('Resume document model adapters', () => {
     expect(JSON.stringify(body)).not.toContain('Alex Morgan')
   })
 
+  it('lets writing highlight Adjacent Evidence facts without naming the uncovered capability', async () => {
+    let instructions = ''
+    const writer = createOpenAiResumeDocumentWriter({ apiKey: 'test-key', model: 'writing-role', reasoningEffort: 'medium',
+      request: (_url, options) => {
+        const body = JSON.parse(typeof options?.body === 'string' ? options.body : '{}') as {
+          input: { content: { text: string }[] }[]
+        }
+        instructions = body.input[0]?.content[0]?.text ?? ''
+        return Promise.resolve(Response.json({ output: [{ content: [{ type: 'output_text', text: JSON.stringify(professionalDocument()) }] }] }))
+      } })
+
+    await writer.write({ candidateFacts: structuredResumeSource.candidateFacts,
+      jobMatch: structuredResumeJobMatch, locale: 'en', purpose: 'tailored' })
+
+    expect(instructions).toContain('jobMatch.analysis.adjacentEvidence')
+    expect(instructions).toMatch(/never name the uncovered (?:Job Requirement|capability)/u)
+  })
+
   it('returns complete field-level semantic validation from the structured role', async () => {
     const validation = { coherent: false, languageMatches: true,
       fields: [{ fieldId: 'summary-billing', supported: false }] }

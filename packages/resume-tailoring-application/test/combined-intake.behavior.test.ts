@@ -529,7 +529,8 @@ function createDependencies(options: () => TestOptions, writingDelivery: () => P
     jobPostingDocumentReader: { read: (document) => Promise.resolve({ ok: true,
       value: { text: new TextDecoder().decode(document.bytes) } }) },
     jobPostingExtractor: { extract: () => Promise.resolve({ ok: true, value: structuredResumeJobMatch }) },
-    matchEvidenceMatcher: { match: () => Promise.resolve({ ok: true, value: options().correspondence === 'none' ? { evidence: [], relevance: [] } : {
+    matchEvidenceMatcher: { match: () => Promise.resolve({ ok: true, value: options().correspondence === 'none' ? { adjacentEvidence: [], evidence: [], relevance: [] } : {
+      adjacentEvidence: [],
       evidence: [{ coverage: 'covered', factMatches: [{ factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' }], requirementId: 'job-requirement-react' }],
       relevance: [{ requirementId: 'job-requirement-react', factMatch: { factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' } }],
     } }) },

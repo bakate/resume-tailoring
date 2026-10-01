@@ -50,7 +50,7 @@ function JobMatchResult({ candidateJourney, jobMatch, localization, sourceIntake
     <MatchOverview {...{ jobMatch, localization }} />
 
     <Text>{localization.translate('jobMatch.measurement')}</Text>
-    <MatchSummaries {...{ jobMatch, localization }} />
+    <MatchSummaries {...{ jobMatch, localization, sourceFacts }} />
     <CriticalReserve {...{ jobMatch, localization }} />
     <PracticalConstraints {...{ jobMatch, localization }} />
     <RequirementDetails {...{ jobMatch, localization, sourceFacts }} />
@@ -73,22 +73,24 @@ function MatchOverview({ jobMatch, localization }: Readonly<{
   </Group>
 }
 
-function MatchSummaries({ jobMatch, localization }: Readonly<{
+function MatchSummaries({ jobMatch, localization, sourceFacts }: Readonly<{
   jobMatch: JobMatch
   localization: Localization
+  sourceFacts: readonly CandidateFact[]
 }>) {
   return <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
     <RequirementSummary ids={jobMatch.strengthRequirementIds} jobMatch={jobMatch}
       localization={localization} titleKey="jobMatch.strengths" />
     <RequirementSummary ids={jobMatch.priorityGapRequirementIds} jobMatch={jobMatch}
-      localization={localization} titleKey="jobMatch.gaps" />
+      localization={localization} sourceFacts={sourceFacts} titleKey="jobMatch.gaps" />
   </SimpleGrid>
 }
 
-function RequirementSummary({ ids, jobMatch, localization, titleKey }: Readonly<{
+function RequirementSummary({ ids, jobMatch, localization, sourceFacts = [], titleKey }: Readonly<{
   ids: readonly string[]
   jobMatch: JobMatch
   localization: Localization
+  sourceFacts?: readonly CandidateFact[]
   titleKey: 'jobMatch.gaps' | 'jobMatch.strengths'
 }>) {
   const requirements = ids.flatMap((id) => {
@@ -97,8 +99,26 @@ function RequirementSummary({ ids, jobMatch, localization, titleKey }: Readonly<
   })
   return <Paper p="md" withBorder><Title order={4}>{localization.translate(titleKey)}</Title>
     <List mt="sm">{requirements.map((requirement) => (
-      <List.Item key={requirement.id}>{requirement.value}</List.Item>
+      <List.Item key={requirement.id}>{requirement.value}
+        <AdjacentEvidenceNote {...{ jobMatch, localization, requirement, sourceFacts }} />
+      </List.Item>
     ))}</List></Paper>
+}
+
+// Adjacent Evidence sits next to the gap and never reads as coverage (ADR-0015).
+function AdjacentEvidenceNote({ jobMatch, localization, requirement, sourceFacts }: Readonly<{
+  jobMatch: JobMatch
+  localization: Localization
+  requirement: JobRequirement
+  sourceFacts: readonly CandidateFact[]
+}>) {
+  const factIds = new Set(jobMatch.analysis.adjacentEvidence
+    .filter(({ requirementId }) => requirementId === requirement.id)
+    .flatMap((adjacentEvidence) => adjacentEvidence.factIds))
+  const values = sourceFacts.filter(({ id }) => factIds.has(id)).map(({ value }) => value)
+  if (values.length === 0) return null
+  return <Text c="dimmed" size="sm">{localization.translate('jobMatch.adjacentEvidence')}:{' '}
+    {values.join(' · ')}</Text>
 }
 
 function CriticalReserve({ jobMatch, localization }: Readonly<{
@@ -166,6 +186,7 @@ function RequirementDetail({
     <Text size="sm"><strong>{localization.translate('jobMatch.sourceExcerpt')}:</strong>{' '}
       {requirement.sourceExcerpt}</Text>
     <RequirementEvidence {...{ evidenceValues, localization }} />
+    <AdjacentEvidenceNote {...{ jobMatch, localization, requirement, sourceFacts }} />
   </Stack></Paper>
 }
 

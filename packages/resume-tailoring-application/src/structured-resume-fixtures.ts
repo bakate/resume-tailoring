@@ -57,6 +57,7 @@ export const structuredResumeSource: SourceIntake = {
 
 export const structuredResumeJobMatch: JobMatch = {
   analysis: {
+    adjacentEvidence: [],
     criticalRequirementReserve: { requirementIds: [], status: 'clear' },
     evidence: [{ coverage: 'covered', factIds: ['source-fact-skills-0-name-0'], requirementId: 'job-requirement-react' }],
     generationEligibility: 'eligible', matchBand: 'strong', matchBandQualification: null,

@@ -68,6 +68,10 @@ const jobRequirementSchema = z.strictObject({
 
 export const jobMatchSchema = z.strictObject({
   analysis: z.strictObject({
+    adjacentEvidence: z.array(z.strictObject({
+      factIds: z.array(candidateFactIdSchema).min(1),
+      requirementId: requirementIdSchema,
+    })).default([]),
     criticalRequirementReserve: z.strictObject({
       requirementIds: z.array(requirementIdSchema),
       status: z.enum(['clear', 'present']),

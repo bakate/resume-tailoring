@@ -141,6 +141,19 @@ describe('browser Candidate Session persistence', () => {
       ok: true, value: { notice: null, session: jobMatchCandidateSession },
     })
   })
+
+  it('restores a Match Analysis stored before Adjacent Evidence existed', () => {
+    const storedAnalysis: Record<string, unknown> = { ...jobMatchCandidateSession.jobMatch.analysis }
+    delete storedAnalysis.adjacentEvidence
+    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage({
+      initialValue: JSON.stringify({ ...jobMatchCandidateSession,
+        jobMatch: { ...jobMatchCandidateSession.jobMatch, analysis: storedAnalysis } }),
+    }) })
+
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
+      ok: true, value: { notice: null, session: jobMatchCandidateSession },
+    })
+  })
 })
 
 const sourceIntakeCandidateSession = {
@@ -172,6 +185,7 @@ const jobMatchCandidateSession = {
   ...sourceIntakeCandidateSession,
   jobMatch: {
     analysis: {
+      adjacentEvidence: [],
       criticalRequirementReserve: { requirementIds: [], status: 'clear' },
       evidence: [{
         coverage: 'covered',
