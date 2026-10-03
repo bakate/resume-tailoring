@@ -1,0 +1,5 @@
+# Give the resume result its own route
+
+The Tailored Resume result lives on a dedicated `/resume` route. The landing page `/` keeps the introduction and intake. Clicking "Generate my resume" navigates to `/resume`, which shows the preparation progress and then the preview with a single primary Download action. Both routes read the same browser-local XState Candidate Session (ADR-0011). Navigation is presentation only and carries no Candidate content in the URL. `/resume` redirects to `/` when the session holds no result.
+
+This replaces the single-page layout, in which the result, intake, disclosures, and phase cards stacked together and the Candidate lost track of the outcome. It accepts two routes that must each rehydrate the Candidate Session, as well as Candidate content, such as the photo, that has to move into the session to survive navigation and reload. In return, the result is reloadable, the browser back button works, and the page focuses on reading and downloading the resume.
