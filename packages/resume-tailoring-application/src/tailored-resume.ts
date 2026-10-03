@@ -11,6 +11,11 @@ import type {
 
 export type { TailoredResume, TailoredResumeExperience, TailoredResumeField, TailoredResumeLocale, TailoredResumeSection, TailoredResumeSkillGroup }
 
+/** French typography has no em dash: the resume writes an en dash instead, in every language for consistency. */
+export function replaceEmDashes(text: string) {
+  return text.replaceAll('—', '–')
+}
+
 export function createTailoredResume({
   jobMatch,
   locale,
@@ -26,11 +31,15 @@ export function createTailoredResume({
 }
 
 /**
- * Locally detected personal information is a labeled sensitive attribute (nationality, gender, marital status),
- * never the Candidate name, so the identity starts empty and is entered locally before export.
+ * The identity is the Candidate name detected locally in the source, or empty for the Candidate to enter before export.
+ * Labeled personal information (nationality, gender, marital status) never reaches the resume.
  */
 export function readLocalResumeContacts({ sourceIntake }: Readonly<{ sourceIntake: SourceIntake }>): Pick<TailoredResume, 'identity' | 'contactDetails'> {
-  return { identity: null, contactDetails: sourceIntake.contactDetails.filter(({ kind }) => kind !== 'personal-information') }
+  const name = sourceIntake.contactDetails.find(({ kind }) => kind === 'name')
+  return {
+    identity: name === undefined ? null : { kind: 'personal-information', value: name.value, origin: 'detected' },
+    contactDetails: sourceIntake.contactDetails.filter(({ kind }) => kind !== 'personal-information' && kind !== 'name'),
+  }
 }
 
 export function createNormalizedResume({ sourceIntake, locale }: Readonly<{
@@ -69,7 +78,7 @@ function createValueProposition({ facts, relevantFactIds }: Readonly<{
   facts: readonly CandidateFact[]
   relevantFactIds: ReadonlySet<string>
 }>) {
-  const summaryFacts = facts.filter(({ path }) => !['role', 'organization', 'startDate', 'endDate', 'category']
+  const summaryFacts = facts.filter(({ path }) => !['role', 'organization', 'startDate', 'endDate', 'location', 'category']
     .includes(path.split('.')[2] ?? ''))
   const relevantFacts = summaryFacts.filter(({ id }) => relevantFactIds.has(id))
   const remainingFacts = summaryFacts.filter(({ id }) => !relevantFactIds.has(id))
@@ -102,7 +111,8 @@ function readExperienceValues({ facts }: Readonly<{ facts: readonly CandidateFac
   }
   return {
     role: readValue('role'), organization: readValue('organization'),
-    startDate: readValue('startDate'), endDate: readValue('endDate'), context: readValue('context'),
+    startDate: readValue('startDate'), endDate: readValue('endDate'), location: readValue('location'),
+    context: readValue('context'),
     achievements: facts.filter(({ path }) => ['achievements', 'candidate-enrichment']
       .includes(path.split('.')[2] ?? '')).map(toField),
   }
@@ -110,7 +120,7 @@ function readExperienceValues({ facts }: Readonly<{ facts: readonly CandidateFac
 
 export function readExperienceFields({ experience }: Readonly<{ experience: TailoredResumeExperience }>) {
   return [experience.role, experience.organization, experience.startDate, experience.endDate,
-    experience.context, ...experience.achievements].filter((field) => field !== null)
+    experience.location ?? null, experience.context, ...experience.achievements].filter((field) => field !== null)
 }
 
 function createSections({ facts }: Readonly<{ facts: readonly CandidateFact[] }>) {

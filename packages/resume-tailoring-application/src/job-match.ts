@@ -10,6 +10,7 @@ import type {
 } from '@resume-tailoring/matching-engine'
 import { validateRelevantFactProposals } from '@resume-tailoring/matching-engine'
 import type { CandidateFact } from '@resume-tailoring/domain/source-intake'
+import { locateSourceSpan } from './source-span'
 import type {
   JobMatch,
   JobRequirement,
@@ -327,13 +328,33 @@ function readSourceBackedExtraction({ content, extraction }: Readonly<{
   extraction: ExtractedJobPosting
 }>): ExtractedJobPosting | null {
   if (!hasValidRequirementIds({ requirements: extraction.requirements })) return null
-  if (!hasSupportedTargetRole({ content, targetRole: extraction.targetRole })) return null
-  if (!extraction.requirements.every((requirement) =>
-    hasSourceBackedRequirement({ content, requirement }))) return null
-  const requirements = normalizeRequirements({ requirements: extraction.requirements })
-  const practicalConstraints = extraction.practicalConstraints.filter((constraint) =>
-    hasSourceSupport({ content, excerpt: constraint.sourceExcerpt, value: constraint.value }))
-  return requirements.length === 0 ? null : { ...extraction, practicalConstraints, requirements }
+  const targetRole = extraction.targetRole === null ? null : anchorToSource({ content, item: extraction.targetRole })
+  if ((extraction.targetRole !== null && targetRole === null)
+    || !hasSupportedTargetRole({ content, targetRole })) return null
+  // A requirement the posting does not back is omitted; the analysis fails only when none remains.
+  const sourceBackedRequirements = extraction.requirements.flatMap((requirement) => {
+    const anchored = anchorToSource({ content, item: requirement })
+    return anchored !== null && hasSourceBackedRequirement({ content, requirement: anchored }) ? [anchored] : []
+  })
+  const requirements = normalizeRequirements({ requirements: sourceBackedRequirements })
+  const practicalConstraints = extraction.practicalConstraints.flatMap((constraint) => {
+    const anchored = anchorToSource({ content, item: constraint })
+    return anchored !== null && hasSourceSupport({ content, excerpt: anchored.sourceExcerpt, value: anchored.value })
+      ? [anchored] : []
+  })
+  return requirements.length === 0 ? null : { ...extraction, practicalConstraints, requirements, targetRole }
+}
+
+/**
+ * Replaces a quoted excerpt and its value with the exact Job Posting text they quote, so provenance stays an exact
+ * substring even when the model changed letter case or spacing. Returns null when the excerpt cannot be found.
+ */
+function anchorToSource<TItem extends Readonly<{ sourceExcerpt: string; value: string }>>({ content, item }: Readonly<{
+  content: string; item: TItem
+}>): TItem | null {
+  const sourceExcerpt = locateSourceSpan({ text: content, quote: item.sourceExcerpt })
+  if (sourceExcerpt === null) return null
+  return { ...item, sourceExcerpt, value: locateSourceSpan({ text: sourceExcerpt, quote: item.value }) ?? item.value }
 }
 
 function hasSourceBackedRequirement({ content, requirement }: Readonly<{

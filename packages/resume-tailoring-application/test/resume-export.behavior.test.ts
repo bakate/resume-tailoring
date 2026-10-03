@@ -50,6 +50,15 @@ describe('Candidate Journey document rendering', () => {
     system.expectPendingRenderingDiscarded()
   })
 
+  it('keeps the preview of a document whose download waits only for the Candidate name', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCurrentDraftWasRendered()
+
+    await system.renderDraftWithoutName()
+
+    system.expectPreviewWithoutDownload()
+  })
+
   it('publishes the actual rendered layout on the current editor revision', async () => {
     const system = createSystemUnderTest()
     await system.givenCurrentDraftWasRendered()
@@ -178,6 +187,14 @@ function createSystemUnderTest() {
       result = await journey.renderResumeDocument({ document: groupedResumeDocument, unsupportedFieldIds: [] })
       settlePrevious?.(successfulResult({ revision: 'old' }))
       previousResult = await previous
+    },
+    renderDraftWithoutName: async () => {
+      result = await journey.renderResumeDocument({ document: { ...groupedResumeDocument, identity: null }, unsupportedFieldIds: [] })
+    },
+    expectPreviewWithoutDownload: () => {
+      expect(result, 'renderDraftWithoutName must run first').toBeDefined()
+      expect(result?.pdf, 'A missing name never hides the preview').not.toBeNull()
+      expect(result?.assessment.exportEligibility).toMatchObject({ status: 'blocked', reasons: ['missing-identity'] })
     },
     expectOnlyCurrentDraftCanBeExported: () => {
       expect(result, 'renderCurrentDraft must run first').toBeDefined()

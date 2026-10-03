@@ -64,7 +64,7 @@ function MatchOverview({ jobMatch, localization }: Readonly<{
 }>) {
   return <Group align="flex-end" justify="space-between">
     <div><Text fw={700}>{localization.translate('jobMatch.targetRole')}</Text>
-      <Title order={3}>{jobMatch.targetRole?.value ?? '—'}</Title></div>
+      <Title order={3}>{jobMatch.targetRole?.value ?? '–'}</Title></div>
     <div><Text fw={700}>{localization.translate('matchAnalysis.score')}</Text>
       <Title order={3}>{String(jobMatch.analysis.matchScore)}%</Title></div>
     <Badge color={readBandColor({ band: jobMatch.analysis.matchBand })} size="lg">

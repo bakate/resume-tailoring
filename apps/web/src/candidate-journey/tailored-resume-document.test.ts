@@ -23,6 +23,43 @@ describe('Tailored Resume export document', () => {
     expect(html.indexOf('2021 – 2024')).toBeLessThan(html.indexOf('<h3>Software Developer</h3>'))
   })
 
+  it('writes an en dash wherever the content carries an em dash', () => {
+    const resume = createTailoredResume({ jobMatch: structuredResumeJobMatch, sourceIntake: structuredResumeSource })
+    const tailoredResume = { ...resume, locale: 'fr' as const, purpose: 'normalized' as const,
+      sections: [{ section: 'projects' as const, fields: [{ id: 'project-1', factIds: ['source-fact-projects-0-name-0' as const],
+        text: 'Parent Up — Plateforme de co-parentalité' }] }] }
+
+    const html = renderTailoredResumeDocument({ tailoredResume })
+
+    expect(html).not.toContain('—')
+    expect(html).toContain('Parent Up – Plateforme de co-parentalité')
+    expect(html).toContain('CV normalisé – non adapté à l’offre')
+  })
+
+  it('ends the dates line of an experience with its location', () => {
+    const resume = createTailoredResume({ jobMatch: structuredResumeJobMatch, sourceIntake: structuredResumeSource })
+    const [experience] = resume.experiences
+    if (experience === undefined) throw new Error('The fixture has an experience')
+    const location = { id: 'location-northwind', factIds: ['source-fact-experiences-0-location-0' as const], text: 'Paris' }
+
+    const html = renderTailoredResumeDocument({ tailoredResume: { ...resume,
+      experiences: [{ ...experience, location }, { ...experience, id: 'experiences.9', startDate: null, endDate: null, location }] } })
+
+    expect(html).toContain('<p class="experience-dates"><span>2021 – 2024</span><span class="experience-location">Paris</span></p>')
+    expect(html).toContain('<p class="experience-dates"><span></span><span class="experience-location">Paris</span></p>')
+  })
+
+  it('places the photo in its own header column, beside contact details that never break inside', () => {
+    const tailoredResume = createTailoredResume({ jobMatch: structuredResumeJobMatch, sourceIntake: structuredResumeSource })
+    const photoDataUrl = 'data:image/png;base64,iVBORw0KGgo='
+
+    const html = renderTailoredResumeDocument({ tailoredResume, photoDataUrl })
+
+    expect(html).toMatch(/<header class="with-photo"><div class="resume-identity"><h1>.*<\/address><\/div><img class="resume-photo"/u)
+    expect(html).toContain('<span class="contact-detail">alex@example.com</span>')
+    expect(renderTailoredResumeDocument({ tailoredResume })).toContain('<header><div class="resume-identity">')
+  })
+
   it('renders one category heading and unique skill items', () => {
     const tailoredResume = createTailoredResume({ jobMatch: structuredResumeJobMatch, sourceIntake: structuredResumeSource })
 
@@ -53,7 +90,7 @@ describe('Tailored Resume export document', () => {
 
     const html = renderTailoredResumeDocument({ tailoredResume })
 
-    expect(html).toContain('Normalized Resume — not tailored')
+    expect(html).toContain('Normalized Resume – not tailored')
     expect(html).not.toContain('<p>Frontend Engineer</p>')
   })
 

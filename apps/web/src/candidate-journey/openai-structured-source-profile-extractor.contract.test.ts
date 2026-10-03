@@ -50,7 +50,7 @@ describe('OpenAI structured Source Profile extractor contract', () => {
       ...structuredSourceProfile,
       education: [{ institution: null, qualification: 'MSc Computer Science' }],
       experiences: [{
-        achievements: [], context: null, endDate: null, organization: null,
+        achievements: [], context: null, endDate: null, location: null, organization: null,
         role: 'Developer', startDate: null,
       }],
       projects: [{ description: null, name: 'Billing platform' }],

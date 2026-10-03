@@ -34,11 +34,29 @@ test.describe('Candidate Journey integration qualification', () => {
     await system.expectOneRenderAfterEditing()
   })
 
-  test('asks only for the locally entered name before the first export', async ({ page }) => {
+  test('offers the download without editing when the resume starts with the Candidate name', async ({ page }) => {
     const system = createSystemUnderTest({ page })
     await system.givenGeneratedResume()
 
-    await system.enterRequiredName()
+    await system.waitForPreview()
+
+    await system.expectExportableWithDetectedName()
+  })
+
+  test('previews a resume without a detectable name and asks for it above the download', async ({ page }) => {
+    const system = createSystemUnderTest({ page, source: 'unnamed' })
+    await system.givenGeneratedResume()
+
+    await system.waitForPreview()
+
+    await system.expectPreviewBlockedOnMissingName()
+  })
+
+  test('renders once after the inline name field loses focus', async ({ page }) => {
+    const system = createSystemUnderTest({ page, source: 'unnamed' })
+    await system.givenGeneratedPreview()
+
+    await system.typeNameInlineAndLeaveField()
 
     await system.expectExportableAfterNameEntry()
   })
@@ -200,7 +218,7 @@ function createSystemUnderTest({ page, source = 'standard', condensation = 'shor
   return new CandidateJourneyIntegrationSystem({ page, source, condensation })
 }
 
-type SourceScenario = 'standard' | 'dense'
+type SourceScenario = 'standard' | 'dense' | 'unnamed'
 type CondensationScenario = 'shorter' | 'insufficient' | 'unavailable'
 type AnalyticsEvent = Readonly<Record<string, unknown>>
 
@@ -211,6 +229,7 @@ class CandidateJourneyIntegrationSystem {
   readonly #errors: string[] = []
   readonly #analytics: AnalyticsEvent[] = []
   readonly #modelRequests: string[] = []
+  readonly #modelRequestBodies: string[] = []
   #posting = firstPosting
   #pdfText: string | null = null
   #pdfPageCount = 0
@@ -231,7 +250,6 @@ class CandidateJourneyIntegrationSystem {
 
   async givenGeneratedPreview() {
     await this.givenGeneratedResume()
-    await this.enterRequiredName()
     await this.#expectCurrentPreview()
   }
 
@@ -240,16 +258,21 @@ class CandidateJourneyIntegrationSystem {
     await this.#page.getByRole('combobox', { name: 'Resume language', exact: true }).click()
     await this.#page.getByRole('option', { name: 'Français', exact: true }).click()
     await this.#generate()
-    await this.#expectGeneratedResume()
-    await this.enterRequiredName()
     await this.#expectCurrentPreview()
   }
 
-  async enterRequiredName() {
-    await expect(this.#page.getByRole('alert').filter({ hasText: /Add your full name|Ajoute ton nom complet/ })).toBeVisible({ timeout: 30_000 })
-    await this.#page.getByRole('button', { name: /^(Edit resume|Modifier le CV)$/ }).click()
-    await this.#page.getByRole('textbox', { name: /^(Name|Nom)$/ }).fill('Alex Morgan')
-    await this.#closeEditor()
+  async waitForPreview() {
+    await this.#expectCurrentPreview()
+    this.#completedAction = 'preview-rendered'
+  }
+
+  async typeNameInlineAndLeaveField() {
+    this.#countRendersFromHere()
+    const field = this.#page.getByRole('textbox', { name: 'Full name', exact: true })
+    await field.pressSequentially('Alex Morgan', { delay: 50 })
+    await this.#page.waitForTimeout(1_000)
+    expect(this.#renderRequestsSinceAction(), 'Typing the name does not render on each keystroke').toBe(0)
+    await field.blur()
     this.#completedAction = 'name-entered'
   }
 
@@ -469,12 +492,35 @@ class CandidateJourneyIntegrationSystem {
       'resume-correction-recorded', 'resume-downloaded'])
   }
 
+  async expectExportableWithDetectedName() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled({ timeout: 30_000 })
+    const field = this.#page.getByRole('textbox', { name: 'Full name', exact: true })
+    await expect(field).toHaveValue('Alex Morgan')
+    await expect(field).toHaveAccessibleDescription(/Detected in your resume, check it/u)
+    await expect(this.#page.getByRole('alert')).toHaveCount(0)
+    this.#expectNameKeptFromModels()
+  }
+
+  async expectPreviewBlockedOnMissingName() {
+    this.#expectAction()
+    await expect(this.#page.locator('.resume-pdf-pages canvas').first()).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeDisabled()
+    const field = this.#page.getByRole('textbox', { name: 'Full name', exact: true })
+    await expect(field).toHaveValue('')
+    await expect(field).toHaveAccessibleDescription(/Add your full name to download the PDF/u)
+    await expect(this.#page.getByRole('alert')).toHaveCount(0)
+    await expect(this.#page.getByText(/could not be (?:rendered|produced)/u)).toHaveCount(0)
+  }
+
   async expectExportableAfterNameEntry() {
     this.#expectAction()
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled({ timeout: 30_000 })
+    await this.#page.waitForTimeout(1_000)
+    expect(this.#renderRequestsSinceAction(), 'Committing the name renders exactly once').toBe(1)
     await expect(this.#page.locator('.resume-pdf-pages canvas').first()).toBeVisible()
     await expect(this.#page.getByRole('alert')).toHaveCount(0)
-    await this.#expectDocumentTextContains('alex@example.com')
+    await this.#expectDocumentTextContains('Alex Morgan')
   }
 
   async expectGeneratedResumeDownloaded() {
@@ -621,7 +667,7 @@ class CandidateJourneyIntegrationSystem {
   }
 
   async #fillIntake() {
-    await this.#page.getByRole('textbox', { name: 'Professional text', exact: true }).fill(sourceText)
+    await this.#page.getByRole('textbox', { name: 'Professional text', exact: true }).fill(this.#source === 'unnamed' ? unnamedSourceText : sourceText)
     await this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true }).fill(this.#posting)
   }
 
@@ -649,6 +695,11 @@ class CandidateJourneyIntegrationSystem {
     const resume = await this.#page.locator('#tailored-resume-title').boundingBox()
     const intake = await this.#page.locator('#combined-intake-title').boundingBox()
     expect(resume?.y ?? Infinity).toBeLessThan(intake?.y ?? 0)
+  }
+
+  #expectNameKeptFromModels() {
+    expect(this.#modelRequestBodies.length, 'The source was sent for extraction').toBeGreaterThan(0)
+    for (const body of this.#modelRequestBodies) expect(body).not.toMatch(/Alex Morgan/iu)
   }
 
   async #expectPrivacySafeAnalytics(names: readonly string[]) {
@@ -697,6 +748,9 @@ class CandidateJourneyIntegrationSystem {
   #recordModelRequest(request: Request) {
     const path = new URL(request.url()).pathname
     if (path.startsWith('/api/')) this.#modelRequests.push(path)
+    if (path.startsWith('/api/') && path !== '/api/resume-document' && path !== '/api/analytics') {
+      this.#modelRequestBodies.push(request.postData() ?? '')
+    }
   }
 
   async #installModelAdapters() {
@@ -732,6 +786,7 @@ class CandidateJourneyIntegrationSystem {
 }
 
 const sourceText = 'Alex Morgan\nalex@example.com\nFrontend Engineer at Northwind. Built accessible billing screens. React and TypeScript.'
+const unnamedSourceText = 'alex@example.com\nFrontend Engineer at Northwind. Built accessible billing screens. React and TypeScript.'
 const firstPosting = 'Frontend Engineer. React is required.'
 const secondPosting = 'Accessibility Lead. React is required. Inclusive product delivery matters.'
 const correctedSummary = 'Built accessible billing screens with React.'

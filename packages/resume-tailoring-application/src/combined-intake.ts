@@ -218,7 +218,7 @@ function reportProgress({ context, phase }: Readonly<{ context: PreparationConte
 
 function hasUsableEvidence(source: SourceIntake) {
   return safeCandidateFacts(source).some(({ path, value }) => value.trim().length > 0
-    && !/\.(category|organization|startDate|endDate)\./u.test(path))
+    && !/\.(category|organization|startDate|endDate|location)\./u.test(path))
 }
 
 function safeCandidateFacts(source: SourceIntake): readonly CandidateFact[] {

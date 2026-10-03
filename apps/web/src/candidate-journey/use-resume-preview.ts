@@ -10,9 +10,10 @@ export type ResumePreviewProps = Readonly<{
   renderDocument: (request: ResumeRenderInput) => Promise<ResumeRenderResult>
   unsupportedFieldIds: readonly string[]
   onDownload: () => void
+  onIdentityChange: (identity: TailoredResume['identity']) => void
 }>
 
-type PreviewInput = Omit<ResumePreviewProps, 'onDownload'> & Readonly<{
+type PreviewInput = Omit<ResumePreviewProps, 'onDownload' | 'onIdentityChange'> & Readonly<{
   attempt: number
 }>
 

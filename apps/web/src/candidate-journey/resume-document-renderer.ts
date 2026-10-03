@@ -78,6 +78,5 @@ function measuredDocument({ pageCount, pdf, request }: Readonly<{
   const layout = pageCount === 1 || pageCount === 2
     ? { status: 'fits', pageCount, revision } as const
     : { status: 'overflow', pageCount, revision } as const
-  const assessment = assessResumeExport({ ...request, layout })
-  return { assessment, pdf: assessment.exportEligibility.status === 'eligible' ? pdf : null }
+  return { assessment: assessResumeExport({ ...request, layout }), pdf }
 }

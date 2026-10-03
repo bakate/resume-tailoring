@@ -217,7 +217,7 @@ describe('Candidate Journey combined intake', () => {
 
     await system.generateFromSourceWithSensitiveAttributes()
 
-    system.expectIdentityLeftForCandidateEntry()
+    system.expectOnlyTheDetectedNameAsIdentity()
   })
 
   it('explains an unusable source instead of presenting an empty correction form', async () => {
@@ -323,9 +323,9 @@ class CombinedIntakeSystem {
     await this.#expectPreparationFinished()
   }
 
-  expectIdentityLeftForCandidateEntry() {
+  expectOnlyTheDetectedNameAsIdentity() {
     const resume = this.#expectOutcomeView()?.session.tailoredResume
-    expect(resume?.identity).toBeNull()
+    expect(resume?.identity).toEqual({ kind: 'personal-information', value: 'Alex Morgan', origin: 'detected' })
     expect(resume?.contactDetails).toEqual([{ kind: 'email', value: 'alex@example.com' }])
     expect(JSON.stringify(resume)).not.toContain('Nationality')
   }

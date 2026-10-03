@@ -4,7 +4,7 @@ import type {
   SourceProfileReview,
 } from '@resume-tailoring/domain/resume-tailoring-state'
 
-import { minimizeSensitiveContent } from './content-privacy'
+import { minimizeCandidateContent } from './candidate-name'
 import { hasSourceProfileFactConflict } from './resume-tailoring-workflow'
 
 type FactTransitionResult =
@@ -30,7 +30,7 @@ export function createReviewingSourceProfile({
   documentName,
   documentText,
 }: Readonly<{ documentName: string; documentText: string }>): SourceProfileReview {
-  const minimizedContent = minimizeSensitiveContent({ content: documentText })
+  const minimizedContent = minimizeCandidateContent({ content: documentText })
   return {
     status: 'reviewing-document',
     documentName,

@@ -2,8 +2,9 @@ import { readResumeRecovery } from './resume-recovery-view'
 import type { PrivacySafeTelemetryEvent } from './resume-tailoring-workflow-ports'
 import type { CandidateSession } from '@resume-tailoring/domain/candidate-session'
 import type { ResumeEditingState, TailoredResume } from '@resume-tailoring/domain/tailored-resume'
-import type { ProfessionalResumeDocument, ResumeDocumentPorts, ResumeDocumentReview, ResumeExportBlocker,
-  ResumeLayoutAssessment, ResumeLayoutOutcome, ResumeOperationFailure, ResumeSectionChange } from './structured-resume-contract'
+import type { ProfessionalResumeDocument, ResumeDocumentPorts, ResumeDocumentReview,
+  ResumeOperationFailure, ResumeSectionChange } from './structured-resume-contract'
+import { assessResumeExport } from './resume-export'
 import { readResumeFields, updateResumeField } from './resume-field-editing'
 
 export type ResumeReview = ResumeDocumentReview & Readonly<{
@@ -43,21 +44,6 @@ export function professionalDocument({ document }: Readonly<{ document: Tailored
     ...(document.sectionOrder === undefined ? {} : { sectionOrder: document.sectionOrder }) }
 }
 
-export function assessEligibility({ document, revision, unsupportedFieldIds, layout }: Readonly<{
-  document: TailoredResume; revision: string; unsupportedFieldIds: readonly string[]; layout: ResumeLayoutOutcome
-}>): ResumeLayoutAssessment {
-  const reasons: ResumeExportBlocker[] = []
-  if (unsupportedFieldIds.length > 0) reasons.push('unsupported-content')
-  if (!document.identity?.value.trim()) reasons.push('missing-identity')
-  if (!document.contactDetails.some(({ kind, value }) => (kind === 'email' || kind === 'phone') && value.trim())) reasons.push('missing-contact')
-  if (layout.revision !== revision) reasons.push('stale-layout')
-  if (layout.status === 'overflow') reasons.push('overflow')
-  if (layout.status === 'unavailable') reasons.push('layout-unavailable')
-  return { layout, exportEligibility: reasons.length === 0 && layout.status === 'fits'
-    ? { status: 'eligible', revision, pageCount: layout.pageCount }
-    : { status: 'blocked', revision, reasons } }
-}
-
 export function readResumeReview({ session, review }: Readonly<{
   session: CandidateSession; review: ResumeReviewState
 }>): ResumeReview | null {
@@ -67,7 +53,7 @@ export function readResumeReview({ session, review }: Readonly<{
   const presentIds = new Set(readResumeFields({ resume: session.tailoredResume }).map(({ field }) => field.id))
   const unsupportedFieldIds = editing.unsupportedFieldIds.filter((id) => presentIds.has(id))
   const currentReview = review.proposal !== null && review.proposal.baseRevision !== editing.revision ? emptyResumeReview : review
-  const assessment = session.preparedResumeStatus !== 'outdated' && currentReview.assessment?.layout.revision === editing.revision ? currentReview.assessment : assessEligibility({ ...draft, unsupportedFieldIds,
+  const assessment = session.preparedResumeStatus !== 'outdated' && currentReview.assessment?.layout.revision === editing.revision ? currentReview.assessment : assessResumeExport({ draft, unsupportedFieldIds,
     layout: { status: 'unavailable', revision: editing.revision } })
   return { ...currentReview, draft, assessment, recovery: readResumeRecovery({ document: draft.document, editing, session }), manuallyEdited: editing.manuallyEdited,
     unsupportedFieldIds }

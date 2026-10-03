@@ -36,7 +36,7 @@ function readSectionReferences({ section }: Readonly<{ section: TailoredResumeSe
 }
 
 function readExperienceReferences({ experience }: Readonly<{ experience: TailoredResumeExperience }>) {
-  return (['role', 'organization', 'startDate', 'endDate', 'context', 'achievements'] as const)
+  return (['role', 'organization', 'startDate', 'endDate', 'location', 'context', 'achievements'] as const)
     .flatMap((fieldName) => {
       const fields = readExperienceValues({ experience, fieldName })
       return fields.map((field) => createReference({ field, location: {
@@ -121,7 +121,7 @@ function readExperienceValues({ experience, fieldName }: Readonly<{
   experience: TailoredResumeExperience; fieldName: ExperienceValue
 }>) {
   if (fieldName === 'achievements') return experience.achievements
-  const field = experience[fieldName]
+  const field = experience[fieldName] ?? null
   return field === null ? [] : [field]
 }
 

@@ -83,17 +83,12 @@ function ReviewStatus({ candidateJourney, copy }: Readonly<{ candidateJourney: R
   const review = candidateJourney.view.status === 'candidate-session-open' ? candidateJourney.view.resumeReview : null
   if (review === null) return null
   const layout = review.assessment?.layout
-  const layoutText = layout === undefined || layout.revision !== review.draft.revision ? copy.unchecked
-    : layout.status === 'fits' ? copy.fits : layout.status === 'overflow' ? copy.overflow : copy.unavailable
+  const measured = layout !== undefined && layout.revision === review.draft.revision
+  const layoutText = !measured ? '' : layout.status === 'fits' ? copy.fits : layout.status === 'overflow' ? copy.overflow : ''
   const operationText = review.operation === 'validating-section' ? copy.validating
     : review.operation === 'condensing' ? copy.condensing : review.operation === 'assessing-layout' ? copy.checking : ''
   return <Stack gap="xs"><Text role="status" aria-live="polite">{operationText || layoutText}</Text>
-    {review.unsupportedFieldIds.length > 0 ? <Text c="danger.8" role="alert">{copy.unsupported}</Text> : null}
     {review.failure === null ? null : <Text c="danger.8" role="alert">{copy.failure} {copy[review.failure.recovery]}</Text>}
-    {review.assessment?.exportEligibility.status === 'blocked' ? <Stack gap={0}>
-      {review.assessment.exportEligibility.reasons.filter((reason) => reason !== 'overflow').map((reason) =>
-        <Text key={reason} size="sm">{copy[reason]}</Text>)}
-    </Stack> : null}
   </Stack>
 }
 
@@ -129,7 +124,8 @@ function CurrentResumePreview({ candidateJourney, resume, editorOpened, photo, o
     && view.resumeReview.operation === null && (view.operation === null || view.operation === 'rendering-resume-document')
   return <TailoredResumePreview document={resume} enabled={enabled} paused={editorOpened} photo={photo}
     unsupportedFieldIds={view.resumeReview.unsupportedFieldIds} renderDocument={candidateJourney.renderResumeDocument}
-    onDownload={onDownload} />
+    onDownload={onDownload} onIdentityChange={(identity) => {
+      candidateJourney.updateResumeContacts({ identity, contactDetails: resume.contactDetails }) }} />
 }
 
 function UsabilityFeedback({ candidateJourney, copy }: Readonly<{ candidateJourney: ResumeReviewController; copy: ResumeReviewCopy }>) {

@@ -14,6 +14,7 @@ export const sensitiveContentKinds = [
   'address',
   'date-of-birth',
   'personal-information',
+  'name',
 ] as const
 
 export type SensitiveContentKind = typeof sensitiveContentKinds[number]

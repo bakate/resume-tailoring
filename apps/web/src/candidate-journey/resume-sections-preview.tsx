@@ -1,4 +1,4 @@
-import { List, Paper, Skeleton, Stack, Text, Title } from '@mantine/core'
+import { Group, List, Paper, Skeleton, Stack, Text, Title } from '@mantine/core'
 import type { CandidateSession, ResumeSectionSnapshot } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeSectionContent, ResumeSectionKind } from '@resume-tailoring/application/candidate-journey'
 import { inferTailoredResumeLocale } from '@resume-tailoring/application/tailored-resume'
@@ -85,11 +85,12 @@ function ValidatedSectionContent({ content }: Readonly<{ content: ResumeSectionC
   if (content.kind === 'skills') return <List>{content.groups.map((group) => <List.Item key={group.id}>
     {[group.category?.text, group.items.map(({ text }) => text).join(', ')].filter(Boolean).join(' : ')}</List.Item>)}</List>
   if (content.kind !== 'experience') return <List>{content.fields.map((field) => <List.Item key={field.id}>{field.text}</List.Item>)}</List>
-  const { role, organization, startDate, endDate, context, achievements } = content.experience
+  const { role, organization, startDate, endDate, location, context, achievements } = content.experience
   const period = [startDate?.text, endDate?.text].filter(Boolean).join(' – ')
   return <Stack gap={4}>
-    <Text fw={700}>{[role?.text, organization?.text].filter(Boolean).join(' — ')}</Text>
-    {period.length === 0 ? null : <Text c="dimmed" size="sm">{period}</Text>}
+    <Text fw={700}>{[role?.text, organization?.text].filter(Boolean).join(' – ')}</Text>
+    {period.length === 0 && !location ? null : <Group justify="space-between" gap="sm">
+      <Text c="dimmed" size="sm">{period}</Text>{location ? <Text c="dimmed" size="sm">{location.text}</Text> : null}</Group>}
     {context === null ? null : <Text size="sm">{context.text}</Text>}
     <List>{achievements.map((field) => <List.Item key={field.id}>{field.text}</List.Item>)}</List>
   </Stack>
