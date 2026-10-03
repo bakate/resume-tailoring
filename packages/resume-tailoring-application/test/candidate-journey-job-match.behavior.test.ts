@@ -53,6 +53,31 @@ describe('Candidate Journey Job Match', () => {
     system.expectUploadedJobPostingToBeAnalyzed({ name })
   })
 
+  it('ranks covered requirements as strengths and uncovered ones as priority gaps, never the same one twice', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenResponsibilitiesListedBeforeCoveredSkills()
+
+    await system.submitPastedJobPosting()
+
+    system.expectCoverageRankedSummary()
+  })
+
+  it.each([
+    ['Développeur Fullstack Confirmé - Reactjs Nodejs H/F', 'Développeur Fullstack Confirmé - Reactjs Nodejs'],
+    ['Développeurs Fullstack - F/H/X', 'Développeurs Fullstack'],
+    ['Frontend Engineer (M/F)', 'Frontend Engineer'],
+    ['Softwareentwickler (m/w/d)', 'Softwareentwickler'],
+  ])('keeps the gender marker of "%s" out of the Target Role', async (title, expected) => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenPostingTitled(title)
+
+    await system.submitPastedJobPosting()
+
+    system.expectTargetRole(expected)
+  })
+
   it('preserves the last Match Analysis when an extraction is not source-backed', async () => {
     const system = createSystemUnderTest()
 
@@ -411,6 +436,30 @@ class CandidateJourneyJobMatchTestSystem {
       mediaType: 'text/plain', name: 'stable-job-posting.txt',
     }) })
     await this.#waitForCompletedJobMatch()
+  }
+
+  givenPostingTitled(title: string) {
+    this.#jobPostingText = [title, ...jobPostingText.split('\n').slice(1)].join('\n')
+    this.#extractedJobPosting = { ...extractedJobPosting, targetRole: { sourceExcerpt: title, value: title } }
+  }
+
+  expectTargetRole(value: string) {
+    this.#expectCompletedAction()
+    expect(this.#readOpenView().session.jobMatch?.targetRole?.value).toBe(value)
+  }
+
+  givenResponsibilitiesListedBeforeCoveredSkills() {
+    this.#jobPostingText = coverageRankingJobPostingText
+    this.#extractedJobPosting = coverageRankingJobPosting
+    this.#matchEvidence = coverageRankingMatchEvidence
+  }
+
+  expectCoverageRankedSummary() {
+    this.#expectCompletedAction()
+    const jobMatch = this.#readOpenView().session.jobMatch
+    if (jobMatch === null) expect.fail('Expected a Match Analysis')
+    expect(jobMatch.strengthRequirementIds).toEqual(['job-requirement-3', 'job-requirement-4', 'job-requirement-2'])
+    expect(jobMatch.priorityGapRequirementIds).toEqual(['job-requirement-5', 'job-requirement-1'])
   }
 
   givenExtractionContainsAnInventedExcerpt() {
@@ -1145,6 +1194,35 @@ const emphasizedResponsibilitiesJobRequirements = [
 ] as const
 
 const baselineMatchScore = 60
+
+const coverageRankingJobPostingText = [
+  'We are hiring a Staff Engineer.',
+  'Lead architecture across the organization.',
+  'Own platform strategy.',
+  'TypeScript is required.',
+  'Mentor senior engineers.',
+  'Kotlin is required.',
+].join('\n')
+const coverageRankingJobPosting = {
+  practicalConstraints: [],
+  requirements: [
+    createRequirement('1', 'leadership', 'architecture', 'central', 'Lead architecture across the organization.'),
+    createRequirement('2', 'strategy', 'platform strategy', 'central', 'Own platform strategy.'),
+    createRequirement('3', 'technical-expertise', 'TypeScript', 'central', 'TypeScript is required.'),
+    createRequirement('4', 'leadership', 'Mentor', 'central', 'Mentor senior engineers.'),
+    createRequirement('5', 'technical-expertise', 'Kotlin', 'central', 'Kotlin is required.'),
+  ],
+  targetRole: { sourceExcerpt: 'We are hiring a Staff Engineer.', value: 'Staff Engineer' },
+} as const satisfies ExtractedJobPosting
+const coverageRankingMatchEvidence = {
+  adjacentEvidence: [],
+  evidence: [
+    createEvidence('2', 'source-fact-4', 'partially-covered', 'platform strategy', 'platform strategy'),
+    createEvidence('3', 'source-fact-1', 'covered', 'TypeScript', 'TypeScript'),
+    createEvidence('4', 'source-fact-3', 'covered', 'Mentor', 'Mentor'),
+  ],
+  relevance: [createRelevance('3', 'source-fact-1', 'TypeScript', 'TypeScript')],
+} as const satisfies MatchEvidenceProposal
 
 const emptyMatchEvidenceMatcher = { match: () => Promise.resolve({
   ok: true,

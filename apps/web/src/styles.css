@@ -24,6 +24,11 @@ body {
   padding-block: 12px;
 }
 
+.candidate-journey-app .candidate-journey-brand {
+  color: inherit;
+  text-decoration: none;
+}
+
 .candidate-journey-app .candidate-journey-workspace,
 .candidate-journey-app .candidate-journey-progress {
   width: 100%;

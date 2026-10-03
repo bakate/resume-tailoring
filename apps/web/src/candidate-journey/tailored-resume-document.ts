@@ -80,7 +80,9 @@ function renderExperience({ experience }: Readonly<{ experience: TailoredResumeE
     .map(({ text }) => renderText(text)).join(' – ')
   const context = experience.context === null ? '' : `<p>${renderText(experience.context.text)}</p>`
   const achievements = experience.achievements.map(({ text }) => `<li>${renderText(text)}</li>`).join('')
-  return `<article class="resume-experience">${role}${organization}${renderPeriod({ dates, location: experience.location ?? null })}${context}${achievements.length === 0 ? '' : `<ul>${achievements}</ul>`}</article>`
+  // The heading stays whole and with what follows it, so a page never ends on a role without its dates.
+  const heading = `<div class="experience-heading">${role}${organization}${renderPeriod({ dates, location: experience.location ?? null })}</div>`
+  return `<article class="resume-experience">${heading}${context}${achievements.length === 0 ? '' : `<ul>${achievements}</ul>`}</article>`
 }
 
 /** The dates line, with the location at its far end when the experience has one. */

@@ -264,12 +264,13 @@ function mapMatchAnalysis({ analysis }: Readonly<{
   }
 }
 
+/** The strongest supported matches: fully covered requirements before partially covered ones, by weight. */
 function readStrengthRequirementIds({ analysis }: Readonly<{
   analysis: EngineMatchAnalysis
 }>) {
   return analysis.requirementGroups
     .filter(({ coverage }) => coverage !== 'uncovered')
-    .toSorted(compareRequirementGroups)
+    .toSorted(rankRequirementGroups(['covered', 'partially-covered']))
     .flatMap((group) => readEvidencedRequirementId({ analysis, group }))
     .slice(0, summaryItemLimit)
 }
@@ -283,21 +284,28 @@ function readEvidencedRequirementId({ analysis, group }: Readonly<{
   return requirementId === undefined ? [] : [toRequirementId(requirementId)]
 }
 
+/**
+ * The most important missing evidence: uncovered requirements before partially covered ones, by weight. A requirement
+ * already shown as a strength is not repeated as a gap.
+ */
 function readPriorityGapRequirementIds({ analysis }: Readonly<{
   analysis: EngineMatchAnalysis
 }>) {
+  const strengths = new Set<string>(readStrengthRequirementIds({ analysis }))
   return analysis.requirementGroups
     .filter(({ coverage }) => coverage !== 'covered')
-    .toSorted(compareRequirementGroups)
+    .toSorted(rankRequirementGroups(['uncovered', 'partially-covered']))
     .flatMap(({ requirementIds }) => requirementIds.slice(0, 1).map(toRequirementId))
+    .filter((requirementId) => !strengths.has(requirementId))
     .slice(0, summaryItemLimit)
 }
 
-function compareRequirementGroups(
-  leftGroup: EngineMatchAnalysis['requirementGroups'][number],
-  rightGroup: EngineMatchAnalysis['requirementGroups'][number],
-) {
-  return rightGroup.effectiveWeight - leftGroup.effectiveWeight
+type RequirementGroup = EngineMatchAnalysis['requirementGroups'][number]
+
+function rankRequirementGroups(coverageOrder: readonly RequirementGroup['coverage'][]) {
+  return (leftGroup: RequirementGroup, rightGroup: RequirementGroup) =>
+    coverageOrder.indexOf(leftGroup.coverage) - coverageOrder.indexOf(rightGroup.coverage)
+      || rightGroup.effectiveWeight - leftGroup.effectiveWeight
 }
 
 function mapCandidateFacts({ candidateFacts }: Readonly<{
@@ -342,7 +350,16 @@ function readSourceBackedExtraction({ content, extraction }: Readonly<{
     return anchored !== null && hasSourceSupport({ content, excerpt: anchored.sourceExcerpt, value: anchored.value })
       ? [anchored] : []
   })
-  return requirements.length === 0 ? null : { ...extraction, practicalConstraints, requirements, targetRole }
+  return requirements.length === 0 ? null : { ...extraction, practicalConstraints, requirements,
+    targetRole: targetRole === null ? null : { ...targetRole, value: withoutGenderMarker(targetRole.value) } }
+}
+
+/** "H/F", "F/H/X", "(M/F)" or "(m/w/d)" addresses applicants; it is not part of the role a resume heading names. */
+const genderMarker = /\s*[-–—]?\s*\(?\b(?:[HFMWX](?:\s*\/\s*[HFMWXDN]){1,2}|[hfmwx](?:\s*\/\s*[hfmwxdn]){1,2})\)?\s*$/u
+
+function withoutGenderMarker(value: string) {
+  const title = value.replace(genderMarker, '').trim()
+  return title.length === 0 ? value : title
 }
 
 /**

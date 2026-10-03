@@ -1,5 +1,6 @@
 import { Alert, Button, CloseButton, Divider, Fieldset, Group, Modal, Paper, Select, SimpleGrid, Stack, Text, Textarea, Title } from '@mantine/core'
 import { Dropzone } from '@mantine/dropzone'
+import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { inferTailoredResumeLocale } from '@resume-tailoring/application/tailored-resume'
@@ -20,7 +21,9 @@ type IntakeState = Readonly<{
   failure: ResumePreparationFailure | null; confirmation: boolean; purpose: ResumePurpose
 }>
 type IntakeControls = ReturnType<typeof useIntakeForm>
-type IntakeActionsInput = OpenIntakeProps & Readonly<{ state: IntakeState; setState: Dispatch<SetStateAction<IntakeState>> }>
+type IntakeActionsInput = OpenIntakeProps & Readonly<{
+  state: IntakeState; setState: Dispatch<SetStateAction<IntakeState>>; onStarted: () => void
+}>
 
 export function CombinedIntakeWorkspace(props: IntakeProps) {
   const { view } = props.candidateJourney
@@ -40,7 +43,8 @@ function CombinedIntakeForm(props: OpenIntakeProps) {
       <Stack><IntakeFields {...props} busy={view.operation !== null} controls={controls} /></Stack>
     </Fieldset>
     <Button aria-describedby={processingPolicyNoticeId} disabled={view.operation !== null} loading={view.operation !== null}
-      onClick={() => { controls.requestGeneration({ purpose: 'tailored' }) }} size="lg">{localization.translate('combinedIntake.generate')}</Button>
+      onClick={() => { controls.requestGeneration({ purpose: 'tailored' }) }} size="lg">
+      {localization.translate(session.tailoredResume === null ? 'combinedIntake.generate' : 'combinedIntake.regenerate')}</Button>
     <ProcessingPolicyNotice {...{ candidateJourney, localization }} />
     <PreparationFeedback {...{ candidateJourney, localization, localFailure: controls.state.failure }}
       onRetry={() => { controls.requestGeneration({ purpose: session.preparation?.purpose ?? 'tailored' }) }}
@@ -50,6 +54,7 @@ function CombinedIntakeForm(props: OpenIntakeProps) {
 }
 
 function useIntakeForm(props: OpenIntakeProps) {
+  const navigate = useNavigate()
   const [state, setState] = useState<IntakeState>(() => ({ sourceChoice: initialSource(props.candidateJourney),
     postingChoice: initialPosting(props.candidateJourney), locale: props.session.preparation?.locale ?? 'automatic',
     failure: null, confirmation: false, purpose: 'tailored' }))
@@ -61,7 +66,8 @@ function useIntakeForm(props: OpenIntakeProps) {
     setState((current) => ({ ...current, ...change, failure: null }))
     props.candidateJourney.invalidateResumeInputs()
   }
-  return { state, updateInputs, ...createIntakeActions({ ...props, state, setState }) }
+  return { state, updateInputs, ...createIntakeActions({ ...props, state, setState,
+    onStarted: () => { void navigate({ to: '/resume' }) } }) }
 }
 
 function createIntakeActions(input: IntakeActionsInput) {
@@ -74,6 +80,7 @@ function createIntakeActions(input: IntakeActionsInput) {
     const consentRequired = view.status === 'candidate-session-open' && view.processingConsentStatus !== 'granted'
     input.candidateJourney.startTailoredResumePreparation(consentRequired
       ? { ...request.value, grantProcessingConsent: true } : request.value)
+    input.onStarted()
   }
   const requestGeneration = ({ purpose }: Readonly<{ purpose: ResumePurpose }>) => {
     if (input.session.tailoredResume === null) { void generate({ purpose }); return }
@@ -218,10 +225,8 @@ function initialSource(candidateJourney: IntakeProps['candidateJourney']): Docum
 function initialPosting(candidateJourney: IntakeProps['candidateJourney']): DocumentChoice {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open') return restoreChoice()
-  const preparation = view.session.preparation
-  if (preparation?.jobPosting !== null && preparation?.jobPosting !== undefined) return restoreChoice(preparation.jobPosting)
-  const posting = preparation?.jobMatch?.jobPosting ?? view.session.jobMatch?.jobPosting
-  return { method: 'paste', text: posting?.originalContent ?? '', file: null }
+  // A preparation stores the posting it was given; none means "Change job posting" cleared it.
+  return restoreChoice(view.session.preparation?.jobPosting)
 }
 
 function restoreChoice(document?: StoredIntakeDocument | null): DocumentChoice {
@@ -234,8 +239,9 @@ function restoreChoice(document?: StoredIntakeDocument | null): DocumentChoice {
   } catch { return { method: 'paste', text: '', file: null } }
 }
 
-function PreparationFeedback({ candidateJourney, localization, localFailure, onRetry, onNormalized }: IntakeProps & Readonly<{
-  localFailure: ResumePreparationFailure | null; onRetry: () => void; onNormalized: () => void
+/** The outcome of a preparation without a usable result; `onBack` leads from `/resume` to the documents on `/`. */
+export function PreparationFeedback({ candidateJourney, localization, localFailure, onBack, onRetry, onNormalized }: IntakeProps & Readonly<{
+  localFailure: ResumePreparationFailure | null; onBack?: () => void; onRetry: () => void; onNormalized: () => void
 }>) {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open') return null
@@ -243,15 +249,16 @@ function PreparationFeedback({ candidateJourney, localization, localFailure, onR
   const failure = localFailure ?? preparation?.failure ?? null
   const failedPreparation = localFailure === null && (preparation?.status === 'failed' || preparation?.status === 'interrupted')
   return <>
-    {failedPreparation ? <PreparationFailureAlert {...{ failure, localization, onRetry }}
+    {failedPreparation ? <PreparationFailureAlert {...{ failure, localization, onBack, onRetry }}
       busy={view.operation !== null} hasStableResume={view.session.tailoredResume !== null}
       interrupted={preparation.status === 'interrupted'} /> : <InputFailure {...{ failure, localization }} />}
     {preparation?.status === 'awaiting-correction' && preparation.sourceIntake !== null
       ? <CriticalAmbiguityQuestions {...{ candidateJourney, localization, sourceIntake: preparation.sourceIntake }} /> : null}
     {preparation?.status === 'no-relevant-evidence' ? <Alert color="caution" title={localization.translate('jobMatch.generation.denied')}>
       <Text>{localization.translate('jobMatch.generation.normalizedNotice')}</Text>
-      <Button mt="sm" disabled={view.operation !== null} onClick={onNormalized}>
+      <Group mt="sm"><Button disabled={view.operation !== null} onClick={onNormalized}>
         {localization.translate('combinedIntake.normalized')}</Button>
+        <BackToDocuments {...{ localization, onBack }} /></Group>
     </Alert> : null}
     {preparation?.status === 'prepared' && preparation.sourceIntake !== null && preparation.sourceIntake.criticalAmbiguities.length > 0
       ? <Alert color="informative">{localization.translate('combinedIntake.omittedAmbiguities')}</Alert> : null}
@@ -281,9 +288,14 @@ const inputFailures = new Set<ResumePreparationFailure>([
   'oversized-job-posting', 'scanned-job-posting', 'unsupported-job-posting', 'unreadable-job-posting',
 ])
 
-function PreparationFailureAlert({ busy, failure, hasStableResume, interrupted, localization, onRetry }: Readonly<{
+function BackToDocuments({ localization, onBack }: Readonly<{ localization: Localization; onBack: (() => void) | undefined }>) {
+  return onBack === undefined ? null
+    : <Button onClick={onBack} variant="default">{localization.translate('resumeResult.backToDocuments')}</Button>
+}
+
+function PreparationFailureAlert({ busy, failure, hasStableResume, interrupted, localization, onBack, onRetry }: Readonly<{
   busy: boolean; failure: ResumePreparationFailure | null; hasStableResume: boolean; interrupted: boolean
-  localization: Localization; onRetry: () => void
+  localization: Localization; onBack: (() => void) | undefined; onRetry: () => void
 }>) {
   const cause = interrupted || failure === null ? null
     : localization.translate(failure in retryableFailureCauses
@@ -294,8 +306,9 @@ function PreparationFailureAlert({ busy, failure, hasStableResume, interrupted, 
     <Stack gap="sm">
       {cause === null ? null : <Text size="sm">{cause}</Text>}
       <Text c="dimmed" size="sm">{localization.translate(hasStableResume ? 'combinedIntake.inputsAndResumeKept' : 'combinedIntake.inputsKept')}</Text>
-      {retryable ? <Group><Button disabled={busy} onClick={onRetry} variant="default">
-        {localization.translate('combinedIntake.retry')}</Button></Group> : null}
+      <Group>{retryable ? <Button disabled={busy} onClick={onRetry} variant="default">
+        {localization.translate('combinedIntake.retry')}</Button> : null}
+        <BackToDocuments {...{ localization, onBack }} /></Group>
     </Stack>
   </Alert>
 }

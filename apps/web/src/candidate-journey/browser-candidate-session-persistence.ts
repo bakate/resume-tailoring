@@ -8,16 +8,28 @@ import type {
 } from '@resume-tailoring/application/candidate-journey'
 
 const candidateSessionStorageKey = 'honest-resume:candidate-session'
+const leavingEvents = ['beforeunload', 'pagehide'] as const
+const stayingEvents = ['pageshow', 'pointerdown', 'keydown'] as const
 
 type BrowserStorage = Pick<Storage, 'getItem' | 'removeItem' | 'setItem'>
 
-export function createBrowserCandidateSessionPersistence({ storage }: Readonly<{
+/**
+ * While the page is being left, saves keep the last stored session. WebKit cancels in-flight requests as soon as a
+ * reload starts (`beforeunload`) and lets the leaving page record them as failures before `pagehide`; keeping the
+ * stored session lets the next load restore the cut-short preparation as interrupted. A page that was not left after
+ * all (restored from the back-forward cache, or used again after a cancelled navigation) saves again.
+ */
+export function createBrowserCandidateSessionPersistence({ storage, page }: Readonly<{
   storage: BrowserStorage
+  page?: Pick<EventTarget, 'addEventListener'>
 }>): CandidateSessionPersistence {
+  let leaving = false
+  for (const event of leavingEvents) page?.addEventListener(event, () => { leaving = true })
+  for (const event of stayingEvents) page?.addEventListener(event, () => { leaving = false })
   return {
     delete: () => deleteCandidateSession({ storage }),
     restore: ({ now }) => restoreCandidateSession({ now, storage }),
-    save: ({ session }) => saveCandidateSession({ session, storage }),
+    save: ({ session }) => leaving ? { ok: true, value: session } : saveCandidateSession({ session, storage }),
   }
 }
 

@@ -62,6 +62,24 @@ describe('browser Candidate Session persistence', () => {
     })
   })
 
+  it('restores the resume photo kept in the Candidate Session', () => {
+    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage() })
+    const session = { ...candidateSession, resumePhoto: { dataUrl: 'data:image/png;base64,iVBORw0KGgo=', name: 'portrait.png' } }
+    persistence.save({ session })
+
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session } })
+  })
+
+  it('discards a stored resume photo that is not an image', () => {
+    const storage = createMemoryStorage({ initialValue: JSON.stringify({ ...candidateSession,
+      resumePhoto: { dataUrl: 'data:text/html;base64,PHNjcmlwdD4=', name: 'portrait.png' } }) })
+    const persistence = createBrowserCandidateSessionPersistence({ storage })
+
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
+      ok: true, value: { notice: 'incompatible-session-discarded', session: null },
+    })
+  })
+
   it('explicitly discards the previous flat document version', () => {
     const storage = createMemoryStorage({ initialValue: JSON.stringify({ ...candidateSession, version: 5 }) })
     const persistence = createBrowserCandidateSessionPersistence({ storage })
@@ -96,6 +114,42 @@ describe('browser Candidate Session persistence', () => {
       value: { notice: 'incompatible-session-discarded', session: null },
     })
     expect(storage.getItem(candidateSessionStorageKey)).toBeNull()
+  })
+
+  it('keeps the last saved session while the page is being left, so cut-short work restores as interrupted', () => {
+    const storage = createMemoryStorage()
+    const page = new EventTarget()
+    const persistence = createBrowserCandidateSessionPersistence({ storage, page })
+    persistence.save({ session: candidateSession })
+
+    page.dispatchEvent(new Event('beforeunload'))
+    persistence.save({ session: consentedCandidateSession })
+
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session: candidateSession } })
+  })
+
+  it('saves again once the Candidate keeps using a page they did not leave', () => {
+    const storage = createMemoryStorage()
+    const page = new EventTarget()
+    const persistence = createBrowserCandidateSessionPersistence({ storage, page })
+    page.dispatchEvent(new Event('beforeunload'))
+
+    page.dispatchEvent(new Event('keydown'))
+    persistence.save({ session: consentedCandidateSession })
+
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session: consentedCandidateSession } })
+  })
+
+  it('saves again once a page left for the back-forward cache is shown again', () => {
+    const storage = createMemoryStorage()
+    const page = new EventTarget()
+    const persistence = createBrowserCandidateSessionPersistence({ storage, page })
+    page.dispatchEvent(new Event('pagehide'))
+
+    page.dispatchEvent(new Event('pageshow'))
+    persistence.save({ session: consentedCandidateSession })
+
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session: consentedCandidateSession } })
   })
 
   it('deletes a stored Candidate Session', () => {

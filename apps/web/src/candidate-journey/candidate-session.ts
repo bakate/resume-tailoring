@@ -205,6 +205,7 @@ export const candidateSessionSchema = z.strictObject({
   ),
   sourceIntake: sourceIntakeSchema.nullable(),
   tailoredResume: tailoredResumeSchema.nullable(),
+  resumePhoto: z.strictObject({ dataUrl: z.string().regex(/^data:image\/(?:png|jpeg|webp);base64,/u), name: z.string() }).optional(),
   startedAt: z.number().int().nonnegative(),
   version: z.literal(candidateSessionStorageVersion),
 }).refine(

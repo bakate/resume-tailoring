@@ -9,7 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as CandidateJourneyRouteImport } from './routes/_candidate-journey'
+import { Route as CandidateJourneyIndexRouteImport } from './routes/_candidate-journey.index'
+import { Route as CandidateJourneyResumeRouteImport } from './routes/_candidate-journey.resume'
 import { Route as ApiAnalyticsRouteImport } from './routes/api.analytics'
 import { Route as ApiDemoAccessRouteImport } from './routes/api.demo-access'
 import { Route as ApiExplainableJobPostingExtractionRouteImport } from './routes/api.explainable-job-posting-extraction'
@@ -26,10 +28,19 @@ import { Route as ApiSourceProfileExtractionRouteImport } from './routes/api.sou
 import { Route as ApiStructuredSourceProfileExtractionRouteImport } from './routes/api.structured-source-profile-extraction'
 import { Route as ApiTailoredResumePdfRouteImport } from './routes/api.tailored-resume-pdf'
 
-const IndexRoute = IndexRouteImport.update({
+const CandidateJourneyRoute = CandidateJourneyRouteImport.update({
+  id: '/_candidate-journey',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CandidateJourneyIndexRoute = CandidateJourneyIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => CandidateJourneyRoute,
+} as any)
+const CandidateJourneyResumeRoute = CandidateJourneyResumeRouteImport.update({
+  id: '/resume',
+  path: '/resume',
+  getParentRoute: () => CandidateJourneyRoute,
 } as any)
 const ApiAnalyticsRoute = ApiAnalyticsRouteImport.update({
   id: '/api/analytics',
@@ -116,7 +127,8 @@ const ApiTailoredResumePdfRoute = ApiTailoredResumePdfRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof CandidateJourneyIndexRoute
+  '/resume': typeof CandidateJourneyResumeRoute
   '/api/analytics': typeof ApiAnalyticsRoute
   '/api/demo-access': typeof ApiDemoAccessRoute
   '/api/explainable-job-posting-extraction': typeof ApiExplainableJobPostingExtractionRoute
@@ -134,7 +146,7 @@ export interface FileRoutesByFullPath {
   '/api/tailored-resume-pdf': typeof ApiTailoredResumePdfRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/resume': typeof CandidateJourneyResumeRoute
   '/api/analytics': typeof ApiAnalyticsRoute
   '/api/demo-access': typeof ApiDemoAccessRoute
   '/api/explainable-job-posting-extraction': typeof ApiExplainableJobPostingExtractionRoute
@@ -150,10 +162,12 @@ export interface FileRoutesByTo {
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
   '/api/structured-source-profile-extraction': typeof ApiStructuredSourceProfileExtractionRoute
   '/api/tailored-resume-pdf': typeof ApiTailoredResumePdfRoute
+  '/': typeof CandidateJourneyIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_candidate-journey': typeof CandidateJourneyRouteWithChildren
+  '/_candidate-journey/resume': typeof CandidateJourneyResumeRoute
   '/api/analytics': typeof ApiAnalyticsRoute
   '/api/demo-access': typeof ApiDemoAccessRoute
   '/api/explainable-job-posting-extraction': typeof ApiExplainableJobPostingExtractionRoute
@@ -169,11 +183,13 @@ export interface FileRoutesById {
   '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
   '/api/structured-source-profile-extraction': typeof ApiStructuredSourceProfileExtractionRoute
   '/api/tailored-resume-pdf': typeof ApiTailoredResumePdfRoute
+  '/_candidate-journey/': typeof CandidateJourneyIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/resume'
     | '/api/analytics'
     | '/api/demo-access'
     | '/api/explainable-job-posting-extraction'
@@ -191,7 +207,7 @@ export interface FileRouteTypes {
     | '/api/tailored-resume-pdf'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
+    | '/resume'
     | '/api/analytics'
     | '/api/demo-access'
     | '/api/explainable-job-posting-extraction'
@@ -207,9 +223,11 @@ export interface FileRouteTypes {
     | '/api/source-profile-extraction'
     | '/api/structured-source-profile-extraction'
     | '/api/tailored-resume-pdf'
+    | '/'
   id:
     | '__root__'
-    | '/'
+    | '/_candidate-journey'
+    | '/_candidate-journey/resume'
     | '/api/analytics'
     | '/api/demo-access'
     | '/api/explainable-job-posting-extraction'
@@ -225,10 +243,11 @@ export interface FileRouteTypes {
     | '/api/source-profile-extraction'
     | '/api/structured-source-profile-extraction'
     | '/api/tailored-resume-pdf'
+    | '/_candidate-journey/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  CandidateJourneyRoute: typeof CandidateJourneyRouteWithChildren
   ApiAnalyticsRoute: typeof ApiAnalyticsRoute
   ApiDemoAccessRoute: typeof ApiDemoAccessRoute
   ApiExplainableJobPostingExtractionRoute: typeof ApiExplainableJobPostingExtractionRoute
@@ -248,12 +267,26 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_candidate-journey': {
+      id: '/_candidate-journey'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof CandidateJourneyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_candidate-journey/': {
+      id: '/_candidate-journey/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof CandidateJourneyIndexRouteImport
+      parentRoute: typeof CandidateJourneyRoute
+    }
+    '/_candidate-journey/resume': {
+      id: '/_candidate-journey/resume'
+      path: '/resume'
+      fullPath: '/resume'
+      preLoaderRoute: typeof CandidateJourneyResumeRouteImport
+      parentRoute: typeof CandidateJourneyRoute
     }
     '/api/analytics': {
       id: '/api/analytics'
@@ -363,8 +396,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface CandidateJourneyRouteChildren {
+  CandidateJourneyResumeRoute: typeof CandidateJourneyResumeRoute
+  CandidateJourneyIndexRoute: typeof CandidateJourneyIndexRoute
+}
+
+const CandidateJourneyRouteChildren: CandidateJourneyRouteChildren = {
+  CandidateJourneyResumeRoute: CandidateJourneyResumeRoute,
+  CandidateJourneyIndexRoute: CandidateJourneyIndexRoute,
+}
+
+const CandidateJourneyRouteWithChildren =
+  CandidateJourneyRoute._addFileChildren(CandidateJourneyRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  CandidateJourneyRoute: CandidateJourneyRouteWithChildren,
   ApiAnalyticsRoute: ApiAnalyticsRoute,
   ApiDemoAccessRoute: ApiDemoAccessRoute,
   ApiExplainableJobPostingExtractionRoute:

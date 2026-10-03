@@ -1,6 +1,6 @@
 import { createPrivacySafeBrowserTelemetry } from '../resume-tailoring/browser-adapters'
 import { createResumeDocumentModelAdapters } from './resume-document-model-adapters'
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react'
 import { createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 
 import { createBrowserResumeDocumentRenderer } from './browser-resume-document-renderer'
@@ -16,7 +16,20 @@ import type {
 } from '@resume-tailoring/application/job-match'
 import type { StructuredSourceProfileExtractor } from '@resume-tailoring/application/source-intake'
 
-export function useCandidateJourney() {
+export type CandidateJourneyController = ReturnType<typeof useCandidateJourneyController>
+
+const CandidateJourneyContext = createContext<CandidateJourneyController | null>(null)
+
+/** Shares one Candidate Journey actor between the intake and result routes, so navigation never restarts it (ADR-0016). */
+export const CandidateJourneyControllerProvider = CandidateJourneyContext.Provider
+
+export function useCandidateJourney(): CandidateJourneyController {
+  const controller = useContext(CandidateJourneyContext)
+  if (controller === null) throw new Error('useCandidateJourney requires a CandidateJourneyControllerProvider')
+  return controller
+}
+
+export function useCandidateJourneyController() {
   const [candidateJourneySystem] = useState(createBrowserCandidateJourneySystem)
   const { candidateJourney } = candidateJourneySystem
   useEffect(() => {
@@ -41,10 +54,11 @@ export function useCandidateJourney() {
     moveResumeField: candidateJourney.moveResumeField,
     reorderResumeSections: candidateJourney.reorderResumeSections,
     updateResumeContacts: candidateJourney.updateResumeContacts,
+    updateResumePhoto: candidateJourney.updateResumePhoto,
+    changeJobPosting: candidateJourney.changeJobPosting,
     proposeResumeCondensation: candidateJourney.proposeResumeCondensation,
     acceptResumeCondensation: candidateJourney.acceptResumeCondensation,
     rejectResumeCondensation: candidateJourney.rejectResumeCondensation,
-    assessResumeLayout: candidateJourney.assessResumeLayout,
     confirmProfileEnrichment: candidateJourney.confirmProfileEnrichment,
     deleteCandidateSession: candidateJourney.deleteCandidateSession,
     rateResumeUsefulness: candidateJourney.rateResumeUsefulness,
@@ -88,7 +102,7 @@ function createBrowserDependencies({ languageModelGateway }: Readonly<{
     languageModelGateway,
     matchEvidenceMatcher: createGatewayMatchEvidenceMatcher({ languageModelGateway }),
     now: () => Date.now(),
-    persistence: createBrowserCandidateSessionPersistence({ storage: localStorage }),
+    persistence: createBrowserCandidateSessionPersistence({ storage: localStorage, page: window }),
     sourceDocumentReader: createBrowserSourceIntakeDocumentReader(),
     sourceProfileExtractor: createGatewaySourceProfileExtractor({ languageModelGateway }),
   }
