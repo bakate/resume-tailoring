@@ -1,27 +1,24 @@
-import type {
-  ResumeClaim,
-  ResumeClaimWritingInputs,
-} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type { ResumeClaim, ResumeClaimWritingInputs } from '@resume-tailoring/application/resume-claims'
 import { describe, expect, it } from 'vitest'
 
 import {
   createOpenAiResumeClaimSemanticValidator,
-  createOpenAiResumeClaimWriter,
+  createOpenAiResumeClaimReformulator,
 } from './openai-resume-claim-service'
 
 describe('OpenAI Resume Claim service contract', () => {
-  it('writes strict structured claims through a stateless writing-model request', async () => {
+  it('reformulates a claim through a strict stateless writing-model request', async () => {
     const requests: Request[] = []
-    const writer = createOpenAiResumeClaimWriter({
+    const reformulator = createOpenAiResumeClaimReformulator({
       apiKey: 'test-api-key',
       model: 'writing-model',
       reasoningEffort: 'medium',
       request: createRequestSpy({ requests, value: { claims: [proposedClaim] } }),
     })
 
-    const result = await writer.write(writingInputs)
+    const result = await reformulator.reformulate(reformulation)
 
-    expect(result).toEqual({ ok: true, value: [proposedClaim] })
+    expect(result).toEqual({ ok: true, value: proposedClaim })
     const requestBody = await readRequestBody({ requests })
     expect(requestBody).toMatchObject({
       model: 'writing-model',
@@ -31,7 +28,8 @@ describe('OpenAI Resume Claim service contract', () => {
         { role: 'developer', content: [{ type: 'input_text' }] },
         {
           role: 'user',
-          content: [{ type: 'input_text', text: JSON.stringify(writingInputs) }],
+          content: [{ type: 'input_text', text: JSON.stringify({ ...writingInputs,
+            revision: { claim: proposedClaim, feedback: reformulation.feedback } }) }],
         },
       ],
       text: { format: { type: 'json_schema', name: 'resume_claims', strict: true } },
@@ -40,8 +38,8 @@ describe('OpenAI Resume Claim service contract', () => {
     expect(JSON.stringify(requestBody)).toMatch(/exact language requested by locale/iu)
   })
 
-  it('rejects claims that reference facts outside the minimized writing input', async () => {
-    const writer = createOpenAiResumeClaimWriter({
+  it('rejects a reformulation that references facts outside the minimized writing input', async () => {
+    const reformulator = createOpenAiResumeClaimReformulator({
       apiKey: 'test-api-key',
       model: 'writing-model',
       reasoningEffort: 'medium',
@@ -53,7 +51,7 @@ describe('OpenAI Resume Claim service contract', () => {
       }),
     })
 
-    const result = await writer.write(writingInputs)
+    const result = await reformulator.reformulate(reformulation)
 
     expect(result).toEqual(resumeClaimWritingUnavailableResult)
   })
@@ -167,6 +165,12 @@ const writingInputs = {
 
 const proposedClaim = {
   segments: [{ text: 'Used TypeScript', factIds: ['source-fact-typescript'] }],
+} as const
+
+const reformulation = {
+  ...writingInputs,
+  claim: proposedClaim,
+  feedback: [{ code: 'unsupported-meaning', segmentIndex: 0 }],
 } as const
 
 const storedClaim = {

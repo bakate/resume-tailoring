@@ -1,14 +1,5 @@
-import type {
-  ProposedResumeClaim,
-  ResumeClaimWritingInputs,
-} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
-import {
-  jobRequirementClassifications,
-  resumeClaimContractLimits,
-  resumeClaimSemanticValidationFeedbackCodes,
-  resumeClaimValidationFeedbackCodes,
-  sourceProfileFactKinds,
-} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type { ProposedResumeClaim, ResumeClaimWritingInputs } from '@resume-tailoring/application/resume-claims'
+import { jobRequirementClassifications, resumeClaimContractLimits, resumeClaimSemanticValidationFeedbackCodes, resumeClaimValidationFeedbackCodes, sourceProfileFactKinds } from '@resume-tailoring/application/resume-claims'
 import { z } from 'zod'
 
 const sourceProfileFactIdSchema = z.templateLiteral(['source-fact-', z.string().min(1)])
@@ -68,15 +59,12 @@ export const resumeClaimSemanticValidationSchema = z.object({
   }
 })
 
-export const resumeClaimWritingRequestSchema = z.discriminatedUnion('operation', [
-  resumeClaimWritingInputsSchema.extend({ operation: z.literal('write') }),
-  resumeClaimWritingInputsSchema.extend({
-    operation: z.literal('reformulate'),
-    claim: proposedResumeClaimSchema,
-    feedback: z.array(validationFeedbackSchema).max(resumeClaimContractLimits.segmentCount),
-    request: z.string().trim().min(1).max(resumeClaimContractLimits.textLength).optional(),
-  }),
-])
+export const resumeClaimWritingRequestSchema = resumeClaimWritingInputsSchema.extend({
+  operation: z.literal('reformulate'),
+  claim: proposedResumeClaimSchema,
+  feedback: z.array(validationFeedbackSchema).max(resumeClaimContractLimits.segmentCount),
+  request: z.string().trim().min(1).max(resumeClaimContractLimits.textLength).optional(),
+})
 
 export const resumeClaimWritingResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), value: proposedResumeClaimsSchema }),

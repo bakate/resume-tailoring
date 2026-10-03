@@ -1,6 +1,6 @@
 import { assessResumeExport, unavailableResumeRender } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeRenderRequest } from '@resume-tailoring/application/candidate-journey'
-import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/privacy-safe-telemetry'
 import { groupedResumeDocument, resumeContractRevision } from '@resume-tailoring/application/structured-resume-fixtures'
 import { describe, expect, it, vi } from 'vitest'
 

@@ -1,6 +1,6 @@
 import { unavailableResumeRender } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeDocumentRenderer, ResumeRenderRequest, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
-import type { PrivacySafeTelemetry, resumeRenderFailureCategories } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type { PrivacySafeTelemetry, resumeRenderFailureCategories } from '@resume-tailoring/application/privacy-safe-telemetry'
 import { resumeRenderResponseSchema } from './resume-render-schema'
 
 type RenderFailureCategory = typeof resumeRenderFailureCategories[number]

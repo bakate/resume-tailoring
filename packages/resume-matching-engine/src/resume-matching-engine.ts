@@ -160,24 +160,6 @@ function readUncoveredAdjacentEvidence({ adjacentEvidence, requirementGroups }: 
   return adjacentEvidence.filter(({ requirementId }) => uncoveredRequirementIds.has(requirementId))
 }
 
-export function restoreResumeMatch({
-  candidateFacts,
-  evidence,
-  relevantFactIds,
-  requirements,
-}: Readonly<{
-  candidateFacts: readonly CandidateFact[]
-  evidence: readonly MatchEvidence[]
-  relevantFactIds: readonly string[]
-  requirements: readonly JobRequirement[]
-}>): MatchAnalysisResult {
-  if (!hasValidStoredEvidence({ candidateFacts, evidence, requirements })
-    || !hasValidRelevantFacts({ candidateFacts, evidence, relevantFactIds })) {
-    return { error: { type: 'invalid-match-input' }, ok: false }
-  }
-  return createSuccessfulResult({ evidence, relevantFactIds, requirements })
-}
-
 function createSuccessfulResult({ evidence, relevantFactIds, requirements }: Readonly<{
   evidence: readonly MatchEvidence[]
   relevantFactIds: readonly string[]
@@ -198,23 +180,6 @@ function createSuccessfulResult({ evidence, relevantFactIds, requirements }: Rea
     relevantFactIds,
     requirementGroups,
   } }
-}
-
-function hasValidStoredEvidence({ candidateFacts, evidence, requirements }: Readonly<{
-  candidateFacts: readonly CandidateFact[]
-  evidence: readonly MatchEvidence[]
-  requirements: readonly JobRequirement[]
-}>) {
-  const factIds = new Set(candidateFacts.map(({ id }) => id))
-  const requirementIds = new Set(requirements.map(({ id }) => id))
-  const referencedRequirementIds = new Set<string>()
-  return evidence.every((item) => {
-    if (referencedRequirementIds.has(item.requirementId) || item.factIds.length === 0) return false
-    referencedRequirementIds.add(item.requirementId)
-    return requirementIds.has(item.requirementId)
-      && new Set(item.factIds).size === item.factIds.length
-      && item.factIds.every((factId) => factIds.has(factId))
-  })
 }
 
 export function readMatchBand({ matchScore }: Readonly<{ matchScore: number }>): MatchBand {

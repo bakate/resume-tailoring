@@ -1,7 +1,7 @@
 import type { ProfessionalResumeDocument, ResumeDocumentPorts, ResumeOperationFailure, ResumeSectionChange } from '@resume-tailoring/application/candidate-journey'
 import type { LanguageModelFailure } from '@resume-tailoring/application/language-model-gateway'
 import { validateProposedResumeClaim } from '@resume-tailoring/application/resume-claims'
-import type { ResumeClaimWritingInputs } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type { ResumeClaimWritingInputs } from '@resume-tailoring/application/resume-claims'
 import type { CandidateFact } from '@resume-tailoring/application/source-intake'
 import { readExperienceFields, readSectionFields } from '@resume-tailoring/application/tailored-resume'
 import type { TailoredResumeField } from '@resume-tailoring/application/tailored-resume'

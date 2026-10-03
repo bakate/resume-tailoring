@@ -1,10 +1,10 @@
-import type { ResumeClaimWriter } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type { ResumeClaimReformulator } from '@resume-tailoring/application/resume-claims'
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
-import { createOpenAiResumeClaimWriter } from '../resume-tailoring/openai-resume-claim-service'
+import { createOpenAiResumeClaimReformulator } from '../resume-tailoring/openai-resume-claim-service'
 import { resumeClaimWritingRequestSchema } from '../resume-tailoring/resume-claim-schemas'
 
 export const Route = createFileRoute('/api/resume-claim-writing')({
@@ -21,26 +21,25 @@ async function writeResumeClaims({ request }: Readonly<{ request: Request }>) {
   if (!writingRequest.ok) return createFailureResponse({ status: 400 })
   const environment = validateServerEnvironment({ environment: process.env })
   if (!environment.ok) return createFailureResponse({ status: 503 })
-  const writer = createOpenAiResumeClaimWriter({
+  const reformulator = createOpenAiResumeClaimReformulator({
     apiKey: environment.value.openAiApiKey,
     model: environment.value.openAiWritingModel,
     reasoningEffort: environment.value.openAiWritingReasoningEffort,
   })
-  const result = await executeWritingRequest({ request: writingRequest.value, writer })
+  const result = await reformulateResumeClaim({ request: writingRequest.value, reformulator })
   return result.ok
     ? Response.json({ ok: true, value: { claims: result.value } }, { headers: privateHeaders })
     : createFailureResponse({ status: 502 })
 }
 
-function executeWritingRequest({
+function reformulateResumeClaim({
   request,
-  writer,
+  reformulator,
 }: Readonly<{
   request: ReturnType<typeof resumeClaimWritingRequestSchema.parse>
-  writer: ResumeClaimWriter
+  reformulator: ResumeClaimReformulator
 }>) {
-  if (request.operation === 'write') return writer.write(request)
-  return writer.reformulate(request).then((result) => result.ok
+  return reformulator.reformulate(request).then((result) => result.ok
     ? { ok: true, value: [result.value] } as const
     : result)
 }

@@ -3,7 +3,7 @@ import type { ResumeRenderRequest, ResumeRenderResult } from '@resume-tailoring/
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import puppeteer from 'puppeteer'
 import type { Browser, Page } from 'puppeteer'
-import { hasA4Dimensions, hasExpectedEmbeddedFonts, hasExpectedPdfTextInReadingOrder } from '../resume-tailoring/tailored-resume-pdf'
+import { hasA4Dimensions, hasExpectedEmbeddedFonts, hasExpectedPdfTextInReadingOrder } from './resume-pdf-verification'
 import { renderTailoredResumeDocument } from './tailored-resume-document'
 
 export async function renderResumeDocument(request: ResumeRenderRequest): Promise<ResumeRenderResult> {

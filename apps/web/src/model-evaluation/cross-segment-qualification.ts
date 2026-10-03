@@ -6,7 +6,7 @@ import {
   type ProposedMatchEvidence,
   type RequirementCoverage,
   type RequirementImportance,
-} from '@resume-tailoring/application/matching-engine'
+} from '@resume-tailoring/matching-engine'
 
 export const qualificationRoleFamilies = [
   'technology', 'general-management', 'sales',

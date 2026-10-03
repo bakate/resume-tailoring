@@ -42,19 +42,6 @@ export function readLocalResumeContacts({ sourceIntake }: Readonly<{ sourceIntak
   }
 }
 
-export function createNormalizedResume({ sourceIntake, locale }: Readonly<{
-  sourceIntake: SourceIntake; locale: TailoredResumeLocale
-}>): TailoredResume {
-  const facts = sourceIntake.candidateFacts.filter(({ status }) => status === 'attested')
-  return {
-    purpose: 'normalized', locale, targetRole: null,
-    ...readLocalResumeContacts({ sourceIntake }),
-    valueProposition: { kind: 'evidence-excerpts', paragraphs: [] },
-    experiences: createExperiences({ facts, relevantFactIds: new Set() }),
-    sections: createSections({ facts }),
-  }
-}
-
 function createTailoredResumeValue({ attestedFacts, jobMatch, locale, relevantFactIds, sourceIntake }: Readonly<{
   attestedFacts: readonly CandidateFact[]
   jobMatch: JobMatch

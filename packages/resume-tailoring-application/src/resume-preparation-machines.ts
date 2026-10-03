@@ -1,6 +1,6 @@
 import { assign, enqueueActions, fromPromise, sendParent, setup } from 'xstate'
 import type { ResumeSectionSnapshot } from '@resume-tailoring/domain/candidate-session'
-import type { PrivacySafeTelemetryEvent, resumeSectionOutcomes } from './resume-tailoring-workflow-ports'
+import type { PrivacySafeTelemetryEvent, resumeSectionOutcomes } from './privacy-safe-telemetry'
 import type { ResumeOperationFailure, ResumePreparationOutcome } from './structured-resume-contract'
 import { assembleResumeDocumentWithOrigins, citedCandidateFacts, createSectionWritingInput, hasSupportedSectionStructure,
   isSectionFullyValidated, normalizeSectionContent, planResumeSections, readRejectedFields,

@@ -1,4 +1,4 @@
-import type { SourceDocumentReader } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type { SourceDocument } from '@resume-tailoring/application/source-intake'
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 
 import { installPromiseWithResolvers } from './promise-with-resolvers'
@@ -27,26 +27,13 @@ type PdfReaderLoadResult =
     }>
   | Readonly<{ ok: false; error: { readonly type: 'pdf-reader-load-failure' } }>
 
-export function createBrowserSourceDocumentReader({
-  loadPdfReader = loadBrowserPdfReader,
-  readBrowserEnvironment = readCurrentBrowserEnvironment,
-}: SourceDocumentReaderDependencies = {}): SourceDocumentReader {
-  const browserEnvironment = readBrowserEnvironment()
-  return {
-    read: async (document) => {
-      const result = await readSourceDocumentDetails({ browserEnvironment, document, loadPdfReader })
-      return result.ok ? { ok: true, value: result.value.text } : result
-    },
-  }
-}
-
 export function createBrowserPdfDocumentReader({
   loadPdfReader = loadBrowserPdfReader,
   readBrowserEnvironment = readCurrentBrowserEnvironment,
 }: SourceDocumentReaderDependencies = {}) {
   const browserEnvironment = readBrowserEnvironment()
   return {
-    read: (document: Parameters<SourceDocumentReader['read']>[0]) => (
+    read: (document: SourceDocument) => (
       readSourceDocumentDetails({ browserEnvironment, document, loadPdfReader })
     ),
   }
@@ -92,7 +79,7 @@ async function readSourceDocumentDetails({
   loadPdfReader,
 }: Readonly<{
   browserEnvironment: SourceDocumentBrowserEnvironment
-  document: Parameters<SourceDocumentReader['read']>[0]
+  document: SourceDocument
   loadPdfReader: () => Promise<PdfReaderLoadResult>
 }>) {
   if (isText({ document })) return readPastedText({ document })
@@ -185,7 +172,7 @@ async function loadBrowserPdfReader(): Promise<PdfReaderLoadResult> {
 }
 
 function readPastedText({ document }: Readonly<{
-  document: Parameters<SourceDocumentReader['read']>[0]
+  document: SourceDocument
 }>) {
   const text = decodeUtf8({ bytes: document.bytes }).trim()
   return text.length === 0
@@ -230,7 +217,7 @@ async function readPdfPage({ page }: Readonly<{ page: PDFPageProxy }>) {
 }
 
 function isPdf({ document }: Readonly<{
-  document: Parameters<SourceDocumentReader['read']>[0]
+  document: SourceDocument
 }>) {
   return document.mediaType === 'application/pdf'
     || document.name.toLowerCase().endsWith('.pdf')
@@ -241,7 +228,7 @@ function hasPdfHeader({ bytes }: Readonly<{ bytes: Uint8Array }>) {
 }
 
 function isText({ document }: Readonly<{
-  document: Parameters<SourceDocumentReader['read']>[0]
+  document: SourceDocument
 }>) {
   return document.mediaType === 'text/plain'
     || document.name.toLowerCase().endsWith('.txt')

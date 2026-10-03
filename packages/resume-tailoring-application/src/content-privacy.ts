@@ -1,7 +1,7 @@
 import type {
   SensitiveContent,
   SensitiveContentKind,
-} from '@resume-tailoring/domain/resume-tailoring-state'
+} from '@resume-tailoring/domain/resume-claim'
 
 type SensitiveContentMatch = Readonly<{
   end: number

@@ -18,19 +18,10 @@ import type {
   JobPostingExtractor as ExplainableJobPostingExtractor,
   MatchEvidenceMatcher as ExplainableMatchEvidenceMatcher,
 } from '@resume-tailoring/application/job-match'
-import type {
-  JobRequirementExtractor,
-  MatchEvidenceMatcher,
-  ResumeClaimSemanticValidator,
-  ResumeClaimWriter,
-  SourceProfileExtractor,
-} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type { ResumeClaimSemanticValidator, ResumeClaimReformulator } from '@resume-tailoring/application/resume-claims'
 import {
-  createBrowserJobRequirementExtractor,
-  createBrowserMatchEvidenceMatcher,
   createBrowserResumeClaimSemanticValidator,
-  createBrowserResumeClaimWriter,
-  createBrowserSourceProfileExtractor,
+  createBrowserResumeClaimReformulator,
 } from '../resume-tailoring/browser-adapters'
 import { createBrowserStructuredSourceProfileExtractor } from './browser-structured-source-profile-extractor'
 import {
@@ -43,29 +34,21 @@ type StructuredModelRequest =
   | ModelRequest<'resume-document-coherence', Parameters<ResumeCoherenceChecker['check']>[0]>
   | ModelRequest<'explainable-job-posting-extraction', Parameters<ExplainableJobPostingExtractor['extract']>[0]>
   | ModelRequest<'explainable-match-evidence', Parameters<ExplainableMatchEvidenceMatcher['match']>[0]>
-  | ModelRequest<'job-requirement-extraction', Parameters<JobRequirementExtractor['extract']>[0]>
-  | ModelRequest<'match-analysis', Parameters<MatchEvidenceMatcher['match']>[0]>
   | ModelRequest<'resume-claim-validation', Parameters<ResumeClaimSemanticValidator['validate']>[0]>
-  | ModelRequest<'source-profile-extraction', Parameters<SourceProfileExtractor['extract']>[0]>
   | ModelRequest<'structured-source-profile-extraction', Parameters<StructuredSourceProfileExtractor['extract']>[0]>
 type WritingModelRequest =
   | ModelRequest<'resume-section-writing', Parameters<ResumeSectionWriter['write']>[0]>
-  | ModelRequest<'resume-claim-reformulation', Parameters<ResumeClaimWriter['reformulate']>[0]>
-  | ModelRequest<'resume-claim-writing', Parameters<ResumeClaimWriter['write']>[0]>
+  | ModelRequest<'resume-claim-reformulation', Parameters<ResumeClaimReformulator['reformulate']>[0]>
 type StructuredModelValue =
   | MeteredModelValue<'resume-section-validation', ResumeFieldValidator['validate']>
   | MeteredModelValue<'resume-document-coherence', ResumeCoherenceChecker['check']>
   | ModelValue<'explainable-job-posting-extraction', ExplainableJobPostingExtractor['extract']>
   | ModelValue<'explainable-match-evidence', ExplainableMatchEvidenceMatcher['match']>
-  | ModelValue<'job-requirement-extraction', JobRequirementExtractor['extract']>
-  | ModelValue<'match-analysis', MatchEvidenceMatcher['match']>
   | ModelValue<'resume-claim-validation', ResumeClaimSemanticValidator['validate']>
-  | ModelValue<'source-profile-extraction', SourceProfileExtractor['extract']>
   | ModelValue<'structured-source-profile-extraction', StructuredSourceProfileExtractor['extract']>
 type WritingModelValue =
   | MeteredModelValue<'resume-section-writing', ResumeSectionWriter['write']>
-  | ModelValue<'resume-claim-reformulation', ResumeClaimWriter['reformulate']>
-  | ModelValue<'resume-claim-writing', ResumeClaimWriter['write']>
+  | ModelValue<'resume-claim-reformulation', ResumeClaimReformulator['reformulate']>
 type ModelRequest<TOperation extends string, TInput> = Readonly<{
   input: TInput
   operation: TOperation
@@ -91,11 +74,8 @@ type OpenAiModelAdapters = Readonly<{
   resumeCoherenceChecker: ResumeCoherenceChecker
   explainableJobPostingExtractor: ExplainableJobPostingExtractor
   explainableMatchEvidenceMatcher: ExplainableMatchEvidenceMatcher
-  jobRequirementExtractor: JobRequirementExtractor
-  matchEvidenceMatcher: MatchEvidenceMatcher
   resumeClaimSemanticValidator: ResumeClaimSemanticValidator
-  resumeClaimWriter: ResumeClaimWriter
-  sourceProfileExtractor: SourceProfileExtractor
+  resumeClaimReformulator: ResumeClaimReformulator
   structuredSourceProfileExtractor: StructuredSourceProfileExtractor
 }>
 
@@ -151,11 +131,8 @@ function createOpenAiModelAdapters({ request }: Readonly<{
     resumeCoherenceChecker: createBrowserResumeCoherenceChecker({ request }),
     explainableJobPostingExtractor: createBrowserJobPostingExtractor({ request }),
     explainableMatchEvidenceMatcher: createBrowserJobMatchEvidenceMatcher({ request }),
-    jobRequirementExtractor: createBrowserJobRequirementExtractor({ request }),
-    matchEvidenceMatcher: createBrowserMatchEvidenceMatcher({ request }),
     resumeClaimSemanticValidator: createBrowserResumeClaimSemanticValidator({ request }),
-    resumeClaimWriter: createBrowserResumeClaimWriter({ request }),
-    sourceProfileExtractor: createBrowserSourceProfileExtractor({ request }),
+    resumeClaimReformulator: createBrowserResumeClaimReformulator({ request }),
     structuredSourceProfileExtractor: createBrowserStructuredSourceProfileExtractor({ request }),
   }
 }
@@ -180,16 +157,10 @@ async function processStructured({ modelAdapters, modelRequest }: ProcessStructu
   if (modelRequest.operation === 'explainable-match-evidence') {
     return processExplainableMatchEvidence({ modelAdapters, modelRequest })
   }
-  if (modelRequest.operation === 'source-profile-extraction') {
-    return processSourceProfileExtraction({ modelAdapters, modelRequest })
-  }
   if (modelRequest.operation === 'structured-source-profile-extraction') {
     return processStructuredSourceProfileExtraction({ modelAdapters, modelRequest })
   }
-  if (modelRequest.operation === 'job-requirement-extraction') {
-    return processJobRequirementExtraction({ modelAdapters, modelRequest })
-  }
-  return processStructuredAnalysis({ modelAdapters, modelRequest })
+  return processResumeClaimValidation({ modelAdapters, modelRequest })
 }
 
 type StructuredRequest<TOperation extends StructuredModelRequest['operation']> =
@@ -211,14 +182,6 @@ async function processExplainableMatchEvidence({ modelAdapters, modelRequest }: 
   return toGatewayResult({ operation: modelRequest.operation, result })
 }
 
-async function processSourceProfileExtraction({ modelAdapters, modelRequest }: Readonly<{
-  modelAdapters: OpenAiModelAdapters
-  modelRequest: StructuredRequest<'source-profile-extraction'>
-}>) {
-  const result = await modelAdapters.sourceProfileExtractor.extract(modelRequest.input)
-  return toGatewayResult({ operation: modelRequest.operation, result })
-}
-
 async function processStructuredSourceProfileExtraction({ modelAdapters, modelRequest }: Readonly<{
   modelAdapters: OpenAiModelAdapters
   modelRequest: StructuredRequest<'structured-source-profile-extraction'>
@@ -227,31 +190,10 @@ async function processStructuredSourceProfileExtraction({ modelAdapters, modelRe
   return toGatewayResult({ operation: modelRequest.operation, result })
 }
 
-async function processJobRequirementExtraction({ modelAdapters, modelRequest }: Readonly<{
+async function processResumeClaimValidation({ modelAdapters, modelRequest }: Readonly<{
   modelAdapters: OpenAiModelAdapters
-  modelRequest: StructuredRequest<'job-requirement-extraction'>
-}>) {
-  const result = await modelAdapters.jobRequirementExtractor.extract(modelRequest.input)
-  return toGatewayResult({ operation: modelRequest.operation, result })
-}
-
-async function processStructuredAnalysis({ modelAdapters, modelRequest }: Readonly<{
-  modelAdapters: OpenAiModelAdapters
-  modelRequest: Exclude<StructuredModelRequest,
-  { readonly operation:
-    | 'resume-section-validation'
-    | 'resume-document-coherence'
-    | 'explainable-job-posting-extraction'
-    | 'explainable-match-evidence'
-    | 'job-requirement-extraction'
-    | 'source-profile-extraction'
-    | 'structured-source-profile-extraction'
-  }>
+  modelRequest: StructuredRequest<'resume-claim-validation'>
 }>): Promise<LanguageModelResult<StructuredModelValue>> {
-  if (modelRequest.operation === 'match-analysis') {
-    const result = await modelAdapters.matchEvidenceMatcher.match(modelRequest.input)
-    return toGatewayResult({ operation: modelRequest.operation, result })
-  }
   const result = await modelAdapters.resumeClaimSemanticValidator.validate(modelRequest.input)
   return toGatewayResult({ operation: modelRequest.operation, result })
 }
@@ -264,11 +206,7 @@ async function processWriting({ modelAdapters, modelRequest }: Readonly<{
     const result = await modelAdapters.resumeSectionWriter.write(modelRequest.input)
     return toSectionGatewayResult({ operation: modelRequest.operation, result })
   }
-  if (modelRequest.operation === 'resume-claim-writing') {
-    const result = await modelAdapters.resumeClaimWriter.write(modelRequest.input)
-    return toGatewayResult({ operation: modelRequest.operation, result })
-  }
-  const result = await modelAdapters.resumeClaimWriter.reformulate(modelRequest.input)
+  const result = await modelAdapters.resumeClaimReformulator.reformulate(modelRequest.input)
   return toGatewayResult({ operation: modelRequest.operation, result })
 }
 
