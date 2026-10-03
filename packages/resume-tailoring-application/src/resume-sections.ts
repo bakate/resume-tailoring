@@ -239,12 +239,6 @@ export function citedCandidateFacts({ content, candidateFacts }: Readonly<{
   return candidateFacts.filter(({ id }) => cited.has(id))
 }
 
-export function assembleResumeDocument(request: Readonly<{
-  contents: readonly ResumeSectionContent[]; request: ResumeSectionsRequest
-}>): ProfessionalResumeDocument {
-  return assembleResumeDocumentWithOrigins(request).document
-}
-
 /** The Resume Section key and the section's own field behind one field id of the assembled document. */
 /** Where an assembled field came from; `copiedFromSource` marks a date or a location the writer may not change. */
 export type AssembledFieldOrigin = Readonly<{ sectionKey: string; field: TailoredResumeField; copiedFromSource: boolean }>

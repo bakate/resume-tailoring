@@ -1,5 +1,5 @@
 import { readResumeRecovery } from './resume-recovery-view'
-import type { PrivacySafeTelemetryEvent } from './resume-tailoring-workflow-ports'
+import type { PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
 import type { CandidateSession } from '@resume-tailoring/domain/candidate-session'
 import type { ResumeEditingState, TailoredResume } from '@resume-tailoring/domain/tailored-resume'
 import type { ProfessionalResumeDocument, ResumeDocumentPorts, ResumeDocumentReview,

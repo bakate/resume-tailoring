@@ -2,12 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createBrowserPdfDocumentReader,
-  createBrowserSourceDocumentReader,
 } from './source-document-pdf'
 
 describe('browser Source Document reader', () => {
   it('reports browser incompatibility when PDF reading capabilities are unavailable', async () => {
-    const reader = createBrowserSourceDocumentReader({
+    const reader = createBrowserPdfDocumentReader({
       readBrowserEnvironment: () => ({
         capabilities: [],
         userAgent: supportedChromeUserAgent,
@@ -30,7 +29,7 @@ describe('browser Source Document reader', () => {
   })
 
   it('keeps pasted text available when PDF reading capabilities are unavailable', async () => {
-    const reader = createBrowserSourceDocumentReader({
+    const reader = createBrowserPdfDocumentReader({
       readBrowserEnvironment: () => ({
         capabilities: [],
         userAgent: supportedChromeUserAgent,
@@ -43,11 +42,11 @@ describe('browser Source Document reader', () => {
       name: 'pasted-professional-text.txt',
     })
 
-    expect(result).toEqual({ ok: true, value: 'Senior FullStack Developer' })
+    expect(result).toEqual({ ok: true, value: { pageCount: null, text: 'Senior FullStack Developer' } })
   })
 
   it('reads a TXT file when the browser omits its media type', async () => {
-    const reader = createBrowserSourceDocumentReader()
+    const reader = createBrowserPdfDocumentReader()
 
     const result = await reader.read({
       bytes: new TextEncoder().encode('Senior FullStack Developer'),
@@ -55,13 +54,13 @@ describe('browser Source Document reader', () => {
       name: 'job.txt',
     })
 
-    expect(result).toEqual({ ok: true, value: 'Senior FullStack Developer' })
+    expect(result).toEqual({ ok: true, value: { pageCount: null, text: 'Senior FullStack Developer' } })
   })
 
   it('keeps pasted text available without the native TextDecoder API', async () => {
     const textDecoderDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'TextDecoder')
     Reflect.deleteProperty(globalThis, 'TextDecoder')
-    const reader = createBrowserSourceDocumentReader({
+    const reader = createBrowserPdfDocumentReader({
       readBrowserEnvironment: () => ({
         capabilities: ['worker'],
         userAgent: supportedChromeUserAgent,
@@ -75,14 +74,14 @@ describe('browser Source Document reader', () => {
         name: 'pasted-professional-text.txt',
       })
 
-      expect(result).toEqual({ ok: true, value: 'Senior' })
+      expect(result).toEqual({ ok: true, value: { pageCount: null, text: 'Senior' } })
     } finally {
       restoreGlobalProperty({ descriptor: textDecoderDescriptor, property: 'TextDecoder' })
     }
   })
 
   it('reports browser incompatibility when WebKit is older than the supported matrix', async () => {
-    const reader = createBrowserSourceDocumentReader({
+    const reader = createBrowserPdfDocumentReader({
       readBrowserEnvironment: () => ({
         capabilities: ['worker'],
         userAgent: unsupportedIosWebKitUserAgent,
@@ -107,7 +106,7 @@ describe('browser Source Document reader', () => {
   it('reads a selectable-text PDF without native Promise.withResolvers support', async () => {
     const withResolversDescriptor = Object.getOwnPropertyDescriptor(Promise, 'withResolvers')
     Reflect.deleteProperty(Promise, 'withResolvers')
-    const reader = createBrowserSourceDocumentReader({
+    const reader = createBrowserPdfDocumentReader({
       readBrowserEnvironment: () => ({
         capabilities: ['worker'],
         userAgent: supportedChromeUserAgent,
@@ -123,7 +122,7 @@ describe('browser Source Document reader', () => {
 
       expect(result).toEqual({
         ok: true,
-        value: 'Senior FullStack Developer using React at Acme',
+        value: { pageCount: 1, text: 'Senior FullStack Developer using React at Acme' },
       })
     } finally {
       restoreWithResolvers({ descriptor: withResolversDescriptor })
@@ -148,7 +147,7 @@ describe('browser Source Document reader', () => {
   })
 
   it('reports a PDF reader runtime failure as browser incompatibility', async () => {
-    const reader = createBrowserSourceDocumentReader({
+    const reader = createBrowserPdfDocumentReader({
       loadPdfReader: () => Promise.resolve({
         ok: false,
         error: { type: 'pdf-reader-load-failure' },
@@ -175,7 +174,7 @@ describe('browser Source Document reader', () => {
   })
 
   it('contains a synchronous PDF runtime failure as browser incompatibility', async () => {
-    const reader = createBrowserSourceDocumentReader({
+    const reader = createBrowserPdfDocumentReader({
       loadPdfReader: () => Promise.resolve({
         ok: true,
         value: {
@@ -208,7 +207,7 @@ describe('browser Source Document reader', () => {
   })
 
   it('contains an asynchronous PDF runtime failure as browser incompatibility', async () => {
-    const reader = createBrowserSourceDocumentReader({
+    const reader = createBrowserPdfDocumentReader({
       loadPdfReader: () => Promise.resolve({
         ok: true,
         value: {
@@ -257,7 +256,7 @@ describe('browser Source Document reader', () => {
   })
 
   it('preserves text-empty PDFs as a document-specific failure', async () => {
-    const reader = createBrowserSourceDocumentReader({
+    const reader = createBrowserPdfDocumentReader({
       readBrowserEnvironment: readSupportedBrowserEnvironment,
     })
 
@@ -273,7 +272,7 @@ describe('browser Source Document reader', () => {
   })
 
   it('rejects a mislabeled PDF before loading the PDF reader', async () => {
-    const reader = createBrowserSourceDocumentReader({
+    const reader = createBrowserPdfDocumentReader({
       loadPdfReader: () => Promise.resolve({
         ok: false,
         error: { type: 'pdf-reader-load-failure' },
@@ -297,7 +296,7 @@ const supportedChromeUserAgent = 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36'
 const unsupportedIosWebKitUserAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_7 like Mac OS X) AppleWebKit/605.1.15 Version/17.7 Mobile/15E148 Safari/604.1'
 
 function createReaderWithLoadingFailure({ error }: Readonly<{ error: Error }>) {
-  return createBrowserSourceDocumentReader({
+  return createBrowserPdfDocumentReader({
     loadPdfReader: () => Promise.resolve({
       ok: true,
       value: {

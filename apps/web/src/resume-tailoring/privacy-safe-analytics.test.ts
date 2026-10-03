@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import type { PrivacySafeTelemetry } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type { PrivacySafeTelemetry } from '@resume-tailoring/application/privacy-safe-telemetry'
 
 import { createPrivacySafeBrowserTelemetry } from './browser-adapters'
 

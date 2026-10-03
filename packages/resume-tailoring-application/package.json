@@ -4,23 +4,14 @@
   "type": "module",
   "exports": {
     "./candidate-journey": "./src/candidate-journey.ts",
-    "./language-model-gateway": "./src/language-model-gateway.ts",
-    "./job-posting-analysis": "./src/job-posting-analysis.ts",
     "./job-match": "./src/job-match.ts",
-    "./job-posting-target-role": "./src/job-posting-target-role.ts",
-    "./resume-tailoring-workflow": "./src/resume-tailoring-workflow.ts",
-    "./resume-tailoring-workflow-composition": "./src/resume-tailoring-workflow-composition.ts",
-    "./match-analysis": "./src/match-analysis.ts",
-    "./matching-engine": "./src/matching-engine.ts",
+    "./language-model-gateway": "./src/language-model-gateway.ts",
+    "./privacy-safe-telemetry": "./src/privacy-safe-telemetry.ts",
     "./resume-claims": "./src/resume-claims.ts",
-    "./tailored-resume-document": "./src/tailored-resume-document.ts",
-    "./tailored-resume": "./src/tailored-resume.ts",
-    "./resume-claim-restoration": "./src/resume-claim-restoration.ts",
     "./resume-preparation": "./src/resume-preparation.ts",
-    "./resume-tailoring-workflow-ports": "./src/resume-tailoring-workflow-ports.ts",
-    "./resume-tailoring-workflow-testing": "./src/resume-tailoring-workflow-testing.ts",
     "./source-intake": "./src/source-intake.ts",
-    "./structured-resume-fixtures": "./src/structured-resume-fixtures.ts"
+    "./structured-resume-fixtures": "./src/structured-resume-fixtures.ts",
+    "./tailored-resume": "./src/tailored-resume.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

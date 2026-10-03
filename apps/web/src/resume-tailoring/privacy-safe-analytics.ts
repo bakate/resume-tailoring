@@ -1,15 +1,7 @@
 import { z } from 'zod'
 
-import {
-  correctionKinds,
-  journeyPhases,
-  matchScoreBands,
-  resumePreparationOutcomes,
-  resumeRenderFailureCategories,
-  resumeSectionKinds,
-  resumeSectionOutcomes,
-} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
-import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import { correctionKinds, journeyPhases, matchScoreBands, resumePreparationOutcomes, resumeRenderFailureCategories, resumeSectionKinds, resumeSectionOutcomes } from '@resume-tailoring/application/privacy-safe-telemetry'
+import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/privacy-safe-telemetry'
 
 const matchScoreBandSchema = z.enum(matchScoreBands)
 const metricCountSchema = z.number().int().min(0).max(10_000_000)

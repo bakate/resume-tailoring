@@ -16,17 +16,13 @@ import { Route as ApiAnalyticsRouteImport } from './routes/api.analytics'
 import { Route as ApiDemoAccessRouteImport } from './routes/api.demo-access'
 import { Route as ApiExplainableJobPostingExtractionRouteImport } from './routes/api.explainable-job-posting-extraction'
 import { Route as ApiExplainableMatchEvidenceRouteImport } from './routes/api.explainable-match-evidence'
-import { Route as ApiJobRequirementExtractionRouteImport } from './routes/api.job-requirement-extraction'
-import { Route as ApiMatchAnalysisRouteImport } from './routes/api.match-analysis'
 import { Route as ApiResumeClaimValidationRouteImport } from './routes/api.resume-claim-validation'
 import { Route as ApiResumeClaimWritingRouteImport } from './routes/api.resume-claim-writing'
 import { Route as ApiResumeDocumentRouteImport } from './routes/api.resume-document'
 import { Route as ApiResumeDocumentCoherenceRouteImport } from './routes/api.resume-document-coherence'
 import { Route as ApiResumeSectionValidationRouteImport } from './routes/api.resume-section-validation'
 import { Route as ApiResumeSectionWritingRouteImport } from './routes/api.resume-section-writing'
-import { Route as ApiSourceProfileExtractionRouteImport } from './routes/api.source-profile-extraction'
 import { Route as ApiStructuredSourceProfileExtractionRouteImport } from './routes/api.structured-source-profile-extraction'
-import { Route as ApiTailoredResumePdfRouteImport } from './routes/api.tailored-resume-pdf'
 
 const CandidateJourneyRoute = CandidateJourneyRouteImport.update({
   id: '/_candidate-journey',
@@ -64,17 +60,6 @@ const ApiExplainableMatchEvidenceRoute =
     path: '/api/explainable-match-evidence',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiJobRequirementExtractionRoute =
-  ApiJobRequirementExtractionRouteImport.update({
-    id: '/api/job-requirement-extraction',
-    path: '/api/job-requirement-extraction',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiMatchAnalysisRoute = ApiMatchAnalysisRouteImport.update({
-  id: '/api/match-analysis',
-  path: '/api/match-analysis',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiResumeClaimValidationRoute =
   ApiResumeClaimValidationRouteImport.update({
     id: '/api/resume-claim-validation',
@@ -108,23 +93,12 @@ const ApiResumeSectionWritingRoute = ApiResumeSectionWritingRouteImport.update({
   path: '/api/resume-section-writing',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSourceProfileExtractionRoute =
-  ApiSourceProfileExtractionRouteImport.update({
-    id: '/api/source-profile-extraction',
-    path: '/api/source-profile-extraction',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiStructuredSourceProfileExtractionRoute =
   ApiStructuredSourceProfileExtractionRouteImport.update({
     id: '/api/structured-source-profile-extraction',
     path: '/api/structured-source-profile-extraction',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiTailoredResumePdfRoute = ApiTailoredResumePdfRouteImport.update({
-  id: '/api/tailored-resume-pdf',
-  path: '/api/tailored-resume-pdf',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof CandidateJourneyIndexRoute
@@ -133,17 +107,13 @@ export interface FileRoutesByFullPath {
   '/api/demo-access': typeof ApiDemoAccessRoute
   '/api/explainable-job-posting-extraction': typeof ApiExplainableJobPostingExtractionRoute
   '/api/explainable-match-evidence': typeof ApiExplainableMatchEvidenceRoute
-  '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
-  '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
   '/api/resume-document': typeof ApiResumeDocumentRoute
   '/api/resume-document-coherence': typeof ApiResumeDocumentCoherenceRoute
   '/api/resume-section-validation': typeof ApiResumeSectionValidationRoute
   '/api/resume-section-writing': typeof ApiResumeSectionWritingRoute
-  '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
   '/api/structured-source-profile-extraction': typeof ApiStructuredSourceProfileExtractionRoute
-  '/api/tailored-resume-pdf': typeof ApiTailoredResumePdfRoute
 }
 export interface FileRoutesByTo {
   '/resume': typeof CandidateJourneyResumeRoute
@@ -151,17 +121,13 @@ export interface FileRoutesByTo {
   '/api/demo-access': typeof ApiDemoAccessRoute
   '/api/explainable-job-posting-extraction': typeof ApiExplainableJobPostingExtractionRoute
   '/api/explainable-match-evidence': typeof ApiExplainableMatchEvidenceRoute
-  '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
-  '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
   '/api/resume-document': typeof ApiResumeDocumentRoute
   '/api/resume-document-coherence': typeof ApiResumeDocumentCoherenceRoute
   '/api/resume-section-validation': typeof ApiResumeSectionValidationRoute
   '/api/resume-section-writing': typeof ApiResumeSectionWritingRoute
-  '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
   '/api/structured-source-profile-extraction': typeof ApiStructuredSourceProfileExtractionRoute
-  '/api/tailored-resume-pdf': typeof ApiTailoredResumePdfRoute
   '/': typeof CandidateJourneyIndexRoute
 }
 export interface FileRoutesById {
@@ -172,17 +138,13 @@ export interface FileRoutesById {
   '/api/demo-access': typeof ApiDemoAccessRoute
   '/api/explainable-job-posting-extraction': typeof ApiExplainableJobPostingExtractionRoute
   '/api/explainable-match-evidence': typeof ApiExplainableMatchEvidenceRoute
-  '/api/job-requirement-extraction': typeof ApiJobRequirementExtractionRoute
-  '/api/match-analysis': typeof ApiMatchAnalysisRoute
   '/api/resume-claim-validation': typeof ApiResumeClaimValidationRoute
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
   '/api/resume-document': typeof ApiResumeDocumentRoute
   '/api/resume-document-coherence': typeof ApiResumeDocumentCoherenceRoute
   '/api/resume-section-validation': typeof ApiResumeSectionValidationRoute
   '/api/resume-section-writing': typeof ApiResumeSectionWritingRoute
-  '/api/source-profile-extraction': typeof ApiSourceProfileExtractionRoute
   '/api/structured-source-profile-extraction': typeof ApiStructuredSourceProfileExtractionRoute
-  '/api/tailored-resume-pdf': typeof ApiTailoredResumePdfRoute
   '/_candidate-journey/': typeof CandidateJourneyIndexRoute
 }
 export interface FileRouteTypes {
@@ -194,17 +156,13 @@ export interface FileRouteTypes {
     | '/api/demo-access'
     | '/api/explainable-job-posting-extraction'
     | '/api/explainable-match-evidence'
-    | '/api/job-requirement-extraction'
-    | '/api/match-analysis'
     | '/api/resume-claim-validation'
     | '/api/resume-claim-writing'
     | '/api/resume-document'
     | '/api/resume-document-coherence'
     | '/api/resume-section-validation'
     | '/api/resume-section-writing'
-    | '/api/source-profile-extraction'
     | '/api/structured-source-profile-extraction'
-    | '/api/tailored-resume-pdf'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/resume'
@@ -212,17 +170,13 @@ export interface FileRouteTypes {
     | '/api/demo-access'
     | '/api/explainable-job-posting-extraction'
     | '/api/explainable-match-evidence'
-    | '/api/job-requirement-extraction'
-    | '/api/match-analysis'
     | '/api/resume-claim-validation'
     | '/api/resume-claim-writing'
     | '/api/resume-document'
     | '/api/resume-document-coherence'
     | '/api/resume-section-validation'
     | '/api/resume-section-writing'
-    | '/api/source-profile-extraction'
     | '/api/structured-source-profile-extraction'
-    | '/api/tailored-resume-pdf'
     | '/'
   id:
     | '__root__'
@@ -232,17 +186,13 @@ export interface FileRouteTypes {
     | '/api/demo-access'
     | '/api/explainable-job-posting-extraction'
     | '/api/explainable-match-evidence'
-    | '/api/job-requirement-extraction'
-    | '/api/match-analysis'
     | '/api/resume-claim-validation'
     | '/api/resume-claim-writing'
     | '/api/resume-document'
     | '/api/resume-document-coherence'
     | '/api/resume-section-validation'
     | '/api/resume-section-writing'
-    | '/api/source-profile-extraction'
     | '/api/structured-source-profile-extraction'
-    | '/api/tailored-resume-pdf'
     | '/_candidate-journey/'
   fileRoutesById: FileRoutesById
 }
@@ -252,17 +202,13 @@ export interface RootRouteChildren {
   ApiDemoAccessRoute: typeof ApiDemoAccessRoute
   ApiExplainableJobPostingExtractionRoute: typeof ApiExplainableJobPostingExtractionRoute
   ApiExplainableMatchEvidenceRoute: typeof ApiExplainableMatchEvidenceRoute
-  ApiJobRequirementExtractionRoute: typeof ApiJobRequirementExtractionRoute
-  ApiMatchAnalysisRoute: typeof ApiMatchAnalysisRoute
   ApiResumeClaimValidationRoute: typeof ApiResumeClaimValidationRoute
   ApiResumeClaimWritingRoute: typeof ApiResumeClaimWritingRoute
   ApiResumeDocumentRoute: typeof ApiResumeDocumentRoute
   ApiResumeDocumentCoherenceRoute: typeof ApiResumeDocumentCoherenceRoute
   ApiResumeSectionValidationRoute: typeof ApiResumeSectionValidationRoute
   ApiResumeSectionWritingRoute: typeof ApiResumeSectionWritingRoute
-  ApiSourceProfileExtractionRoute: typeof ApiSourceProfileExtractionRoute
   ApiStructuredSourceProfileExtractionRoute: typeof ApiStructuredSourceProfileExtractionRoute
-  ApiTailoredResumePdfRoute: typeof ApiTailoredResumePdfRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -316,20 +262,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiExplainableMatchEvidenceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/job-requirement-extraction': {
-      id: '/api/job-requirement-extraction'
-      path: '/api/job-requirement-extraction'
-      fullPath: '/api/job-requirement-extraction'
-      preLoaderRoute: typeof ApiJobRequirementExtractionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/match-analysis': {
-      id: '/api/match-analysis'
-      path: '/api/match-analysis'
-      fullPath: '/api/match-analysis'
-      preLoaderRoute: typeof ApiMatchAnalysisRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/resume-claim-validation': {
       id: '/api/resume-claim-validation'
       path: '/api/resume-claim-validation'
@@ -372,25 +304,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiResumeSectionWritingRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/source-profile-extraction': {
-      id: '/api/source-profile-extraction'
-      path: '/api/source-profile-extraction'
-      fullPath: '/api/source-profile-extraction'
-      preLoaderRoute: typeof ApiSourceProfileExtractionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/structured-source-profile-extraction': {
       id: '/api/structured-source-profile-extraction'
       path: '/api/structured-source-profile-extraction'
       fullPath: '/api/structured-source-profile-extraction'
       preLoaderRoute: typeof ApiStructuredSourceProfileExtractionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tailored-resume-pdf': {
-      id: '/api/tailored-resume-pdf'
-      path: '/api/tailored-resume-pdf'
-      fullPath: '/api/tailored-resume-pdf'
-      preLoaderRoute: typeof ApiTailoredResumePdfRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -416,18 +334,14 @@ const rootRouteChildren: RootRouteChildren = {
   ApiExplainableJobPostingExtractionRoute:
     ApiExplainableJobPostingExtractionRoute,
   ApiExplainableMatchEvidenceRoute: ApiExplainableMatchEvidenceRoute,
-  ApiJobRequirementExtractionRoute: ApiJobRequirementExtractionRoute,
-  ApiMatchAnalysisRoute: ApiMatchAnalysisRoute,
   ApiResumeClaimValidationRoute: ApiResumeClaimValidationRoute,
   ApiResumeClaimWritingRoute: ApiResumeClaimWritingRoute,
   ApiResumeDocumentRoute: ApiResumeDocumentRoute,
   ApiResumeDocumentCoherenceRoute: ApiResumeDocumentCoherenceRoute,
   ApiResumeSectionValidationRoute: ApiResumeSectionValidationRoute,
   ApiResumeSectionWritingRoute: ApiResumeSectionWritingRoute,
-  ApiSourceProfileExtractionRoute: ApiSourceProfileExtractionRoute,
   ApiStructuredSourceProfileExtractionRoute:
     ApiStructuredSourceProfileExtractionRoute,
-  ApiTailoredResumePdfRoute: ApiTailoredResumePdfRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

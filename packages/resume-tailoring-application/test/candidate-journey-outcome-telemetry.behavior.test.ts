@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourney, CandidateJourneyDependencies, CandidateSession } from '@resume-tailoring/application/candidate-journey'
-import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/privacy-safe-telemetry'
 import { createFixtureResumeSectionModels, readGroupedResumeSection, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 
 describe('Candidate Journey privacy-safe outcome telemetry', () => {
@@ -39,6 +39,15 @@ describe('Candidate Journey privacy-safe outcome telemetry', () => {
     system.reportResumeNeedsStructuralRewriting()
 
     system.expectUsabilityAssessmentRecorded()
+  })
+
+  it('records a resume correction without the corrected Candidate content', async () => {
+    const system = createSystemUnderTest()
+    await system.givenGeneratedResume()
+
+    system.removeValueProposition()
+
+    system.expectCorrectionRecorded()
   })
 
   it('records a download of a non-tailored normalized resume', async () => {
@@ -141,6 +150,14 @@ class OutcomeTelemetrySystem {
     this.#journey.rateResumeUsefulness({ useful: false })
   }
 
+  removeValueProposition() {
+    const view = this.#journey.readView()
+    const fieldId = view.status === 'candidate-session-open'
+      ? view.session.tailoredResume?.valueProposition.paragraphs[0]?.id ?? '' : ''
+    this.#markAction()
+    this.#journey.hideResumeField({ fieldId })
+  }
+
   async openExpiringSession() {
     this.#markAction()
     this.#journey.start()
@@ -177,6 +194,11 @@ class OutcomeTelemetrySystem {
 
   expectDownloadRecorded() {
     expect(this.#recordedAfterAction()).toEqual([{ name: 'resume-downloaded', matchScoreBand: '75-100' }])
+    this.#expectNoCandidateContent()
+  }
+
+  expectCorrectionRecorded() {
+    expect(this.#recordedAfterAction()).toEqual([{ name: 'resume-correction-recorded', correctionKind: 'resume-claim-removal' }])
     this.#expectNoCandidateContent()
   }
 

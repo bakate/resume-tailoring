@@ -23,8 +23,8 @@ describe('OpenAI request policy', () => {
       },
     })
 
-    await requester.send({ body: {}, deadlineSignal, operation: 'match-analysis' })
-    await requester.send({ body: {}, deadlineSignal, operation: 'match-analysis' })
+    await requester.send({ body: {}, deadlineSignal, operation: 'explainable-match-evidence' })
+    await requester.send({ body: {}, deadlineSignal, operation: 'explainable-match-evidence' })
 
     expect(signals).toEqual([deadlineSignal, deadlineSignal])
   })
@@ -38,14 +38,14 @@ describe('OpenAI request policy', () => {
 
     const result = await requester.send({
       body: { professionalContent: 'Private Candidate history' },
-      operation: 'source-profile-extraction',
+      operation: 'structured-source-profile-extraction',
     })
 
     expect(result).toEqual({ ok: false, error: { type: 'timeout' } })
     expect(writeLog).toHaveBeenCalledOnce()
     const serializedMetric = String(writeLog.mock.calls.at(0)?.at(0))
     expect(serializedMetric).toContain('"cause":"timeout"')
-    expect(serializedMetric).toContain('"operation":"source-profile-extraction"')
+    expect(serializedMetric).toContain('"operation":"structured-source-profile-extraction"')
     expect(serializedMetric).not.toContain('Private Candidate history')
     expect(serializedMetric).not.toContain('private-api-key')
     writeLog.mockRestore()
@@ -96,7 +96,7 @@ describe('OpenAI request policy', () => {
       })),
     })
 
-    const result = await requester.send({ body: {}, operation: 'match-analysis' })
+    const result = await requester.send({ body: {}, operation: 'explainable-match-evidence' })
 
     expect(result).toEqual({
       ok: false,

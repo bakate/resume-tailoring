@@ -4,13 +4,9 @@ type OpenAiOperation =
   | 'resume-document-coherence'
   | 'explainable-job-posting-extraction'
   | 'explainable-match-evidence'
-  | 'job-requirement-extraction'
-  | 'match-analysis'
   | 'resume-claim-validation'
   | 'resume-claim-writing'
-  | 'source-profile-extraction'
   | 'structured-source-profile-extraction'
-  | 'tailored-resume-pdf-validation'
 
 export type OpenAiRequestFailure = Readonly<{
   type: 'invalid-response' | 'rate-limited' | 'timeout' | 'transport'

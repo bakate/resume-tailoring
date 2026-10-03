@@ -9,7 +9,7 @@ import { resumePreparationMachine } from './resume-preparation-machines'
 import { prepareCombinedIntake, publishResumePreparation, unavailable } from './combined-intake'
 import type { CombinedIntakeOutcome, CombinedIntakeRequest, PreparationPhase, PreparedResumeInputs } from './combined-intake'
 
-import type { MatchScoreBand, PrivacySafeTelemetry, PrivacySafeTelemetryEvent } from './resume-tailoring-workflow-ports'
+import type { MatchScoreBand, PrivacySafeTelemetry, PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
 import type { ResumeCorrectionKind } from './resume-editing'
 import { assessResumeLayout, proposeResumeCondensation, acceptResumeCondensation, rejectResumeCondensation } from './resume-condensation'
 import type { ResumeProposalDecision } from './structured-resume-contract'

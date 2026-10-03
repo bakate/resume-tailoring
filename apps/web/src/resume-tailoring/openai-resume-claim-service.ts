@@ -1,8 +1,4 @@
-import type {
-  ResumeClaimSemanticValidator,
-  ResumeClaimWriter,
-  ResumeClaimWritingInputs,
-} from '@resume-tailoring/application/resume-tailoring-workflow-ports'
+import type { ResumeClaimSemanticValidator, ResumeClaimReformulator, ResumeClaimWritingInputs } from '@resume-tailoring/application/resume-claims'
 import { z } from 'zod'
 
 import {
@@ -21,23 +17,23 @@ type OpenAiModelConfiguration = Readonly<{
 
 type OpenAiValidationConfiguration = OpenAiModelConfiguration & Readonly<{
   deadlineSignal?: AbortSignal
-  operation?: 'resume-claim-validation' | 'tailored-resume-pdf-validation'
+  operation?: 'resume-claim-validation'
 }>
 
 type ActiveOpenAiModelConfiguration = Readonly<{
   deadlineSignal?: AbortSignal
   model: string
-  operation: 'resume-claim-validation' | 'resume-claim-writing' | 'tailored-resume-pdf-validation'
+  operation: 'resume-claim-validation' | 'resume-claim-writing'
   reasoningEffort: 'low' | 'medium'
   requester: ReturnType<typeof createOpenAiRequester>
 }>
 
-export function createOpenAiResumeClaimWriter({
+export function createOpenAiResumeClaimReformulator({
   apiKey,
   model,
   reasoningEffort,
   request = fetch,
-}: OpenAiModelConfiguration): ResumeClaimWriter {
+}: OpenAiModelConfiguration): ResumeClaimReformulator {
   const configuration = {
     model,
     operation: 'resume-claim-writing' as const,
@@ -45,7 +41,6 @@ export function createOpenAiResumeClaimWriter({
     requester: createOpenAiRequester({ apiKey, request }),
   }
   return {
-    write: (writingInputs) => writeResumeClaims({ configuration, writingInputs }),
     reformulate: (reformulation) => reformulateResumeClaim({ configuration, reformulation }),
   }
 }
@@ -72,7 +67,7 @@ export function createOpenAiResumeClaimSemanticValidator({
 
 async function reformulateResumeClaim({ configuration, reformulation }: Readonly<{
   configuration: ActiveOpenAiModelConfiguration
-  reformulation: Parameters<ResumeClaimWriter['reformulate']>[0]
+  reformulation: Parameters<ResumeClaimReformulator['reformulate']>[0]
 }>) {
   const { claim, feedback, request: candidateRequest, ...writingInputs } = reformulation
   const result = await writeResumeClaims({
