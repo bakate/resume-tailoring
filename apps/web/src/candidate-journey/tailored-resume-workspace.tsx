@@ -55,7 +55,7 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
         onClick={() => { setEditorOpened(true) }}>{copy.edit}</Button>
         <Button variant="default" onClick={props.onChangeJobPosting}>{copy.changeJobPosting}</Button></Group>
       <MatchAnalysisDisclosure {...props} />
-      <DocumentText document={props.resume} />
+      <DocumentText document={props.resume} locale={props.localization.locale} />
     </Stack>
     <ResumeEditorDialog {...props} {...{ copy, editorOpened }} closeEditor={() => { setEditorOpened(false) }} />
   </Paper>
@@ -133,14 +133,14 @@ function ResumePreview({ resume, title, photoDataUrl }: Readonly<{ resume: Tailo
     srcDoc={renderTailoredResumeDocument({ tailoredResume: resume, photoDataUrl })} />
 }
 
-function CurrentResumePreview({ candidateJourney, condensation, resume, editorOpened, photo, onDownload }: ResumeDocumentProps & Readonly<{
+function CurrentResumePreview({ candidateJourney, condensation, localization, resume, editorOpened, photo, onDownload }: ResumeDocumentProps & Readonly<{
   condensation: ResumePreviewProps['condensation']; editorOpened: boolean; photo: ReturnType<typeof useResumePhoto>; onDownload: () => void
 }>) {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open' || view.resumeReview === null) return null
   const enabled = view.session.preparedResumeStatus !== 'outdated'
     && view.resumeReview.operation === null && (view.operation === null || view.operation === 'rendering-resume-document')
-  return <TailoredResumePreview document={resume} enabled={enabled} paused={editorOpened} photo={photo} condensation={condensation}
+  return <TailoredResumePreview document={resume} locale={localization.locale} enabled={enabled} paused={editorOpened} photo={photo} condensation={condensation}
     unsupportedFieldIds={view.resumeReview.unsupportedFieldIds} renderDocument={candidateJourney.renderResumeDocument}
     onDownload={onDownload} onIdentityChange={(identity) => {
       candidateJourney.updateResumeContacts({ identity, contactDetails: resume.contactDetails }) }} />

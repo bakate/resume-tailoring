@@ -4,6 +4,8 @@ import type { TailoredResume } from '@resume-tailoring/application/tailored-resu
 
 export type ResumePreviewProps = Readonly<{
   document: TailoredResume
+  /** The interface language; the document keeps its own resume language. */
+  locale: TailoredResume['locale']
   enabled?: boolean
   paused: boolean
   photo: ReturnType<typeof useResumePhoto>
@@ -15,7 +17,7 @@ export type ResumePreviewProps = Readonly<{
   onIdentityChange: (identity: TailoredResume['identity']) => void
 }>
 
-type PreviewInput = Omit<ResumePreviewProps, 'condensation' | 'onDownload' | 'onIdentityChange'> & Readonly<{
+type PreviewInput = Omit<ResumePreviewProps, 'condensation' | 'locale' | 'onDownload' | 'onIdentityChange'> & Readonly<{
   attempt: number
 }>
 

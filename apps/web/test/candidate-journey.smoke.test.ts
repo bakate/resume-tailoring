@@ -626,7 +626,7 @@ class CandidateJourneyTestSystem {
       await expect(this.#page.getByRole('status').filter({ hasText: 'PDF handed to your browser' })).toBeVisible()
       await this.#page.getByText('Read the document text', { exact: true }).click()
       await this.#page.setViewportSize({ width: 1280, height: 1800 })
-      await this.#page.locator('[aria-labelledby="tailored-resume-preview-title"]').screenshot({ path: 'test-results/bak-59-preview.png' })
+      await this.#page.getByRole('region', { name: 'Preview and export' }).screenshot({ path: 'test-results/bak-59-preview.png' })
     } finally { await loading.destroy() }
   }
 

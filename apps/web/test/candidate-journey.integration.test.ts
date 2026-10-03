@@ -180,6 +180,15 @@ test.describe('Candidate Journey integration qualification', () => {
     system.expectFrenchResumeDownloaded()
   })
 
+  test('keeps the result page in the interface language when the resume is in French', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGeneratedFrenchPreview()
+
+    await system.waitForPreview()
+
+    await system.expectResultInInterfaceLanguage()
+  })
+
   test('renders the screenshot regression fixture as a grouped document', async ({ page }) => {
     const system = createSystemUnderTest({ page })
     await system.givenGeneratedPreview()
@@ -424,6 +433,8 @@ class CandidateJourneyIntegrationSystem {
     await expect(this.#page).toHaveURL(/\/resume$/u)
     await expect(this.#page.getByRole('region', { name: 'Candidate Journey progress' })).toBeVisible()
     await expect(this.#page.locator('#combined-intake-title')).toHaveCount(0)
+    await expect(this.#page.locator('.sr-only[aria-live="polite"]')).toContainText('Writing')
+    await expect(this.#page.locator('.sr-only[aria-live="polite"]')).not.toContainText('last stable result')
     this.#releaseWriting()
     await this.#expectCurrentPreview()
     await expect(this.#page.getByRole('region', { name: 'Candidate Journey progress' })).toHaveCount(0)
@@ -436,6 +447,15 @@ class CandidateJourneyIntegrationSystem {
     await this.#expectCurrentPreview()
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled({ timeout: 30_000 })
     await expect(this.#page.locator('#combined-intake-title')).toHaveCount(0)
+  }
+
+  async expectResultInInterfaceLanguage() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeVisible()
+    await expect(this.#page.getByRole('textbox', { name: 'Full name', exact: true })).toBeVisible()
+    await expect(this.#page.getByText(/Télécharger|Nom complet|Aperçu et export|Lire le texte/u)).toHaveCount(0)
+    await expect(this.#page.getByRole('heading', { name: 'Preview and export' })).toHaveCount(0)
+    await this.#expectDocumentTextContains('Compétences')
   }
 
   async expectIntakeRoute() {

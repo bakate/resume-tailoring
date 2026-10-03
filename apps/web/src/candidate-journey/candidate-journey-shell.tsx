@@ -277,8 +277,11 @@ LocalizationProps & Readonly<{
   const operation = candidateJourney.view.status === 'candidate-session-open'
     ? candidateJourney.view.operation
     : null
+  // The previous result is only promised to stay visible when there is one.
+  const hasStableResult = candidateJourney.view.status === 'candidate-session-open'
+    && candidateJourney.view.session.tailoredResume !== null
   const operationMessage = operation === null ? null : formatJourneyMessage({
-    template: localization.translate('candidateJourney.operationAnnouncement'),
+    template: localization.translate(hasStableResult ? 'candidateJourney.operationAnnouncement' : 'candidateJourney.firstOperationAnnouncement'),
     value: localization.translate(readOperationKey({ candidateJourney, operation })),
     token: 'operation',
   })

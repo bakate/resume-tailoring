@@ -1,4 +1,4 @@
-import { Avatar, Button, FileButton, Group, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Avatar, Button, FileButton, Group, Stack, Text, TextInput } from '@mantine/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ResumeExportBlocker, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
@@ -17,15 +17,13 @@ type RenderedResumeProps = Readonly<{
 }>
 
 export function TailoredResumePreview(props: ResumePreviewProps) {
-  const messages = resumePreviewMessages[props.document.locale]
+  const messages = resumePreviewMessages[props.locale]
   const [attempt, setAttempt] = useState(0)
   const { photo } = props
   const { current } = useRenderedResume({ ...props, attempt, photo })
   const name = useCandidateNameDraft({ identity: props.document.identity, onCommit: props.onIdentityChange })
   const onRetry = () => { setAttempt((value) => value + 1) }
-  return <section aria-labelledby="tailored-resume-preview-title">
-    <Title id="tailored-resume-preview-title" order={3}>{messages.title}</Title>
-    <Text c="dimmed" mt="xs">{messages.description}</Text>
+  return <section aria-label={messages.title}>
     {current === null ? <Stack><Text role="status">{photo.failed ? messages.photoInvalid : messages.pending}</Text>
       <Button disabled>{messages.download}</Button>
       <CandidateNameField identity={props.document.identity} explain={false} messages={messages} name={name} /></Stack>
@@ -135,8 +133,8 @@ function ResumeDownload({ bytes, messages, onDownload, purpose }: Readonly<{
   </>
 }
 
-export function DocumentText({ document }: Readonly<{ document: TailoredResume }>) {
-  const messages = resumePreviewMessages[document.locale]
+export function DocumentText({ document, locale }: Readonly<{ document: TailoredResume; locale: TailoredResume['locale'] }>) {
+  const messages = resumePreviewMessages[locale]
   return <details><summary>{messages.textVersion}</summary>
     <iframe className="tailored-resume-preview-frame" sandbox="" title={messages.previewTitle}
       srcDoc={renderTailoredResumeDocument({ tailoredResume: document })} />
