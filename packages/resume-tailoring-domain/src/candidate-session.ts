@@ -28,9 +28,13 @@ export type CandidateSession = Readonly<{
   tailoredResume: TailoredResume | null
   resumeEditing?: ResumeEditingState
   resumeFactLocations?: readonly Readonly<{ factId: CandidateFactId; location: ResumeFieldLocation }>[]
+  /** The optional photo shown in the Tailored Resume; browser-local and deleted with the session (ADR-0002). */
+  resumePhoto?: ResumePhoto
   startedAt: number
   version: typeof candidateSessionStorageVersion
 }>
+
+export type ResumePhoto = Readonly<{ dataUrl: string; name: string }>
 
 export function hasValidCandidateSessionLifetime({ session }: Readonly<{
   session: Pick<CandidateSession, 'expiresAt' | 'startedAt'>

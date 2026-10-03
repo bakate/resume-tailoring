@@ -1,4 +1,5 @@
 import {
+  Alert,
   AppShell,
   Badge,
   Box,
@@ -15,7 +16,9 @@ import {
   ThemeIcon,
   Title,
 } from '@mantine/core'
+import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 
 import {
   LocalizationFailure,
@@ -28,21 +31,17 @@ import type { CandidateJourneyPhase } from './candidate-journey-phases'
 import { useCandidateJourney } from './use-candidate-journey'
 import { CombinedIntakeWorkspace } from './combined-intake-workspace'
 import { SourceIntakeWorkspace } from './source-intake-workspace'
-import { JobMatchWorkspace } from './job-match-workspace'
-import { TailoredResumeWorkspace } from './tailored-resume-workspace'
-import { ResumeSectionsPreview } from './resume-sections-preview'
+import type { CandidateJourneyController } from './use-candidate-journey'
 
-export function CandidateJourneyShell() {
+/** The chrome both Candidate Journey routes share: header, skip link and live announcements. */
+export function CandidateJourneyShell({ children }: Readonly<{ children: ReactNode }>) {
   const localizationResult = useLocalization()
   if (!localizationResult.ok) return <LocalizationFailure />
-  return <LocalizedCandidateJourneyShell localization={localizationResult.value} />
+  return <LocalizedCandidateJourneyShell localization={localizationResult.value}>{children}</LocalizedCandidateJourneyShell>
 }
 
-function LocalizedCandidateJourneyShell({ localization }: LocalizationProps) {
+function LocalizedCandidateJourneyShell({ children, localization }: LocalizationProps & Readonly<{ children: ReactNode }>) {
   const candidateJourney = useCandidateJourney()
-  const activePhase = candidateJourney.view.status === 'candidate-session-open'
-    ? candidateJourney.view.session.phase
-    : null
   return (
     <AppShell className="candidate-journey-app" header={{ height: 76 }} padding={{ base: 'sm', sm: 'xl' }}>
       <a className="skip-link" href="#main-content">
@@ -50,44 +49,75 @@ function LocalizedCandidateJourneyShell({ localization }: LocalizationProps) {
       </a>
       <CandidateJourneyHeader localization={localization} />
       <AppShell.Main id="main-content"><Container size="xl"><Stack gap="xl">
-        <CandidateJourneyIntroduction {...{ candidateJourney, localization }} />
-        <CandidateJourneyStatusAnnouncements {...{ activePhase, candidateJourney, localization }} />
-        <CandidateJourneyProgress {...{ candidateJourney, localization }} />
-        <ResumeSectionsPreview {...{ candidateJourney, localization }} />
-        <TailoredResumeWorkspace {...{ candidateJourney, localization }} />
-        <CombinedIntakeWorkspace {...{ candidateJourney, localization }} />
-        <ResultDisclosures {...{ candidateJourney, localization }} />
-        <CandidateJourneyPhaseList {...{ activePhase, localization }} />
+        <CandidateJourneyStatusAnnouncements {...{ activePhase: readActivePhase(candidateJourney), candidateJourney, localization }} />
+        {children}
       </Stack></Container></AppShell.Main>
     </AppShell>
   )
 }
 
-type LocalizationProps = Readonly<{ localization: Localization }>
-type CandidateJourneyController = ReturnType<typeof useCandidateJourney>
+/** `/`: the introduction, the intake, the source evidence and the phases; the result lives on `/resume`. */
+export function CandidateIntakePage() {
+  const localizationResult = useLocalization()
+  if (!localizationResult.ok) return <LocalizationFailure />
+  const localization = localizationResult.value
+  return <CandidateIntake localization={localization} />
+}
 
-function ResultDisclosures({ candidateJourney, localization }: LocalizationProps & Readonly<{
-  candidateJourney: CandidateJourneyController
-}>) {
+function CandidateIntake({ localization }: LocalizationProps) {
+  const candidateJourney = useCandidateJourney()
+  return <>
+    <CandidateJourneyIntroduction {...{ candidateJourney, localization }} />
+    {isResultOperation(candidateJourney) ? null : <CandidateJourneyProgress {...{ candidateJourney, localization }} />}
+    <LatestResumeBanner {...{ candidateJourney, localization }} />
+    <CombinedIntakeWorkspace {...{ candidateJourney, localization }} />
+    <SourceEvidenceDisclosure {...{ candidateJourney, localization }} />
+    <CandidateJourneyPhaseList {...{ activePhase: readActivePhase(candidateJourney), localization }} />
+  </>
+}
+
+type LocalizationProps = Readonly<{ localization: Localization }>
+type CandidateJourneyProps = LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>
+
+function readActivePhase({ view }: CandidateJourneyController) {
+  return view.status === 'candidate-session-open' ? view.session.phase : null
+}
+
+/** Preparing and rendering the Tailored Resume are shown on `/resume`, not on the intake. */
+export function isResultOperation({ view }: CandidateJourneyController) {
+  return view.status === 'candidate-session-open'
+    && (view.operation === 'preparing-tailored-resume' || view.operation === 'rendering-resume-document')
+}
+
+/** Links back to the result without redirecting, so the Candidate can still change their documents. */
+function LatestResumeBanner({ candidateJourney, localization }: CandidateJourneyProps) {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open') return null
-  const { preparation } = view.session
-  const sourceIntake = preparation?.sourceIntake ?? view.session.sourceIntake
-  const jobMatch = preparation?.jobMatch ?? view.session.jobMatch
-  return <>
-    {sourceIntake === null || jobMatch === null ? null
-      : <details><summary>{localization.translate('combinedIntake.analysis')}</summary>
-        <JobMatchWorkspace {...{ candidateJourney, localization }} /></details>}
-    {sourceIntake === null ? null
-      : <details><summary>{localization.translate('combinedIntake.inspection')}</summary>
-        <SourceIntakeWorkspace {...{ candidateJourney, localization }} /></details>}
-  </>
+  const preparing = view.operation === 'preparing-tailored-resume'
+  if (!preparing && view.session.tailoredResume === null) return null
+  return <Alert color="forest" variant="light">
+    <Group justify="space-between" wrap="wrap">
+      <Text fw={600}>{localization.translate(preparing ? 'resultBanner.preparing' : 'resultBanner.ready')}</Text>
+      <Button component={Link} to="/resume" variant="light" rightSection={<span aria-hidden="true">→</span>}>
+        {localization.translate('resultBanner.view')}
+      </Button>
+    </Group>
+  </Alert>
+}
+
+function SourceEvidenceDisclosure({ candidateJourney, localization }: CandidateJourneyProps) {
+  const { view } = candidateJourney
+  if (view.status !== 'candidate-session-open') return null
+  const sourceIntake = view.session.preparation?.sourceIntake ?? view.session.sourceIntake
+  if (sourceIntake === null) return null
+  return <details><summary>{localization.translate('combinedIntake.inspection')}</summary>
+    <SourceIntakeWorkspace {...{ candidateJourney, localization }} /></details>
 }
 
 function CandidateJourneyHeader({ localization }: LocalizationProps) {
   return (
     <AppShell.Header><Container h="100%" size="xl"><Group className="candidate-journey-header" h="100%" justify="space-between" wrap="wrap">
-      <Text fw={700} size="lg">{localization.translate('brand.name')}</Text>
+      <Text className="candidate-journey-brand" component={Link} to="/" fw={700} size="lg">{localization.translate('brand.name')}</Text>
       <Group gap="sm" wrap="wrap">
         <Badge color="forest" variant="light">
           {localization.translate('candidateJourney.privateByDesign')}
@@ -259,7 +289,7 @@ LocalizationProps & Readonly<{
   </div>
 }
 
-function CandidateJourneyProgress({ candidateJourney, localization }:
+export function CandidateJourneyProgress({ candidateJourney, localization }:
 LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) {
   if (candidateJourney.view.status !== 'candidate-session-open'
     || candidateJourney.view.operation === null) return null

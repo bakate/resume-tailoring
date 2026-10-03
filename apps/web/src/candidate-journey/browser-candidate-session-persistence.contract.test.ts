@@ -62,6 +62,24 @@ describe('browser Candidate Session persistence', () => {
     })
   })
 
+  it('restores the resume photo kept in the Candidate Session', () => {
+    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage() })
+    const session = { ...candidateSession, resumePhoto: { dataUrl: 'data:image/png;base64,iVBORw0KGgo=', name: 'portrait.png' } }
+    persistence.save({ session })
+
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session } })
+  })
+
+  it('discards a stored resume photo that is not an image', () => {
+    const storage = createMemoryStorage({ initialValue: JSON.stringify({ ...candidateSession,
+      resumePhoto: { dataUrl: 'data:text/html;base64,PHNjcmlwdD4=', name: 'portrait.png' } }) })
+    const persistence = createBrowserCandidateSessionPersistence({ storage })
+
+    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
+      ok: true, value: { notice: 'incompatible-session-discarded', session: null },
+    })
+  })
+
   it('explicitly discards the previous flat document version', () => {
     const storage = createMemoryStorage({ initialValue: JSON.stringify({ ...candidateSession, version: 5 }) })
     const persistence = createBrowserCandidateSessionPersistence({ storage })

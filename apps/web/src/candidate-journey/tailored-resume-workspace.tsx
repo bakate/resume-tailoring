@@ -6,7 +6,9 @@ import type { TailoredResume } from '@resume-tailoring/application/tailored-resu
 import type { Localization } from '../localization/localization'
 import type { useCandidateJourney } from './use-candidate-journey'
 import { useResumePhoto } from './use-resume-preview'
-import { TailoredResumePreview } from './tailored-resume-preview'
+import type { ResumePreviewProps } from './use-resume-preview'
+import { DocumentText, TailoredResumePreview } from './tailored-resume-preview'
+import { JobMatchWorkspace } from './job-match-workspace'
 import { renderTailoredResumeDocument } from './tailored-resume-document'
 import { ResumeEditor } from './resume-editor'
 import { resumeReviewCopy } from './resume-review-copy'
@@ -15,16 +17,21 @@ import type { ResumeReviewCopy } from './resume-review-copy'
 export type ResumeReviewController = ReturnType<typeof useCandidateJourney>
 export type ResumeReviewProps = Readonly<{ candidateJourney: ResumeReviewController; localization: Localization }>
 
-export function TailoredResumeWorkspace({ candidateJourney, localization }: ResumeReviewProps) {
+export function TailoredResumeWorkspace({ candidateJourney, localization, onChangeJobPosting }: ResumeReviewProps & Readonly<{
+  onChangeJobPosting: () => void
+}>) {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open' || view.resumeReview === null) return null
-  return <ResumeReview {...{ candidateJourney, localization }} resume={view.resumeReview.draft.document} />
+  return <ResumeReview {...{ candidateJourney, localization, onChangeJobPosting }} resume={view.resumeReview.draft.document} />
 }
 
 type ResumeDocumentProps = ResumeReviewProps & Readonly<{ resume: TailoredResume }>
 
-function ResumeReview(props: ResumeDocumentProps) {
-  const photo = useResumePhoto()
+/** Preview and Download first, then the name, then the secondary actions (ADR-0016). */
+function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting: () => void }>) {
+  const { view } = props.candidateJourney
+  const photo = useResumePhoto({ photo: view.status === 'candidate-session-open' ? view.session.resumePhoto ?? null : null,
+    onChange: props.candidateJourney.updateResumePhoto })
   const [proposalPhoto, setProposalPhoto] = useState<string | undefined>(undefined)
   const [editorOpened, setEditorOpened] = useState(false)
   const [downloadedRevision, setDownloadedRevision] = useState<string | null>(null)
@@ -36,14 +43,19 @@ function ResumeReview(props: ResumeDocumentProps) {
       <PreparationStatus {...props} />
       <div><Title id="tailored-resume-title" order={2}>{copy.preview}</Title><Text c="dimmed">{copy.description}</Text></div>
       <CurrentResumePreview {...props} {...{ editorOpened, photo }} onDownload={() => {
-        props.candidateJourney.recordResumeDownload(); setDownloadedRevision(revision) }} />
+        props.candidateJourney.recordResumeDownload(); setDownloadedRevision(revision) }}
+        condensation={{ label: copy.condense, disabled: !canCondense({ candidateJourney: props.candidateJourney, photo }),
+          propose: () => { setProposalPhoto(photo.dataUrl); void props.candidateJourney.proposeResumeCondensation({ photoDataUrl: photo.dataUrl }) } }} />
       {downloadedRevision !== null && downloadedRevision === revision
         ? <UsabilityFeedback key={downloadedRevision} candidateJourney={props.candidateJourney} copy={copy} /> : null}
-      <Group><Button disabled={props.candidateJourney.view.status === 'candidate-session-open' && props.candidateJourney.view.operation !== null} onClick={() => { setEditorOpened(true) }}>{copy.edit}</Button>
-        <ReviewActions candidateJourney={props.candidateJourney} copy={copy} photo={photo} onProposalRequested={setProposalPhoto} /></Group>
       <ReviewStatus candidateJourney={props.candidateJourney} copy={copy} />
       <CondensationProposal {...props} copy={copy} photoDataUrl={photo.dataUrl}
         proposalLayoutCurrent={photo.ready && !photo.failed && proposalPhoto === photo.dataUrl} />
+      <Group><Button variant="default" disabled={view.status === 'candidate-session-open' && view.operation !== null}
+        onClick={() => { setEditorOpened(true) }}>{copy.edit}</Button>
+        <Button variant="default" onClick={props.onChangeJobPosting}>{copy.changeJobPosting}</Button></Group>
+      <MatchAnalysisDisclosure {...props} />
+      <DocumentText document={props.resume} />
     </Stack>
     <ResumeEditorDialog {...props} {...{ copy, editorOpened }} closeEditor={() => { setEditorOpened(false) }} />
   </Paper>
@@ -68,15 +80,21 @@ function ResumeEditorDialog(props: ResumeDocumentProps & Readonly<{
   </Modal>
 }
 
-function ReviewActions({ candidateJourney, copy, photo, onProposalRequested }: Readonly<{
-  candidateJourney: ResumeReviewController; copy: ResumeReviewCopy; photo: ReturnType<typeof useResumePhoto>
-  onProposalRequested: (photoDataUrl: string | undefined) => void
+function canCondense({ candidateJourney, photo }: Readonly<{
+  candidateJourney: ResumeReviewController; photo: ReturnType<typeof useResumePhoto>
 }>) {
-  const review = candidateJourney.view.status === 'candidate-session-open' ? candidateJourney.view.resumeReview : null
-  const busy = !photo.ready || photo.failed || review?.operation !== null || (candidateJourney.view.status === 'candidate-session-open' && candidateJourney.view.operation !== null)
-  return <><Button variant="default" disabled={busy} onClick={() => { onProposalRequested(photo.dataUrl); void candidateJourney.proposeResumeCondensation({ photoDataUrl: photo.dataUrl }) }}>
-    {copy.condense}</Button><Button variant="default" disabled={busy} onClick={() => { void candidateJourney.assessResumeLayout({ photoDataUrl: photo.dataUrl }) }}>
-    {copy.checkLayout}</Button></>
+  const { view } = candidateJourney
+  return photo.ready && !photo.failed && view.status === 'candidate-session-open'
+    && view.resumeReview?.operation === null && view.operation === null
+}
+
+function MatchAnalysisDisclosure({ candidateJourney, localization }: ResumeReviewProps) {
+  const { view } = candidateJourney
+  if (view.status !== 'candidate-session-open') return null
+  const { preparation } = view.session
+  if ((preparation?.sourceIntake ?? view.session.sourceIntake) === null || (preparation?.jobMatch ?? view.session.jobMatch) === null) return null
+  return <details><summary>{localization.translate('combinedIntake.analysis')}</summary>
+    <JobMatchWorkspace {...{ candidateJourney, localization }} /></details>
 }
 
 function ReviewStatus({ candidateJourney, copy }: Readonly<{ candidateJourney: ResumeReviewController; copy: ResumeReviewCopy }>) {
@@ -115,14 +133,14 @@ function ResumePreview({ resume, title, photoDataUrl }: Readonly<{ resume: Tailo
     srcDoc={renderTailoredResumeDocument({ tailoredResume: resume, photoDataUrl })} />
 }
 
-function CurrentResumePreview({ candidateJourney, resume, editorOpened, photo, onDownload }: ResumeDocumentProps & Readonly<{
-  editorOpened: boolean; photo: ReturnType<typeof useResumePhoto>; onDownload: () => void
+function CurrentResumePreview({ candidateJourney, condensation, resume, editorOpened, photo, onDownload }: ResumeDocumentProps & Readonly<{
+  condensation: ResumePreviewProps['condensation']; editorOpened: boolean; photo: ReturnType<typeof useResumePhoto>; onDownload: () => void
 }>) {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open' || view.resumeReview === null) return null
   const enabled = view.session.preparedResumeStatus !== 'outdated'
     && view.resumeReview.operation === null && (view.operation === null || view.operation === 'rendering-resume-document')
-  return <TailoredResumePreview document={resume} enabled={enabled} paused={editorOpened} photo={photo}
+  return <TailoredResumePreview document={resume} enabled={enabled} paused={editorOpened} photo={photo} condensation={condensation}
     unsupportedFieldIds={view.resumeReview.unsupportedFieldIds} renderDocument={candidateJourney.renderResumeDocument}
     onDownload={onDownload} onIdentityChange={(identity) => {
       candidateJourney.updateResumeContacts({ identity, contactDetails: resume.contactDetails }) }} />

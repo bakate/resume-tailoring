@@ -13,7 +13,7 @@ type PreviewMessages = typeof resumePreviewMessages['en'] | typeof resumePreview
 type CandidateNameDraft = ReturnType<typeof useCandidateNameDraft>
 type RenderedResumeProps = Readonly<{
   current: ResumeRenderResult; document: TailoredResume; messages: PreviewMessages; name: CandidateNameDraft
-  onDownload: () => void; onRetry: () => void; paused: boolean
+  condensation?: ResumePreviewProps['condensation']; onDownload: () => void; onRetry: () => void; paused: boolean
 }>
 
 export function TailoredResumePreview(props: ResumePreviewProps) {
@@ -26,17 +26,16 @@ export function TailoredResumePreview(props: ResumePreviewProps) {
   return <section aria-labelledby="tailored-resume-preview-title">
     <Title id="tailored-resume-preview-title" order={3}>{messages.title}</Title>
     <Text c="dimmed" mt="xs">{messages.description}</Text>
-    <PhotoPicker photo={photo} messages={messages} disabled={props.enabled === false} />
     {current === null ? <Stack><Text role="status">{photo.failed ? messages.photoInvalid : messages.pending}</Text>
-      <CandidateNameField identity={props.document.identity} explain={false} messages={messages} name={name} />
-      <Button disabled>{messages.download}</Button></Stack>
+      <Button disabled>{messages.download}</Button>
+      <CandidateNameField identity={props.document.identity} explain={false} messages={messages} name={name} /></Stack>
       : current.assessment.layout.status === 'unavailable' ? <RenderFailure {...{ messages, onRetry }} />
         : <RenderedResume key={current.assessment.layout.revision} {...{ ...props, current, messages, name, onRetry }} />}
-    <DocumentText {...{ document: props.document, messages }} />
+    <PhotoPicker photo={photo} messages={messages} disabled={props.enabled === false} />
   </section>
 }
 
-function RenderedResume({ current, document, messages, name, onDownload, onRetry, paused }: RenderedResumeProps) {
+function RenderedResume({ condensation, current, document, messages, name, onDownload, onRetry, paused }: RenderedResumeProps) {
   const [preview, setPreview] = useState<'pending' | 'ready' | 'failed'>('pending')
   const ready = useCallback(() => { setPreview('ready') }, [])
   const failed = useCallback(() => { setPreview('failed') }, [])
@@ -47,8 +46,10 @@ function RenderedResume({ current, document, messages, name, onDownload, onRetry
     {blocker === null || blocker === 'missing-identity' ? null : <Text role="alert" c="danger.8">{messages[blocker]}</Text>}
     {current.pdf === null ? null : <ResumePdfPages bytes={current.pdf} onReady={ready} onFailure={failed} pageLabel={messages.page} />}
     {preview === 'failed' ? <RenderFailure {...{ messages, onRetry }} /> : null}
-    <CandidateNameField identity={document.identity} explain={blocker === 'missing-identity'} messages={messages} name={name} />
+    {eligibility.status === 'blocked' && eligibility.reasons.includes('overflow') && condensation !== undefined
+      ? <Button disabled={condensation.disabled} onClick={condensation.propose}>{condensation.label}</Button> : null}
     <ResumeDownload {...{ bytes, messages, onDownload, purpose: document.purpose }} />
+    <CandidateNameField identity={document.identity} explain={blocker === 'missing-identity'} messages={messages} name={name} />
   </Stack>
 }
 
@@ -94,7 +95,7 @@ function CandidateNameField({ identity, explain, messages, name }: Readonly<{
 function PhotoPicker({ disabled, messages, photo }: Readonly<{
   disabled: boolean; messages: PreviewMessages; photo: ResumePreviewProps['photo']
 }>) {
-  const chosen = photo.file !== null
+  const chosen = photo.name !== null
   return <div role="group" aria-labelledby="resume-photo-label"><Stack gap={6} mt="sm">
     <Text id="resume-photo-label" fw={600} size="sm">{messages.photo}</Text>
     <Group gap="md" wrap="nowrap">
@@ -108,7 +109,7 @@ function PhotoPicker({ disabled, messages, photo }: Readonly<{
             {messages.photoRemove}</Button> : null}
         </Group>
         <Text c={photo.failed ? 'danger.8' : 'dimmed'} role={photo.failed ? 'alert' : undefined} size="xs">
-          {photo.failed ? messages.photoInvalid : chosen ? photo.file?.name : messages.photoHint}</Text>
+          {photo.failed ? messages.photoInvalid : photo.name ?? messages.photoHint}</Text>
       </Stack>
     </Group>
   </Stack></div>
@@ -134,7 +135,8 @@ function ResumeDownload({ bytes, messages, onDownload, purpose }: Readonly<{
   </>
 }
 
-function DocumentText({ document, messages }: Readonly<{ document: TailoredResume; messages: PreviewMessages }>) {
+export function DocumentText({ document }: Readonly<{ document: TailoredResume }>) {
+  const messages = resumePreviewMessages[document.locale]
   return <details><summary>{messages.textVersion}</summary>
     <iframe className="tailored-resume-preview-frame" sandbox="" title={messages.previewTitle}
       srcDoc={renderTailoredResumeDocument({ tailoredResume: document })} />

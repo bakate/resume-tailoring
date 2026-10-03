@@ -427,7 +427,14 @@ class CandidateJourneyTestSystem {
 
   async generateResume() {
     await this.#page.getByRole('button', { name: 'Generate my resume', exact: true }).click()
+    await expect(this.#page).toHaveURL(/\/resume$/u)
+    await expect(this.#page.locator('#combined-intake-title')).toHaveCount(0)
     this.#completedAction = 'generated'
+  }
+
+  async #returnToDocuments() {
+    await this.#page.getByRole('link', { name: 'Honest Resume', exact: true }).click()
+    await expect(this.#page).toHaveURL(/\/$/u)
   }
 
   async givenStablePreview() {
@@ -462,6 +469,7 @@ class CandidateJourneyTestSystem {
     await this.#page.route('**/api/resume-section-writing', (route) => route.fulfill({ json: { ok: false, error: { type: 'permanent' } } }))
     await this.generateResume()
     await expect(this.#page.getByText('Preparation could not finish.', { exact: false }).first()).toBeVisible()
+    await this.#page.getByRole('button', { name: 'Back to my documents', exact: true }).click()
     await this.#page.getByText('Inspect or enrich your source evidence', { exact: true }).click()
     await this.#page.unroute('**/api/resume-section-writing')
     await this.#installModelAdapters()
@@ -484,12 +492,14 @@ class CandidateJourneyTestSystem {
   }
 
   async inspectSourceProfile() {
+    await this.#page.getByRole('button', { name: 'Back to my documents', exact: true }).click()
     await this.#page.getByText('Inspect or enrich your source evidence', { exact: true }).click()
     await this.#page.getByRole('button', { name: 'Inspect Source Profile', exact: true }).click()
     this.#completedAction = 'inspected'
   }
 
   async replacePosting() {
+    await this.#returnToDocuments()
     await this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true }).fill('Rust engineer. Rust is required.')
     this.#completedAction = 'posting-replaced'
   }
@@ -534,6 +544,7 @@ class CandidateJourneyTestSystem {
 
   async regenerateWithUnavailableWriter() {
     this.#scenario = 'unavailable'
+    await this.#returnToDocuments()
     await this.#page.getByRole('button', { name: 'Generate my resume', exact: true }).click()
     await expect(this.#page.getByRole('dialog')).toContainText('including manual edits')
     await this.#page.getByRole('button', { name: 'Replace and regenerate' }).click()
@@ -729,6 +740,8 @@ class CandidateJourneyTestSystem {
 
   async restoreAndDeleteSession() {
     await this.#page.reload()
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeVisible()
+    await this.#returnToDocuments()
     await expect(this.#page.getByText(/^Processed by .+, with nothing stored on our servers.$/)).toBeVisible()
     await this.#page.getByRole('button', { name: 'Delete Candidate Session' }).click()
     await this.#page.getByRole('button', { name: 'Delete session now' }).click()
@@ -896,6 +909,8 @@ class CandidateJourneyTestSystem {
   async expectIntakeLockedDuringPreparation() {
     this.#expectAction()
     await expect(this.#page.getByRole('region', { name: 'Candidate Journey progress' })).toBeVisible()
+    await this.#page.goBack()
+    await expect(this.#page.getByText('Your resume is being prepared', { exact: true })).toBeVisible()
     await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toBeDisabled()
     await expect(this.#page.getByRole('combobox', { name: 'Resume language', exact: true })).toBeDisabled()
   }

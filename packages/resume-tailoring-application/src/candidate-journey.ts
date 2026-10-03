@@ -38,6 +38,7 @@ import {
 import type {
   CandidateSession,
   CandidateJourneyPhase,
+  ResumePhoto,
   ResumeSectionSnapshot,
 } from '@resume-tailoring/domain/candidate-session'
 import { hasProcessingConsentForPolicy } from '@resume-tailoring/domain/processing-policy'
@@ -74,7 +75,7 @@ export {
   hasValidCandidateSessionLifetime,
 } from '@resume-tailoring/domain/candidate-session'
 export type { CandidateJourneyPhase, CandidateSession }
-export type { StoredIntakeDocument, ResumePreparationFailure, ResumeSectionSnapshot } from '@resume-tailoring/domain/candidate-session'
+export type { StoredIntakeDocument, ResumePhoto, ResumePreparationFailure, ResumeSectionSnapshot } from '@resume-tailoring/domain/candidate-session'
 
 export type CandidateSessionNotice =
   | 'deleted'
@@ -153,6 +154,8 @@ type CandidateJourneyEvent =
   | Readonly<{ type: 'SAVE_RESUME'; session: CandidateSession; baseRevision: string; correctionKind?: ResumeCorrectionKind }>
   | Readonly<{ type: 'REPORT_RESUME'; review: ResumeReviewState; baseRevision: string }>
   | Readonly<{ type: 'UPDATE_RESUME_CONTACTS'; contacts: ResumeContacts }>
+  | Readonly<{ type: 'UPDATE_RESUME_PHOTO'; photo: ResumePhoto | null }>
+  | Readonly<{ type: 'CHANGE_JOB_POSTING' }>
   | Readonly<{ type: 'DELETE_CANDIDATE_SESSION' }>
   | Readonly<{ type: 'GRANT_PROCESSING_CONSENT' }>
   | Readonly<{
@@ -212,6 +215,9 @@ export type CandidateJourney = Readonly<{
   applyValidatedSectionChange: (change: ResumeSectionChange) => Promise<void>
   editResumeField: (request: Readonly<{ fieldId: string; text: string }>) => Promise<void>
   updateResumeContacts: (contacts: ResumeContacts) => void
+  updateResumePhoto: (photo: ResumePhoto | null) => void
+  /** Forgets the Job Posting to restore in the intake; the Source Profile and the current result stay. */
+  changeJobPosting: () => void
   confirmProfileEnrichment: (request: Readonly<{
     kind: ProfileEnrichmentFactKind
     requirementId: JobRequirementId
@@ -508,6 +514,21 @@ function invalidateResumeInputs({ session, dependencies }: CandidateJourneyConte
   return next
 }
 
+function withResumePhoto({ session, photo }: Readonly<{ session: CandidateSession; photo: ResumePhoto | null }>): CandidateSession {
+  if (photo !== null) return { ...session, resumePhoto: photo }
+  const { resumePhoto, ...withoutPhoto } = session
+  return resumePhoto === undefined ? session : withoutPhoto
+}
+
+/** Persists a change that leaves the Tailored Resume itself untouched, so the current review and rendering stay. */
+function saveSessionChange({ context, change }: Readonly<{
+  context: CandidateJourneyContext; change: (session: CandidateSession) => CandidateSession
+}>): Partial<CandidateJourneyContext> {
+  if (context.session === null) return {}
+  const result = context.dependencies.persistence.save({ session: change(context.session) })
+  return result.ok ? { session: result.value } : { resumeReview: { ...context.resumeReview, failure: unavailableResumeResult } }
+}
+
 const candidateJourneyMachine = setup({
   actors: {
     generateApplicationResume,
@@ -617,6 +638,10 @@ const candidateJourneyMachine = setup({
               : { resumeRendering: null, resumeReview: { ...emptyResumeReview, failure: unavailableResumeResult } }
           }),
         },
+        UPDATE_RESUME_PHOTO: { actions: assign(({ context, event }) => saveSessionChange({ context,
+          change: (session) => withResumePhoto({ session, photo: event.photo }) })) },
+        CHANGE_JOB_POSTING: { actions: assign(({ context }) => saveSessionChange({ context, change: (session) =>
+          session.preparation === undefined ? session : { ...session, preparation: { ...session.preparation, jobPosting: null } } })) },
         CONFIRM_PROFILE_ENRICHMENT: {
           actions: assign({ profileEnrichmentFailure: null }),
           target: 'processingProfileEnrichment',
@@ -963,6 +988,8 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     applyValidatedSectionChange: (change) => applyValidatedSectionChange({ access: editingAccess, change }),
     editResumeField: (request) => editResumeField({ access: editingAccess, ...request }),
     updateResumeContacts: (contacts) => { actor.send({ type: 'UPDATE_RESUME_CONTACTS', contacts }) },
+    updateResumePhoto: (photo) => { actor.send({ type: 'UPDATE_RESUME_PHOTO', photo }) },
+    changeJobPosting: () => { actor.send({ type: 'CHANGE_JOB_POSTING' }) },
     confirmProfileEnrichment: ({ kind, requirementId, value }) => {
       actor.send({ type: 'CONFIRM_PROFILE_ENRICHMENT', kind, requirementId, value })
     },

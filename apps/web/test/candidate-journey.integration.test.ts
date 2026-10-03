@@ -146,8 +146,9 @@ test.describe('Candidate Journey integration qualification', () => {
   test('blocks the previous result when the Job Posting changes', async ({ page }) => {
     const system = createSystemUnderTest({ page })
     await system.givenGeneratedPreview()
-
     await system.replaceJobPosting()
+
+    await system.viewLatestResume()
 
     await system.expectPreviousResultOutdated()
   })
@@ -188,6 +189,78 @@ test.describe('Candidate Journey integration qualification', () => {
     await system.expectScreenshotRegressionsAbsent()
   })
 
+  test('shows the preparation progress and then the preview on the dedicated result route', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenConsentedIntake()
+
+    await system.generateWhileSectionWritingIsHeld()
+
+    await system.expectProgressThenPreviewOnResultRoute()
+  })
+
+  test('restores the result after reloading the result route', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGeneratedPreview()
+
+    await system.reloadResultRoute()
+
+    await system.expectRestoredResultRoute()
+  })
+
+  test('sends a visit to the result route without a result to the intake', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    await system.visitResultRouteWithoutSession()
+
+    await system.expectIntakeRoute()
+  })
+
+  test('links the intake to the latest resume without leaving it', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGeneratedPreview()
+
+    await system.returnToIntakeAndViewLatestResume()
+
+    await system.expectRestoredResultRoute()
+  })
+
+  test('keeps the analyzed resume and clears the Job Posting when changing the job posting', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGeneratedPreview()
+
+    await system.changeJobPostingAndReload()
+
+    await system.expectIntakeWithAnalyzedResumeAndNoPosting()
+  })
+
+  test('keeps the resume photo after reloading the result route', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGeneratedPreview()
+    await system.givenResumePhotoChosen()
+
+    await system.reloadResultRoute()
+
+    await system.expectResumePhotoKept()
+  })
+
+  test('offers condensation only when the resume overflows', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGeneratedResume()
+
+    await system.waitForPreview()
+
+    await system.expectNoPageCountOrCondensationAction()
+  })
+
+  test('offers a way back to the documents after a failed preparation', async ({ page }) => {
+    const system = createSystemUnderTest({ page, sourceExtraction: 'unavailable' })
+    await system.givenConsentedIntake()
+
+    await system.generateAndGoBackToDocuments()
+
+    await system.expectIntakeWithDocumentsKept()
+  })
+
   test('operates the journey by keyboard with announcements and reduced motion', async ({ page }) => {
     const system = createSystemUnderTest({ page })
     await system.givenReducedMotionIntake()
@@ -212,20 +285,22 @@ test.describe('Candidate Journey mobile integration', () => {
   })
 })
 
-function createSystemUnderTest({ page, source = 'standard', condensation = 'shorter' }: Readonly<{
-  page: Page; source?: SourceScenario; condensation?: CondensationScenario
+function createSystemUnderTest({ page, source = 'standard', condensation = 'shorter', sourceExtraction = 'available' }: Readonly<{
+  page: Page; source?: SourceScenario; condensation?: CondensationScenario; sourceExtraction?: SourceExtractionScenario
 }>) {
-  return new CandidateJourneyIntegrationSystem({ page, source, condensation })
+  return new CandidateJourneyIntegrationSystem({ page, source, condensation, sourceExtraction })
 }
 
 type SourceScenario = 'standard' | 'dense' | 'unnamed'
 type CondensationScenario = 'shorter' | 'insufficient' | 'unavailable'
+type SourceExtractionScenario = 'available' | 'unavailable'
 type AnalyticsEvent = Readonly<Record<string, unknown>>
 
 class CandidateJourneyIntegrationSystem {
   readonly #page: Page
   readonly #source: SourceScenario
   readonly #condensation: CondensationScenario
+  readonly #sourceExtraction: SourceExtractionScenario
   readonly #errors: string[] = []
   readonly #analytics: AnalyticsEvent[] = []
   readonly #modelRequests: string[] = []
@@ -235,9 +310,12 @@ class CandidateJourneyIntegrationSystem {
   #pdfPageCount = 0
   #completedAction: string | null = null
   #rendersBeforeAction = 0
+  #releaseWriting: () => void = () => undefined
 
-  constructor({ page, source, condensation }: Readonly<{ page: Page; source: SourceScenario; condensation: CondensationScenario }>) {
-    this.#page = page; this.#source = source; this.#condensation = condensation
+  constructor({ page, source, condensation, sourceExtraction }: Readonly<{
+    page: Page; source: SourceScenario; condensation: CondensationScenario; sourceExtraction: SourceExtractionScenario
+  }>) {
+    this.#page = page; this.#source = source; this.#condensation = condensation; this.#sourceExtraction = sourceExtraction
     page.on('pageerror', (error) => { this.#errors.push(error.message) })
     page.on('request', (request) => { this.#recordModelRequest(request) })
   }
@@ -283,6 +361,117 @@ class CandidateJourneyIntegrationSystem {
     await this.#page.getByRole('button', { name: 'Start a Candidate Session' }).focus()
     await this.#page.keyboard.press('Enter')
     await this.#fillIntake()
+  }
+
+  async givenConsentedIntake() {
+    await this.#openConsentedIntake()
+  }
+
+  async generateWhileSectionWritingIsHeld() {
+    const held = new Promise<void>((resolve) => { this.#releaseWriting = resolve })
+    await this.#page.route('**/api/resume-section-writing', (route) => held.then(() => route.fallback()))
+    await this.#generate()
+    this.#completedAction = 'generated-while-writing-held'
+  }
+
+  async reloadResultRoute() {
+    await expect(this.#page).toHaveURL(/\/resume$/u)
+    await this.#page.reload()
+    this.#completedAction = 'result-reloaded'
+  }
+
+  async visitResultRouteWithoutSession() {
+    await this.#installModelAdapters()
+    await this.#page.goto('/resume')
+    this.#completedAction = 'result-visited-without-session'
+  }
+
+  async returnToIntakeAndViewLatestResume() {
+    await this.#page.goBack()
+    await expect(this.#page).toHaveURL(/\/$/u)
+    await expect(this.#page.getByText('Your latest resume is ready', { exact: true })).toBeVisible()
+    await this.#page.getByRole('link', { name: 'View', exact: true }).click()
+    this.#completedAction = 'latest-resume-viewed'
+  }
+
+  async changeJobPosting() {
+    await this.#page.getByRole('button', { name: 'Change job posting', exact: true }).click()
+    this.#completedAction = 'job-posting-changed'
+  }
+
+  async changeJobPostingAndReload() {
+    await this.changeJobPosting()
+    await expect(this.#page).toHaveURL(/\/$/u)
+    await this.#page.reload()
+  }
+
+  async givenResumePhotoChosen() {
+    await this.#page.locator('input[type="file"][accept^="image/"]').setInputFiles({ name: 'portrait.png', mimeType: 'image/png',
+      buffer: Buffer.from(onePixelPng, 'base64') })
+    await expect(this.#page.getByText('portrait.png', { exact: true })).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled({ timeout: 30_000 })
+  }
+
+  async generateAndGoBackToDocuments() {
+    await this.#generate()
+    await expect(this.#page).toHaveURL(/\/resume$/u)
+    await this.#page.getByRole('alert').getByRole('button', { name: 'Back to my documents', exact: true }).click()
+    this.#completedAction = 'returned-to-documents'
+  }
+
+  async expectProgressThenPreviewOnResultRoute() {
+    this.#expectAction()
+    await expect(this.#page).toHaveURL(/\/resume$/u)
+    await expect(this.#page.getByRole('region', { name: 'Candidate Journey progress' })).toBeVisible()
+    await expect(this.#page.locator('#combined-intake-title')).toHaveCount(0)
+    this.#releaseWriting()
+    await this.#expectCurrentPreview()
+    await expect(this.#page.getByRole('region', { name: 'Candidate Journey progress' })).toHaveCount(0)
+    await expect(this.#page).toHaveURL(/\/resume$/u)
+  }
+
+  async expectRestoredResultRoute() {
+    this.#expectAction()
+    await expect(this.#page).toHaveURL(/\/resume$/u)
+    await this.#expectCurrentPreview()
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled({ timeout: 30_000 })
+    await expect(this.#page.locator('#combined-intake-title')).toHaveCount(0)
+  }
+
+  async expectIntakeRoute() {
+    this.#expectAction()
+    await expect(this.#page).toHaveURL(/\/$/u)
+    await expect(this.#page.getByRole('button', { name: 'Start a Candidate Session' })).toBeVisible()
+  }
+
+  async expectIntakeWithAnalyzedResumeAndNoPosting() {
+    this.#expectAction()
+    await expect(this.#page).toHaveURL(/\/$/u)
+    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toHaveValue('')
+    await expect(this.#page.getByRole('textbox', { name: 'Professional text', exact: true })).toHaveCount(0)
+    await expect(this.#page.getByText('Your latest resume is ready', { exact: true })).toBeVisible()
+  }
+
+  async expectResumePhotoKept() {
+    this.#expectAction()
+    await expect(this.#page).toHaveURL(/\/resume$/u)
+    await expect(this.#page.getByText('portrait.png', { exact: true })).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Change photo', exact: true })).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled({ timeout: 30_000 })
+  }
+
+  async expectNoPageCountOrCondensationAction() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled({ timeout: 30_000 })
+    await expect(this.#page.getByRole('button', { name: 'Check page count', exact: true })).toHaveCount(0)
+    await expect(this.#page.getByRole('button', { name: 'Propose a shorter version', exact: true })).toHaveCount(0)
+  }
+
+  async expectIntakeWithDocumentsKept() {
+    this.#expectAction()
+    await expect(this.#page).toHaveURL(/\/$/u)
+    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toHaveValue(firstPosting)
+    await expect(this.#page.getByRole('button', { name: 'Try again', exact: true })).toBeEnabled()
   }
 
   async givenSupportedSummaryCorrection() {
@@ -460,6 +649,7 @@ class CandidateJourneyIntegrationSystem {
 
   async replaceJobPosting() {
     this.#posting = secondPosting
+    await this.changeJobPosting()
     await this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true }).fill(secondPosting)
     this.#completedAction = 'posting-replaced'
   }
@@ -471,6 +661,7 @@ class CandidateJourneyIntegrationSystem {
   }
 
   async deleteCandidateSession() {
+    await this.#page.getByRole('link', { name: 'Honest Resume', exact: true }).click()
     await this.#page.getByRole('button', { name: 'Delete Candidate Session' }).click()
     await this.#page.getByRole('button', { name: 'Delete session now' }).click()
     this.#completedAction = 'deleted'
@@ -589,6 +780,11 @@ class CandidateJourneyIntegrationSystem {
     await expect(this.#page.getByRole('button', { name: 'Restore experience', exact: true })).toBeVisible()
   }
 
+  async viewLatestResume() {
+    await this.#page.getByRole('link', { name: 'View', exact: true }).click()
+    this.#completedAction = 'latest-resume-viewed'
+  }
+
   async expectPreviousResultOutdated() {
     this.#expectAction()
     await expect(this.#page.getByRole('status').filter({ hasText: 'export is paused' })).toBeVisible()
@@ -638,6 +834,7 @@ class CandidateJourneyIntegrationSystem {
   async expectAccessibleKeyboardJourney() {
     this.#expectAction()
     await this.#expectGeneratedResume()
+    await this.#expectResultRouteOnly()
     await expect(this.#page.locator('.sr-only[aria-live="polite"]')).toContainText('Tailored Resume is validated and ready.')
     const transition = await this.#page.getByRole('button', { name: 'Edit resume', exact: true })
       .evaluate((element) => getComputedStyle(element).transitionDuration)
@@ -654,9 +851,7 @@ class CandidateJourneyIntegrationSystem {
     expect(text).toContain(correctedSummary)
     const overflow = await this.#page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     expect(overflow).toBeLessThanOrEqual(0)
-    const resume = await this.#page.locator('#tailored-resume-title').boundingBox()
-    const intake = await this.#page.locator('#combined-intake-title').boundingBox()
-    expect(resume?.y ?? Infinity).toBeLessThan(intake?.y ?? 0)
+    await this.#expectResultRouteOnly()
   }
 
   async #openConsentedIntake() {
@@ -692,9 +887,13 @@ class CandidateJourneyIntegrationSystem {
   async #expectNoNormalPathCheckpoint() {
     await expect(this.#page.locator('details').filter({ hasText: 'Match Analysis and supporting evidence' }).first()).not.toHaveAttribute('open')
     await expect(this.#page.getByRole('button', { name: /Approve|Confirm analysis|Continue to/ })).toHaveCount(0)
-    const resume = await this.#page.locator('#tailored-resume-title').boundingBox()
-    const intake = await this.#page.locator('#combined-intake-title').boundingBox()
-    expect(resume?.y ?? Infinity).toBeLessThan(intake?.y ?? 0)
+    await this.#expectResultRouteOnly()
+  }
+
+  async #expectResultRouteOnly() {
+    await expect(this.#page).toHaveURL(/\/resume$/u)
+    await expect(this.#page.locator('#tailored-resume-title')).toBeVisible()
+    await expect(this.#page.locator('#combined-intake-title')).toHaveCount(0)
   }
 
   #expectNameKeptFromModels() {
@@ -758,7 +957,8 @@ class CandidateJourneyIntegrationSystem {
       this.#analytics.push(route.request().postDataJSON() as AnalyticsEvent)
       await route.fulfill({ status: 204, body: '' })
     })
-    await this.#page.route('**/api/structured-source-profile-extraction', (route) => route.fulfill({ json: {
+    await this.#page.route('**/api/structured-source-profile-extraction', (route) => route.fulfill({ json: this.#sourceExtraction === 'unavailable'
+      ? { ok: false, error: 'source-profile-extraction-unavailable' } : {
       ok: true, value: { ...(this.#source === 'dense' ? denseSourceProfile : structuredResumeSource.sourceProfile), criticalAmbiguities: [] },
     } }))
     await this.#page.route('**/api/explainable-job-posting-extraction', (route) => {
@@ -788,6 +988,7 @@ class CandidateJourneyIntegrationSystem {
 const sourceText = 'Alex Morgan\nalex@example.com\nFrontend Engineer at Northwind. Built accessible billing screens. React and TypeScript.'
 const unnamedSourceText = 'alex@example.com\nFrontend Engineer at Northwind. Built accessible billing screens. React and TypeScript.'
 const firstPosting = 'Frontend Engineer. React is required.'
+const onePixelPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
 const secondPosting = 'Accessibility Lead. React is required. Inclusive product delivery matters.'
 const correctedSummary = 'Built accessible billing screens with React.'
 const candidateContent = ['Northwind', 'Contoso', 'billing', 'Alex', 'Morgan', 'example.com', 'Frontend', 'Accessibility'] as const
