@@ -102,7 +102,7 @@ function createBrowserDependencies({ languageModelGateway }: Readonly<{
     languageModelGateway,
     matchEvidenceMatcher: createGatewayMatchEvidenceMatcher({ languageModelGateway }),
     now: () => Date.now(),
-    persistence: createBrowserCandidateSessionPersistence({ storage: localStorage }),
+    persistence: createBrowserCandidateSessionPersistence({ storage: localStorage, page: window }),
     sourceDocumentReader: createBrowserSourceIntakeDocumentReader(),
     sourceProfileExtractor: createGatewaySourceProfileExtractor({ languageModelGateway }),
   }

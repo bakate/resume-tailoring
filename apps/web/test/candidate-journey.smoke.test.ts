@@ -368,7 +368,7 @@ class CandidateJourneyTestSystem {
 
   constructor(page: Page, scenario: Scenario) {
     this.#page = page; this.#scenario = scenario
-    page.on('pageerror', (error) => { this.#errors.push(error.message) })
+    page.on('pageerror', (error) => { if (!isCancelledByLeavingPage(error.message)) this.#errors.push(error.message) })
   }
 
   async #installModelAdapters() {
@@ -939,6 +939,14 @@ class CandidateJourneyTestSystem {
   }
 
   #expectAction() { expect(this.#completedAction, 'Perform a Candidate Journey action before reading the outcome').not.toBeNull() }
+}
+
+/**
+ * WebKit reports each same-origin request it cancels while a page reloads as a page error, even when the app catches
+ * the rejection. The app only calls its own origin, so this message never stands for a real access control failure.
+ */
+function isCancelledByLeavingPage(message: string) {
+  return message.endsWith('due to access control checks.')
 }
 
 const postingText = 'Frontend Engineer. React is required. Rust is required. Java is required.'
