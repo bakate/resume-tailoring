@@ -29,11 +29,12 @@ async function renderDocument({ input, dependencies }: Readonly<{
 async function attemptRender({ input, dependencies }: Readonly<{
   input: ResumeRenderRequest; dependencies: RendererDependencies
 }>): Promise<RenderAttempt> {
+  const { request, timeoutMilliseconds } = dependencies
   let response: Response
   try {
-    response = await dependencies.request('/api/resume-document', { method: 'POST', cache: 'no-store',
+    response = await request('/api/resume-document', { method: 'POST', cache: 'no-store',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
-      signal: AbortSignal.timeout(dependencies.timeoutMilliseconds) })
+      signal: AbortSignal.timeout(timeoutMilliseconds) })
   } catch (error) {
     return failed(error instanceof DOMException && error.name === 'TimeoutError' ? 'timeout' : 'network')
   }
