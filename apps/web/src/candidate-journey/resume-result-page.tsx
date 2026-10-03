@@ -1,4 +1,5 @@
-import { useNavigate } from '@tanstack/react-router'
+import { Anchor } from '@mantine/core'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 
 import { LocalizationFailure, useLocalization } from '../localization/localization'
@@ -26,6 +27,9 @@ function ResumeResult({ localization }: Readonly<{ localization: Localization }>
   if (view.status !== 'candidate-session-open') return null
   const purpose = view.session.preparation?.purpose ?? 'tailored'
   return <>
+    <Anchor component={Link} to="/" fw={600} w="fit-content">
+      <span aria-hidden="true">← </span>{localization.translate('resumeResult.backToDocuments')}
+    </Anchor>
     {isResultOperation(candidateJourney) ? <CandidateJourneyProgress {...{ candidateJourney, localization }} /> : null}
     <ResumeSectionsPreview {...{ candidateJourney, localization }} />
     <PreparationFeedback {...{ candidateJourney, localization }} localFailure={null} onBack={toDocuments}

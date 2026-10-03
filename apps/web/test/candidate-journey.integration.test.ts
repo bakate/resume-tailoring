@@ -242,6 +242,15 @@ test.describe('Candidate Journey integration qualification', () => {
     await system.expectIntakeWithAnalyzedResumeAndNoPosting()
   })
 
+  test('returns from the result to the documents, which offer to generate the resume again', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGeneratedPreview()
+
+    await system.returnToDocuments()
+
+    await system.expectDocumentsOfferingRegeneration()
+  })
+
   test('keeps the resume photo after reloading the result route', async ({ page }) => {
     const system = createSystemUnderTest({ page })
     await system.givenGeneratedPreview()
@@ -412,6 +421,19 @@ class CandidateJourneyIntegrationSystem {
     await this.changeJobPosting()
     await expect(this.#page).toHaveURL(/\/$/u)
     await this.#page.reload()
+  }
+
+  async returnToDocuments() {
+    await this.#page.getByRole('link', { name: 'Back to my documents', exact: true }).click()
+    this.#completedAction = 'returned-to-documents'
+  }
+
+  async expectDocumentsOfferingRegeneration() {
+    this.#expectAction()
+    await expect(this.#page).toHaveURL(/\/$/u)
+    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toHaveValue(firstPosting)
+    await expect(this.#page.getByRole('button', { name: 'Regenerate my resume', exact: true })).toBeEnabled()
+    await expect(this.#page.getByRole('button', { name: 'Generate my resume', exact: true })).toHaveCount(0)
   }
 
   async givenResumePhotoChosen() {
@@ -675,7 +697,7 @@ class CandidateJourneyIntegrationSystem {
   }
 
   async regenerateForAnotherOpportunity() {
-    await this.#page.getByRole('button', { name: 'Generate my resume', exact: true }).click()
+    await this.#page.getByRole('button', { name: 'Regenerate my resume', exact: true }).click()
     await this.#page.getByRole('button', { name: 'Replace and regenerate', exact: true }).click()
     this.#completedAction = 'regenerated'
   }

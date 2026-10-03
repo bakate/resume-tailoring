@@ -433,7 +433,7 @@ class CandidateJourneyTestSystem {
   }
 
   async #returnToDocuments() {
-    await this.#page.getByRole('link', { name: 'Resume Studio', exact: true }).click()
+    await this.#page.getByRole('link', { name: 'Back to my documents', exact: true }).click()
     await expect(this.#page).toHaveURL(/\/$/u)
   }
 
@@ -545,7 +545,7 @@ class CandidateJourneyTestSystem {
   async regenerateWithUnavailableWriter() {
     this.#scenario = 'unavailable'
     await this.#returnToDocuments()
-    await this.#page.getByRole('button', { name: 'Generate my resume', exact: true }).click()
+    await this.#page.getByRole('button', { name: 'Regenerate my resume', exact: true }).click()
     await expect(this.#page.getByRole('dialog')).toContainText('including manual edits')
     await this.#page.getByRole('button', { name: 'Replace and regenerate' }).click()
     this.#completedAction = 'regenerated'

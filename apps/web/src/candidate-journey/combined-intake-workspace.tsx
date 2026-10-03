@@ -43,7 +43,8 @@ function CombinedIntakeForm(props: OpenIntakeProps) {
       <Stack><IntakeFields {...props} busy={view.operation !== null} controls={controls} /></Stack>
     </Fieldset>
     <Button aria-describedby={processingPolicyNoticeId} disabled={view.operation !== null} loading={view.operation !== null}
-      onClick={() => { controls.requestGeneration({ purpose: 'tailored' }) }} size="lg">{localization.translate('combinedIntake.generate')}</Button>
+      onClick={() => { controls.requestGeneration({ purpose: 'tailored' }) }} size="lg">
+      {localization.translate(session.tailoredResume === null ? 'combinedIntake.generate' : 'combinedIntake.regenerate')}</Button>
     <ProcessingPolicyNotice {...{ candidateJourney, localization }} />
     <PreparationFeedback {...{ candidateJourney, localization, localFailure: controls.state.failure }}
       onRetry={() => { controls.requestGeneration({ purpose: session.preparation?.purpose ?? 'tailored' }) }}
