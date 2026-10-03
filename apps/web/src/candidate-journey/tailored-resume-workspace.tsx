@@ -125,9 +125,9 @@ function CurrentResumePreview({ candidateJourney, resume, editorOpened, photo, o
 }>) {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open' || view.resumeReview === null) return null
-  const enabled = !editorOpened && view.session.preparedResumeStatus !== 'outdated'
+  const enabled = view.session.preparedResumeStatus !== 'outdated'
     && view.resumeReview.operation === null && (view.operation === null || view.operation === 'rendering-resume-document')
-  return <TailoredResumePreview document={resume} enabled={enabled} photo={photo}
+  return <TailoredResumePreview document={resume} enabled={enabled} paused={editorOpened} photo={photo}
     unsupportedFieldIds={view.resumeReview.unsupportedFieldIds} renderDocument={candidateJourney.renderResumeDocument}
     onDownload={onDownload} />
 }

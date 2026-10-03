@@ -16,6 +16,24 @@ test.describe('Candidate Journey integration qualification', () => {
     await system.expectCorrectedResumeDownloaded()
   })
 
+  test('keeps the current preview when the editor closes without changes', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGeneratedPreview()
+
+    await system.openAndCloseEditorWithoutChanges()
+
+    await system.expectPreviewKeptWithoutRendering()
+  })
+
+  test('renders the preview once when the editor closes after an edit', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGeneratedPreview()
+
+    await system.editSummaryAndCloseEditor()
+
+    await system.expectOneRenderAfterEditing()
+  })
+
   test('asks only for the locally entered name before the first export', async ({ page }) => {
     const system = createSystemUnderTest({ page })
     await system.givenGeneratedResume()
@@ -197,6 +215,7 @@ class CandidateJourneyIntegrationSystem {
   #pdfText: string | null = null
   #pdfPageCount = 0
   #completedAction: string | null = null
+  #rendersBeforeAction = 0
 
   constructor({ page, source, condensation }: Readonly<{ page: Page; source: SourceScenario; condensation: CondensationScenario }>) {
     this.#page = page; this.#source = source; this.#condensation = condensation
@@ -245,10 +264,7 @@ class CandidateJourneyIntegrationSystem {
 
   async givenSupportedSummaryCorrection() {
     await this.#openEditor()
-    await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
-    await this.#page.getByRole('textbox', { name: 'Resume Field', exact: true }).first().fill(correctedSummary)
-    await this.#page.getByRole('button', { name: 'Save wording', exact: true }).first().click()
-    await expect(this.#page.getByRole('dialog').getByRole('status').filter({ hasText: 'Resume updated.' })).toBeVisible()
+    await this.#saveCorrectedSummary()
     await this.#closeEditor()
   }
 
@@ -264,6 +280,56 @@ class CandidateJourneyIntegrationSystem {
     await this.#page.getByRole('button', { name: 'Close editor', exact: true }).click()
     await expect(this.#page.getByRole('dialog')).toHaveCount(0)
   }
+
+  async openAndCloseEditorWithoutChanges() {
+    this.#countRendersFromHere()
+    await this.#openEditor()
+    await this.#expectPreviewVisibleWhileEditing()
+    await this.#closeEditor()
+    this.#completedAction = 'editor-toggled'
+  }
+
+  async editSummaryAndCloseEditor() {
+    this.#countRendersFromHere()
+    await this.#openEditor()
+    await this.#saveCorrectedSummary()
+    await this.#expectPreviewVisibleWhileEditing()
+    await this.#closeEditor()
+    this.#completedAction = 'summary-edited'
+  }
+
+  async expectPreviewKeptWithoutRendering() {
+    this.#expectAction()
+    await this.#page.waitForTimeout(1_000)
+    expect(this.#renderRequestsSinceAction(), 'Closing an unchanged editor must not render').toBe(0)
+    await expect(this.#page.locator('.resume-pdf-pages canvas').first()).toBeVisible()
+  }
+
+  async expectOneRenderAfterEditing() {
+    this.#expectAction()
+    await expect.poll(() => this.#renderRequestsSinceAction(), { timeout: 30_000 }).toBe(1)
+    await this.#page.waitForTimeout(1_000)
+    expect(this.#renderRequestsSinceAction(), 'One edit renders exactly once').toBe(1)
+  }
+
+  #countRendersFromHere() { this.#rendersBeforeAction = this.#renderRequests() }
+
+  async #expectPreviewVisibleWhileEditing() {
+    await this.#page.waitForTimeout(1_000)
+    await expect(this.#page.locator('.resume-pdf-pages canvas').first()).toBeVisible()
+    expect(this.#renderRequestsSinceAction(), 'An open editor must not render').toBe(0)
+  }
+
+  async #saveCorrectedSummary() {
+    await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
+    await this.#page.getByRole('textbox', { name: 'Resume Field', exact: true }).first().fill(correctedSummary)
+    await this.#page.getByRole('button', { name: 'Save wording', exact: true }).first().click()
+    await expect(this.#page.getByRole('dialog').getByRole('status').filter({ hasText: 'Resume updated.' })).toBeVisible()
+  }
+
+  #renderRequests() { return this.#modelRequests.filter((path) => path === '/api/resume-document').length }
+
+  #renderRequestsSinceAction() { return this.#renderRequests() - this.#rendersBeforeAction }
 
   async givenDownloadedResume() {
     await this.givenGeneratedPreview()

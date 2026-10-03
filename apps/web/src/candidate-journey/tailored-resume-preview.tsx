@@ -12,7 +12,7 @@ import './resume-preview.css'
 type PreviewMessages = typeof resumePreviewMessages['en'] | typeof resumePreviewMessages['fr']
 type RenderedResumeProps = Readonly<{
   current: ResumeRenderResult; document: TailoredResume; messages: PreviewMessages
-  onDownload: () => void; onRetry: () => void
+  onDownload: () => void; onRetry: () => void; paused: boolean
 }>
 
 export function TailoredResumePreview(props: ResumePreviewProps) {
@@ -34,12 +34,12 @@ export function TailoredResumePreview(props: ResumePreviewProps) {
   </section>
 }
 
-function RenderedResume({ current, document, messages, onDownload, onRetry }: RenderedResumeProps) {
+function RenderedResume({ current, document, messages, onDownload, onRetry, paused }: RenderedResumeProps) {
   const [preview, setPreview] = useState<'pending' | 'ready' | 'failed'>('pending')
   const ready = useCallback(() => { setPreview('ready') }, [])
   const failed = useCallback(() => { setPreview('failed') }, [])
   const eligibility = current.assessment.exportEligibility
-  const bytes = eligibility.status === 'eligible' && preview === 'ready' ? current.pdf : null
+  const bytes = eligibility.status === 'eligible' && preview === 'ready' && !paused ? current.pdf : null
   return <Stack gap="sm" mt="md">
     {eligibility.status === 'blocked' ? eligibility.reasons.map((reason) =>
       <Text role="alert" c="danger.8" key={reason}>{messages[reason]}</Text>) : null}

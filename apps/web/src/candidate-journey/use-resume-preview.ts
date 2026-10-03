@@ -5,6 +5,7 @@ import type { TailoredResume } from '@resume-tailoring/application/tailored-resu
 export type ResumePreviewProps = Readonly<{
   document: TailoredResume
   enabled?: boolean
+  paused: boolean
   photo: ReturnType<typeof useResumePhoto>
   renderDocument: (request: ResumeRenderInput) => Promise<ResumeRenderResult>
   unsupportedFieldIds: readonly string[]
@@ -15,21 +16,23 @@ type PreviewInput = Omit<ResumePreviewProps, 'onDownload'> & Readonly<{
   attempt: number
 }>
 
-export function useRenderedResume({ document, renderDocument, unsupportedFieldIds, attempt, photo, enabled: requested = true }: PreviewInput) {
+export function useRenderedResume({ document, renderDocument, unsupportedFieldIds, attempt, photo, enabled: requested = true, paused }: PreviewInput) {
   const photoDataUrl = photo.ready ? photo.dataUrl : undefined
-  const inputKey = JSON.stringify({ document, unsupportedFieldIds, photoDataUrl })
-  const request = useMemo<ResumeRenderInput>(() => ({ document, unsupportedFieldIds, photoDataUrl }), [inputKey, attempt])
-  const [rendered, setRendered] = useState<Readonly<{ request: ResumeRenderInput; result: ResumeRenderResult }> | null>(null)
+  const renderKey = JSON.stringify({ document, unsupportedFieldIds, photoDataUrl, attempt })
+  const request = useMemo<ResumeRenderInput>(() => ({ document, unsupportedFieldIds, photoDataUrl }), [renderKey])
+  const [rendered, setRendered] = useState<Readonly<{ renderKey: string; result: ResumeRenderResult }> | null>(null)
   const enabled = requested && photo.ready && !photo.failed
+  const renderDue = enabled && !paused && rendered?.renderKey !== renderKey
   useEffect(() => {
-    if (!enabled) return
+    if (!renderDue) return
     let active = true
     const timer = window.setTimeout(() => { void renderDocument(request).then((result) => {
-      if (active) setRendered({ request, result })
+      if (active) setRendered({ renderKey, result })
     }) }, 300)
     return () => { active = false; window.clearTimeout(timer) }
-  }, [request, renderDocument, enabled])
-  return { request, current: enabled && rendered?.request === request ? rendered.result : null }
+  }, [request, renderKey, renderDocument, renderDue])
+  const current = paused || (enabled && rendered?.renderKey === renderKey) ? rendered?.result ?? null : null
+  return { request, current }
 }
 
 export function useResumePhoto() {
