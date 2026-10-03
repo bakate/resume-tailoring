@@ -530,6 +530,8 @@ class CandidateJourneyIntegrationSystem {
     const transition = await this.#page.getByRole('button', { name: 'Edit resume', exact: true })
       .evaluate((element) => getComputedStyle(element).transitionDuration)
     expect(transition.split(',').every((duration) => parseFloat(duration) <= 0.00001)).toBe(true)
+    // Focus return is checked once the page-count check is done; a check still running disables the button (BAK-76).
+    await expect(this.#page.getByText('The current version fits within two pages.', { exact: true }).last()).toBeVisible({ timeout: 30_000 })
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).focus()
     await this.#page.keyboard.press('Enter')
     await expect(this.#page.getByRole('dialog')).toBeVisible()

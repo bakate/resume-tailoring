@@ -541,7 +541,7 @@ class CandidateJourneyTestSystem {
   }
 
   async correctContactAndReload() {
-    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#openEditor()
     await this.#page.getByLabel('Email', { exact: true }).fill('updated@example.com')
     await this.#page.reload()
     this.#completedAction = 'contact-corrected-and-reloaded'
@@ -551,12 +551,12 @@ class CandidateJourneyTestSystem {
     this.#expectAction()
     await this.#showDocumentText()
     await expect(this.#page.frameLocator('iframe').getByText('updated@example.com', { exact: true })).toBeVisible()
-    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#openEditor()
     await expect(this.#page.getByLabel('Email', { exact: true })).toHaveValue('updated@example.com')
   }
 
   async editUnsupportedWordingAndReload() {
-    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#openEditor()
     await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
     await this.#page.getByLabel('Resume Field', { exact: true }).first().fill('Led 100 engineers')
     await this.#page.getByRole('button', { name: 'Save wording', exact: true }).first().click()
@@ -569,7 +569,7 @@ class CandidateJourneyTestSystem {
     await this.#showDocumentText()
     await expect(this.#page.frameLocator('iframe').getByText('Led 100 engineers', { exact: true })).toBeVisible()
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeDisabled()
-    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#openEditor()
     await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
     await expect(this.#page.getByText('This professional edit is not supported by the current Candidate Facts.', { exact: true })).toBeVisible()
   }
@@ -578,7 +578,9 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByRole('button', { name: 'Edit resume', exact: true })).toBeVisible()
     await expect(this.#page.getByLabel('Resume Field', { exact: true })).toHaveCount(0)
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeVisible()
-    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    // Focus return is checked once the page-count check is done; a check still running disables the button (BAK-76).
+    await expect(this.#page.getByText('The current version fits within two pages.', { exact: true }).last()).toBeVisible({ timeout: 30_000 })
+    await this.#openEditor()
     await expect(this.#page.getByRole('dialog')).toBeVisible()
     await this.#page.keyboard.press('Escape')
     await expect(this.#page.getByRole('dialog')).toHaveCount(0)
@@ -586,7 +588,7 @@ class CandidateJourneyTestSystem {
   }
 
   async givenRequiredContactsArePresent() {
-    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#openEditor()
     await this.#page.getByRole('textbox', { name: 'Name', exact: true }).fill('Alex Morgan')
     await this.#page.getByRole('textbox', { name: 'Email', exact: true }).fill('alex@example.com')
     await this.#page.keyboard.press('Escape')
@@ -620,7 +622,7 @@ class CandidateJourneyTestSystem {
   }
 
   async enterUnsupportedProfessionalText() {
-    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#openEditor()
     await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
     await this.#page.getByRole('textbox', { name: 'Resume Field', exact: true }).first()
       .fill('Built accessible billing screens and led 500 engineers')
@@ -680,7 +682,7 @@ class CandidateJourneyTestSystem {
   }
 
   async removeResumeContact() {
-    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#openEditor()
     await this.#page.getByRole('textbox', { name: 'Email', exact: true }).fill('')
     await this.#page.keyboard.press('Escape')
   }
@@ -691,7 +693,7 @@ class CandidateJourneyTestSystem {
   }
 
   async hideAndRestoreEmployer() {
-    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#openEditor()
     await this.#page.getByRole('tab', { name: 'Experience', exact: true }).click()
     const employerField = this.#page.locator('textarea').filter({ hasText: 'Northwind' })
     const fieldCard = employerField.locator('xpath=ancestor::*[contains(@class,"mantine-Paper-root")][1]')
@@ -704,7 +706,7 @@ class CandidateJourneyTestSystem {
   }
 
   async hideAndRestoreExperience() {
-    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#openEditor()
     await this.#page.getByRole('tab', { name: 'Experience', exact: true }).click()
     await this.#page.getByRole('button', { name: 'Hide experience', exact: true }).first().click()
     await expect(this.#page.frameLocator('iframe').getByText('Northwind', { exact: true })).toHaveCount(0)
@@ -714,7 +716,7 @@ class CandidateJourneyTestSystem {
   }
 
   async moveExperienceBeforeSummary() {
-    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#openEditor()
     await this.#page.getByRole('tab', { name: 'Section order', exact: true }).click()
     const experienceOrder = this.#page.getByRole('tabpanel').getByText('Experience', { exact: true }).locator('..')
     await experienceOrder.getByRole('button', { name: 'Move up', exact: true }).click()
@@ -914,6 +916,15 @@ class CandidateJourneyTestSystem {
     await expect(generate).toBeEnabled()
     await expect(this.#page.getByRole('textbox', { name: 'Professional text' })).toBeVisible()
     await expect(this.#page.getByRole('textbox', { name: 'Job Posting text' })).toBeVisible()
+  }
+
+  // The page-count check disables 'Edit resume' while it runs, after a preparation or a reload, and a
+  // click queued behind a busy main thread lands on the disabled button and is dropped.
+  async #openEditor() {
+    await expect(async () => {
+      await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+      await expect(this.#page.getByRole('dialog')).toBeVisible({ timeout: 1_000 })
+    }).toPass()
   }
 
   async #showDocumentText() {

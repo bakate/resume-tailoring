@@ -21,14 +21,16 @@ export function useRenderedResume({ document, renderDocument, unsupportedFieldId
   const request = useMemo<ResumeRenderInput>(() => ({ document, unsupportedFieldIds, photoDataUrl }), [inputKey, attempt])
   const [rendered, setRendered] = useState<Readonly<{ request: ResumeRenderInput; result: ResumeRenderResult }> | null>(null)
   const enabled = requested && photo.ready && !photo.failed
+  // Closing the editor without changes re-enables the same request: its result is reused, not rendered again.
+  const renderedRequest = rendered?.request
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || renderedRequest === request) return
     let active = true
     const timer = window.setTimeout(() => { void renderDocument(request).then((result) => {
       if (active) setRendered({ request, result })
     }) }, 300)
     return () => { active = false; window.clearTimeout(timer) }
-  }, [request, renderDocument, enabled])
+  }, [request, renderDocument, enabled, renderedRequest])
   return { request, current: enabled && rendered?.request === request ? rendered.result : null }
 }
 
