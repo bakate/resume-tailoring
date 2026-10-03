@@ -1,8 +1,8 @@
 import { z } from 'zod'
 import type { ResumeSectionModelResult } from '@resume-tailoring/application/candidate-journey'
-import type { ResumeCoherenceChecker, ResumeFieldValidator, ResumeSectionWriter } from './openai-resume-section-models'
+import type { ResumeCoherenceChecker, ResumeFieldValidator, ResumeSectionWriter } from '@resume-tailoring/application/ports'
 import { resumeDocumentCoherenceSchema, resumeFieldValidationSchema, resumeModelUsageSchema, resumeSectionModelFailureSchema,
-  resumeSectionOutputSchemas } from './resume-document-schemas'
+  resumeSectionOutputSchemas } from '../../candidate-journey/resume-document-schemas'
 
 const resumeSectionContentSchema = z.union([
   z.strictObject({ kind: z.literal('value-proposition'), ...resumeSectionOutputSchemas['value-proposition'].shape }),

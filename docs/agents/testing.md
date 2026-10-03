@@ -10,6 +10,15 @@ Develop observable behavior one tracer bullet at a time through an agreed public
 
 Tests must not import domain internals or inspect orchestration details.
 
+## Hexagon layout
+
+- Ports: `packages/resume-tailoring-application/src/ports.ts`, imported as `@resume-tailoring/application/ports`.
+- Browser adapters (persistence, document readers, fetch clients, telemetry, and the ports translated over the Language Model Gateway): `apps/web/src/adapters/browser/`.
+- Server adapters (OpenAI, Puppeteer renderer): `apps/web/src/adapters/server/`.
+- Composition root: `apps/web/src/composition-root.ts` wires the browser adapters into `createCandidateJourney`.
+
+Adapter contract tests sit next to their adapter. `pnpm check:architecture` rejects any `apps/web` module other than the composition root, API routes and their `-` helpers, adapters, and tests that imports `src/adapters/**`.
+
 ## Fakes
 
 Every Candidate Journey port has one in-memory fake in `@resume-tailoring/application/testing`. Each answers from the anonymized structured-resume fixtures, so a behavior test overrides only the behavior it varies:

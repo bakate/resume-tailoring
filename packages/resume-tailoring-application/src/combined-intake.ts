@@ -1,6 +1,5 @@
 import type { CandidateSession, ResumePreparation, StoredIntakeDocument, ResumePreparationFailure } from '@resume-tailoring/domain/candidate-session'
 import { hasProcessingConsentForPolicy } from '@resume-tailoring/domain/processing-policy'
-import type { CandidateJourneyDependencies } from './candidate-journey'
 import { createJobMatch, maximumJobPostingBytes } from './job-match'
 import type { JobPostingDocument } from './job-match'
 import { createSourceIntake, resolveCriticalAmbiguity, maximumSourceDocumentBytes } from './source-intake'
@@ -9,6 +8,7 @@ import { inferTailoredResumeLocale, readLocalResumeContacts } from './tailored-r
 import type { TailoredResumeLocale } from './tailored-resume'
 import type { ResumeOperationFailure, ResumePreparationOutcome } from './structured-resume-contract'
 import type { ResumeSectionsRequest } from './resume-sections'
+import type { CandidateJourneyDependencies } from './ports'
 
 export type CombinedIntakeRequest = Readonly<{
   grantProcessingConsent?: true

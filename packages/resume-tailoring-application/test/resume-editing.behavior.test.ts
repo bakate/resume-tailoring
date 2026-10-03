@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
-import type { CandidateJourneyDependencies, CandidateJourneyView, CandidateSession, ResumeDocumentPorts, ResumeProposalDecision, ResumeLayoutOutcome, ResumeExportEligibility } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateJourneyView, CandidateSession, ResumeProposalDecision, ResumeLayoutOutcome, ResumeExportEligibility } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateFact } from '@resume-tailoring/application/source-intake'
 import { resumeLayoutExpectations, writeResumeSectionFromFacts, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createFakeCandidateJourneyDependencies, createFakeResumeDocumentPorts, createFakeResumeSectionModels,
   createInMemoryCandidateSessionPersistence } from '@resume-tailoring/application/testing'
+import type { CandidateJourneyDependencies, ResumeDocumentPorts } from '@resume-tailoring/application/ports'
 
 type TestPorts = { -readonly [Port in keyof ResumeDocumentPorts]?: ResumeDocumentPorts[Port] }
 type LayoutExample = Readonly<{ layout: ResumeLayoutOutcome; eligibility: ResumeExportEligibility }>

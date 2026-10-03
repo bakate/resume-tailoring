@@ -3,34 +3,9 @@ import type {
   ProcessingConsent,
   ProcessingPolicy,
 } from '@resume-tailoring/domain/processing-policy'
+import type { LanguageModelGatewayAdapter, LanguageModelRole } from './ports'
 
 export type { ProcessingConsent, ProcessingPolicy }
-
-export type LanguageModelFailure = Readonly<{
-  transient?: boolean
-  /** Distinguishes a timeout, which is never retried, from other unavailability. */
-  cause?: 'transient' | 'timeout' | 'permanent'
-  type: 'language-model-unavailable' | 'processing-consent-required'
-}>
-
-export type LanguageModelResult<TValue> =
-  | Readonly<{ ok: true; value: TValue }>
-  | Readonly<{ ok: false; error: LanguageModelFailure }>
-
-export type LanguageModelRole<TRequest, TValue> = Readonly<{
-  process: (request: TRequest) => Promise<LanguageModelResult<TValue>>
-}>
-
-export type LanguageModelGatewayAdapter<
-  TStructuredRequest,
-  TStructuredValue,
-  TWritingRequest = TStructuredRequest,
-  TWritingValue = TStructuredValue,
-> = Readonly<{
-  processingPolicy: ProcessingPolicy
-  structured: LanguageModelRole<TStructuredRequest, TStructuredValue>
-  writing: LanguageModelRole<TWritingRequest, TWritingValue>
-}>
 
 export type LanguageModelGateway<
   TStructuredRequest,

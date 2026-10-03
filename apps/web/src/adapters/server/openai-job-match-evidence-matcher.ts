@@ -1,21 +1,21 @@
 import { z } from 'zod'
 
-import type { MatchEvidenceMatcher } from '@resume-tailoring/application/job-match'
 import {
   validateAdjacentEvidence,
   validateMatchEvidence,
   validateRelevantFactProposals,
 } from '@resume-tailoring/matching-engine'
-import type { OpenAiReasoningEffort } from '../openai-model-configuration'
+import type { OpenAiReasoningEffort } from '../../openai-model-configuration'
 import {
   createOpenAiRequester,
   type OpenAiRequestFailure,
-} from '../resume-tailoring/openai-request'
-import { requirementCoverageInstructions } from '../resume-tailoring/requirement-coverage-instructions'
+} from './openai-request'
+import { requirementCoverageInstructions } from '../../resume-tailoring/requirement-coverage-instructions'
 import {
   matchEvidenceProposalSchema,
   matchEvidenceResponseFormat,
-} from './job-match-schemas'
+} from '../../candidate-journey/job-match-schemas'
+import type { MatchEvidenceMatcher } from '@resume-tailoring/application/ports'
 
 export function createOpenAiJobMatchEvidenceMatcher({
   apiKey, model, reasoningEffort, request = fetch,

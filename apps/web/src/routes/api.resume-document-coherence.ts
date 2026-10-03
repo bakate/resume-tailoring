@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
-import { createOpenAiResumeCoherenceChecker } from '../candidate-journey/openai-resume-section-models'
+import { createOpenAiResumeCoherenceChecker } from '../adapters/server/openai-resume-section-models'
 import { resumeCoherenceInputSchema } from '../candidate-journey/resume-document-schemas'
 import { processResumeModel } from './-resume-document-model'
 

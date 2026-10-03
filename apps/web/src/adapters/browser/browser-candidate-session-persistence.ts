@@ -1,11 +1,10 @@
 import {
   candidateSessionSchema,
-} from './candidate-session'
+} from '../../candidate-journey/candidate-session'
 import type {
   CandidateSession,
-  CandidateSessionPersistence,
-  CandidateSessionStorageResult,
 } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateSessionPersistence, CandidateSessionStorageResult } from '@resume-tailoring/application/ports'
 
 const candidateSessionStorageKey = 'honest-resume:candidate-session'
 const leavingEvents = ['beforeunload', 'pagehide'] as const

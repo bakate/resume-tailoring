@@ -3,20 +3,17 @@
  * a behavior test overrides only the behavior it varies.
  */
 import type {
-  CandidateJourneyDependencies,
   CandidateSession,
-  CandidateSessionPersistence,
-  CandidateSessionStorageResult,
 } from './candidate-journey'
-import type { JobPostingDocumentReader, JobPostingExtractor, MatchEvidenceMatcher, MatchEvidenceProposal } from './job-match'
+import type { MatchEvidenceProposal } from './job-match'
 import type { ProcessingPolicy } from './language-model-gateway'
-import type { PrivacySafeTelemetry, PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
+import type { PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
 import { assessResumeExport } from './resume-export'
-import type { ResumeDocumentRenderer, ResumeRenderRequest } from './resume-export'
-import type { ResumeSectionModels } from './resume-sections'
-import type { SourceDocumentReader, StructuredSourceProfileExtractor } from './source-intake'
-import type { ResumeDocumentPorts } from './structured-resume-contract'
+import type { ResumeRenderRequest } from './resume-export'
 import { readGroupedResumeSection, structuredResumeJobMatch, structuredResumeSource } from './structured-resume-fixtures'
+import type { CandidateJourneyDependencies, CandidateSessionPersistence, CandidateSessionStorageResult,
+  JobPostingDocumentReader, JobPostingExtractor, MatchEvidenceMatcher, PrivacySafeTelemetry, ResumeDocumentPorts,
+  ResumeDocumentRenderer, ResumeSectionModels, SourceDocumentReader, StructuredSourceProfileExtractor } from './ports'
 
 export { describeCandidateSessionPersistenceContract } from './candidate-session-persistence-contract'
 export type { CandidateSessionPersistenceSetup } from './candidate-session-persistence-contract'

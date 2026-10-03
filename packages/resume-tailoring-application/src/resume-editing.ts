@@ -2,10 +2,11 @@ import { readResumeRecovery } from './resume-recovery-view'
 import type { PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
 import type { CandidateSession } from '@resume-tailoring/domain/candidate-session'
 import type { ResumeEditingState, TailoredResume } from '@resume-tailoring/domain/tailored-resume'
-import type { ProfessionalResumeDocument, ResumeDocumentPorts, ResumeDocumentReview,
+import type { ProfessionalResumeDocument, ResumeDocumentReview,
   ResumeOperationFailure, ResumeSectionChange } from './structured-resume-contract'
 import { assessResumeExport } from './resume-export'
 import { readResumeFields, updateResumeField } from './resume-field-editing'
+import type { ResumeDocumentPorts } from './ports'
 
 export type ResumeReview = ResumeDocumentReview & Readonly<{
   recovery: ReturnType<typeof readResumeRecovery>

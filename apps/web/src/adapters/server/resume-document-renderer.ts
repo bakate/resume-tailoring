@@ -4,7 +4,7 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import puppeteer from 'puppeteer'
 import type { Browser, Page } from 'puppeteer'
 import { hasA4Dimensions, hasExpectedEmbeddedFonts, hasExpectedPdfTextInReadingOrder } from './resume-pdf-verification'
-import { renderTailoredResumeDocument } from './tailored-resume-document'
+import { renderTailoredResumeDocument } from '../../candidate-journey/tailored-resume-document'
 
 export async function renderResumeDocument(request: ResumeRenderRequest): Promise<ResumeRenderResult> {
   let browser: Browser | undefined

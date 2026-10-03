@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion } from './candidate-journey'
-import type { CandidateSession, CandidateSessionPersistence } from './candidate-journey'
+import type { CandidateSession } from './candidate-journey'
+import type { CandidateSessionPersistence } from './ports'
 
 export type CandidateSessionPersistenceSetup = Readonly<{
   storedSession: CandidateSession | null

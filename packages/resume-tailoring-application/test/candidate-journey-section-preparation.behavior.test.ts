@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
-import type { CandidateJourney, CandidateJourneyDependencies, CandidateJourneyView, CandidateSession,
+import type { CandidateJourney, CandidateJourneyView, CandidateSession,
   ResumeCoherenceInput, ResumeDocumentCoherence, ResumeRejectedField, ResumeSectionContent, ResumeSectionModelFailure,
   ResumeSectionWritingInput,
 } from '@resume-tailoring/application/candidate-journey'
@@ -9,6 +9,7 @@ import { readGroupedResumeSection, structuredResumeJobMatch,
 import { createFakeCandidateJourneyDependencies, createFakeResumeSectionModels, createInMemoryCandidateSessionPersistence,
   testProcessingPolicy } from '@resume-tailoring/application/testing'
 import type { TailoredResumeField } from '@resume-tailoring/application/tailored-resume'
+import type { CandidateJourneyDependencies } from '@resume-tailoring/application/ports'
 
 describe('Candidate Journey section-by-section resume preparation', () => {
   it('writes each planned Resume Section once from only the Candidate Facts it may cite', async () => {

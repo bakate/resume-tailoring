@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
-import { createOpenAiStructuredSourceProfileExtractor } from '../candidate-journey/openai-structured-source-profile-extractor'
+import { createOpenAiStructuredSourceProfileExtractor } from '../adapters/server/openai-structured-source-profile-extractor'
 import { structuredSourceProfileRequestSchema } from '../candidate-journey/structured-source-profile-schema'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'

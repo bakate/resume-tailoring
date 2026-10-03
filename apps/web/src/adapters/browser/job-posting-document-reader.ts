@@ -1,8 +1,8 @@
 import type {
   JobPostingDocument,
-  JobPostingDocumentReader,
 } from '@resume-tailoring/application/job-match'
-import { createBrowserPdfDocumentReader } from '../resume-tailoring/source-document-pdf'
+import { createBrowserPdfDocumentReader } from '../../resume-tailoring/source-document-pdf'
+import type { JobPostingDocumentReader } from '@resume-tailoring/application/ports'
 
 type PdfDocumentReader = ReturnType<typeof createBrowserPdfDocumentReader>['read']
 

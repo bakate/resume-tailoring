@@ -3,13 +3,12 @@ export { readProfessionalResumeFields, resumeCoherenceIssueKinds, resumeSectionK
 export type { ResumeCoherenceInput, ResumeCoherenceIssue, ResumeCoherenceIssueKind, ResumeDocumentCoherence,
   ResumeFieldRejection, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage, ResumeRejectedField,
   ResumeSectionContent, ResumeSectionKind, ResumeSectionModelFailure, ResumeSectionModelResult,
-  ResumeSectionModels, ResumeSectionPlanEntry, ResumeSectionWritingInput } from './resume-sections'
-import type { ResumeSectionModels } from './resume-sections'
+  ResumeSectionPlanEntry, ResumeSectionWritingInput } from './resume-sections'
 import { resumePreparationMachine } from './resume-preparation-machines'
 import { prepareCombinedIntake, publishResumePreparation, unavailable } from './combined-intake'
 import type { CombinedIntakeOutcome, CombinedIntakeRequest, PreparationPhase, PreparedResumeInputs } from './combined-intake'
 
-import type { MatchScoreBand, PrivacySafeTelemetry, PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
+import type { MatchScoreBand, PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
 import type { ResumeCorrectionKind } from './resume-editing'
 import { assessResumeLayout, proposeResumeCondensation, acceptResumeCondensation, rejectResumeCondensation } from './resume-condensation'
 import type { ResumeProposalDecision } from './structured-resume-contract'
@@ -18,17 +17,17 @@ import type { ResumeSectionName } from './tailored-resume'
 import { applyValidatedSectionChange, changedResumeSession, editResumeField, emptyResumeReview,
   readResumeEditing, readResumeReview, unavailableResumeResult } from './resume-editing'
 import type { ResumeEditingAccess, ResumeReview, ResumeReviewState } from './resume-editing'
-import type { ResumeDocumentPorts, ResumeSectionChange } from './structured-resume-contract'
+import type { ResumeSectionChange } from './structured-resume-contract'
 import { assign, createActor, fromPromise, setup, waitFor } from 'xstate'
 import type { AnyActorRef, SnapshotFrom } from 'xstate'
 import { prepareResumeRendering, staleResumeRendering, validateResumeRendering } from './resume-rendering-state'
 import type { ResumeRenderingState } from './resume-rendering-state'
 
 import { unavailableResumeRender } from './resume-export'
-import type { ResumeDocumentRenderer, ResumeRenderInput, ResumeRenderRequest, ResumeRenderResult } from './resume-export'
+import type { ResumeRenderInput, ResumeRenderRequest, ResumeRenderResult } from './resume-export'
 
 export { assessResumeExport, unavailableResumeRender } from './resume-export'
-export type { ResumeDocumentRenderer, ResumeRenderInput, ResumeRenderRequest, ResumeRenderResult } from './resume-export'
+export type { ResumeRenderInput, ResumeRenderRequest, ResumeRenderResult } from './resume-export'
 
 
 import {
@@ -51,9 +50,6 @@ import { createJobMatch, refreshJobMatch } from './job-match'
 import type {
   JobMatchFailure,
   JobPostingDocument,
-  JobPostingDocumentReader,
-  JobPostingExtractor,
-  MatchEvidenceMatcher,
   ProfileEnrichmentFactKind,
 } from './job-match'
 import type { JobMatch, JobRequirementId } from '@resume-tailoring/domain/job-match'
@@ -63,10 +59,10 @@ import type { ProfileEnrichmentValidationFailure } from './profile-enrichment'
 import type { TailoredResume } from './tailored-resume'
 import type {
   SourceDocument,
-  SourceDocumentReader,
   SourceIntakeFailure,
-  StructuredSourceProfileExtractor,
 } from './source-intake'
+import type { CandidateJourneyDependencies, CandidateSessionNotice, CandidateSessionStorageResult,
+  ResumeSectionModels } from './ports'
 
 export {
   candidateJourneyPhases,
@@ -76,44 +72,6 @@ export {
 } from '@resume-tailoring/domain/candidate-session'
 export type { CandidateJourneyPhase, CandidateSession }
 export type { StoredIntakeDocument, ResumePhoto, ResumePreparationFailure, ResumeSectionSnapshot } from '@resume-tailoring/domain/candidate-session'
-
-export type CandidateSessionNotice =
-  | 'deleted'
-  | 'expired-session-discarded'
-  | 'incompatible-session-discarded'
-  | null
-
-export type CandidateSessionStorageFailure = 'candidate-session-storage-unavailable'
-
-export type CandidateSessionStorageResult<TValue> =
-  | Readonly<{ ok: true; value: TValue }>
-  | Readonly<{ ok: false; error: CandidateSessionStorageFailure }>
-
-export type CandidateSessionPersistence = Readonly<{
-  delete: () => CandidateSessionStorageResult<null>
-  restore: (request: Readonly<{ now: number }>) => CandidateSessionStorageResult<Readonly<{
-    notice: CandidateSessionNotice
-    session: CandidateSession | null
-  }>>
-  save: (request: Readonly<{ session: CandidateSession }>) =>
-    CandidateSessionStorageResult<CandidateSession>
-}>
-
-export type CandidateJourneyDependencies = Readonly<{
-  resumeDocumentRenderer?: ResumeDocumentRenderer
-  telemetry?: PrivacySafeTelemetry
-  resumeDocumentPorts?: Partial<ResumeDocumentPorts>
-  resumeSectionModels?: ResumeSectionModels
-  createSessionId: () => string
-  jobPostingDocumentReader: JobPostingDocumentReader
-  jobPostingExtractor: JobPostingExtractor
-  languageModelGateway: Readonly<{ processingPolicy: ProcessingPolicy }>
-  matchEvidenceMatcher: MatchEvidenceMatcher
-  now: () => number
-  persistence: CandidateSessionPersistence
-  sourceDocumentReader: SourceDocumentReader
-  sourceProfileExtractor: StructuredSourceProfileExtractor
-}>
 
 type CandidateJourneySourceIntakeFailure =
   | SourceIntakeFailure
@@ -1121,7 +1079,7 @@ function canSubmitJobPosting({ session }: Readonly<{
 // Contract vocabulary consumed by BAK-57/58/59 through this existing public seam.
 export type {
   ProfessionalResumeDocument, ResumeCondensationOutcome, ResumeCondensationProposal,
-  ResumeDocumentPorts, ResumeDocumentReview, ResumeDraft, ResumeExportBlocker, ResumeExportEligibility,
+  ResumeDocumentReview, ResumeDraft, ResumeExportBlocker, ResumeExportEligibility,
   ResumeLayoutAssessment, ResumeLayoutOutcome, ResumeOperationFailure, ResumePreparationOutcome,
   ResumeProposalDecision, ResumeProposalDecisionOutcome, ResumeSectionChange, ResumeSectionChangeOutcome,
 } from './structured-resume-contract'

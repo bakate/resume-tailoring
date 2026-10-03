@@ -1,11 +1,8 @@
-import type {
-  JobPostingExtractor,
-  MatchEvidenceMatcher,
-} from '@resume-tailoring/application/job-match'
 import {
   jobPostingExtractionSuccessSchema,
   matchEvidenceSuccessSchema,
-} from './job-match-schemas'
+} from '../../candidate-journey/job-match-schemas'
+import type { JobPostingExtractor, MatchEvidenceMatcher } from '@resume-tailoring/application/ports'
 
 export function createBrowserJobPostingExtractor({
   request = fetch,

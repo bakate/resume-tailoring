@@ -1,11 +1,11 @@
-import type { ResumeClaimReformulator } from '@resume-tailoring/application/resume-claims'
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
-import { createOpenAiResumeClaimReformulator } from '../resume-tailoring/openai-resume-claim-service'
+import { createOpenAiResumeClaimReformulator } from '../adapters/server/openai-resume-claim-service'
 import { resumeClaimWritingRequestSchema } from '../resume-tailoring/resume-claim-schemas'
+import type { ResumeClaimReformulator } from '@resume-tailoring/application/ports'
 
 export const Route = createFileRoute('/api/resume-claim-writing')({
   server: {

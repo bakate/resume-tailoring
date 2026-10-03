@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import type { PrivacySafeTelemetry } from '@resume-tailoring/application/privacy-safe-telemetry'
 
 import { createPrivacySafeBrowserTelemetry } from './browser-adapters'
+import type { PrivacySafeTelemetry } from '@resume-tailoring/application/ports'
 
 describe('privacy-safe browser analytics', () => {
   it('transmits journey progression without a Candidate identifier', async () => {

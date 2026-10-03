@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { renderResumeDocument } from '../candidate-journey/resume-document-renderer'
+import { renderResumeDocument } from '../adapters/server/resume-document-renderer'
 import { crossSegmentQualificationCorpus } from './cross-segment-corpus'
 import { qualifyCrossSegmentDocuments } from './cross-segment-document-qualification'
 import { qualificationSplits } from './cross-segment-qualification'

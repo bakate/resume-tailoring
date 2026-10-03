@@ -39,9 +39,20 @@ module.exports = {
         path: '(@tanstack|react|puppeteer|openai|idb)',
       },
     },
+    {
+      name: 'only-the-composition-root-wires-adapters',
+      comment: 'UI modules reach adapters through apps/web/src/composition-root.ts; API routes and evaluation tests use them directly.',
+      severity: 'error',
+      from: {
+        path: '^apps/web/src',
+        pathNot: '^apps/web/src/(composition-root[.]ts$|adapters/|routes/(api[.]|-)[^/]*[.]ts$)|[.]evaluation[.]test[.]ts$',
+      },
+      to: { path: '^apps/web/src/adapters/' },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },
+    tsPreCompilationDeps: true,
     enhancedResolveOptions: {
       exportsFields: ['exports'],
     },

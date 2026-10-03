@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
-import { requestOpenAiJobPostingExtraction } from '../candidate-journey/openai-job-posting-extractor'
+import { requestOpenAiJobPostingExtraction } from '../adapters/server/openai-job-posting-extractor'
 import { jobPostingExtractionRequestSchema } from '../candidate-journey/job-match-schemas'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
