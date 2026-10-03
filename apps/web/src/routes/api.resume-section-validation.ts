@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
-import { createOpenAiResumeFieldValidator } from '../candidate-journey/openai-resume-section-models'
+import { createOpenAiResumeFieldValidator } from '../adapters/server/openai-resume-section-models'
 import { resumeFieldValidationInputSchema } from '../candidate-journey/resume-document-schemas'
 import { processResumeModel } from './-resume-document-model'
 

@@ -1,7 +1,8 @@
 import { unavailableResumeRender } from '@resume-tailoring/application/candidate-journey'
-import type { ResumeDocumentRenderer, ResumeRenderRequest, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
-import type { PrivacySafeTelemetry, resumeRenderFailureCategories } from '@resume-tailoring/application/privacy-safe-telemetry'
-import { resumeRenderResponseSchema } from './resume-render-schema'
+import type { ResumeRenderRequest, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
+import type { resumeRenderFailureCategories } from '@resume-tailoring/application/privacy-safe-telemetry'
+import { resumeRenderResponseSchema } from '../../candidate-journey/resume-render-schema'
+import type { PrivacySafeTelemetry, ResumeDocumentRenderer } from '@resume-tailoring/application/ports'
 
 type RenderFailureCategory = typeof resumeRenderFailureCategories[number]
 type RenderAttempt = Readonly<{ ok: true; result: ResumeRenderResult }> | Readonly<{ ok: false; category: RenderFailureCategory }>

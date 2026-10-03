@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
-import { requestOpenAiJobMatchEvidence } from '../candidate-journey/openai-job-match-evidence-matcher'
+import { requestOpenAiJobMatchEvidence } from '../adapters/server/openai-job-match-evidence-matcher'
 import { matchEvidenceRequestSchema } from '../candidate-journey/job-match-schemas'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'

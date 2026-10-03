@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
-import { renderResumeDocument } from '../candidate-journey/resume-document-renderer'
+import { renderResumeDocument } from '../adapters/server/resume-document-renderer'
 import { resumeRenderRequestSchema } from '../candidate-journey/resume-render-schema'
 
 export const Route = createFileRoute('/api/resume-document')({

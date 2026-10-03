@@ -1,7 +1,7 @@
-import type { ResumeDocumentCoherence, ResumeModelUsage, ResumeSectionKind, ResumeSectionModelFailure,
-  ResumeSectionModels } from '@resume-tailoring/application/candidate-journey'
+import type { ResumeDocumentCoherence, ResumeModelUsage, ResumeSectionKind, ResumeSectionModelFailure } from '@resume-tailoring/application/candidate-journey'
 
 import type { CalibratedGate } from './model-qualification'
+import type { ResumeSectionModels } from '@resume-tailoring/application/ports'
 
 export type SectionPreparationBudgets = Readonly<{
   sectionP95LatencyMilliseconds: number

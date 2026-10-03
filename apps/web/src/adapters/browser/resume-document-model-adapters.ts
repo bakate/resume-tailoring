@@ -1,11 +1,11 @@
-import type { ProfessionalResumeDocument, ResumeDocumentPorts, ResumeOperationFailure, ResumeSectionChange } from '@resume-tailoring/application/candidate-journey'
-import type { LanguageModelFailure } from '@resume-tailoring/application/language-model-gateway'
+import type { ProfessionalResumeDocument, ResumeOperationFailure, ResumeSectionChange } from '@resume-tailoring/application/candidate-journey'
 import { validateProposedResumeClaim } from '@resume-tailoring/application/resume-claims'
 import type { ResumeClaimWritingInputs } from '@resume-tailoring/application/resume-claims'
 import type { CandidateFact } from '@resume-tailoring/application/source-intake'
 import { readExperienceFields, readSectionFields } from '@resume-tailoring/application/tailored-resume'
 import type { TailoredResumeField } from '@resume-tailoring/application/tailored-resume'
 import type { OpenAiLanguageModelGateway } from './openai-language-model-gateway'
+import type { LanguageModelFailure, ResumeDocumentPorts } from '@resume-tailoring/application/ports'
 
 type AdapterOptions = Readonly<{ gateway: OpenAiLanguageModelGateway; createProposalId?: () => string }>
 type FieldValidation = Readonly<{ status: 'supported' | 'unsupported' }> | ResumeOperationFailure

@@ -13,10 +13,6 @@ export type ResumeRenderResult = Readonly<{
   pdf: Uint8Array | null
 }>
 
-export type ResumeDocumentRenderer = Readonly<{
-  render: (request: ResumeRenderRequest) => Promise<ResumeRenderResult>
-}>
-
 export function assessResumeExport({ draft, layout, unsupportedFieldIds }: ResumeRenderRequest & Readonly<{
   layout: ResumeLayoutOutcome
 }>): ResumeLayoutAssessment {

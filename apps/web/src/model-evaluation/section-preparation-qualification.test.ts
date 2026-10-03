@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ResumeSectionModels, ResumeSectionPlanEntry } from '@resume-tailoring/application/candidate-journey'
+import type { ResumeSectionPlanEntry } from '@resume-tailoring/application/candidate-journey'
 
 import { realSizedResumeFixture } from './real-sized-resume-corpus'
 import {
@@ -8,6 +8,7 @@ import {
   type MeasuredResumeSection,
   type SectionPreparationRun,
 } from './section-preparation-qualification'
+import type { ResumeSectionModels } from '@resume-tailoring/application/ports'
 
 describe('section preparation qualification on a real-sized resume', () => {
   it('passes when every section meets the p95 budget and every preparation meets the wall-time budget', () => {

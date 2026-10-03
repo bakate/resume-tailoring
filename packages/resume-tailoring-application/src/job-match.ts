@@ -18,6 +18,7 @@ import type {
   PracticalConstraint,
   TargetRole,
 } from '@resume-tailoring/domain/job-match'
+import type { JobPostingDocumentReader, JobPostingExtractor, MatchEvidenceMatcher } from './ports'
 
 export type {
   JobMatch,
@@ -46,40 +47,16 @@ export type JobPostingDocumentFailure =
   | 'unsupported-job-posting'
   | 'unreadable-job-posting'
 
-export type JobPostingDocumentReader = Readonly<{
-  read: (document: JobPostingDocument) => Promise<
-    | Readonly<{ ok: true; value: Readonly<{ text: string }> }>
-    | Readonly<{ ok: false; error: JobPostingDocumentFailure }>
-  >
-}>
-
 export type ExtractedJobPosting = Readonly<{
   practicalConstraints: readonly PracticalConstraint[]
   requirements: readonly JobRequirement[]
   targetRole: TargetRole | null
 }>
 
-export type JobPostingExtractor = Readonly<{
-  extract: (request: Readonly<{ jobPostingContent: string }>) => Promise<
-    | Readonly<{ ok: true; value: ExtractedJobPosting }>
-    | Readonly<{ ok: false; error: 'job-posting-extraction-unavailable' }>
-  >
-}>
-
 export type MatchEvidenceProposal = Readonly<{
   adjacentEvidence: readonly ProposedAdjacentEvidence[]
   evidence: readonly ProposedMatchEvidence[]
   relevance: readonly ProposedRelevantFact[]
-}>
-
-export type MatchEvidenceMatcher = Readonly<{
-  match: (request: Readonly<{
-    candidateFacts: readonly EngineCandidateFact[]
-    requirements: readonly JobRequirement[]
-  }>) => Promise<
-    | Readonly<{ ok: true; value: MatchEvidenceProposal }>
-    | Readonly<{ ok: false; error: 'match-evidence-unavailable' }>
-  >
 }>
 
 export const profileEnrichmentFactKinds = [

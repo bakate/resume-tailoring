@@ -53,12 +53,6 @@ export type ResumeSectionModelResult<TValue> =
   | Readonly<{ ok: true; value: TValue; usage?: ResumeModelUsage }>
   | Readonly<{ ok: false; error: Readonly<{ type: ResumeSectionModelFailure }>; usage?: ResumeModelUsage }>
 
-export type ResumeSectionModels = Readonly<{
-  writeSection: (input: ResumeSectionWritingInput) => Promise<ResumeSectionModelResult<ResumeSectionContent>>
-  validateFields: (input: ResumeFieldValidationInput) => Promise<ResumeSectionModelResult<ResumeFieldValidation>>
-  checkCoherence: (input: ResumeCoherenceInput) => Promise<ResumeSectionModelResult<ResumeDocumentCoherence>>
-}>
-
 export type ResumeSectionsRequest = Readonly<{
   candidateFacts: readonly CandidateFact[]
   jobMatch: JobMatch

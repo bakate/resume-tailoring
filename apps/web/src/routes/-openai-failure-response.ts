@@ -1,4 +1,4 @@
-import type { OpenAiRequestFailure } from '../resume-tailoring/openai-request'
+import type { OpenAiRequestFailure } from '../adapters/server/openai-request'
 
 type OpenAiRouteFailure = OpenAiRequestFailure | Readonly<{
   type: 'invalid-model-output' | 'request-too-large'

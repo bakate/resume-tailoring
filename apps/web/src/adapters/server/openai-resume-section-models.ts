@@ -1,27 +1,17 @@
 import { z } from 'zod'
-import type { ResumeCoherenceInput, ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput,
-  ResumeSectionContent, ResumeSectionKind, ResumeSectionModelResult, ResumeSectionWritingInput,
+import type { ResumeSectionContent, ResumeSectionKind, ResumeSectionModelResult,
 } from '@resume-tailoring/application/candidate-journey'
-import type { OpenAiReasoningEffort } from '../openai-model-configuration'
-import { createOpenAiRequester } from '../resume-tailoring/openai-request'
-import type { OpenAiRequestFailure } from '../resume-tailoring/openai-request'
+import type { ResumeCoherenceChecker, ResumeFieldValidator, ResumeSectionWriter } from '@resume-tailoring/application/ports'
+import type { OpenAiReasoningEffort } from '../../openai-model-configuration'
+import { createOpenAiRequester } from './openai-request'
+import type { OpenAiRequestFailure } from './openai-request'
 import { resumeDocumentCoherenceSchema, resumeFieldValidationSchema, resumeSectionOutputSchemas,
-  resumeStructuredOutputFormat } from './resume-document-schemas'
+  resumeStructuredOutputFormat } from '../../candidate-journey/resume-document-schemas'
 
 type ModelConfiguration = Readonly<{
   apiKey: string; model: string; reasoningEffort: OpenAiReasoningEffort; request?: typeof fetch
 }>
 type ResumeSectionOperation = 'resume-section-writing' | 'resume-section-validation' | 'resume-document-coherence'
-
-export type ResumeSectionWriter = Readonly<{
-  write: (input: ResumeSectionWritingInput) => Promise<ResumeSectionModelResult<ResumeSectionContent>>
-}>
-export type ResumeFieldValidator = Readonly<{
-  validate: (input: ResumeFieldValidationInput) => Promise<ResumeSectionModelResult<ResumeFieldValidation>>
-}>
-export type ResumeCoherenceChecker = Readonly<{
-  check: (input: ResumeCoherenceInput) => Promise<ResumeSectionModelResult<ResumeDocumentCoherence>>
-}>
 
 export function createOpenAiResumeSectionWriter(configuration: ModelConfiguration): ResumeSectionWriter {
   return { write: async (input) => {

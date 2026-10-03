@@ -1,33 +1,26 @@
 import type { ResumeModelUsage, ResumeSectionModelResult } from '@resume-tailoring/application/candidate-journey'
 import { createBrowserResumeCoherenceChecker, createBrowserResumeFieldValidator, createBrowserResumeSectionWriter } from './browser-resume-section-models'
-import type { ResumeCoherenceChecker, ResumeFieldValidator, ResumeSectionWriter } from './openai-resume-section-models'
+import type { ResumeCoherenceChecker, ResumeFieldValidator, ResumeSectionWriter } from '@resume-tailoring/application/ports'
 import {
   createLanguageModelGateway,
 } from '@resume-tailoring/application/language-model-gateway'
 import type {
   LanguageModelGateway,
-  LanguageModelGatewayAdapter,
-  LanguageModelResult,
   ProcessingConsent,
   ProcessingPolicy,
 } from '@resume-tailoring/application/language-model-gateway'
-import type {
-  StructuredSourceProfileExtractor,
-} from '@resume-tailoring/application/source-intake'
-import type {
-  JobPostingExtractor as ExplainableJobPostingExtractor,
-  MatchEvidenceMatcher as ExplainableMatchEvidenceMatcher,
-} from '@resume-tailoring/application/job-match'
-import type { ResumeClaimSemanticValidator, ResumeClaimReformulator } from '@resume-tailoring/application/resume-claims'
 import {
   createBrowserResumeClaimSemanticValidator,
   createBrowserResumeClaimReformulator,
-} from '../resume-tailoring/browser-adapters'
+} from './browser-adapters'
 import { createBrowserStructuredSourceProfileExtractor } from './browser-structured-source-profile-extractor'
 import {
   createBrowserJobMatchEvidenceMatcher,
   createBrowserJobPostingExtractor,
 } from './browser-job-match-adapters'
+import type { JobPostingExtractor as ExplainableJobPostingExtractor, LanguageModelGatewayAdapter,
+  LanguageModelResult, MatchEvidenceMatcher as ExplainableMatchEvidenceMatcher, ResumeClaimReformulator,
+  ResumeClaimSemanticValidator, StructuredSourceProfileExtractor } from '@resume-tailoring/application/ports'
 
 type StructuredModelRequest =
   | ModelRequest<'resume-section-validation', Parameters<ResumeFieldValidator['validate']>[0]>

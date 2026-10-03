@@ -13,7 +13,6 @@ import type {
 import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
 import type {
   SourceDocumentFailure,
-  SourceDocumentReader,
   StructuredSourceProfileExtraction,
 } from '@resume-tailoring/application/source-intake'
 import {
@@ -23,6 +22,7 @@ import {
   createFakeSourceProfileExtractor,
   createInMemoryCandidateSessionPersistence,
 } from '@resume-tailoring/application/testing'
+import type { SourceDocumentReader } from '@resume-tailoring/application/ports'
 
 const currentTime = Date.UTC(2026, 8, 29, 9)
 const activeProcessingPolicy = {

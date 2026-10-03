@@ -9,6 +9,7 @@ import { sourceProfileSections } from '@resume-tailoring/domain/source-intake'
 
 import { minimizeCandidateContent } from './candidate-name'
 import { locateSourceSpan } from './source-span'
+import type { SourceDocumentReader, StructuredSourceProfileExtractor } from './ports'
 
 export type {
   CandidateFact,
@@ -32,28 +33,11 @@ export type SourceDocumentFailure =
   | 'unsupported-document'
   | 'unreadable-document'
 
-export type SourceDocumentReader = Readonly<{
-  read: (document: SourceDocument) => Promise<
-    | Readonly<{ ok: true; value: Readonly<{ pageCount: number | null; text: string }> }>
-    | Readonly<{ ok: false; error: SourceDocumentFailure }>
-  >
-}>
-
 export type StructuredSourceProfileExtraction = StructuredSourceProfile & Readonly<{
   criticalAmbiguities: readonly Readonly<{
     path: string
     question: string
   }>[]
-}>
-
-export type StructuredSourceProfileExtractor = Readonly<{
-  extract: (request: Readonly<{ professionalContent: string }>) => Promise<
-    | Readonly<{ ok: true; value: StructuredSourceProfileExtraction }>
-    | Readonly<{
-        ok: false
-        error: 'processing-consent-required' | 'source-profile-extraction-unavailable'
-      }>
-  >
 }>
 
 export type SourceIntakeFailure =

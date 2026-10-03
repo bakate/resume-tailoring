@@ -6,8 +6,9 @@ import { assembleResumeDocumentWithOrigins, citedCandidateFacts, createSectionWr
   isSectionFullyValidated, normalizeSectionContent, planResumeSections, readRejectedFields,
   readSectionContentFields, removeSectionFields } from './resume-sections'
 import type { ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage,
-  ResumeRejectedField, ResumeSectionContent, ResumeSectionModelResult, ResumeSectionModels, ResumeSectionPlanEntry, ResumeSectionsRequest,
+  ResumeRejectedField, ResumeSectionContent, ResumeSectionModelResult, ResumeSectionPlanEntry, ResumeSectionsRequest,
   ResumeSectionWritingInput } from './resume-sections'
+import type { ResumeSectionModels } from './ports'
 
 type ResumeSectionFailure = Exclude<typeof resumeSectionOutcomes[number], 'validated'>
 

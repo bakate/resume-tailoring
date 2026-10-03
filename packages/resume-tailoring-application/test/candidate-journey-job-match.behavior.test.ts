@@ -11,7 +11,6 @@ import {
 } from '@resume-tailoring/application/candidate-journey'
 import type {
   CandidateJourney,
-  CandidateJourneyDependencies,
   CandidateJourneyView,
   CandidateSession,
   ResumeSectionWritingInput,
@@ -21,6 +20,7 @@ import type {
   MatchEvidenceProposal,
 } from '@resume-tailoring/application/job-match'
 import { createJobMatch } from '@resume-tailoring/application/job-match'
+import type { CandidateJourneyDependencies } from '@resume-tailoring/application/ports'
 
 const currentTime = Date.UTC(2026, 8, 29, 10)
 

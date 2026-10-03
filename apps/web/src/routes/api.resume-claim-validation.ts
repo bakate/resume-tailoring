@@ -3,7 +3,7 @@ import { createCsrfMiddleware } from '@tanstack/react-start'
 
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
-import { createOpenAiResumeClaimSemanticValidator } from '../resume-tailoring/openai-resume-claim-service'
+import { createOpenAiResumeClaimSemanticValidator } from '../adapters/server/openai-resume-claim-service'
 import { resumeClaimValidationRequestSchema } from '../resume-tailoring/resume-claim-schemas'
 
 export const Route = createFileRoute('/api/resume-claim-validation')({

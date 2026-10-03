@@ -1,0 +1,65 @@
+/**
+ * The only module that wires browser adapters into the Candidate Journey. UI modules reach adapters through it alone.
+ */
+import { createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateJourney } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateJourneyDependencies } from '@resume-tailoring/application/ports'
+import { createPrivacySafeBrowserTelemetry } from './adapters/browser/browser-adapters'
+import { createBrowserCandidateSessionPersistence } from './adapters/browser/browser-candidate-session-persistence'
+import { createBrowserResumeDocumentRenderer } from './adapters/browser/browser-resume-document-renderer'
+import { createBrowserJobPostingDocumentReader } from './adapters/browser/job-posting-document-reader'
+import {
+  createGatewayJobPostingExtractor,
+  createGatewayMatchEvidenceMatcher,
+  createGatewayResumeSectionModels,
+  createGatewaySourceProfileExtractor,
+} from './adapters/browser/language-model-gateway-ports'
+import { createOpenAiLanguageModelGateway } from './adapters/browser/openai-language-model-gateway'
+import type { OpenAiLanguageModelGateway } from './adapters/browser/openai-language-model-gateway'
+import { createResumeDocumentModelAdapters } from './adapters/browser/resume-document-model-adapters'
+import { createBrowserSourceIntakeDocumentReader } from './adapters/browser/source-intake-document-reader'
+
+export type BrowserCandidateJourneySystem = Readonly<{
+  candidateJourney: CandidateJourney
+  languageModelGateway: OpenAiLanguageModelGateway
+}>
+
+export function createBrowserCandidateJourneySystem(): BrowserCandidateJourneySystem {
+  let candidateJourney: CandidateJourney | null = null
+  const languageModelGateway = createOpenAiLanguageModelGateway({
+    readProcessingConsent: () => readProcessingConsent({ candidateJourney }),
+  })
+  candidateJourney = createCandidateJourney({
+    dependencies: createBrowserDependencies({ languageModelGateway }),
+  })
+  return { candidateJourney, languageModelGateway }
+}
+
+function createBrowserDependencies({ languageModelGateway }: Readonly<{
+  languageModelGateway: OpenAiLanguageModelGateway
+}>): CandidateJourneyDependencies {
+  const telemetry = createPrivacySafeBrowserTelemetry()
+  return {
+    resumeDocumentRenderer: createBrowserResumeDocumentRenderer({ telemetry }),
+    telemetry,
+    resumeDocumentPorts: createResumeDocumentModelAdapters({ gateway: languageModelGateway }),
+    resumeSectionModels: createGatewayResumeSectionModels({ languageModelGateway }),
+    createSessionId: () => crypto.randomUUID(),
+    jobPostingDocumentReader: createBrowserJobPostingDocumentReader(),
+    jobPostingExtractor: createGatewayJobPostingExtractor({ languageModelGateway }),
+    languageModelGateway,
+    matchEvidenceMatcher: createGatewayMatchEvidenceMatcher({ languageModelGateway }),
+    now: () => Date.now(),
+    persistence: createBrowserCandidateSessionPersistence({ storage: localStorage, page: window }),
+    sourceDocumentReader: createBrowserSourceIntakeDocumentReader(),
+    sourceProfileExtractor: createGatewaySourceProfileExtractor({ languageModelGateway }),
+  }
+}
+
+/** The gateway binds Processing Consent to the Candidate Session the journey currently holds. */
+function readProcessingConsent({ candidateJourney }: Readonly<{
+  candidateJourney: CandidateJourney | null
+}>) {
+  const view = candidateJourney?.readView()
+  return view?.status === 'candidate-session-open' ? view.session.processingConsent : null
+}
