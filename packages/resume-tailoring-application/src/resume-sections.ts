@@ -1,6 +1,6 @@
 import type { JobMatch } from '@resume-tailoring/domain/job-match'
 import type { CandidateFact, CandidateFactId } from '@resume-tailoring/domain/source-intake'
-import { readExperienceFields, readSectionFields } from './tailored-resume'
+import { readExperienceFields, readSectionFields, replaceEmDashes } from './tailored-resume'
 import type { TailoredResumeExperience, TailoredResumeField, TailoredResumeLocale, TailoredResumeSection } from './tailored-resume'
 import type { ProfessionalResumeDocument } from './structured-resume-contract'
 import type { ResumeSectionContent, ResumeSectionKind } from '@resume-tailoring/domain/tailored-resume'
@@ -41,7 +41,7 @@ export type ResumeCoherenceInput = Readonly<{ document: ProfessionalResumeDocume
 export const resumeCoherenceIssueKinds = ['chronology', 'mixed-association', 'redundant', 'skill-category',
   'duplicated-skill', 'language'] as const
 export type ResumeCoherenceIssueKind = typeof resumeCoherenceIssueKinds[number]
-/** A field of the assembled document that the coherence check objects to; its section is rewritten. */
+/** A field of the assembled document that the coherence check objects to: removed when redundant, else rewritten. */
 export type ResumeCoherenceIssue = Readonly<{ fieldId: string; kind: ResumeCoherenceIssueKind }>
 export type ResumeDocumentCoherence = Readonly<{
   coherent: boolean; languageMatches: boolean; issues: readonly ResumeCoherenceIssue[]
@@ -105,9 +105,11 @@ function readSectionFacts({ candidateFacts, section }: Readonly<{
 }
 
 /** Applies the deterministic normalization owned by the application, never by the writing role. */
-export function normalizeSectionContent({ content, purpose, section }: Readonly<{
+export function normalizeSectionContent({ content: written, purpose, section }: Readonly<{
   content: ResumeSectionContent; purpose: 'tailored' | 'normalized'; section: ResumeSectionPlanEntry
 }>): ResumeSectionContent {
+  const content = mapSectionFields({ content: written,
+    map: (field) => ({ ...field, text: replaceEmDashes(field.text) }) })
   if (content.kind === 'experience') {
     const { experience } = content
     return { kind: 'experience', experience: { ...experience, id: section.key,
@@ -118,6 +120,26 @@ export function normalizeSectionContent({ content, purpose, section }: Readonly<
     return { kind: 'skills', groups: content.groups.map((group) => ({ ...group, items: deduplicateFields(group.items) })) }
   }
   return content
+}
+
+function mapSectionFields({ content, map }: Readonly<{
+  content: ResumeSectionContent; map: (field: TailoredResumeField) => TailoredResumeField
+}>): ResumeSectionContent {
+  const mapOrNull = (field: TailoredResumeField | null) => field === null ? null : map(field)
+  if (content.kind === 'value-proposition') return { ...content, paragraphs: content.paragraphs.map(map) }
+  if (content.kind === 'experience') {
+    const { experience } = content
+    return { ...content, experience: { ...experience, role: mapOrNull(experience.role),
+      organization: mapOrNull(experience.organization), startDate: mapOrNull(experience.startDate),
+      endDate: mapOrNull(experience.endDate), location: mapOrNull(experience.location ?? null),
+      context: mapOrNull(experience.context),
+      achievements: experience.achievements.map(map) } }
+  }
+  if (content.kind === 'skills') {
+    return { ...content, groups: content.groups.map((group) => ({ ...group, category: mapOrNull(group.category),
+      items: group.items.map(map) })) }
+  }
+  return { ...content, fields: content.fields.map(map) }
 }
 
 function deduplicateFields(fields: readonly TailoredResumeField[]) {
@@ -135,6 +157,34 @@ export function readSectionContentFields(content: ResumeSectionContent): readonl
   if (content.kind === 'value-proposition') return content.paragraphs
   if (content.kind === 'experience') return readExperienceFields({ experience: content.experience })
   if (content.kind === 'skills') return readSectionFields({ section: { section: 'skills', groups: content.groups } })
+  return content.fields
+}
+
+/**
+ * The section without the given fields, or null when one of them is not a list item that can simply be left out
+ * (an experience role or date, a skill category): removing those would break the section's structure.
+ */
+export function removeSectionFields({ content, fieldIds }: Readonly<{
+  content: ResumeSectionContent; fieldIds: readonly string[]
+}>): ResumeSectionContent | null {
+  const removable = new Set(readListItemFields(content).map(({ id }) => id))
+  if (!fieldIds.every((id) => removable.has(id))) return null
+  const keep = (fields: readonly TailoredResumeField[]) => fields.filter(({ id }) => !fieldIds.includes(id))
+  if (content.kind === 'value-proposition') return { ...content, paragraphs: keep(content.paragraphs) }
+  if (content.kind === 'experience') {
+    return { ...content, experience: { ...content.experience, achievements: keep(content.experience.achievements) } }
+  }
+  if (content.kind === 'skills') {
+    return { ...content, groups: content.groups.map((group) => ({ ...group, items: keep(group.items) }))
+      .filter(({ items }) => items.length > 0) }
+  }
+  return { ...content, fields: keep(content.fields) }
+}
+
+function readListItemFields(content: ResumeSectionContent): readonly TailoredResumeField[] {
+  if (content.kind === 'value-proposition') return content.paragraphs
+  if (content.kind === 'experience') return content.experience.achievements
+  if (content.kind === 'skills') return content.groups.flatMap(({ items }) => items)
   return content.fields
 }
 
@@ -156,10 +206,11 @@ export function hasSupportedSectionStructure({ content, input }: Readonly<{
 function experienceRetainsAssociations({ candidateFacts, experience }: Readonly<{
   candidateFacts: readonly CandidateFact[]; experience: TailoredResumeExperience
 }>) {
-  return (['role', 'organization', 'startDate', 'endDate', 'context'] as const).every((name) => {
+  return (['role', 'organization', 'startDate', 'endDate', 'location', 'context'] as const).every((name) => {
     const expectedFacts = candidateFacts.filter(({ path }) => path.startsWith(`${experience.id}.${name}.`))
-    const field = experience[name]
-    if (field === null) return name === 'context' || expectedFacts.length === 0
+    const field = experience[name] ?? null
+    // Context and location may be left out; a role, an employer or a date the facts hold must be kept.
+    if (field === null) return name === 'context' || name === 'location' || expectedFacts.length === 0
     return expectedFacts.length > 0 && field.factIds.every((factId) => expectedFacts.some(({ id }) => id === factId))
   })
 }
@@ -195,7 +246,8 @@ export function assembleResumeDocument(request: Readonly<{
 }
 
 /** The Resume Section key and the section's own field behind one field id of the assembled document. */
-export type AssembledFieldOrigin = Readonly<{ sectionKey: string; field: TailoredResumeField }>
+/** Where an assembled field came from; `copiedFromSource` marks a date or a location the writer may not change. */
+export type AssembledFieldOrigin = Readonly<{ sectionKey: string; field: TailoredResumeField; copiedFromSource: boolean }>
 
 /**
  * Assembles validated sections in plan order; a field identifier reused across sections is made unique.
@@ -206,25 +258,29 @@ export function assembleResumeDocumentWithOrigins({ contents, request }: Readonl
 }>): Readonly<{ document: ProfessionalResumeDocument; origins: ReadonlyMap<string, AssembledFieldOrigin> }> {
   const origins = new Map<string, AssembledFieldOrigin>()
   // `key` is always the section key: experiences carry it as their id, every other section kind is its own key.
-  const unique = (field: TailoredResumeField, key: string): TailoredResumeField => {
+  const unique = (field: TailoredResumeField, key: string, copiedFromSource = false): TailoredResumeField => {
     const id = origins.has(field.id) ? `${key}.${field.id}` : field.id
-    origins.set(id, { sectionKey: key, field })
+    origins.set(id, { sectionKey: key, field, copiedFromSource })
     return id === field.id ? field : { ...field, id }
   }
-  const uniqueOrNull = (field: TailoredResumeField | null, key: string) => field === null ? null : unique(field, key)
+  const uniqueOrNull = (field: TailoredResumeField | null, key: string, copiedFromSource = false) =>
+    field === null ? null : unique(field, key, copiedFromSource)
   const paragraphs = contents.flatMap((content) => content.kind === 'value-proposition'
     ? content.paragraphs.map((field) => unique(field, 'value-proposition')) : [])
   const experiences = contents.flatMap((content) => content.kind !== 'experience' ? [] : [{ ...content.experience,
     role: uniqueOrNull(content.experience.role, content.experience.id),
     organization: uniqueOrNull(content.experience.organization, content.experience.id),
-    startDate: uniqueOrNull(content.experience.startDate, content.experience.id),
-    endDate: uniqueOrNull(content.experience.endDate, content.experience.id),
+    startDate: uniqueOrNull(content.experience.startDate, content.experience.id, true),
+    endDate: uniqueOrNull(content.experience.endDate, content.experience.id, true),
+    location: uniqueOrNull(content.experience.location ?? null, content.experience.id, true),
     context: uniqueOrNull(content.experience.context, content.experience.id),
     achievements: content.experience.achievements.map((field) => unique(field, content.experience.id)) }])
   const sections = contents.flatMap((content): TailoredResumeSection[] => {
+    if (content.kind === 'skills' && content.groups.length === 0) return []
     if (content.kind === 'skills') return [{ section: 'skills', groups: content.groups.map((group) => ({ ...group,
       category: uniqueOrNull(group.category, 'skills'), items: group.items.map((field) => unique(field, 'skills')) })) }]
-    if (content.kind === 'value-proposition' || content.kind === 'experience') return []
+    // A section whose every field was removed as redundant is left out rather than shown as an empty heading.
+    if (content.kind === 'value-proposition' || content.kind === 'experience' || content.fields.length === 0) return []
     return [{ section: content.kind, fields: content.fields.map((field) => unique(field, content.kind)) }]
   })
   return { origins, document: { purpose: request.purpose, locale: request.locale,

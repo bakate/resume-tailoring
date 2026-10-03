@@ -296,10 +296,12 @@ class CandidateJourneyTestSystem {
       (candidateFact) => candidateFact.status === 'attested',
     )).toBe(true)
     expect(view.session.sourceIntake?.contactDetails).toEqual([
+      { kind: 'name', value: 'Bakate Example' },
       { kind: 'email', value: 'bakate@example.com' },
     ])
     expect(this.#modelRequests).toHaveLength(1)
     expect(this.#modelRequests[0]).not.toContain('bakate@example.com')
+    expect(this.#modelRequests[0]).not.toContain('Bakate Example')
   }
 
   expectOnlyAmbiguousFactToBeExcluded() {

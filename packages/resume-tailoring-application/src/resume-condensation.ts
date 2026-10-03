@@ -1,7 +1,8 @@
 import type { ResumeDraft, ResumeLayoutOutcome, ResumeProposalDecision } from './structured-resume-contract'
 import type { ResumeEditingAccess, ResumeReview } from './resume-editing'
-import { assessEligibility, changedResumeSession, consentRequired, professionalDocument,
+import { changedResumeSession, consentRequired, professionalDocument,
   reportFailure, staleResumeResult, unavailableResumeResult, unsupportedResumeResult } from './resume-editing'
+import { assessResumeExport } from './resume-export'
 import { readResumeFields } from './resume-field-editing'
 
 export async function assessResumeLayout({ access, photoDataUrl }: Readonly<{ access: ResumeEditingAccess; photoDataUrl?: string }>) {
@@ -12,7 +13,7 @@ export async function assessResumeLayout({ access, photoDataUrl }: Readonly<{ ac
   const current = access.readReview()
   if (current?.draft.revision !== review.draft.revision) return
   access.report({ baseRevision: current.draft.revision, review: { ...current, operation: null,
-    assessment: assessEligibility({ ...current.draft, unsupportedFieldIds: current.unsupportedFieldIds, layout }) } })
+    assessment: assessResumeExport({ draft: current.draft, unsupportedFieldIds: current.unsupportedFieldIds, layout }) } })
 }
 
 async function measureResume({ access, draft, unsupportedFieldIds, photoDataUrl }: Readonly<{

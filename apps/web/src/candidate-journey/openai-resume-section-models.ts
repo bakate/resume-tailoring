@@ -103,6 +103,7 @@ const sharedWritingInstructions = [
   'relevantFactIds may include Adjacent Evidence: Candidate Facts showing a related but distinct capability next to an uncovered Job Requirement. You may highlight them in their own words, but never name the uncovered capability or imply the Candidate has it.',
   'For purpose normalized, write a general professional resume section without claiming relevance to any posting.',
   'Identity and contact details are local exceptions, absent from your input and output. Return only the requested section.',
+  'Never write an em dash (—), which French typography does not use; write an en dash (–), a colon or a comma instead.',
   'rejectedFields lists fields of your previous attempt at this section with the reason they were rejected. Never reuse them as written.',
   'Reason unsupported: validation found the field unsupported by the Candidate Facts it cited; remove the unsupported proposition or rewrite it so that every proposition is directly supported by the facts you cite.',
   'Reason redundant: another section already says the same; keep only content specific to this section or leave the field out. Reason language: write it in the requested locale. Other reasons (chronology, mixed-association, skill-category, duplicated-skill) name a cross-section coherence problem to remove without inventing content.',
@@ -113,6 +114,7 @@ const sectionWritingInstructions: Record<ResumeSectionKind, string> = {
   experience: [
     'Write this one experience with id equal to section.key, retaining its role, employer and dates as one coherent entry.',
     'Choose chronology relevant when the experience holds facts listed in relevantFactIds, context when it is supporting experience worth condensing, and earlier when role, employer and dates suffice. For purpose normalized never choose relevant.',
+    'Copy the location fact into location as written, or null when there is none; never move it into context.',
     'Select and reformulate relevant achievements. Condense contextual experience; earlier experience needs role, employer and dates, not exhaustive bullets. Keep distinct achievements even when they use the same technology.',
   ].join(' '),
   skills: 'Group skills by category. Category labels organize items and never become standalone bullets. Remove duplicate skill items and redundant paraphrases within a group.',
@@ -139,6 +141,7 @@ const coherenceInstructions = [
   'Set coherent false for misleading career chronology, mixed experience associations, redundant paraphrases of an achievement across sections, incoherent skill categories or duplicated skill items.',
   'Whenever coherent or languageMatches is false, list in issues every field id that must change, with its kind: chronology, mixed-association, redundant, skill-category, duplicated-skill or language. For a redundancy, name only the field that repeats content better placed elsewhere, never both. Leave issues empty when the document passes.',
   'Distinct achievements using the same technology and purposeful repetition across summary, skills and experience are valid.',
+  'Concurrent or overlapping experiences, including several roles or products at the same organization, are a valid chronology. Dates and locations are copied from the Candidate and are never an issue.',
   'Set languageMatches false unless professional prose uses document.locale. Proper nouns and standard technical terms may stay unchanged.',
   'A normalized resume must not imply tailoring or relevance to a Job Posting.',
 ].join(' ')

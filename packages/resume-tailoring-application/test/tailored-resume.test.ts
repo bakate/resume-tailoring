@@ -26,6 +26,16 @@ describe('Tailored Resume generation', () => {
     expect(readFields({ tailoredResume }).every((field) => field.factIds.length > 0)).toBe(true)
   })
 
+  it('keeps the location of an experience for its dates line, never for the summary', () => {
+    const tailoredResume = createTailoredResume({ jobMatch, sourceIntake: { ...sourceIntake,
+      candidateFacts: [...sourceIntake.candidateFacts, { id: 'source-fact-experiences-0-location-0',
+        path: 'experiences.0.location.0', status: 'attested', value: 'Paris' }] } })
+
+    expect(tailoredResume.experiences[0]?.location).toMatchObject({
+      factIds: ['source-fact-experiences-0-location-0'], text: 'Paris' })
+    expect(tailoredResume.valueProposition.paragraphs.map(({ text }) => text)).not.toContain('Paris')
+  })
+
   it('uses the Candidate-selected language without translating qualifications or proper nouns', () => {
     const tailoredResume = createTailoredResume({ jobMatch, locale: 'en', sourceIntake })
 

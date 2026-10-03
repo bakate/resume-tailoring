@@ -397,11 +397,11 @@ class CandidateJourneyTestSystem {
     })
     await this.#page.route('**/api/resume-document-coherence', (route) => {
       if (this.#scenario !== 'incoherent') return route.fallback()
-      // The Value Proposition keeps repeating an experience achievement, before and after its rewrite.
+      // The Value Proposition keeps mixing two experiences, before and after its rewrite; a redundancy would be removed.
       const { document } = route.request().postDataJSON() as ResumeCoherenceInput
       const fieldId = document.valueProposition.paragraphs[0]?.id ?? 'missing-field'
       return route.fulfill({ json: { ok: true, value: { coherent: false, languageMatches: true,
-        issues: [{ fieldId, kind: 'redundant' }] } } })
+        issues: [{ fieldId, kind: 'mixed-association' }] } } })
     })
   }
 
@@ -497,7 +497,7 @@ class CandidateJourneyTestSystem {
   async expectCurrentSourceEvidence() {
     this.#expectAction()
     const source = this.#page.getByRole('region', { name: 'Complete your Source Intake' })
-    await expect(source.getByText('Frontend Engineer — Northwind', { exact: true })).toBeVisible()
+    await expect(source.getByText('Frontend Engineer – Northwind', { exact: true })).toBeVisible()
     await expect(source.getByText('Built accessible billing screens', { exact: true })).toBeVisible()
   }
 
@@ -673,7 +673,7 @@ class CandidateJourneyTestSystem {
       const pdf = await loading.promise
       const pdfPage = await pdf.getPage(1)
       const text = (await pdfPage.getTextContent()).items.flatMap((item) => 'str' in item ? item.str : []).join(' ')
-      expect(text).toContain('Normalized Resume — not tailored')
+      expect(text).toContain('Normalized Resume – not tailored')
       expect(text).toContain('Alex Morgan')
       expect(pdf.numPages).toBe(1)
     } finally { await loading.destroy() }

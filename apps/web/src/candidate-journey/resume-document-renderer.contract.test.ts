@@ -47,18 +47,18 @@ describe('structured resume PDF rendering boundary', () => {
 
     expect(result.assessment.layout.status).toBe('overflow')
     expect(result.assessment.exportEligibility).toMatchObject({ status: 'blocked', reasons: ['overflow'] })
-    expect(result.pdf).toBeNull()
+    expect(result.pdf, 'An overflowing document still renders for preview').not.toBeNull()
     expect(JSON.stringify(request.draft)).toBe(before)
   }, 20_000)
 
-  it('reports missing contacts and unresolved professional changes explicitly', async () => {
+  it('renders the preview while reporting missing contacts and unresolved professional changes', async () => {
     const result = await renderResumeDocument({ draft: { revision: 'invalid',
       document: { ...groupedResumeDocument, identity: null, contactDetails: [] } },
     unsupportedFieldIds: ['summary-billing'] })
 
     expect(result.assessment.exportEligibility).toMatchObject({ status: 'blocked',
       reasons: ['unsupported-content', 'missing-identity', 'missing-contact'] })
-    expect(result.pdf).toBeNull()
+    expect(result.pdf, 'A missing name or contact blocks only the download').not.toBeNull()
   }, 20_000)
 
   it('uses the same quality checks for French prose, a normalized title, and an optional photo', async () => {
@@ -76,7 +76,7 @@ describe('structured resume PDF rendering boundary', () => {
       const pdf = await loading.promise
       const page = await pdf.getPage(1)
       const text = (await page.getTextContent()).items.flatMap((item) => 'str' in item ? [item.str] : []).join(' ')
-      expect(text).toMatch(/CV normalisé — non adapté à l\s*[’ʼ']\s*offre/u)
+      expect(text).toMatch(/CV normalisé – non adapté à l\s*[’ʼ']\s*offre/u)
       expect(text).toMatch(/Développement d\s*[’ʼ']\s*interfaces accessibles/u)
       expect(text).toContain('Compétences')
       expect(new TextDecoder('latin1').decode(result.pdf)).toContain('/Subtype /Image')

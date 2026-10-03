@@ -4,7 +4,7 @@ import type { PrivacySafeTelemetryEvent, resumeSectionOutcomes } from './resume-
 import type { ResumeOperationFailure, ResumePreparationOutcome } from './structured-resume-contract'
 import { assembleResumeDocumentWithOrigins, citedCandidateFacts, createSectionWritingInput, hasSupportedSectionStructure,
   isSectionFullyValidated, normalizeSectionContent, planResumeSections, readRejectedFields,
-  readSectionContentFields } from './resume-sections'
+  readSectionContentFields, removeSectionFields } from './resume-sections'
 import type { ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage,
   ResumeRejectedField, ResumeSectionContent, ResumeSectionModelResult, ResumeSectionModels, ResumeSectionPlanEntry, ResumeSectionsRequest,
   ResumeSectionWritingInput } from './resume-sections'
@@ -191,7 +191,11 @@ function assembleDocument(context: ResumePreparationMachineContext) {
   }) })
 }
 
-/** Groups the fields a failed coherence check named by the section they came from; unknown ids are ignored. */
+/**
+ * Groups the fields a failed coherence check named by the section they came from. Unknown ids are ignored, and so
+ * are dates and locations: they are copied from the Candidate's source, so no rewrite may change them, and
+ * concurrent experiences at one employer are a valid chronology.
+ */
 function readCoherenceRejections({ context, coherence }: Readonly<{
   context: ResumePreparationMachineContext; coherence: ResumeSectionModelResult<ResumeDocumentCoherence>
 }>): Readonly<Record<string, readonly ResumeRejectedField[]>> {
@@ -200,7 +204,7 @@ function readCoherenceRejections({ context, coherence }: Readonly<{
   const rejections: Record<string, ResumeRejectedField[]> = {}
   for (const issue of coherence.value.issues) {
     const origin = origins.get(issue.fieldId)
-    if (origin === undefined) continue
+    if (origin === undefined || origin.copiedFromSource) continue
     const fields = rejections[origin.sectionKey] ?? []
     if (!fields.some(({ fieldId }) => fieldId === origin.field.id)) {
       fields.push({ fieldId: origin.field.id, text: origin.field.text, reason: issue.kind })
@@ -214,14 +218,50 @@ function hasCoherenceRejections(rejections: Readonly<Record<string, readonly Res
   return Object.keys(rejections).length > 0
 }
 
+type CoherenceResolution = Readonly<{
+  /** Validated results with every redundant list item removed: the check names only the copy placed worse. */
+  results: readonly ResumeSectionResult[]
+  /** Rejected fields per section key that only a rewrite can resolve. */
+  rewrites: Readonly<Record<string, readonly ResumeRejectedField[]>>
+}>
+
+/** Removes what is merely redundant and keeps for rewriting what a removal cannot fix. */
+function resolveCoherence({ context, coherence }: Readonly<{
+  context: ResumePreparationMachineContext; coherence: ResumeSectionModelResult<ResumeDocumentCoherence>
+}>): CoherenceResolution {
+  const rejections = readCoherenceRejections({ context, coherence })
+  const rewrites: Record<string, readonly ResumeRejectedField[]> = {}
+  const results = context.results.map((result): ResumeSectionResult => {
+    const rejected = rejections[result.section.key]
+    if (rejected === undefined || result.status !== 'validated') return result
+    const redundant = rejected.filter(({ reason }) => reason === 'redundant')
+    const content = removeSectionFields({ content: result.content, fieldIds: redundant.map(({ fieldId }) => fieldId) })
+    const remaining = content === null ? rejected : rejected.filter(({ reason }) => reason !== 'redundant')
+    if (remaining.length > 0) rewrites[result.section.key] = remaining
+    return content === null ? result : { ...result, content }
+  })
+  return { results, rewrites }
+}
+
+/**
+ * A verdict is accepted once the language matches and nothing is left that needs a rewrite: redundant fields are
+ * removed, and an issue naming no field of a Resume Section (the target role, the purpose) gives nothing to change.
+ */
+function coherenceAccepted({ context, coherence }: Readonly<{
+  context: ResumePreparationMachineContext; coherence: ResumePreparationMachineContext['coherence']
+}>) {
+  return coherence?.ok === true && coherence.value.languageMatches
+    && !hasCoherenceRejections(resolveCoherence({ context, coherence }).rewrites)
+}
+
 /** Sends the rejected sections back to writing: their results and snapshots return to planned, the others stay. */
 function readCoherenceRewrite({ context, coherence }: Readonly<{
   context: ResumePreparationMachineContext; coherence: ResumeSectionModelResult<ResumeDocumentCoherence>
 }>): Partial<ResumePreparationMachineContext> {
-  const coherenceRejections = readCoherenceRejections({ context, coherence })
+  const { results, rewrites: coherenceRejections } = resolveCoherence({ context, coherence })
   const rejected = (key: string) => key in coherenceRejections
   return { coherence: null, coherenceRejections,
-    results: context.results.filter(({ section }) => !rejected(section.key)),
+    results: results.filter(({ section }) => !rejected(section.key)),
     startedKeys: context.startedKeys.filter((key) => !rejected(key)),
     sections: context.sections.map((section): ResumeSectionSnapshot => rejected(section.key)
       ? { key: section.key, kind: section.kind, status: 'planned', attempt: 0 } : section) }
@@ -231,8 +271,8 @@ function readCoherenceRewrite({ context, coherence }: Readonly<{
 function readCoherenceFailure({ context, coherence }: Readonly<{
   context: ResumePreparationMachineContext; coherence: ResumeSectionModelResult<ResumeDocumentCoherence>
 }>): Partial<ResumePreparationMachineContext> {
-  const rejections = readCoherenceRejections({ context, coherence })
-  return { coherence, sections: context.sections.map((section): ResumeSectionSnapshot => section.key in rejections
+  const { results, rewrites } = resolveCoherence({ context, coherence })
+  return { coherence, results, sections: context.sections.map((section): ResumeSectionSnapshot => section.key in rewrites
     ? { key: section.key, kind: section.kind, status: 'failed', attempt: section.attempt } : section) }
 }
 
@@ -249,7 +289,7 @@ function coherencePassed(coherence: ResumePreparationMachineContext['coherence']
 }
 
 function readPreparationOutput(context: ResumePreparationMachineContext): ResumePreparationMachineOutput {
-  if (everySectionValidated(context) && coherencePassed(context.coherence)) {
+  if (everySectionValidated(context) && coherenceAccepted({ context, coherence: context.coherence })) {
     return { status: 'prepared', revision: context.revision, document: assembleDocument(context).document }
   }
   return readPreparationFailure(readPreparationFailures(context))
@@ -259,8 +299,8 @@ function readPreparationFailures(context: ResumePreparationMachineContext): read
   const { coherence } = context
   if (coherence === null) return context.results.flatMap((result) => result.status === 'failed' ? [result.failure] : [])
   if (!coherence.ok) return [coherence.error.type]
-  // A rejection naming no field of the document gives nothing to rewrite; checking again may name one.
-  return [hasCoherenceRejections(readCoherenceRejections({ context, coherence })) ? 'incoherent' : 'transient']
+  // A language mismatch naming no field gives nothing to rewrite; checking again may name one.
+  return [hasCoherenceRejections(resolveCoherence({ context, coherence }).rewrites) ? 'incoherent' : 'transient']
 }
 
 type PreparationFailureCause = ResumeSectionFailure | 'incoherent'
@@ -410,10 +450,11 @@ export const resumePreparationMachine = setup({
         src: 'checkDocumentCoherence',
         input: ({ context }) => ({ models: context.models, context }),
         onDone: [
-          { guard: ({ context, event }) => everySectionValidated(context) && coherencePassed(event.output),
-            target: 'prepared', actions: assign({ coherence: ({ event }) => event.output }) },
+          { guard: ({ context, event }) => everySectionValidated(context) && coherenceAccepted({ context, coherence: event.output }),
+            target: 'prepared', actions: assign(({ context, event }) => ({ coherence: event.output,
+              results: resolveCoherence({ context, coherence: event.output }).results })) },
           { guard: ({ context, event }) => context.coherenceRejections === null
-            && hasCoherenceRejections(readCoherenceRejections({ context, coherence: event.output })),
+            && hasCoherenceRejections(resolveCoherence({ context, coherence: event.output }).rewrites),
           target: 'writingSections', actions: [assign(({ context, event }) => readCoherenceRewrite({ context, coherence: event.output })),
             'reportSectionsProgressed'] },
           { target: 'failed', actions: [assign(({ context, event }) => readCoherenceFailure({ context, coherence: event.output })),

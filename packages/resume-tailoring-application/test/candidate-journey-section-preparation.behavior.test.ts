@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourney, CandidateJourneyDependencies, CandidateJourneyView, CandidateSession,
-  ResumeCoherenceInput, ResumeDocumentCoherence, ResumeRejectedField, ResumeSectionModelFailure, ResumeSectionWritingInput,
+  ResumeCoherenceInput, ResumeDocumentCoherence, ResumeRejectedField, ResumeSectionContent, ResumeSectionModelFailure,
+  ResumeSectionWritingInput,
 } from '@resume-tailoring/application/candidate-journey'
 import { createFixtureResumeSectionModels, readGroupedResumeSection, structuredResumeJobMatch,
   structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import type { TailoredResumeField } from '@resume-tailoring/application/tailored-resume'
 
 describe('Candidate Journey section-by-section resume preparation', () => {
   it('writes each planned Resume Section once from only the Candidate Facts it may cite', async () => {
@@ -92,16 +94,25 @@ describe('Candidate Journey section-by-section resume preparation', () => {
   })
 
   it('rewrites only the sections the coherence check rejects, with the fields it named', async () => {
-    const system = createSystemUnderTest({ coherence: 'redundant-projects-once' })
+    const system = createSystemUnderTest({ coherence: 'mixed-projects-once' })
     await system.givenMatchedCandidateSession()
 
     await system.prepareTailoredResume()
 
-    system.expectOnlyProjectsRewrittenWithTheRedundantFieldAndResumePrepared()
+    system.expectOnlyProjectsRewrittenWithTheRejectedFieldAndResumePrepared()
+  })
+
+  it('removes a field the coherence check finds redundant without rewriting or checking again', async () => {
+    const system = createSystemUnderTest({ coherence: 'redundant-projects-always' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectRedundantProjectRemovedAndResumePrepared()
   })
 
   it('keeps the other sections and asks for a retry when the resume is still incoherent after the rewrite', async () => {
-    const system = createSystemUnderTest({ coherence: 'redundant-projects-twice' })
+    const system = createSystemUnderTest({ coherence: 'mixed-projects-twice' })
     await system.givenMatchedCandidateSession()
 
     await system.prepareTailoredResume()
@@ -112,7 +123,7 @@ describe('Candidate Journey section-by-section resume preparation', () => {
   })
 
   it('rewrites only the sections the coherence check rejected when an incoherent preparation is retried', async () => {
-    const system = createSystemUnderTest({ coherence: 'redundant-projects-twice' })
+    const system = createSystemUnderTest({ coherence: 'mixed-projects-twice' })
     await system.givenFailedPreparation()
 
     await system.retryPreparation()
@@ -120,8 +131,44 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectRetryWrote(['projects'])
   })
 
-  it('asks to retry the check when the coherence check rejects the resume without naming a known field', async () => {
-    const system = createSystemUnderTest({ coherence: 'unnamed-issue' })
+  it('replaces every em dash a writer produces with an en dash', async () => {
+    const system = createSystemUnderTest({ writtenPunctuation: 'em-dash' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectPreparedResumeWithEnDashesOnly()
+  })
+
+  it('rewrites only the still incoherent section on retry when a redundancy was removed', async () => {
+    const system = createSystemUnderTest({ coherence: 'redundant-projects-and-mixed-skills-twice' })
+    await system.givenFailedPreparation()
+
+    await system.retryPreparation()
+
+    system.expectRetryWrote(['skills'])
+  })
+
+  it('prepares the resume when the coherence check objects to experience dates copied from the source', async () => {
+    const system = createSystemUnderTest({ coherence: 'chronology-on-source-dates' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectPreparedWithoutRewriting()
+  })
+
+  it('prepares the resume when the coherence check objects only to fields outside any Resume Section', async () => {
+    const system = createSystemUnderTest({ coherence: 'document-level-issue' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectPreparedWithoutRewriting()
+  })
+
+  it('asks to retry the check when the resume language does not match without naming a field', async () => {
+    const system = createSystemUnderTest({ coherence: 'unnamed-language-mismatch' })
     await system.givenMatchedCandidateSession()
 
     await system.prepareTailoredResume()
@@ -195,7 +242,10 @@ type TestOptions = Readonly<{
   heldSection?: 'skills'
   skillsValidation?: 'unsupported-once' | 'unsupported-twice'
   skillsWritingFailure?: Exclude<ResumeSectionModelFailure, 'permanent'>
-  coherence?: 'redundant-projects-once' | 'redundant-projects-twice' | 'unnamed-issue' | 'timeout'
+  writtenPunctuation?: 'em-dash'
+  coherence?: 'mixed-projects-once' | 'mixed-projects-twice' | 'redundant-projects-always' | 'document-level-issue'
+    | 'redundant-projects-and-mixed-skills-twice' | 'chronology-on-source-dates'
+    | 'unnamed-language-mismatch' | 'timeout'
 }>
 
 class SectionPreparationTestSystem {
@@ -405,13 +455,35 @@ class SectionPreparationTestSystem {
     expect(JSON.stringify(this.#expectOutcome()?.session)).not.toContain('rejectedFields')
   }
 
-  expectOnlyProjectsRewrittenWithTheRedundantFieldAndResumePrepared() {
+  expectOnlyProjectsRewrittenWithTheRejectedFieldAndResumePrepared() {
     expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
     expect(this.#writingInputs).toHaveLength(9)
     const projectsWrites = this.#writingInputs.filter(({ section }) => section.key === 'projects')
     expect(projectsWrites.map(({ rejectedFields }) => rejectedFields)).toEqual([[], this.#rejectedFields])
-    expect(this.#rejectedFields).toEqual([expect.objectContaining({ reason: 'redundant' })])
+    expect(this.#rejectedFields).toEqual([expect.objectContaining({ reason: 'mixed-association' })])
     expect(JSON.stringify(this.#expectOutcome()?.session)).not.toContain('rejectedFields')
+  }
+
+  expectRedundantProjectRemovedAndResumePrepared() {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    expect(this.#writingInputs, 'No section is rewritten for a redundancy').toHaveLength(8)
+    expect(this.#coherenceChecks, 'Removing a duplicate needs no second check').toBe(1)
+    const [removed] = this.#rejectedFields
+    expect(removed).toEqual(expect.objectContaining({ reason: 'redundant' }))
+    expect(JSON.stringify(this.#expectOutcome()?.session.tailoredResume)).not.toContain(removed?.text)
+  }
+
+  expectPreparedResumeWithEnDashesOnly() {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    const resume = JSON.stringify(this.#expectOutcome()?.session.tailoredResume)
+    expect(resume).not.toContain('—')
+    expect(resume).toContain(' – détail')
+  }
+
+  expectPreparedWithoutRewriting() {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    expect(this.#writingInputs).toHaveLength(8)
+    expect(this.#coherenceChecks).toBe(1)
   }
 
   expectSkillsWrittenOnceAndPreparationRetryable() {
@@ -482,7 +554,8 @@ function createDependencies({ options, store, models }: Readonly<{
         await models.onWrite(input)
         const failure = options.skillsWritingFailure
         if (input.section.kind === 'skills' && failure !== undefined && models.onSkillsWrite() === 1) return { ok: false, error: { type: failure } }
-        return { ok: true, value: readGroupedResumeSection(input.section) }
+        const content = readGroupedResumeSection(input.section)
+        return { ok: true, value: options.writtenPunctuation === 'em-dash' ? withEmDashes(content) : content }
       },
       validateFields: ({ section, fields }) => {
         const validation = section.kind === 'skills' ? models.onSkillsValidation() : 0
@@ -509,18 +582,48 @@ function createDependencies({ options, store, models }: Readonly<{
   }
 }
 
+/** Appends an em-dashed detail to every written field, as a writing model often does. */
+function withEmDashes(content: ResumeSectionContent): ResumeSectionContent {
+  const dashed = (field: TailoredResumeField) => ({ ...field, text: `${field.text} — détail` })
+  if (content.kind === 'value-proposition') return { ...content, paragraphs: content.paragraphs.map(dashed) }
+  if (content.kind === 'experience') {
+    return { ...content, experience: { ...content.experience, achievements: content.experience.achievements.map(dashed) } }
+  }
+  if (content.kind === 'skills') return { ...content, groups: content.groups.map((group) => ({ ...group, items: group.items.map(dashed) })) }
+  return { ...content, fields: content.fields.map(dashed) }
+}
+
 function readCoherence({ coherence, check, document, onRejectedField }: Readonly<{
   coherence: TestOptions['coherence']; check: number; document: ResumeCoherenceInput['document']
   onRejectedField: (field: ResumeRejectedField) => void
 }>): ResumeDocumentCoherence {
   const coherent = { coherent: true, languageMatches: true, issues: [] }
-  if (coherence === 'unnamed-issue') return { ...coherent, coherent: false, issues: [{ fieldId: 'unknown-field', kind: 'redundant' }] }
-  const rejections = coherence === 'redundant-projects-once' ? 1 : coherence === 'redundant-projects-twice' ? 2 : 0
-  // The Projects entry repeats an experience achievement in the assembled document.
+  if (coherence === 'document-level-issue') {
+    return { ...coherent, coherent: false, issues: [{ fieldId: 'targetRole', kind: 'mixed-association' }] }
+  }
+  if (coherence === 'unnamed-language-mismatch') return { ...coherent, languageMatches: false }
+  if (coherence === 'chronology-on-source-dates') {
+    // Two experiences overlap in time, as concurrent roles at one employer do; their dates come from the source.
+    const startDate = document.experiences[1]?.startDate
+    return startDate === null || startDate === undefined ? coherent
+      : { ...coherent, coherent: false, issues: [{ fieldId: startDate.id, kind: 'chronology' }] }
+  }
+  if (coherence === 'redundant-projects-and-mixed-skills-twice') {
+    // Projects repeat the experiences on every check; Skills stay incoherent through the first preparation only.
+    const project = document.sections.flatMap((section) => section.section === 'projects' ? section.fields : [])[0]
+    const skill = document.sections.flatMap((section) => section.section === 'skills' ? section.groups : [])[0]?.items[0]
+    const issues = [...(project === undefined ? [] : [{ fieldId: project.id, kind: 'redundant' as const }]),
+      ...(skill === undefined || check > 2 ? [] : [{ fieldId: skill.id, kind: 'mixed-association' as const }])]
+    return issues.length === 0 ? coherent : { ...coherent, coherent: false, issues }
+  }
+  const rejections = coherence === 'mixed-projects-once' ? 1 : coherence === 'mixed-projects-twice' ? 2
+    : coherence === 'redundant-projects-always' ? Infinity : 0
+  const kind = coherence === 'redundant-projects-always' ? 'redundant' : 'mixed-association'
+  // The Projects entry repeats or misattributes an experience achievement in the assembled document.
   const field = document.sections.flatMap((section) => section.section === 'projects' ? section.fields : [])[0]
   if (check > rejections || field === undefined) return coherent
-  onRejectedField({ fieldId: field.id, text: field.text, reason: 'redundant' })
-  return { ...coherent, coherent: false, issues: [{ fieldId: field.id, kind: 'redundant' }] }
+  onRejectedField({ fieldId: field.id, text: field.text, reason: kind })
+  return { ...coherent, coherent: false, issues: [{ fieldId: field.id, kind }] }
 }
 
 const policy = { provider: 'Test', purposes: [], retentionPolicy: 'None',

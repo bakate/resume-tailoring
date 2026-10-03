@@ -68,7 +68,8 @@ function formatExperience({ experience, labels }: Readonly<{
 }>) {
   const heading = joinValues({ values: [experience.role, experience.organization] })
   const dates = joinValues({ separator: ' – ', values: [experience.startDate, experience.endDate] })
-  const details = [dates, experience.context, ...experience.achievements.map(bullet)]
+  const period = joinValues({ separator: ' · ', values: [dates.length > 0 ? dates : null, experience.location ?? null] })
+  const details = [period, experience.context, ...experience.achievements.map(bullet)]
     .filter(isPresent)
   return [heading.length > 0 ? heading : labels.experienceFallback, ...details].join('\n')
 }
@@ -86,7 +87,7 @@ function formatSkills({ labels, skills }: Readonly<{
   skills: StructuredSourceProfile['skills']
 }>) {
   return formatSection({ entries: skills.map(({ category, name }) =>
-    bullet(category === null ? name : `${name} — ${category}`)), title: labels.skills })
+    bullet(category === null ? name : `${name} – ${category}`)), title: labels.skills })
 }
 
 function formatEducation({ education, labels }: Readonly<{
@@ -131,7 +132,7 @@ function formatSection({ entries, title }: Readonly<{
   return presentEntries.length === 0 ? '' : [title, ...presentEntries].join('\n')
 }
 
-function joinValues({ separator = ' — ', values }: Readonly<{
+function joinValues({ separator = ' – ', values }: Readonly<{
   separator?: string
   values: readonly (string | null)[]
 }>) {

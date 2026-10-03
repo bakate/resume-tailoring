@@ -20,11 +20,12 @@ export function prepareResumeRendering({ input, previous, revision, sequence }: 
 export function validateResumeRendering({ request, result }: Readonly<{
   request: ResumeRenderRequest; result: ResumeRenderResult
 }>): ResumeRenderResult {
+  if (result.assessment.exportEligibility.revision !== request.draft.revision
+    || result.assessment.layout.revision !== request.draft.revision) return staleResumeRendering({ request })
+  if (result.assessment.layout.status === 'unavailable') return unavailableResumeRender(request)
+  // The rendered PDF stays displayable; only the export assessment decides whether it can be downloaded.
   const assessment = assessResumeExport({ ...request, layout: result.assessment.layout })
-  if (assessment.exportEligibility.status === 'blocked') return { assessment, pdf: null }
-  if (result.assessment.exportEligibility.revision !== request.draft.revision) return staleResumeRendering({ request })
-  if (result.assessment.exportEligibility.status === 'blocked') return { ...result, pdf: null }
-  if (result.pdf === null) return unavailableResumeRender(request)
+  if (assessment.exportEligibility.status === 'eligible' && result.pdf === null) return unavailableResumeRender(request)
   return { assessment, pdf: result.pdf }
 }
 

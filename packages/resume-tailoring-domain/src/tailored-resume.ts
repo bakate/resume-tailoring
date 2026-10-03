@@ -16,6 +16,8 @@ export type TailoredResumeExperience = Readonly<{
   organization: TailoredResumeField | null
   startDate: TailoredResumeField | null
   endDate: TailoredResumeField | null
+  /** Shown at the end of the dates line; absent from resumes prepared before it existed. */
+  location?: TailoredResumeField | null
   context: TailoredResumeField | null
   achievements: readonly TailoredResumeField[]
 }>
@@ -34,12 +36,15 @@ export type TailoredResumeSection = Readonly<{
   section: Exclude<SourceProfileSection, 'experiences' | 'skills'>
 }>
 
+/** The Candidate name shown on the resume; `detected` marks a value read locally from the source, not yet edited. */
+export type ResumeIdentity = LocalContactDetail & Readonly<{ origin?: 'detected' }>
+
 export type TailoredResume = Readonly<{
   sectionOrder?: readonly ResumeSectionName[]
   purpose: 'tailored' | 'normalized'
   contactDetails: readonly LocalContactDetail[]
   experiences: readonly TailoredResumeExperience[]
-  identity: LocalContactDetail | null
+  identity: ResumeIdentity | null
   locale: TailoredResumeLocale
   sections: readonly TailoredResumeSection[]
   targetRole: TargetRole | null

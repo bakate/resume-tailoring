@@ -93,6 +93,7 @@ const extractionInstructions = [
   'Preserve experiences, projects, skills, education, languages, and certifications separately.',
   'Never infer dates, seniority, proficiency, organizations, qualifications, or outcomes.',
   'Use null when an optional value is absent.',
+  'Copy where an experience took place into its location exactly as the source writes it, for example "Paris, France" or "Remote", without shortening or completing it; never put it in context, which holds a team or a short description.',
   'Report a Critical Ambiguity only when a fact is unsafe to order, score, or reuse.',
   'Each ambiguity path must identify one scalar fact as section.entryIndex.field.valueIndex.',
   'Ask one concise targeted question for that fact; do not withhold unrelated evidence.',

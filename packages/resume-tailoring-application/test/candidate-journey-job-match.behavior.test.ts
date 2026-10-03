@@ -68,14 +68,34 @@ describe('Candidate Journey Job Match', () => {
     system.expectStableMatchAnalysisToRemainVisible()
   })
 
-  it('rejects an extracted requirement that is not backed by its excerpt', async () => {
+  it('omits an extracted requirement that is not backed by its excerpt without rejecting the analysis', async () => {
     const system = createSystemUnderTest()
     await system.givenCandidateJourneyIsReadyForJobMatch()
     system.givenExtractionContainsAnInventedRequirement()
 
+    await system.submitPastedJobPosting()
+
+    system.expectOnlySourceBackedRequirements()
+  })
+
+  it('rejects the analysis when no extracted requirement is backed by its excerpt', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenEveryExtractedRequirementIsInvented()
+
     await system.replaceJobPostingWithInvalidExtraction()
 
     system.expectExtractionToBeRejected()
+  })
+
+  it('stores the exact posting text for an excerpt quoted with different letter case or spacing', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenExtractionQuotesAnExcerptWithDifferentCaseAndSpacing()
+
+    await system.submitPastedJobPosting()
+
+    system.expectExcerptStoredAsPostedText()
   })
 
   it('covers a requirement that a Next.js Source Profile proves in different words', async () => {
@@ -417,6 +437,21 @@ class CandidateJourneyJobMatchTestSystem {
     }
   }
 
+  givenEveryExtractedRequirementIsInvented() {
+    this.#extractedJobPosting = {
+      ...extractedJobPosting,
+      requirements: extractedJobPosting.requirements.map((requirement) => ({ ...requirement, value: 'Payroll' })),
+    }
+  }
+
+  givenExtractionQuotesAnExcerptWithDifferentCaseAndSpacing() {
+    this.#extractedJobPosting = {
+      ...extractedJobPosting,
+      requirements: extractedJobPosting.requirements.map((requirement) => requirement.id === 'job-requirement-4'
+        ? { ...requirement, sourceExcerpt: 'mentor  senior engineers.', value: 'mentor' } : requirement),
+    }
+  }
+
   givenAFullStackJobPostingReformulatingNextJsWork() {
     this.#jobPostingText = fullStackJobPostingText
     this.#extractedJobPosting = fullStackJobPosting
@@ -661,6 +696,23 @@ class CandidateJourneyJobMatchTestSystem {
     const view = this.#readOpenView()
     expect(view.jobMatchFailure).toBeNull()
     expect(view.session.jobMatch?.practicalConstraints).toEqual(extractedJobPosting.practicalConstraints)
+  }
+
+  expectOnlySourceBackedRequirements() {
+    this.#expectCompletedAction()
+    const view = this.#readOpenView()
+    expect(view.jobMatchFailure).toBeNull()
+    const requirementIds = view.session.jobMatch?.requirements.map(({ id }) => id)
+    expect(requirementIds).not.toContain('job-requirement-1')
+    expect(requirementIds).toEqual(extractedJobPosting.requirements.slice(1).map(({ id }) => id))
+  }
+
+  expectExcerptStoredAsPostedText() {
+    this.#expectCompletedAction()
+    const view = this.#readOpenView()
+    expect(view.jobMatchFailure).toBeNull()
+    const requirement = view.session.jobMatch?.requirements.find(({ id }) => id === 'job-requirement-4')
+    expect(requirement).toMatchObject({ sourceExcerpt: 'Mentor senior engineers.', value: 'Mentor' })
   }
 
   expectExtractionToBeRejected() {

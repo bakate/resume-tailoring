@@ -7,7 +7,8 @@ import type {
 } from '@resume-tailoring/domain/source-intake'
 import { sourceProfileSections } from '@resume-tailoring/domain/source-intake'
 
-import { minimizeSensitiveContent } from './content-privacy'
+import { minimizeCandidateContent } from './candidate-name'
+import { locateSourceSpan } from './source-span'
 
 export type {
   CandidateFact,
@@ -75,7 +76,7 @@ export async function createSourceIntake(
 ): CreateSourceIntakeResult {
   const contentResult = await readValidatedSourceContent(input)
   if (!contentResult.ok) return contentResult
-  const minimizedContent = minimizeSensitiveContent({ content: contentResult.value })
+  const minimizedContent = minimizeCandidateContent({ content: contentResult.value })
   if (minimizedContent.outgoingContent.trim().length === 0) return emptyResult
   const extractionResult = await input.sourceProfileExtractor.extract({
     professionalContent: minimizedContent.outgoingContent,
@@ -205,13 +206,14 @@ function updateProfileEntries<TEntry extends Readonly<Record<string, unknown>>>(
 type BuildSourceIntakeInput = Readonly<{
   document: SourceDocument
   extraction: StructuredSourceProfileExtraction
-  minimizedContent: ReturnType<typeof minimizeSensitiveContent>
+  minimizedContent: ReturnType<typeof minimizeCandidateContent>
   originalContent: string
 }>
 
 function buildSourceIntake({
-  document, extraction, minimizedContent, originalContent,
+  document, extraction: proposedExtraction, minimizedContent, originalContent,
 }: BuildSourceIntakeInput): SourceIntake {
+  const extraction = anchorExperienceLocations({ extraction: proposedExtraction, originalContent })
   const candidateFacts = createCandidateFacts({ extraction })
   const ambiguousPaths = new Set(extraction.criticalAmbiguities.map((ambiguity) => ambiguity.path))
   const assessedCandidateFacts = assessCandidateFacts({ ambiguousPaths, candidateFacts })
@@ -225,6 +227,20 @@ function buildSourceIntake({
     sourceDocument: { kind: readSourceDocumentKind({ document }), name: document.name },
     sourceProfile: readStructuredSourceProfile({ extraction }),
   }
+}
+
+/**
+ * A location is kept exactly as the Source Document writes it, so "Paris, France" is never shortened or reworded;
+ * a location the source does not contain is dropped rather than shown on the resume.
+ */
+function anchorExperienceLocations({ extraction, originalContent }: Readonly<{
+  extraction: StructuredSourceProfileExtraction; originalContent: string
+}>): StructuredSourceProfileExtraction {
+  return { ...extraction, experiences: extraction.experiences.map((experience) => {
+    const location = experience.location ?? null
+    return { ...experience,
+      location: location === null ? null : locateSourceSpan({ text: originalContent, quote: location }) }
+  }) }
 }
 
 function readStructuredSourceProfile({ extraction }: Readonly<{

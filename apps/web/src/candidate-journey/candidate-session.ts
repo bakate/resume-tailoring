@@ -36,7 +36,7 @@ export const sourceIntakeSchema = z.strictObject({
     value: z.string(),
   })),
   contactDetails: z.array(z.strictObject({
-    kind: z.enum(['address', 'date-of-birth', 'email', 'personal-information', 'phone', 'url']),
+    kind: z.enum(['address', 'date-of-birth', 'email', 'name', 'personal-information', 'phone', 'url']),
     value: z.string().min(1),
   })),
   criticalAmbiguities: z.array(z.strictObject({
@@ -131,10 +131,12 @@ export const tailoredResumeSchema = z.strictObject({
     organization: tailoredResumeFieldSchema.nullable(),
     startDate: tailoredResumeFieldSchema.nullable(),
     endDate: tailoredResumeFieldSchema.nullable(),
+    // Optional so a Tailored Resume prepared before locations existed still restores.
+    location: tailoredResumeFieldSchema.nullable().optional(),
     context: tailoredResumeFieldSchema.nullable(),
     achievements: z.array(tailoredResumeFieldSchema),
   })),
-  identity: sourceIntakeSchema.shape.contactDetails.element.nullable(),
+  identity: sourceIntakeSchema.shape.contactDetails.element.extend({ origin: z.literal('detected').optional() }).nullable(),
   locale: z.enum(['en', 'fr']),
   sections: z.array(z.discriminatedUnion('section', [z.strictObject({
     section: z.literal('skills'),
@@ -174,7 +176,7 @@ const resumePreparationSchema = z.strictObject({
 const resumeFieldLocationSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('value-proposition'), fieldId: z.string() }),
   z.strictObject({ kind: z.literal('experience'), experienceId: z.string(), fieldId: z.string(),
-    fieldName: z.enum(['role', 'organization', 'startDate', 'endDate', 'context', 'achievements']) }),
+    fieldName: z.enum(['role', 'organization', 'startDate', 'endDate', 'location', 'context', 'achievements']) }),
   z.strictObject({ kind: z.literal('section'), fieldId: z.string(),
     section: z.enum(['certifications', 'education', 'languages', 'projects']) }),
   z.strictObject({ kind: z.literal('skill-group'), fieldId: z.string(), groupId: z.string(),

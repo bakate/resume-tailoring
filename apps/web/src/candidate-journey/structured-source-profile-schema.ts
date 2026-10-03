@@ -14,6 +14,8 @@ export const structuredSourceProfileSchema = z.strictObject({
     achievements: z.array(z.string().min(1)),
     context: z.string().min(1).nullable(),
     endDate: z.string().min(1).nullable(),
+    // Optional so a Source Profile saved before locations were extracted still restores.
+    location: z.string().min(1).nullable().optional(),
     organization: z.string().min(1).nullable(),
     role: z.string().min(1).nullable(),
     startDate: z.string().min(1).nullable(),
@@ -33,6 +35,10 @@ export const structuredSourceProfileSchema = z.strictObject({
 })
 
 export const structuredSourceProfileExtractionSchema = structuredSourceProfileSchema.extend({
+  // Strict structured output requires every key, so the model always states a location, or null.
+  experiences: z.array(structuredSourceProfileSchema.shape.experiences.element.extend({
+    location: z.string().min(1).nullable(),
+  })),
   criticalAmbiguities: z.array(z.strictObject({
     path: z.string().regex(/^(?:experiences|projects|skills|education|languages|certifications)\.\d+\.[a-zA-Z]+\.\d+$/u),
     question: z.string().min(1).max(300),

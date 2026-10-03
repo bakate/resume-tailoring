@@ -21,6 +21,8 @@ export type SourceProfileExperience = Readonly<{
   achievements: readonly string[]
   context: string | null
   endDate: string | null
+  /** Where the experience took place (a city, a region, remote); absent from profiles extracted before it existed. */
+  location?: string | null
   organization: string | null
   role: string | null
   startDate: string | null
@@ -69,7 +71,7 @@ export type CriticalAmbiguity = Readonly<{
 }>
 
 export type LocalContactDetail = Readonly<{
-  kind: 'address' | 'date-of-birth' | 'email' | 'personal-information' | 'phone' | 'url'
+  kind: 'address' | 'date-of-birth' | 'email' | 'name' | 'personal-information' | 'phone' | 'url'
   value: string
 }>
 

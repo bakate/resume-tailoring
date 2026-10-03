@@ -252,7 +252,7 @@ function DetailedSourceProfile({
 function formatProfileSummary({ values }: Readonly<{
   values: readonly (string | null)[]
 }>) {
-  return values.filter((value): value is string => value !== null).join(' — ')
+  return values.filter((value): value is string => value !== null).join(' – ')
 }
 
 function ProfileSection({ title, values }: Readonly<{
@@ -260,7 +260,7 @@ function ProfileSection({ title, values }: Readonly<{
   values: readonly string[]
 }>) {
   return <div><Text fw={700}>{title}</Text>
-    {values.length === 0 ? <Text c="dimmed">—</Text> : <List>{values.map((value, valueIndex) => (
+    {values.length === 0 ? <Text c="dimmed">–</Text> : <List>{values.map((value, valueIndex) => (
       <List.Item key={`${String(valueIndex)}:${value}`}>{value}</List.Item>
     ))}</List>}
   </div>
