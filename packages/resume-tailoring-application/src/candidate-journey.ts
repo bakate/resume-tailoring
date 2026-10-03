@@ -5,6 +5,9 @@ export type { ResumeCoherenceInput, ResumeCoherenceIssue, ResumeCoherenceIssueKi
   ResumeSectionContent, ResumeSectionKind, ResumeSectionModelFailure, ResumeSectionModelResult,
   ResumeSectionPlanEntry, ResumeSectionWritingInput } from './resume-sections'
 import { resumePreparationMachine } from './resume-preparation-machines'
+import { bindProcessingConsent } from './prototype-processing-consent-proxy'
+import type { ReadConsentScope } from './prototype-processing-consent-proxy'
+import { modelBackedPortRefusals } from './prototype-processing-consent-proxy.type-probe'
 import { prepareCombinedIntake, publishResumePreparation, unavailable } from './combined-intake'
 import type { CombinedIntakeOutcome, CombinedIntakeRequest, PreparationPhase, PreparedResumeInputs } from './combined-intake'
 
@@ -264,10 +267,7 @@ const submitSourceDocument = fromPromise<SourceIntakeActorResult, SourceIntakeAc
   input: SourceIntakeActorInput
 }>) => {
   if (input.session === null) return storageUnavailableResult
-  if (!hasProcessingConsentForPolicy({
-    consent: input.session.processingConsent,
-    policy: input.dependencies.languageModelGateway.processingPolicy,
-  })) return processingConsentRequiredResult
+  // PROTOTYPE: the early consent check is gone; the proxy refuses the Source Profile extraction instead.
   const sourceIntakeResult = await createSourceIntake({
     document: input.document,
     sourceDocumentReader: input.dependencies.sourceDocumentReader,
@@ -909,7 +909,16 @@ type CandidateJourneySnapshot = SnapshotFrom<typeof candidateJourneyMachine>
 export function createCandidateJourney({ dependencies }: Readonly<{
   dependencies: CandidateJourneyDependencies
 }>): CandidateJourney {
-  const actor = createActor(candidateJourneyMachine, { input: dependencies })
+  // PROTOTYPE: every model-backed port reaches the machine through the Processing Consent proxy.
+  let readConsentScope: ReadConsentScope = () => null
+  const actor = createActor(candidateJourneyMachine, { input: { ...dependencies, ...bindProcessingConsent({
+    ports: { sourceProfileExtractor: dependencies.sourceProfileExtractor, jobPostingExtractor: dependencies.jobPostingExtractor,
+      matchEvidenceMatcher: dependencies.matchEvidenceMatcher,
+      resumeSectionModels: dependencies.resumeSectionModels ?? unavailableSectionModels },
+    refusals: modelBackedPortRefusals,
+    readConsentScope: () => readConsentScope(),
+  }) } })
+  readConsentScope = () => readActorConsentScope(actor.getSnapshot())
   let view = readCandidateJourneyView({ snapshot: actor.getSnapshot() })
   actor.subscribe((snapshot) => {
     view = readCandidateJourneyView({ snapshot })
@@ -1189,4 +1198,13 @@ function renderedResumeReview({ context, result }: Readonly<{
     layout: { ...result.assessment.layout, revision: review.draft.revision },
     exportEligibility: { ...result.assessment.exportEligibility, revision: review.draft.revision },
   } }
+}
+
+/** PROTOTYPE: the consent a model call runs under; changes when the session, the policy, or the grant changes. */
+function readActorConsentScope(snapshot: CandidateJourneySnapshot): string | null {
+  const { session, dependencies } = snapshot.context
+  const policy = dependencies.languageModelGateway.processingPolicy
+  if (session === null || session.processingConsent === null
+    || !hasProcessingConsentForPolicy({ consent: session.processingConsent, policy })) return null
+  return [session.sessionId, policy.version, String(session.processingConsent.grantedAt)].join('|')
 }
