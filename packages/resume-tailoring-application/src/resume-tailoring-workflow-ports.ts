@@ -120,6 +120,9 @@ export const resumeSectionOutcomes = [
   'validated', 'unsupported', 'transient', 'timeout', 'permanent', 'consent-required',
 ] as const
 export const resumePreparationOutcomes = ['prepared', 'failed'] as const
+export const resumeRenderFailureCategories = [
+  'timeout', 'server', 'network', 'access', 'schema', 'revision-mismatch', 'render',
+] as const
 
 export type MatchScoreBand = typeof matchScoreBands[number]
 
@@ -160,6 +163,11 @@ export type PrivacySafeTelemetryEvent =
       outcome: typeof resumePreparationOutcomes[number]
       durationMilliseconds: number
       sectionCount: number
+    }>
+  | Readonly<{
+      name: 'resume-render-failed'
+      category: typeof resumeRenderFailureCategories[number]
+      retried: boolean
     }>
 
 export type SourceDocumentReader = {

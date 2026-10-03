@@ -1119,7 +1119,7 @@ async function requestResumeRendering({ actor, input }: Readonly<{
   if (rendering === null) return unavailableResumeRender({ ...input, draft: { document: input.document, revision: 'unavailable' } })
   try {
     const snapshot = await waitFor(actor, (current) => current.context.resumeRendering?.sequence !== rendering.sequence
-      || current.context.resumeRendering.result !== null, { timeout: 30_000 })
+      || current.context.resumeRendering.result !== null, { timeout: 60_000 })
     const completed = snapshot.context.resumeRendering
     return completed?.sequence === rendering.sequence && completed.result !== null
       ? completed.result : staleResumeRendering({ request: rendering.request })

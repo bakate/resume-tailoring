@@ -5,6 +5,7 @@ import {
   journeyPhases,
   matchScoreBands,
   resumePreparationOutcomes,
+  resumeRenderFailureCategories,
   resumeSectionKinds,
   resumeSectionOutcomes,
 } from '@resume-tailoring/application/resume-tailoring-workflow-ports'
@@ -50,6 +51,11 @@ export const privacySafeAnalyticsEventSchema = z.discriminatedUnion('name', [
     outcome: z.enum(resumePreparationOutcomes),
     durationMilliseconds: metricCountSchema,
     sectionCount: metricCountSchema,
+  }),
+  z.strictObject({
+    name: z.literal('resume-render-failed'),
+    category: z.enum(resumeRenderFailureCategories),
+    retried: z.boolean(),
   }),
 ]) satisfies z.ZodType<PrivacySafeTelemetryEvent>
 

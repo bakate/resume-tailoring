@@ -61,6 +61,21 @@ describe('privacy-safe analytics observability', () => {
     expect(metric.dimensions).not.toHaveProperty('candidateId')
   })
 
+  it('produces a render failure counter with only the category and retry flag', () => {
+    const metric = createPrivacySafeAggregateMetric({
+      name: 'resume-render-failed',
+      category: 'timeout',
+      retried: true,
+    })
+
+    expect(metric).toEqual({
+      category: 'privacy-safe-mvp-analytics',
+      metric: 'resume-render-failed',
+      value: 1,
+      dimensions: { category: 'timeout', retried: true },
+    })
+  })
+
   it('produces a journey counter with only the reached phase', () => {
     const metric = createPrivacySafeAggregateMetric({
       name: 'candidate-journey-phase-reached',

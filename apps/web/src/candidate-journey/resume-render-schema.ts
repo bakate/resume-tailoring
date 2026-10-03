@@ -27,5 +27,5 @@ export const resumeRenderResponseSchema = z.strictObject({
       ])) }),
     ]),
   }),
-  pdf: z.string().nullable(),
+  pdf: z.base64().transform((pdf) => Uint8Array.from(atob(pdf), (value) => value.charCodeAt(0))).nullable(),
 })
