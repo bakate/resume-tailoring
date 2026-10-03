@@ -51,7 +51,7 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
       <ReviewStatus candidateJourney={props.candidateJourney} copy={copy} />
       <CondensationProposal {...props} copy={copy} photoDataUrl={photo.dataUrl}
         proposalLayoutCurrent={photo.ready && !photo.failed && proposalPhoto === photo.dataUrl} />
-      <Group><Button variant="default" disabled={view.status === 'candidate-session-open' && view.operation !== null}
+      <Group><Button variant="default" disabled={blocksResumeEditing(view)}
         onClick={() => { setEditorOpened(true) }}>{copy.edit}</Button>
         <Button variant="default" onClick={props.onChangeJobPosting}>{copy.changeJobPosting}</Button></Group>
       <MatchAnalysisDisclosure {...props} />
@@ -78,6 +78,11 @@ function ResumeEditorDialog(props: ResumeDocumentProps & Readonly<{
     fullScreen={fullScreen} size="xl" returnFocus closeButtonProps={{ 'aria-label': props.copy.close }}>
     <ResumeEditor {...props} />
   </Modal>
+}
+
+/** A preview render is background work: disabling the button for it drops keyboard focus when the editor closes. */
+function blocksResumeEditing(view: ResumeReviewController['view']) {
+  return view.status === 'candidate-session-open' && view.operation !== null && view.operation !== 'rendering-resume-document'
 }
 
 function canCondense({ candidateJourney, photo }: Readonly<{
