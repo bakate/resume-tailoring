@@ -3,7 +3,7 @@ import type { TailoredResume } from './tailored-resume'
 import type { ResumeLayoutOutcome, ResumeExportEligibility, ResumeSectionChange, ResumeSectionChangeOutcome, ResumePreparationOutcome } from './structured-resume-contract'
 import type { JobMatch } from './job-match'
 import type { SourceIntake } from './source-intake'
-import type { ResumeSectionContent, ResumeSectionModels, ResumeSectionPlanEntry, ResumeSectionWritingInput } from './resume-sections'
+import type { ResumeSectionContent, ResumeSectionPlanEntry, ResumeSectionWritingInput } from './resume-sections'
 
 /** Anonymized evidence shared by preparation, editing, and rendering consumers. */
 export const structuredResumeSource: SourceIntake = {
@@ -120,17 +120,6 @@ export const groupedResumeDocument = {
     { section: 'certifications', fields: [{ id: 'cloud', text: 'Cloud practitioner', factIds: ['source-fact-certifications-0-name-0'] }] },
   ],
 } as const satisfies TailoredResume
-
-/** Section models answering with slices of `groupedResumeDocument`; a test overrides only the behavior it varies. */
-export function createFixtureResumeSectionModels(overrides: Partial<ResumeSectionModels> = {}): ResumeSectionModels {
-  return {
-    writeSection: ({ section }) => Promise.resolve({ ok: true, value: readGroupedResumeSection(section) }),
-    validateFields: ({ fields }) => Promise.resolve({ ok: true,
-      value: { fields: fields.map(({ id }) => ({ fieldId: id, supported: true })) } }),
-    checkCoherence: () => Promise.resolve({ ok: true, value: { coherent: true, languageMatches: true, issues: [] } }),
-    ...overrides,
-  }
-}
 
 export function readGroupedResumeSection(section: ResumeSectionPlanEntry): ResumeSectionContent {
   return readResumeSection({ document: groupedResumeDocument, section })

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourneyDependencies, CandidateJourneyView, CandidateSession, ResumeDocumentPorts, ResumeProposalDecision, ResumeLayoutOutcome, ResumeExportEligibility } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateFact } from '@resume-tailoring/application/source-intake'
-import { createFixtureResumeSectionModels, resumeLayoutExpectations, writeResumeSectionFromFacts, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { resumeLayoutExpectations, writeResumeSectionFromFacts, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createFakeCandidateJourneyDependencies, createFakeResumeDocumentPorts, createFakeResumeSectionModels,
+  createInMemoryCandidateSessionPersistence } from '@resume-tailoring/application/testing'
 
 type TestPorts = { -readonly [Port in keyof ResumeDocumentPorts]?: ResumeDocumentPorts[Port] }
 type LayoutExample = Readonly<{ layout: ResumeLayoutOutcome; eligibility: ResumeExportEligibility }>
@@ -686,30 +688,22 @@ function createMatchedSession(): CandidateSession {
   }
 }
 
-function createDependencies({ ports }: Readonly<{ ports: Partial<ResumeDocumentPorts> }>): CandidateJourneyDependencies {
-  let session = createMatchedSession()
-  return {
-    resumeSectionModels: createFixtureResumeSectionModels({
+function createDependencies({ ports }: Readonly<{ ports: TestPorts }>): CandidateJourneyDependencies {
+  const session = createMatchedSession()
+  return createFakeCandidateJourneyDependencies({
+    now: () => session.startedAt,
+    resumeSectionModels: createFakeResumeSectionModels({
       writeSection: (input) => Promise.resolve({ ok: true, value: writeResumeSectionFromFacts(input) }),
     }),
-    resumeDocumentPorts: Object.assign(ports, {
+    // Scenarios replace individual ports on this object after the journey starts.
+    resumeDocumentPorts: Object.assign(ports, createFakeResumeDocumentPorts({
       proposeCondensation: ({ document, baseRevision }) => Promise.resolve({ status: 'proposed', proposal: {
         id: 'proposal-one', baseRevision, layout: { status: 'unavailable', revision: baseRevision },
         document: { ...document, valueProposition: { ...document.valueProposition, paragraphs:
           document.valueProposition.paragraphs.map((field, index) => index === 0
             ? { ...field, text: 'Accessible billing screens' } : field) } },
       } }),
-    } satisfies Partial<ResumeDocumentPorts>),
-    createSessionId: () => 'unused', now: () => session.startedAt,
-    languageModelGateway: { processingPolicy: { provider: 'Test', purposes: [], retentionPolicy: 'None',
-      storageBehavior: 'Browser-local', transmittedDataCategories: [], version: 'test' } },
-    persistence: { delete: () => ({ ok: true, value: null }),
-      restore: () => ({ ok: true, value: { notice: null, session } }),
-      save: ({ session: nextSession }) => { session = nextSession; return { ok: true, value: nextSession } } },
-    jobPostingDocumentReader: { read: () => Promise.resolve({ ok: true, value: { text: '' } }) },
-    jobPostingExtractor: { extract: () => Promise.resolve({ ok: false, error: 'job-posting-extraction-unavailable' }) },
-    matchEvidenceMatcher: { match: () => Promise.resolve({ ok: false, error: 'match-evidence-unavailable' }) },
-    sourceDocumentReader: { read: () => Promise.resolve({ ok: true, value: { pageCount: null, text: '' } }) },
-    sourceProfileExtractor: { extract: () => Promise.resolve({ ok: false, error: 'source-profile-extraction-unavailable' }) },
-  }
+    })),
+    persistence: createInMemoryCandidateSessionPersistence({ session }),
+  })
 }

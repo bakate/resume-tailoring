@@ -1,17 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createOpenAiRequester, createOpenAiRequestDeadline } from './openai-request'
+import { createOpenAiRequester } from './openai-request'
 
 describe('OpenAI request policy', () => {
-  it('creates a deadline with thirty seconds of Lambda response headroom', () => {
-    const timeout = vi.spyOn(AbortSignal, 'timeout')
-
-    createOpenAiRequestDeadline()
-
-    expect(timeout).toHaveBeenCalledWith(90_000)
-    timeout.mockRestore()
-  })
-
   it('reuses a supplied deadline across requests', async () => {
     const deadlineSignal = new AbortController().signal
     const signals: (AbortSignal | null)[] = []

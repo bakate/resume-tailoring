@@ -6,6 +6,7 @@ import {
   candidateSessionStorageVersion,
 } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateSession } from '@resume-tailoring/application/candidate-journey'
+import { describeCandidateSessionPersistenceContract } from '@resume-tailoring/application/testing'
 import { createBrowserCandidateSessionPersistence } from './browser-candidate-session-persistence'
 
 const sessionStartedAt = 1_000
@@ -36,9 +37,17 @@ const consentedCandidateSession = {
   },
 } as const satisfies CandidateSession
 
+describeCandidateSessionPersistenceContract({
+  name: 'Browser Candidate Session persistence',
+  createPersistence: ({ storedSession, storageAvailable }) => createBrowserCandidateSessionPersistence({
+    storage: storageAvailable
+      ? createMemoryStorage({ initialValue: storedSession === null ? null : JSON.stringify(storedSession) })
+      : unavailableStorage,
+  }),
+})
+
 describe('browser Candidate Session persistence', () => {
   it('recovers unresolved edits, hidden entries, and genuine fact restoration destinations', () => {
-    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage() })
     const field = groupedResumeDocument.valueProposition.paragraphs[0]
     const location = { kind: 'value-proposition', fieldId: field.id } as const
     const session: CandidateSession = { ...candidateSession, tailoredResume: { ...groupedResumeDocument,
@@ -47,153 +56,86 @@ describe('browser Candidate Session persistence', () => {
         hiddenFields: [{ field: { ...field, text: '' }, location }], hiddenExperiences: [groupedResumeDocument.experiences[0]] },
       resumeFactLocations: [{ factId: 'source-fact-added', location }],
     }
-    persistence.save({ session })
 
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session } })
+    const restored = roundTrip({ session })
+
+    expect(restored).toEqual({ ok: true, value: { notice: null, session } })
   })
 
   it('round-trips semantic values, stable identities, prose, and grouped provenance', () => {
-    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage() })
     const session = { ...candidateSession, tailoredResume: groupedResumeDocument }
-    persistence.save({ session })
 
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
-      ok: true, value: { notice: null, session },
-    })
+    const restored = roundTrip({ session })
+
+    expect(restored).toEqual({ ok: true, value: { notice: null, session } })
   })
 
   it('restores the resume photo kept in the Candidate Session', () => {
-    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage() })
     const session = { ...candidateSession, resumePhoto: { dataUrl: 'data:image/png;base64,iVBORw0KGgo=', name: 'portrait.png' } }
-    persistence.save({ session })
 
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session } })
-  })
+    const restored = roundTrip({ session })
 
-  it('discards a stored resume photo that is not an image', () => {
-    const storage = createMemoryStorage({ initialValue: JSON.stringify({ ...candidateSession,
-      resumePhoto: { dataUrl: 'data:text/html;base64,PHNjcmlwdD4=', name: 'portrait.png' } }) })
-    const persistence = createBrowserCandidateSessionPersistence({ storage })
-
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
-      ok: true, value: { notice: 'incompatible-session-discarded', session: null },
-    })
-  })
-
-  it('explicitly discards the previous flat document version', () => {
-    const storage = createMemoryStorage({ initialValue: JSON.stringify({ ...candidateSession, version: 5 }) })
-    const persistence = createBrowserCandidateSessionPersistence({ storage })
-
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
-      ok: true, value: { notice: 'incompatible-session-discarded', session: null },
-    })
-    expect(storage.getItem(candidateSessionStorageKey)).toBeNull()
-  })
-
-  it('stores and restores the current version for 24 hours', () => {
-    const storage = createMemoryStorage()
-    const persistence = createBrowserCandidateSessionPersistence({ storage })
-
-    expect(persistence.save({ session: candidateSession })).toEqual({
-      ok: true, value: candidateSession,
-    })
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
-      ok: true, value: { notice: null, session: candidateSession },
-    })
+    expect(restored).toEqual({ ok: true, value: { notice: null, session } })
   })
 
   it.each([
+    ['a resume photo that is not an image', { ...candidateSession,
+      resumePhoto: { dataUrl: 'data:text/html;base64,PHNjcmlwdD4=', name: 'portrait.png' } }],
+    ['the previous flat document version', { ...candidateSession, version: 5 }],
     ['an incompatible version', { ...candidateSession, version: 999 }],
     ['an invalid lifetime', { ...candidateSession, expiresAt: sessionStartedAt + (48 * 60 * 60 * 1_000) }],
   ])('discards %s', (_caseName, storedSession) => {
     const storage = createMemoryStorage({ initialValue: JSON.stringify(storedSession) })
     const persistence = createBrowserCandidateSessionPersistence({ storage })
 
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
-      ok: true,
-      value: { notice: 'incompatible-session-discarded', session: null },
-    })
+    const restored = persistence.restore({ now: sessionStartedAt })
+
+    expect(restored).toEqual({ ok: true, value: { notice: 'incompatible-session-discarded', session: null } })
+    expect(storage.getItem(candidateSessionStorageKey)).toBeNull()
+  })
+
+  it('removes a deleted Candidate Session from browser storage', () => {
+    const storage = createMemoryStorage({ initialValue: JSON.stringify(candidateSession) })
+    const persistence = createBrowserCandidateSessionPersistence({ storage })
+
+    persistence.delete()
+
     expect(storage.getItem(candidateSessionStorageKey)).toBeNull()
   })
 
   it('keeps the last saved session while the page is being left, so cut-short work restores as interrupted', () => {
-    const storage = createMemoryStorage()
     const page = new EventTarget()
-    const persistence = createBrowserCandidateSessionPersistence({ storage, page })
+    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage(), page })
     persistence.save({ session: candidateSession })
-
     page.dispatchEvent(new Event('beforeunload'))
+
     persistence.save({ session: consentedCandidateSession })
 
     expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session: candidateSession } })
   })
 
-  it('saves again once the Candidate keeps using a page they did not leave', () => {
-    const storage = createMemoryStorage()
+  it.each([
+    ['the Candidate keeps using a page they did not leave', 'beforeunload', 'keydown'],
+    ['a page left for the back-forward cache is shown again', 'pagehide', 'pageshow'],
+  ])('saves again once %s', (_caseName, leavingEvent, stayingEvent) => {
     const page = new EventTarget()
-    const persistence = createBrowserCandidateSessionPersistence({ storage, page })
-    page.dispatchEvent(new Event('beforeunload'))
+    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage(), page })
+    page.dispatchEvent(new Event(leavingEvent))
+    page.dispatchEvent(new Event(stayingEvent))
 
-    page.dispatchEvent(new Event('keydown'))
     persistence.save({ session: consentedCandidateSession })
 
     expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session: consentedCandidateSession } })
   })
 
-  it('saves again once a page left for the back-forward cache is shown again', () => {
-    const storage = createMemoryStorage()
-    const page = new EventTarget()
-    const persistence = createBrowserCandidateSessionPersistence({ storage, page })
-    page.dispatchEvent(new Event('pagehide'))
+  it.each([
+    ['Processing Consent bound to its complete policy', consentedCandidateSession],
+    ['the browser-local Source Document, contacts, and structured Source Profile', sourceIntakeCandidateSession],
+    ['the complete explainable Match Analysis', jobMatchCandidateSession],
+  ] as const)('restores %s', (_caseName, session) => {
+    const restored = roundTrip({ session })
 
-    page.dispatchEvent(new Event('pageshow'))
-    persistence.save({ session: consentedCandidateSession })
-
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session: consentedCandidateSession } })
-  })
-
-  it('deletes a stored Candidate Session', () => {
-    const storage = createMemoryStorage({ initialValue: JSON.stringify(candidateSession) })
-    const persistence = createBrowserCandidateSessionPersistence({ storage })
-
-    expect(persistence.delete()).toEqual({ ok: true, value: null })
-    expect(storage.getItem(candidateSessionStorageKey)).toBeNull()
-  })
-
-  it('restores Processing Consent bound to its complete policy', () => {
-    const storage = createMemoryStorage()
-    const persistence = createBrowserCandidateSessionPersistence({ storage })
-
-    expect(persistence.save({ session: consentedCandidateSession })).toEqual({
-      ok: true, value: consentedCandidateSession,
-    })
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
-      ok: true, value: { notice: null, session: consentedCandidateSession },
-    })
-  })
-
-  it('restores the browser-local Source Document, contacts, and structured Source Profile', () => {
-    const storage = createMemoryStorage()
-    const persistence = createBrowserCandidateSessionPersistence({ storage })
-
-    expect(persistence.save({ session: sourceIntakeCandidateSession })).toEqual({
-      ok: true, value: sourceIntakeCandidateSession,
-    })
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
-      ok: true, value: { notice: null, session: sourceIntakeCandidateSession },
-    })
-  })
-
-  it('restores the complete explainable Match Analysis', () => {
-    const storage = createMemoryStorage()
-    const persistence = createBrowserCandidateSessionPersistence({ storage })
-
-    expect(persistence.save({ session: jobMatchCandidateSession })).toEqual({
-      ok: true, value: jobMatchCandidateSession,
-    })
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
-      ok: true, value: { notice: null, session: jobMatchCandidateSession },
-    })
+    expect(restored).toEqual({ ok: true, value: { notice: null, session } })
   })
 
   it('restores a Match Analysis stored before Adjacent Evidence existed', () => {
@@ -204,13 +146,12 @@ describe('browser Candidate Session persistence', () => {
         jobMatch: { ...jobMatchCandidateSession.jobMatch, analysis: storedAnalysis } }),
     }) })
 
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
-      ok: true, value: { notice: null, session: jobMatchCandidateSession },
-    })
+    const restored = persistence.restore({ now: sessionStartedAt })
+
+    expect(restored).toEqual({ ok: true, value: { notice: null, session: jobMatchCandidateSession } })
   })
 
   it('restores the saved Resume Sections of an interrupted preparation, with text only on validated sections', () => {
-    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage() })
     const session: CandidateSession = { ...preparingCandidateSession, preparation: { ...preparingCandidateSession.preparation,
       sections: [
         { key: 'value-proposition', kind: 'value-proposition', attempt: 1, status: 'validated',
@@ -221,20 +162,28 @@ describe('browser Candidate Session persistence', () => {
         { key: 'education', kind: 'education', attempt: 0, status: 'writing' },
         { key: 'languages', kind: 'languages', attempt: 0, status: 'planned' },
       ] } }
-    persistence.save({ session })
 
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session } })
+    const restored = roundTrip({ session })
+
+    expect(restored).toEqual({ ok: true, value: { notice: null, session } })
   })
 
   it('restores a preparation stored before section-by-section preparation', () => {
     const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage({
       initialValue: JSON.stringify(preparingCandidateSession) }) })
 
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({
-      ok: true, value: { notice: null, session: preparingCandidateSession },
-    })
+    const restored = persistence.restore({ now: sessionStartedAt })
+
+    expect(restored).toEqual({ ok: true, value: { notice: null, session: preparingCandidateSession } })
   })
 })
+
+/** Saves a Candidate Session into fresh browser storage and restores it, as the next page load would. */
+function roundTrip({ session }: Readonly<{ session: CandidateSession }>) {
+  const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage() })
+  persistence.save({ session })
+  return persistence.restore({ now: sessionStartedAt })
+}
 
 const sourceIntakeCandidateSession = {
   ...consentedCandidateSession,
@@ -325,4 +274,10 @@ function createMemoryStorage({ initialValue = null }: Readonly<{
     removeItem: (key: string) => { storedValues.delete(key) },
     setItem: (key: string, value: string) => { storedValues.set(key, value) },
   }
+}
+
+const unavailableStorage = { getItem: refuseStorage, removeItem: refuseStorage, setItem: refuseStorage }
+
+function refuseStorage(): never {
+  throw new DOMException('Storage is disabled', 'SecurityError')
 }

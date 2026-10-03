@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourneyDependencies, CandidateSession } from '@resume-tailoring/application/candidate-journey'
-import { createFixtureResumeSectionModels, structuredResumeJobMatch, structuredResumeSource, writeResumeSectionFromFacts } from '@resume-tailoring/application/structured-resume-fixtures'
+import { structuredResumeJobMatch, structuredResumeSource, writeResumeSectionFromFacts } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createFakeCandidateJourneyDependencies, createFakeResumeSectionModels, createInMemoryCandidateSessionPersistence } from '@resume-tailoring/application/testing'
 
 describe('Candidate Session result', () => {
   it('keeps the resume photo in the Candidate Session after reopening it', async () => {
@@ -119,21 +120,12 @@ function createMatchedSession(): CandidateSession {
 }
 
 function createDependencies(): CandidateJourneyDependencies {
-  let session = createMatchedSession()
-  return {
-    resumeSectionModels: createFixtureResumeSectionModels({
+  const session = createMatchedSession()
+  return createFakeCandidateJourneyDependencies({
+    now: () => session.startedAt,
+    resumeSectionModels: createFakeResumeSectionModels({
       writeSection: (input) => Promise.resolve({ ok: true, value: writeResumeSectionFromFacts(input) }),
     }),
-    createSessionId: () => crypto.randomUUID(), now: () => session.startedAt,
-    languageModelGateway: { processingPolicy: { provider: 'Test', purposes: [], retentionPolicy: 'None',
-      storageBehavior: 'Browser-local', transmittedDataCategories: [], version: 'test' } },
-    persistence: { delete: () => ({ ok: true, value: null }),
-      restore: () => ({ ok: true, value: { notice: null, session } }),
-      save: ({ session: nextSession }) => { session = nextSession; return { ok: true, value: nextSession } } },
-    jobPostingDocumentReader: { read: () => Promise.resolve({ ok: true, value: { text: '' } }) },
-    jobPostingExtractor: { extract: () => Promise.resolve({ ok: false, error: 'job-posting-extraction-unavailable' }) },
-    matchEvidenceMatcher: { match: () => Promise.resolve({ ok: false, error: 'match-evidence-unavailable' }) },
-    sourceDocumentReader: { read: () => Promise.resolve({ ok: true, value: { pageCount: null, text: '' } }) },
-    sourceProfileExtractor: { extract: () => Promise.resolve({ ok: false, error: 'source-profile-extraction-unavailable' }) },
-  }
+    persistence: createInMemoryCandidateSessionPersistence({ session }),
+  })
 }

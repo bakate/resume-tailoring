@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createSourceIntake } from '@resume-tailoring/application/source-intake'
 import type { StructuredSourceProfileExtraction } from '@resume-tailoring/application/source-intake'
+import { createFakeSourceDocumentReader, createFakeSourceProfileExtractor } from '@resume-tailoring/application/testing'
 import { readLocalResumeContacts } from '@resume-tailoring/application/tailored-resume'
 
 describe('Local Candidate name detection', () => {
@@ -100,11 +101,11 @@ class CandidateNameDetectionSystem {
   async readSource(text: string) {
     const result = await createSourceIntake({
       document: { bytes: new TextEncoder().encode(text), mediaType: 'text/plain', name: 'resume.txt' },
-      sourceDocumentReader: { read: () => Promise.resolve({ ok: true, value: { pageCount: null, text } }) },
-      sourceProfileExtractor: { extract: ({ professionalContent }) => {
+      sourceDocumentReader: createFakeSourceDocumentReader(),
+      sourceProfileExtractor: createFakeSourceProfileExtractor({ extract: ({ professionalContent }) => {
         this.#modelBoundText.push(professionalContent)
         return Promise.resolve({ ok: true, value: extraction })
-      } },
+      } }),
     })
     if (!result.ok) throw new Error(`Source intake failed: ${result.error}`)
     this.#identity = readLocalResumeContacts({ sourceIntake: result.value }).identity
