@@ -28,8 +28,8 @@ export function TailoredResumePreview(props: ResumePreviewProps) {
       clearable disabled={props.enabled === false} onChange={photo.select} error={photo.failed ? messages.photoInvalid : undefined} />
     {current === null ? <Stack><Text role="status">{photo.failed ? messages.photoInvalid : messages.pending}</Text>
       <Button disabled>{messages.download}</Button></Stack>
-      : <RenderedResume key={current.assessment.layout.revision} {...{ ...props, current, messages, onRetry }} />}
-    {current?.assessment.layout.status === 'unavailable' ? <Button onClick={onRetry}>{messages.retry}</Button> : null}
+      : current.assessment.layout.status === 'unavailable' ? <RenderFailure {...{ messages, onRetry }} />
+        : <RenderedResume key={current.assessment.layout.revision} {...{ ...props, current, messages, onRetry }} />}
     <DocumentText {...{ document: props.document, messages }} />
   </section>
 }
@@ -44,10 +44,14 @@ function RenderedResume({ current, document, messages, onDownload, onRetry, paus
     {eligibility.status === 'blocked' ? eligibility.reasons.map((reason) =>
       <Text role="alert" c="danger.8" key={reason}>{messages[reason]}</Text>) : null}
     {current.pdf === null ? null : <ResumePdfPages bytes={current.pdf} onReady={ready} onFailure={failed} pageLabel={messages.page} />}
-    {preview === 'failed' ? <Stack><Text role="alert" c="danger.8">{messages['layout-unavailable']}</Text>
-      <Button onClick={onRetry}>{messages.retry}</Button></Stack> : null}
+    {preview === 'failed' ? <RenderFailure {...{ messages, onRetry }} /> : null}
     <ResumeDownload {...{ bytes, messages, onDownload, purpose: document.purpose }} />
   </Stack>
+}
+
+function RenderFailure({ messages, onRetry }: Readonly<{ messages: PreviewMessages; onRetry: () => void }>) {
+  return <Stack gap="sm" mt="md"><Text role="alert" c="danger.8">{messages['layout-unavailable']}</Text>
+    <Button onClick={onRetry}>{messages.retry}</Button></Stack>
 }
 
 function ResumeDownload({ bytes, messages, onDownload, purpose }: Readonly<{

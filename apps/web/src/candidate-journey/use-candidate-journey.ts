@@ -76,9 +76,10 @@ type BrowserLanguageModelGateway = ReturnType<typeof createOpenAiLanguageModelGa
 function createBrowserDependencies({ languageModelGateway }: Readonly<{
   languageModelGateway: BrowserLanguageModelGateway
 }>) {
+  const telemetry = createPrivacySafeBrowserTelemetry()
   return {
-    resumeDocumentRenderer: createBrowserResumeDocumentRenderer(),
-    telemetry: createPrivacySafeBrowserTelemetry(),
+    resumeDocumentRenderer: createBrowserResumeDocumentRenderer({ telemetry }),
+    telemetry,
     resumeDocumentPorts: createResumeDocumentModelAdapters({ gateway: languageModelGateway }),
     resumeSectionModels: createGatewayResumeSectionModels(languageModelGateway),
     createSessionId: () => crypto.randomUUID(),
