@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createSourceIntake } from '@resume-tailoring/application/source-intake'
 import type { SourceIntake, StructuredSourceProfileExtraction } from '@resume-tailoring/application/source-intake'
+import { createFakeSourceDocumentReader, createFakeSourceProfileExtractor } from '@resume-tailoring/application/testing'
 
 describe('Experience location from the Source Document', () => {
   it('keeps the location exactly as the source writes it', async () => {
@@ -32,8 +33,8 @@ class SourceProfileLocationSystem {
     const extraction = createExtraction({ location: extractedLocation })
     const result = await createSourceIntake({
       document: { bytes: new TextEncoder().encode(text), mediaType: 'text/plain', name: 'resume.txt' },
-      sourceDocumentReader: { read: () => Promise.resolve({ ok: true, value: { pageCount: null, text } }) },
-      sourceProfileExtractor: { extract: () => Promise.resolve({ ok: true, value: extraction }) },
+      sourceDocumentReader: createFakeSourceDocumentReader(),
+      sourceProfileExtractor: createFakeSourceProfileExtractor({ extract: () => Promise.resolve({ ok: true, value: extraction }) }),
     })
     if (!result.ok) throw new Error(`Source intake failed: ${result.error}`)
     this.#sourceIntake = result.value

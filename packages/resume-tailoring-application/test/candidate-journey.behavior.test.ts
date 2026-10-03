@@ -9,7 +9,6 @@ import type {
   CandidateJourney,
   CandidateJourneyView,
   CandidateSession,
-  CandidateSessionPersistence,
 } from '@resume-tailoring/application/candidate-journey'
 import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
 import type {
@@ -17,6 +16,13 @@ import type {
   SourceDocumentReader,
   StructuredSourceProfileExtraction,
 } from '@resume-tailoring/application/source-intake'
+import {
+  createFakeCandidateJourneyDependencies,
+  createFakeLanguageModelGateway,
+  createFakeSourceDocumentReader,
+  createFakeSourceProfileExtractor,
+  createInMemoryCandidateSessionPersistence,
+} from '@resume-tailoring/application/testing'
 
 const currentTime = Date.UTC(2026, 8, 29, 9)
 const activeProcessingPolicy = {
@@ -157,35 +163,20 @@ class CandidateJourneyTestSystem {
     processingPolicy: ProcessingPolicy
     storedSession: CandidateSession | null
   }>) {
+    const sourceDocumentReader = createFakeSourceDocumentReader()
     this.#candidateJourney = createCandidateJourney({
-      dependencies: {
+      dependencies: createFakeCandidateJourneyDependencies({
         createSessionId: () => '00000000-0000-4000-8000-000000000039',
-        jobPostingDocumentReader: { read: () => Promise.resolve({
-          ok: false,
-          error: 'unsupported-job-posting',
-        }) },
-        jobPostingExtractor: { extract: () => Promise.resolve({
-          ok: false,
-          error: 'job-posting-extraction-unavailable',
-        }) },
-        languageModelGateway: { processingPolicy },
-        matchEvidenceMatcher: { match: () => Promise.resolve({
-          ok: false,
-          error: 'match-evidence-unavailable',
-        }) },
+        languageModelGateway: createFakeLanguageModelGateway({ processingPolicy }),
         now: () => currentTime,
-        persistence: createInMemoryPersistence({ storedSession }),
-        sourceDocumentReader: { read: ({ bytes }) => Promise.resolve(
-          this.#documentReadResult ?? {
-            ok: true,
-            value: { pageCount: null, text: new TextDecoder().decode(bytes) },
-          },
-        ) },
-        sourceProfileExtractor: { extract: ({ professionalContent }) => {
+        persistence: createInMemoryCandidateSessionPersistence({ session: storedSession }),
+        sourceDocumentReader: createFakeSourceDocumentReader({ read: (document) => this.#documentReadResult === null
+          ? sourceDocumentReader.read(document) : Promise.resolve(this.#documentReadResult) }),
+        sourceProfileExtractor: createFakeSourceProfileExtractor({ extract: ({ professionalContent }) => {
           this.#modelRequests.push(professionalContent)
           return Promise.resolve({ ok: true, value: this.#extractionResult })
-        } },
-      },
+        } }),
+      }),
     })
   }
 
@@ -419,23 +410,6 @@ function matchesView({ currentView, processingConsentStatus, status }: Readonly<
   return processingConsentStatus === undefined
     || (currentView.status === 'candidate-session-open'
       && currentView.processingConsentStatus === processingConsentStatus)
-}
-
-function createInMemoryPersistence({ storedSession }: Readonly<{
-  storedSession: CandidateSession | null
-}>): CandidateSessionPersistence {
-  let session = storedSession
-  return {
-    delete: () => {
-      session = null
-      return { ok: true, value: null }
-    },
-    restore: () => ({ ok: true, value: { notice: null, session } }),
-    save: ({ session: nextSession }) => {
-      session = nextSession
-      return { ok: true, value: session }
-    },
-  }
 }
 
 function createConsentedCandidateSession(): CandidateSession {

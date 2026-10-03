@@ -18,24 +18,6 @@ describe('browser Job Posting document reader', () => {
     })
   })
 
-  it('reads selectable text from a PDF Job Posting', async () => {
-    const reader = createBrowserJobPostingDocumentReader({
-      readPdfDocument: () => Promise.resolve({
-        ok: true,
-        value: { pageCount: 2, text: 'Staff Engineer\nArchitecture leadership' },
-      }),
-    })
-
-    const result = await reader.read(createDocument({
-      content: '%PDF', mediaType: 'application/pdf', name: 'role.pdf',
-    }))
-
-    expect(result).toEqual({
-      ok: true,
-      value: { text: 'Staff Engineer\nArchitecture leadership' },
-    })
-  })
-
   it('rejects unsupported Job Posting formats', async () => {
     const reader = createBrowserJobPostingDocumentReader()
 

@@ -4,8 +4,10 @@ import type { CandidateJourney, CandidateJourneyDependencies, CandidateJourneyVi
   ResumeCoherenceInput, ResumeDocumentCoherence, ResumeRejectedField, ResumeSectionContent, ResumeSectionModelFailure,
   ResumeSectionWritingInput,
 } from '@resume-tailoring/application/candidate-journey'
-import { createFixtureResumeSectionModels, readGroupedResumeSection, structuredResumeJobMatch,
+import { readGroupedResumeSection, structuredResumeJobMatch,
   structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createFakeCandidateJourneyDependencies, createFakeResumeSectionModels, createInMemoryCandidateSessionPersistence,
+  testProcessingPolicy } from '@resume-tailoring/application/testing'
 import type { TailoredResumeField } from '@resume-tailoring/application/tailored-resume'
 
 describe('Candidate Journey section-by-section resume preparation', () => {
@@ -251,7 +253,7 @@ type TestOptions = Readonly<{
 class SectionPreparationTestSystem {
   readonly #options: TestOptions
   // The in-memory persistence a reloaded Candidate Journey restores from.
-  readonly #store: SessionStore = { session: createMatchedSession() }
+  readonly #persistence = createInMemoryCandidateSessionPersistence({ session: createMatchedSession() })
   #journey: CandidateJourney
   readonly #writingInputs: ResumeSectionWritingInput[] = []
   readonly #pendingWrites: (() => void)[] = []
@@ -271,7 +273,7 @@ class SectionPreparationTestSystem {
   }
 
   #createJourney({ heldSection }: Readonly<{ heldSection: TestOptions['heldSection'] }>) {
-    return createCandidateJourney({ dependencies: createDependencies({ options: this.#options, store: this.#store, models: {
+    return createCandidateJourney({ dependencies: createDependencies({ options: this.#options, persistence: this.#persistence, models: {
       onWrite: async (input) => {
         this.#writingInputs.push(input)
         this.#writesInFlight += 1
@@ -338,13 +340,14 @@ class SectionPreparationTestSystem {
   }
 
   async givenReloadWithSavedSectionCitingUnattestedFact(key: string) {
-    const preparation = this.#store.session.preparation
+    const session = this.#readStoredSession()
+    const preparation = session.preparation
     if (preparation?.sections === undefined) expect.fail('Expected a saved sections snapshot')
     // A Candidate Fact removed from the Source Intake since the section was validated.
     const sections = preparation.sections.map((section) => section.key !== key || section.status !== 'validated' ? section
       : { ...section, content: { kind: 'education' as const, fields: [{ id: 'education-0', text: 'Computer Science degree',
         factIds: ['source-fact-education-1-qualification-0' as const] }] } })
-    this.#store.session = { ...this.#store.session, preparation: { ...preparation, sections } }
+    this.#persistence.save({ session: { ...session, preparation: { ...preparation, sections } } })
     await this.#reload()
   }
 
@@ -367,6 +370,12 @@ class SectionPreparationTestSystem {
   async #preparationFinished() {
     await expect.poll(() => this.#readOpenView().operation).toBeNull()
     this.#outcome = this.#journey.readView()
+  }
+
+  #readStoredSession() {
+    const session = this.#persistence.readStoredSession()
+    if (session === null) return expect.fail('Expected a stored Candidate Session')
+    return session
   }
 
   #readOpenView() {
@@ -411,7 +420,7 @@ class SectionPreparationTestSystem {
     expect(sections.find(({ key }) => key === 'skills')).not.toHaveProperty('content')
     expect(sections.find(({ key }) => key === 'education')).toMatchObject({ attempt: 1,
       content: readGroupedResumeSection({ key: 'education', kind: 'education' }) })
-    expect(this.#store.session.preparation?.sections).toEqual(sections)
+    expect(this.#readStoredSession().preparation?.sections).toEqual(sections)
   }
 
   expectCompleteResumePreparedWithEverySectionValidated() {
@@ -426,7 +435,7 @@ class SectionPreparationTestSystem {
     const sections = this.#expectOutcome()?.session.preparation?.sections ?? []
     expect(sections).toHaveLength(8)
     expect(sections.every((section) => section.status === 'validated' && section.content.kind === section.kind)).toBe(true)
-    expect(this.#store.session.preparation).toMatchObject({ status: 'failed', failure: 'unavailable', sections })
+    expect(this.#readStoredSession().preparation).toMatchObject({ status: 'failed', failure: 'unavailable', sections })
   }
 
   expectAtMostFourSectionsInFlight() {
@@ -503,7 +512,7 @@ class SectionPreparationTestSystem {
     const sections = this.#expectOutcome()?.session.preparation?.sections ?? []
     expect(sections.filter(({ status }) => status === 'validated').map(({ key }) => key)).toEqual(expected.validated)
     expect(sections.filter(({ status }) => status === 'failed').map(({ key }) => key)).toEqual(expected.failed)
-    expect(this.#store.session.preparation?.sections).toEqual(sections)
+    expect(this.#readStoredSession().preparation?.sections).toEqual(sections)
   }
 
   expectRetryWrote(keys: readonly string[]) {
@@ -532,24 +541,21 @@ function createMatchedSession(): CandidateSession {
   return {
     expiresAt: startedAt + candidateSessionDurationMilliseconds, startedAt,
     version: candidateSessionStorageVersion, sessionId: 'candidate-session-00000000-0000-4000-8000-000000000068',
-    jobMatch: structuredResumeJobMatch, phase: 'job-match', processingConsent: { grantedAt: startedAt, policy },
+    jobMatch: structuredResumeJobMatch, phase: 'job-match', processingConsent: { grantedAt: startedAt, policy: testProcessingPolicy },
     sourceIntake: structuredResumeSource, tailoredResume: null,
   }
 }
 
-type SessionStore = { session: CandidateSession }
-
-function createDependencies({ options, store, models }: Readonly<{
+function createDependencies({ options, persistence, models }: Readonly<{
   options: TestOptions
-  store: SessionStore
+  persistence: CandidateJourneyDependencies['persistence']
   models: Readonly<{ onWrite: (input: ResumeSectionWritingInput) => Promise<void>
     onSkillsWrite: () => number; onSkillsValidation: () => number
     onRejectedField: (field: ResumeRejectedField) => void; onCoherenceCheck: () => number }>
 }>): CandidateJourneyDependencies {
-  return {
-    createSessionId: () => crypto.randomUUID(), now: () => store.session.startedAt,
-    languageModelGateway: { processingPolicy: policy },
-    resumeSectionModels: createFixtureResumeSectionModels({
+  return createFakeCandidateJourneyDependencies({
+    persistence,
+    resumeSectionModels: createFakeResumeSectionModels({
       writeSection: async (input) => {
         await models.onWrite(input)
         const failure = options.skillsWritingFailure
@@ -571,15 +577,7 @@ function createDependencies({ options, store, models }: Readonly<{
           document, onRejectedField: models.onRejectedField }) })
       },
     }),
-    persistence: { delete: () => ({ ok: true, value: null }),
-      restore: () => ({ ok: true, value: { notice: null, session: store.session } }),
-      save: ({ session }) => { store.session = session; return { ok: true, value: session } } },
-    jobPostingDocumentReader: { read: () => Promise.resolve({ ok: true, value: { text: '' } }) },
-    jobPostingExtractor: { extract: () => Promise.resolve({ ok: false, error: 'job-posting-extraction-unavailable' }) },
-    matchEvidenceMatcher: { match: () => Promise.resolve({ ok: false, error: 'match-evidence-unavailable' }) },
-    sourceDocumentReader: { read: () => Promise.resolve({ ok: true, value: { pageCount: null, text: '' } }) },
-    sourceProfileExtractor: { extract: () => Promise.resolve({ ok: false, error: 'source-profile-extraction-unavailable' }) },
-  }
+  })
 }
 
 /** Appends an em-dashed detail to every written field, as a writing model often does. */
@@ -626,5 +624,3 @@ function readCoherence({ coherence, check, document, onRejectedField }: Readonly
   return { ...coherent, coherent: false, issues: [{ fieldId: field.id, kind }] }
 }
 
-const policy = { provider: 'Test', purposes: [], retentionPolicy: 'None',
-  storageBehavior: 'Browser-local', transmittedDataCategories: [], version: 'test' } as const

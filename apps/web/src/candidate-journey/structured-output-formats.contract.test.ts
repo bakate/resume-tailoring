@@ -15,8 +15,10 @@ const structuredOutputFormats = {
 
 describe('Structured output formats', () => {
   it.each(Object.entries(structuredOutputFormats))('keeps the %s schema within strict structured-output rules', (_name, format) => {
+    const violations = findStrictSchemaViolations({ path: '$', schema: format.schema })
+
     expect(format.strict).toBe(true)
-    expect(findStrictSchemaViolations({ path: '$', schema: format.schema })).toEqual([])
+    expect(violations).toEqual([])
   })
 })
 

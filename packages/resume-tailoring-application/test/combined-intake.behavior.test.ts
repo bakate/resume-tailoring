@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourney, CandidateJourneyDependencies, CandidateJourneyView, CandidateSession } from '@resume-tailoring/application/candidate-journey'
-import { createFixtureResumeSectionModels, readGroupedResumeSection, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { readGroupedResumeSection, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createFakeCandidateJourneyDependencies, createFakeMatchEvidenceMatcher, createFakeResumeSectionModels,
+  createFakeSourceProfileExtractor, createInMemoryCandidateSessionPersistence, fixtureMatchEvidence, noMatchEvidence,
+  testProcessingPolicy as policy } from '@resume-tailoring/application/testing'
 
 describe('Candidate Journey combined intake', () => {
   it('prepares a written resume from both inputs with one generation action', async () => {
@@ -546,40 +549,27 @@ class CombinedIntakeSystem {
   }
 }
 
-const policy = { provider: 'Test', purposes: ['Write'], retentionPolicy: 'None',
-  storageBehavior: 'Browser-local', transmittedDataCategories: ['Evidence'], version: 'test' } as const
-
 function createDependencies(options: () => TestOptions, writingDelivery: () => Promise<void>,
   writtenSectionKeys: string[]): CandidateJourneyDependencies {
   let valuePropositionFailures = 0
   const startedAt = Date.now()
-  let session: CandidateSession | null = { expiresAt: startedAt + candidateSessionDurationMilliseconds, startedAt,
+  const session: CandidateSession = { expiresAt: startedAt + candidateSessionDurationMilliseconds, startedAt,
     sessionId: 'candidate-session-00000000-0000-4000-8000-000000000057', version: candidateSessionStorageVersion,
     phase: 'source-intake', processingConsent: { grantedAt: startedAt, policy: options().consent === 'outdated' ? { ...policy, version: 'old' } : policy },
     sourceIntake: null, jobMatch: null, tailoredResume: null }
-  return {
-    createSessionId: () => crypto.randomUUID(), now: () => startedAt,
-    languageModelGateway: { processingPolicy: policy },
-    persistence: { restore: () => ({ ok: true, value: { notice: null, session } }),
-      save: ({ session: nextSession }) => { session = nextSession; return { ok: true, value: session } },
-      delete: () => { session = null; return { ok: true, value: null } } },
-    sourceDocumentReader: { read: (document) => Promise.resolve({ ok: true,
-      value: { text: new TextDecoder().decode(document.bytes), pageCount: 1 } }) },
-    sourceProfileExtractor: { extract: () => options().extraction === 'unavailable'
-      ? Promise.resolve({ ok: false, error: 'source-profile-extraction-unavailable' }) : Promise.resolve({ ok: true,
+  const sourceProfileExtractor = createFakeSourceProfileExtractor()
+  return createFakeCandidateJourneyDependencies({
+    now: () => startedAt,
+    persistence: createInMemoryCandidateSessionPersistence({ session }),
+    sourceProfileExtractor: createFakeSourceProfileExtractor({ extract: (request) => options().extraction === 'unavailable'
+      ? Promise.resolve({ ok: false, error: 'source-profile-extraction-unavailable' })
+      : options().ambiguity === undefined ? sourceProfileExtractor.extract(request) : Promise.resolve({ ok: true,
       value: options().ambiguity === 'no-usable-evidence' ? { experiences: [{ role: null, organization: 'Northwind', startDate: '2021', endDate: '2024', context: null, achievements: [] }], projects: [], education: [], languages: [], certifications: [], skills: [], criticalAmbiguities: [] } : options().ambiguity === 'blocking' ? { experiences: [], projects: [], education: [], languages: [], certifications: [],
         skills: [{ name: 'React', category: null }], criticalAmbiguities: [{ path: 'skills.0.name.0', question: 'Which skill did you use?' }] }
-        : { ...structuredResumeSource.sourceProfile, criticalAmbiguities: options().ambiguity === 'isolated'
-          ? [{ path: 'experiences.0.context.0', question: 'Which team?' }] : [] } }) },
-    jobPostingDocumentReader: { read: (document) => Promise.resolve({ ok: true,
-      value: { text: new TextDecoder().decode(document.bytes) } }) },
-    jobPostingExtractor: { extract: () => Promise.resolve({ ok: true, value: structuredResumeJobMatch }) },
-    matchEvidenceMatcher: { match: () => Promise.resolve({ ok: true, value: options().correspondence === 'none' ? { adjacentEvidence: [], evidence: [], relevance: [] } : {
-      adjacentEvidence: [],
-      evidence: [{ coverage: 'covered', factMatches: [{ factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' }], requirementId: 'job-requirement-react' }],
-      relevance: [{ requirementId: 'job-requirement-react', factMatch: { factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' } }],
-    } }) },
-    resumeSectionModels: options().preparation === 'no-model' ? undefined : createFixtureResumeSectionModels({
+        : { ...structuredResumeSource.sourceProfile, criticalAmbiguities: [{ path: 'experiences.0.context.0', question: 'Which team?' }] } }) }),
+    matchEvidenceMatcher: createFakeMatchEvidenceMatcher({ match: () => Promise.resolve({ ok: true,
+      value: options().correspondence === 'none' ? noMatchEvidence : fixtureMatchEvidence }) }),
+    resumeSectionModels: options().preparation === 'no-model' ? undefined : createFakeResumeSectionModels({
       writeSection: async ({ section, locale }) => {
         writtenSectionKeys.push(section.key)
         await writingDelivery()
@@ -603,7 +593,7 @@ function createDependencies(options: () => TestOptions, writingDelivery: () => P
           .map(({ id }) => ({ fieldId: id, supported: options().preparation !== 'unsafe' || id !== 'summary-billing' })),
       } }),
     }),
-  }
+  })
 }
 
 function documentFromText(text: string) {

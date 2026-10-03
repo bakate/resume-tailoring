@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourney, CandidateJourneyDependencies, CandidateSession } from '@resume-tailoring/application/candidate-journey'
-import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/privacy-safe-telemetry'
-import { createFixtureResumeSectionModels, readGroupedResumeSection, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { readGroupedResumeSection, structuredResumeJobMatch } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createFakeCandidateJourneyDependencies, createFakeMatchEvidenceMatcher, createFakeResumeSectionModels,
+  createInMemoryCandidateSessionPersistence, createRecordingTelemetry, noMatchEvidence } from '@resume-tailoring/application/testing'
 
 describe('Candidate Journey privacy-safe outcome telemetry', () => {
   it('records journey progression through one generation action without Candidate content', async () => {
@@ -92,11 +93,11 @@ type TestOptions = Readonly<{ correspondence?: 'none'; session?: 'expiring' }>
 
 class OutcomeTelemetrySystem {
   readonly #journey: CandidateJourney
-  readonly #events: PrivacySafeTelemetryEvent[] = []
+  readonly #telemetry = createRecordingTelemetry()
   #eventsBeforeAction: number | null = null
 
   constructor(options: TestOptions) {
-    this.#journey = createCandidateJourney({ dependencies: createDependencies({ options, events: this.#events }) })
+    this.#journey = createCandidateJourney({ dependencies: createDependencies({ options, telemetry: this.#telemetry }) })
   }
 
   async givenNewConsentedSession() {
@@ -176,7 +177,7 @@ class OutcomeTelemetrySystem {
       { name: 'candidate-journey-phase-reached', phase: 'job-match' },
       { name: 'candidate-journey-phase-reached', phase: 'tailored-resume-preparation' },
     ])
-    expect(this.#events[0]).toEqual({ name: 'resume-tailoring-opened' })
+    expect(this.#telemetry.events[0]).toEqual({ name: 'resume-tailoring-opened' })
     this.#expectNoCandidateContent()
   }
 
@@ -226,15 +227,15 @@ class OutcomeTelemetrySystem {
     this.#expectNoCandidateContent()
   }
 
-  #markAction() { this.#eventsBeforeAction = this.#events.length }
+  #markAction() { this.#eventsBeforeAction = this.#telemetry.events.length }
 
   #recordedAfterAction() {
     expect(this.#eventsBeforeAction, 'Perform a Candidate Journey action before reading telemetry').not.toBeNull()
-    return this.#events.slice(this.#eventsBeforeAction ?? 0)
+    return this.#telemetry.events.slice(this.#eventsBeforeAction ?? 0)
   }
 
   #expectNoCandidateContent() {
-    const serialized = JSON.stringify(this.#events)
+    const serialized = JSON.stringify(this.#telemetry.events)
     for (const content of candidateContent) expect(serialized).not.toContain(content)
   }
 
@@ -248,33 +249,21 @@ class OutcomeTelemetrySystem {
 
 const candidateContent = ['Northwind', 'billing', 'React', 'Frontend', 'Alex', '@example.com'] as const
 
-function createDependencies({ options, events }: Readonly<{
-  options: TestOptions; events: PrivacySafeTelemetryEvent[]
+function createDependencies({ options, telemetry }: Readonly<{
+  options: TestOptions; telemetry: CandidateJourneyDependencies['telemetry']
 }>): CandidateJourneyDependencies {
   const startedAt = Date.now()
-  let session: CandidateSession | null = options.session === 'expiring' ? { expiresAt: startedAt, startedAt,
+  // Expires a millisecond after the journey restores it.
+  const session: CandidateSession | null = options.session === 'expiring' ? { expiresAt: startedAt + 1, startedAt,
     sessionId: 'candidate-session-00000000-0000-4000-8000-000000000060', version: candidateSessionStorageVersion,
     phase: 'source-intake', processingConsent: null, sourceIntake: null, jobMatch: null, tailoredResume: null } : null
-  const factMatch = { factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' } as const
-  return {
-    createSessionId: () => crypto.randomUUID(), now: () => startedAt,
-    telemetry: { record: (event) => { events.push(event); return Promise.resolve({ ok: true, value: undefined }) } },
-    languageModelGateway: { processingPolicy: policy },
-    persistence: { restore: () => ({ ok: true, value: { notice: null, session } }),
-      save: ({ session: nextSession }) => { session = nextSession; return { ok: true, value: session } },
-      delete: () => { session = null; return { ok: true, value: null } } },
-    sourceDocumentReader: { read: (document) => Promise.resolve({ ok: true,
-      value: { text: new TextDecoder().decode(document.bytes), pageCount: 1 } }) },
-    sourceProfileExtractor: { extract: () => Promise.resolve({ ok: true,
-      value: { ...structuredResumeSource.sourceProfile, criticalAmbiguities: [] } }) },
-    jobPostingDocumentReader: { read: (document) => Promise.resolve({ ok: true,
-      value: { text: new TextDecoder().decode(document.bytes) } }) },
-    jobPostingExtractor: { extract: () => Promise.resolve({ ok: true, value: structuredResumeJobMatch }) },
-    matchEvidenceMatcher: { match: () => Promise.resolve({ ok: true, value: options.correspondence === 'none'
-      ? { adjacentEvidence: [], evidence: [], relevance: [] }
-      : { adjacentEvidence: [], evidence: [{ coverage: 'covered', factMatches: [factMatch], requirementId: 'job-requirement-react' }],
-        relevance: [{ requirementId: 'job-requirement-react', factMatch }] } }) },
-    resumeSectionModels: createFixtureResumeSectionModels({
+  return createFakeCandidateJourneyDependencies({
+    now: () => startedAt,
+    telemetry,
+    persistence: createInMemoryCandidateSessionPersistence({ session }),
+    matchEvidenceMatcher: createFakeMatchEvidenceMatcher(options.correspondence === 'none'
+      ? { match: () => Promise.resolve({ ok: true, value: noMatchEvidence }) } : {}),
+    resumeSectionModels: createFakeResumeSectionModels({
       writeSection: ({ section }) => Promise.resolve({ ok: true, usage: { inputTokens: 80, outputTokens: 30 },
         value: section.kind === 'value-proposition' ? { kind: 'value-proposition', paragraphs: [{ id: 'summary-billing',
           text: 'Frontend engineer building accessible billing screens.', factIds: ['source-fact-skills-0-name-0'] }] }
@@ -282,11 +271,8 @@ function createDependencies({ options, events }: Readonly<{
       validateFields: ({ fields }) => Promise.resolve({ ok: true, usage: { inputTokens: 40, outputTokens: 10 },
         value: { fields: fields.map(({ id }) => ({ fieldId: id, supported: true })) } }),
     }),
-  }
+  })
 }
-
-const policy = { provider: 'Test', purposes: ['Write'], retentionPolicy: 'None',
-  storageBehavior: 'Browser-local', transmittedDataCategories: ['Evidence'], version: 'test' } as const
 
 function documentFromText(text: string) {
   return { bytes: new TextEncoder().encode(text), mediaType: 'text/plain', name: 'pasted.txt' }

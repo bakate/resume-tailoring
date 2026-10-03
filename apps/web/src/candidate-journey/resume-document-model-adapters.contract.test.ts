@@ -8,6 +8,10 @@ const change = { baseRevision: 'draft-1', section: 'value-proposition', replacem
   kind: 'evidence-excerpts', paragraphs: [{ ...groupedResumeDocument.valueProposition.paragraphs[0],
     text: 'Delivered accessible billing screens' }],
 } } as const
+const sectionChangeRequest = { candidateFacts: structuredResumeSource.candidateFacts,
+  currentDocument: groupedResumeDocument, change }
+const condensationRequest = { baseRevision: 'draft-1', candidateFacts: structuredResumeSource.candidateFacts,
+  document: groupedResumeDocument, maximumPages: 2 } as const
 
 describe('resume document professional model boundary', () => {
   it('proposes condensed wording with unchanged identities, evidence and structure after semantic validation', async () => {
@@ -22,8 +26,8 @@ describe('resume document professional model boundary', () => {
     })
     const adapters = createResumeDocumentModelAdapters({ gateway: createConsentedGateway({ request }),
       createProposalId: () => 'proposal-1' })
-    const result = await adapters.proposeCondensation({ baseRevision: 'draft-1',
-      candidateFacts: structuredResumeSource.candidateFacts, document: groupedResumeDocument, maximumPages: 2 })
+
+    const result = await adapters.proposeCondensation(condensationRequest)
 
     expect(result.status).toBe('proposed')
     if (result.status !== 'proposed') return
@@ -50,31 +54,32 @@ describe('resume document professional model boundary', () => {
         feedback: reverse ? [{ code: 'unsupported-meaning', segmentIndex: 0 }] : [] } })
     })
     const adapters = createResumeDocumentModelAdapters({ gateway: createConsentedGateway({ request }) })
-    expect(await adapters.proposeCondensation({ baseRevision: 'draft-1',
-      candidateFacts: structuredResumeSource.candidateFacts, document: groupedResumeDocument, maximumPages: 2,
-    })).toEqual({ status: 'failed', reason: 'unsupported-content', recovery: 'correct-content' })
+
+    const result = await adapters.proposeCondensation(condensationRequest)
+
+    expect(result).toEqual({ status: 'failed', reason: 'unsupported-content', recovery: 'correct-content' })
   })
 
   it('requires current processing consent before transmitting editing or condensation content', async () => {
     const request = vi.fn<typeof fetch>()
     const gateway = createOpenAiLanguageModelGateway({ request, readProcessingConsent: () => null })
     const adapters = createResumeDocumentModelAdapters({ gateway })
+
+    const outcomes = await Promise.all([adapters.validateSectionChange(sectionChangeRequest),
+      adapters.proposeCondensation(condensationRequest)])
+
     const failure = { status: 'failed', reason: 'processing-consent-required', recovery: 'renew-consent' }
-    expect(await adapters.validateSectionChange({ candidateFacts: structuredResumeSource.candidateFacts,
-      currentDocument: groupedResumeDocument, change })).toEqual(failure)
-    expect(await adapters.proposeCondensation({ baseRevision: 'draft-1',
-      candidateFacts: structuredResumeSource.candidateFacts, document: groupedResumeDocument, maximumPages: 2,
-    })).toEqual(failure)
+    expect(outcomes).toEqual([failure, failure])
     expect(request).not.toHaveBeenCalled()
   })
 
   it('rejects edits with unattested references before transmitting content', async () => {
     const request = vi.fn<typeof fetch>()
     const adapters = createResumeDocumentModelAdapters({ gateway: createConsentedGateway({ request }) })
-    expect(await adapters.validateSectionChange({ candidateFacts: [],
-      currentDocument: groupedResumeDocument, change })).toEqual({
-      status: 'unsupported', baseRevision: 'draft-1', fieldIds: ['summary-billing'],
-    })
+
+    const outcome = await adapters.validateSectionChange({ ...sectionChangeRequest, candidateFacts: [] })
+
+    expect(outcome).toEqual({ status: 'unsupported', baseRevision: 'draft-1', fieldIds: ['summary-billing'] })
     expect(request).not.toHaveBeenCalled()
   })
 
@@ -85,8 +90,9 @@ describe('resume document professional model boundary', () => {
     const gateway = createConsentedGateway({ request })
     const adapters = createResumeDocumentModelAdapters({ gateway })
 
-    expect(await adapters.validateSectionChange({ candidateFacts: structuredResumeSource.candidateFacts,
-      currentDocument: groupedResumeDocument, change })).toEqual({ status: 'validated', change })
+    const outcome = await adapters.validateSectionChange(sectionChangeRequest)
+
+    expect(outcome).toEqual({ status: 'validated', change })
     const payload: unknown = JSON.parse(await new Request('https://example.test', request.mock.calls[0]?.[1]).text())
     expect(request.mock.calls[0]?.[0]).toBe('/api/resume-claim-validation')
     expect(payload).toEqual({ claim: { id: 'resume-claim-summary-billing', segments: [{

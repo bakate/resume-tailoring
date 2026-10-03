@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createSourceIntake } from '@resume-tailoring/application/source-intake'
 import type { SourceIntake, StructuredSourceProfileExtraction } from '@resume-tailoring/application/source-intake'
+import { createFakeSourceDocumentReader, createFakeSourceProfileExtractor } from '@resume-tailoring/application/testing'
 
 describe('Local postal address redaction', () => {
   it('keeps an address marked by a location icon out of model-bound text', async () => {
@@ -58,11 +59,11 @@ class CandidateAddressRedactionSystem {
   async readSource(text: string) {
     const result = await createSourceIntake({
       document: { bytes: new TextEncoder().encode(text), mediaType: 'text/plain', name: 'resume.txt' },
-      sourceDocumentReader: { read: () => Promise.resolve({ ok: true, value: { pageCount: null, text } }) },
-      sourceProfileExtractor: { extract: ({ professionalContent }) => {
+      sourceDocumentReader: createFakeSourceDocumentReader(),
+      sourceProfileExtractor: createFakeSourceProfileExtractor({ extract: ({ professionalContent }) => {
         this.#modelBoundText.push(professionalContent)
         return Promise.resolve({ ok: true, value: extraction })
-      } },
+      } }),
     })
     if (!result.ok) throw new Error(`Source intake failed: ${result.error}`)
     this.#sourceIntake = result.value

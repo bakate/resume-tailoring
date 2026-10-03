@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
-import type { CandidateJourneyDependencies, CandidateSession, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
+import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney, unavailableResumeRender } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateSession, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import { groupedResumeDocument, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createFakeCandidateJourneyDependencies, createFakeResumeDocumentPorts, createFakeResumeDocumentRenderer,
+  createInMemoryCandidateSessionPersistence } from '@resume-tailoring/application/testing'
 
 describe('Candidate Journey document rendering', () => {
   it('rejects a late layout when a newer draft was requested', async () => {
@@ -104,23 +106,21 @@ function createSystemUnderTest() {
   let initialRevision: string | undefined
   let unavailable = false
   const session = createSession()
-  const journey = createCandidateJourney({ dependencies: {
-    ...unusedDependencies,
+  const renderer = createFakeResumeDocumentRenderer()
+  const journey = createCandidateJourney({ dependencies: createFakeCandidateJourneyDependencies({
     now: () => 1000,
-    persistence: { restore: () => ({ ok: true, value: { notice: null, session } }),
-      save: ({ session: nextSession }) => ({ ok: true, value: nextSession }),
-      delete: () => ({ ok: true, value: null }) },
-    resumeDocumentPorts: { proposeCondensation: ({ document, baseRevision }) => Promise.resolve({ status: 'proposed',
-      proposal: { id: 'photo-proposal', document, baseRevision, layout: { status: 'unavailable', revision: baseRevision } } }) },
-    resumeDocumentRenderer: { render: ({ draft, photoDataUrl }) => {
-      if (photoDataUrl !== undefined) return Promise.resolve({ pdf: null, assessment: {
-        layout: { status: 'overflow', revision: draft.revision, pageCount: 3 },
-        exportEligibility: { status: 'blocked', revision: draft.revision, reasons: ['overflow'] },
+    persistence: createInMemoryCandidateSessionPersistence({ session }),
+    // Without an assessLayout port, the journey measures layout through the renderer below.
+    resumeDocumentPorts: { proposeCondensation: createFakeResumeDocumentPorts().proposeCondensation },
+    resumeDocumentRenderer: createFakeResumeDocumentRenderer({ render: (request) => {
+      if (request.photoDataUrl !== undefined) return Promise.resolve({ pdf: null, assessment: {
+        layout: { status: 'overflow', revision: request.draft.revision, pageCount: 3 },
+        exportEligibility: { status: 'blocked', revision: request.draft.revision, reasons: ['overflow'] },
       } })
-      if (draft.document.identity?.value === 'Old Alex') return new Promise((resolve) => { settlePrevious = resolve })
-      return Promise.resolve(unavailable ? { ...failedResult, assessment: { layout: { status: 'unavailable', revision: draft.revision }, exportEligibility: { status: 'blocked', revision: draft.revision, reasons: ['layout-unavailable'] } } } : successfulResult({ revision: draft.revision }))
-    } },
-  } })
+      if (request.draft.document.identity?.value === 'Old Alex') return new Promise((resolve) => { settlePrevious = resolve })
+      return unavailable ? Promise.resolve(unavailableResumeRender(request)) : renderer.render(request)
+    } }),
+  }) })
   const start = async () => { journey.start(); await Promise.resolve(); await Promise.resolve() }
   return {
     givenAnOlderDraftIsRendering: async () => { await start()
@@ -216,23 +216,9 @@ function successfulResult({ revision }: Readonly<{ revision: string }>): ResumeR
     exportEligibility: { status: 'eligible', revision, pageCount: 1 } }, pdf: new Uint8Array([37, 80, 68, 70, 45]) }
 }
 
-const failedResult: ResumeRenderResult = { assessment: { layout: { status: 'unavailable', revision: 'current' },
-  exportEligibility: { status: 'blocked', revision: 'current', reasons: ['layout-unavailable'] } }, pdf: null }
-
 function createSession(): CandidateSession {
   return { expiresAt: 1000 + candidateSessionDurationMilliseconds, startedAt: 1000,
     sessionId: 'candidate-session-fixture' as const, version: candidateSessionStorageVersion,
     phase: 'tailored-resume-preparation' as const, processingConsent: null,
     sourceIntake: structuredResumeSource, jobMatch: structuredResumeJobMatch, tailoredResume: groupedResumeDocument }
 }
-
-const unusedDependencies = {
-  createSessionId: () => 'fixture',
-  languageModelGateway: { processingPolicy: { version: 'test', provider: 'Test provider', purposes: [],
-    transmittedDataCategories: [], retentionPolicy: 'None', storageBehavior: 'None' } },
-  jobPostingDocumentReader: { read: () => Promise.resolve({ ok: false, error: 'unsupported-job-posting' }) },
-  jobPostingExtractor: { extract: () => Promise.resolve({ ok: false, error: 'job-posting-extraction-unavailable' }) },
-  matchEvidenceMatcher: { match: () => Promise.resolve({ ok: false, error: 'match-evidence-unavailable' }) },
-  sourceDocumentReader: { read: () => Promise.resolve({ ok: false, error: 'unsupported-document' }) },
-  sourceProfileExtractor: { extract: () => Promise.resolve({ ok: false, error: 'source-profile-extraction-unavailable' }) },
-} satisfies Omit<CandidateJourneyDependencies, 'now' | 'persistence'>

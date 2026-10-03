@@ -1,6 +1,6 @@
 import { assessResumeExport, unavailableResumeRender } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeRenderRequest } from '@resume-tailoring/application/candidate-journey'
-import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/privacy-safe-telemetry'
+import { createRecordingTelemetry } from '@resume-tailoring/application/testing'
 import { groupedResumeDocument, resumeContractRevision } from '@resume-tailoring/application/structured-resume-fixtures'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -64,7 +64,7 @@ function measuredResponse() {
 }
 
 function rendererAnswering(answers: readonly Answer[]) {
-  const telemetry: PrivacySafeTelemetryEvent[] = []
+  const telemetry = createRecordingTelemetry()
   const request = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
     const answer = answers[request.mock.calls.length - 1]
     if (answer !== 'hang') return answer?.() ?? Promise.reject(new Error('unexpected render request'))
@@ -73,6 +73,6 @@ function rendererAnswering(answers: readonly Answer[]) {
     })
   })
   const renderer = createBrowserResumeDocumentRenderer({ request, timeoutMilliseconds: 20,
-    telemetry: { record: (event) => { telemetry.push(event); return Promise.resolve({ ok: true, value: undefined }) } } })
-  return { render: renderer.render, telemetry, calls: () => request.mock.calls.length }
+    telemetry })
+  return { render: renderer.render, telemetry: telemetry.events, calls: () => request.mock.calls.length }
 }

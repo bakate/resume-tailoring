@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { createFixtureResumeSectionModels, writeResumeSectionFromFacts } from '@resume-tailoring/application/structured-resume-fixtures'
+import { writeResumeSectionFromFacts } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createFakeCandidateJourneyDependencies, createFakeJobPostingDocumentReader, createFakeJobPostingExtractor,
+  createFakeLanguageModelGateway, createFakeMatchEvidenceMatcher, createFakeResumeSectionModels,
+  createInMemoryCandidateSessionPersistence, noMatchEvidence } from '@resume-tailoring/application/testing'
 
 import {
   candidateSessionDurationMilliseconds,
@@ -11,12 +14,10 @@ import type {
   CandidateJourneyDependencies,
   CandidateJourneyView,
   CandidateSession,
-  CandidateSessionPersistence,
   ResumeSectionWritingInput,
 } from '@resume-tailoring/application/candidate-journey'
 import type {
   ExtractedJobPosting,
-  JobPostingDocumentReader,
   MatchEvidenceProposal,
 } from '@resume-tailoring/application/job-match'
 import { createJobMatch } from '@resume-tailoring/application/job-match'
@@ -311,8 +312,8 @@ async function analyzeFrenchJobPosting() {
     candidateFacts: [],
     document: { bytes: new TextEncoder().encode(frenchJobPostingText),
       mediaType: 'text/plain', name: 'role.txt' },
-    jobPostingDocumentReader: createJobPostingDocumentReader(),
-    jobPostingExtractor: { extract: () => Promise.resolve({ ok: true, value: extraction }) },
+    jobPostingDocumentReader: createFakeJobPostingDocumentReader(),
+    jobPostingExtractor: createFakeJobPostingExtractor({ extract: () => Promise.resolve({ ok: true, value: extraction }) }),
     matchEvidenceMatcher: emptyMatchEvidenceMatcher,
   })
 }
@@ -322,12 +323,12 @@ async function analyzeJobPostingWithEmphasizedResponsibilities() {
     candidateFacts: [],
     document: { bytes: new TextEncoder().encode(emphasizedResponsibilitiesJobPostingText),
       mediaType: 'text/plain', name: 'role.txt' },
-    jobPostingDocumentReader: createJobPostingDocumentReader(),
-    jobPostingExtractor: { extract: () => Promise.resolve({ ok: true, value: {
+    jobPostingDocumentReader: createFakeJobPostingDocumentReader(),
+    jobPostingExtractor: createFakeJobPostingExtractor({ extract: () => Promise.resolve({ ok: true, value: {
       practicalConstraints: [],
       requirements: emphasizedResponsibilitiesJobRequirements,
       targetRole: null,
-    } }) },
+    } }) }),
     matchEvidenceMatcher: emptyMatchEvidenceMatcher,
   })
 }
@@ -361,25 +362,22 @@ type TestDependenciesRequest = Readonly<{
 function createTestDependencies({
   onMatch, onResumeWriting, readExtraction, readMatchEvidence, resumeWriting, session,
 }: TestDependenciesRequest): CandidateJourneyDependencies {
-  return {
-    resumeSectionModels: createFixtureResumeSectionModels({ writeSection: (input) => {
+  return createFakeCandidateJourneyDependencies({
+    resumeSectionModels: createFakeResumeSectionModels({ writeSection: (input) => {
       if (resumeWriting === 'prepared') return Promise.resolve({ ok: true, value: writeResumeSectionFromFacts(input) })
       onResumeWriting(input)
       return Promise.resolve({ ok: false, error: { type: 'permanent' } })
     } }),
     createSessionId: () => '00000000-0000-4000-8000-000000000042',
-    jobPostingDocumentReader: createJobPostingDocumentReader(),
-    jobPostingExtractor: { extract: () => Promise.resolve({ ok: true, value: readExtraction() }) },
-    languageModelGateway: { processingPolicy },
-    matchEvidenceMatcher: { match: (request) => {
+    jobPostingExtractor: createFakeJobPostingExtractor({ extract: () => Promise.resolve({ ok: true, value: readExtraction() }) }),
+    languageModelGateway: createFakeLanguageModelGateway({ processingPolicy }),
+    matchEvidenceMatcher: createFakeMatchEvidenceMatcher({ match: (request) => {
       onMatch()
       return Promise.resolve({ ok: true, value: readMatchEvidence(request) })
-    } },
+    } }),
     now: () => currentTime,
-    persistence: createInMemoryPersistence({ storedSession: session }),
-    sourceDocumentReader: unavailableSourceDocumentReader,
-    sourceProfileExtractor: unavailableSourceProfileExtractor,
-  }
+    persistence: createInMemoryCandidateSessionPersistence({ session }),
+  })
 }
 
 class CandidateJourneyJobMatchTestSystem {
@@ -967,27 +965,6 @@ class CandidateJourneyJobMatchTestSystem {
 type JobMatchAction = 'job-posting-submitted' | 'profile-enrichment-confirmed'
   | 'tailored-resume-preparation-started'
 
-function createJobPostingDocumentReader(): JobPostingDocumentReader {
-  return { read: (document) => Promise.resolve({
-    ok: true,
-    value: { text: new TextDecoder().decode(document.bytes) },
-  }) }
-}
-
-function createInMemoryPersistence({ storedSession }: Readonly<{
-  storedSession: CandidateSession
-}>): CandidateSessionPersistence {
-  let session = storedSession
-  return {
-    delete: () => ({ ok: true, value: null }),
-    restore: () => ({ ok: true, value: { notice: null, session } }),
-    save: ({ session: nextSession }) => {
-      session = nextSession
-      return { ok: true, value: session }
-    },
-  }
-}
-
 function createJobMatchSession(): CandidateSession {
   return {
     expiresAt: currentTime + candidateSessionDurationMilliseconds,
@@ -1224,20 +1201,7 @@ const coverageRankingMatchEvidence = {
   relevance: [createRelevance('3', 'source-fact-1', 'TypeScript', 'TypeScript')],
 } as const satisfies MatchEvidenceProposal
 
-const emptyMatchEvidenceMatcher = { match: () => Promise.resolve({
-  ok: true,
-  value: { adjacentEvidence: [], evidence: [], relevance: [] },
-} as const) } as const
-
-const unavailableSourceDocumentReader = { read: () => Promise.resolve({
-  ok: false,
-  error: 'unsupported-document',
-} as const) } as const
-
-const unavailableSourceProfileExtractor = { extract: () => Promise.resolve({
-  ok: false,
-  error: 'source-profile-extraction-unavailable',
-} as const) } as const
+const emptyMatchEvidenceMatcher = createFakeMatchEvidenceMatcher({ match: () => Promise.resolve({ ok: true, value: noMatchEvidence }) })
 
 const matchEvidenceProposal = {
   adjacentEvidence: [],

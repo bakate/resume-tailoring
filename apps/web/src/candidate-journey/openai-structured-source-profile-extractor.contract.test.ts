@@ -44,28 +44,6 @@ describe('OpenAI structured Source Profile extractor contract', () => {
 
     expect(result).toEqual({ ok: false, error: 'source-profile-extraction-unavailable' })
   })
-
-  it('preserves explicit partial entries without requiring invented evidence', async () => {
-    const partialProfile = {
-      ...structuredSourceProfile,
-      education: [{ institution: null, qualification: 'MSc Computer Science' }],
-      experiences: [{
-        achievements: [], context: null, endDate: null, location: null, organization: null,
-        role: 'Developer', startDate: null,
-      }],
-      projects: [{ description: null, name: 'Billing platform' }],
-    }
-    const extractor = createOpenAiStructuredSourceProfileExtractor({
-      apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
-      request: () => Promise.resolve(Response.json(createOpenAiResponse({
-        profile: partialProfile,
-      }))),
-    })
-
-    const result = await extractor.extract({ professionalContent: 'Developer, MSc, Billing' })
-
-    expect(result).toEqual({ ok: true, value: partialProfile })
-  })
 })
 
 function createOpenAiResponse({

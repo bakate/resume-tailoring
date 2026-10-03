@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourneyDependencies, CandidateJourneyView, CandidateSession } from '@resume-tailoring/application/candidate-journey'
-import { createFixtureResumeSectionModels, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createFakeCandidateJourneyDependencies, createFakeResumeSectionModels, createInMemoryCandidateSessionPersistence,
+  testProcessingPolicy } from '@resume-tailoring/application/testing'
 
 describe('Candidate Journey structured resume', () => {
   it('preserves each experience and its evidence through preparation', async () => {
@@ -89,27 +91,16 @@ function createMatchedSession(): CandidateSession {
   return {
     expiresAt: startedAt + candidateSessionDurationMilliseconds, startedAt,
     version: candidateSessionStorageVersion, sessionId: 'candidate-session-00000000-0000-4000-8000-000000000056',
-    jobMatch: structuredResumeJobMatch, phase: 'job-match', processingConsent: { grantedAt: startedAt, policy },
+    jobMatch: structuredResumeJobMatch, phase: 'job-match', processingConsent: { grantedAt: startedAt, policy: testProcessingPolicy },
     sourceIntake: structuredResumeSource, tailoredResume: null,
   }
 }
 
 function createDependencies(): CandidateJourneyDependencies {
   const session = createMatchedSession()
-  return {
-    createSessionId: () => 'unused', now: () => session.startedAt,
-    languageModelGateway: { processingPolicy: policy },
-    resumeSectionModels: createFixtureResumeSectionModels(),
-    persistence: { delete: () => ({ ok: true, value: null }),
-      restore: () => ({ ok: true, value: { notice: null, session } }),
-      save: ({ session: nextSession }) => ({ ok: true, value: nextSession }) },
-    jobPostingDocumentReader: { read: () => Promise.resolve({ ok: true, value: { text: '' } }) },
-    jobPostingExtractor: { extract: () => Promise.resolve({ ok: false, error: 'job-posting-extraction-unavailable' }) },
-    matchEvidenceMatcher: { match: () => Promise.resolve({ ok: false, error: 'match-evidence-unavailable' }) },
-    sourceDocumentReader: { read: () => Promise.resolve({ ok: true, value: { pageCount: null, text: '' } }) },
-    sourceProfileExtractor: { extract: () => Promise.resolve({ ok: false, error: 'source-profile-extraction-unavailable' }) },
-  }
+  return createFakeCandidateJourneyDependencies({
+    now: () => session.startedAt,
+    resumeSectionModels: createFakeResumeSectionModels(),
+    persistence: createInMemoryCandidateSessionPersistence({ session }),
+  })
 }
-
-const policy = { provider: 'Test', purposes: [], retentionPolicy: 'None',
-  storageBehavior: 'Browser-local', transmittedDataCategories: [], version: 'test' } as const

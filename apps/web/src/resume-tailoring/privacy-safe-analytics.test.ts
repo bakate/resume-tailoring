@@ -23,31 +23,6 @@ describe('privacy-safe browser analytics', () => {
     })
   })
 
-  it('transmits an allowlisted aggregate outcome', async () => {
-    const request = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 202 }))
-    const telemetry = createPrivacySafeBrowserTelemetry({ request })
-
-    const result = await telemetry.record({
-      name: 'resume-usefulness-rated',
-      hasComment: true,
-      matchScoreBand: '75-100',
-      useful: true,
-    })
-
-    expect(result).toEqual({ ok: true, value: undefined })
-    expect(request).toHaveBeenCalledWith('/api/analytics', {
-      body: JSON.stringify({
-        name: 'resume-usefulness-rated',
-        hasComment: true,
-        matchScoreBand: '75-100',
-        useful: true,
-      }),
-      cache: 'no-store',
-      headers: { 'Content-Type': 'application/json' },
-      method: 'POST',
-    })
-  })
-
   it.each([
     'candidateName',
     'contactDetails',

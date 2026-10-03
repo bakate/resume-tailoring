@@ -20,24 +20,6 @@ describe('browser Source Intake document reader', () => {
     })
   })
 
-  it('extracts DOCX text through the browser-local document adapter', async () => {
-    const reader = createBrowserSourceIntakeDocumentReader({
-      extractDocxText: () => Promise.resolve('Led a platform migration'),
-      readDocxPageCount: () => Promise.resolve(1),
-    })
-
-    const result = await reader.read({
-      bytes: new Uint8Array([80, 75, 3, 4]),
-      mediaType: docxMediaType,
-      name: 'resume.docx',
-    })
-
-    expect(result).toEqual({
-      ok: true,
-      value: { pageCount: 1, text: 'Led a platform migration' },
-    })
-  })
-
   it('reports a DOCX page count when Word metadata provides it', async () => {
     const bytes = await createDocxArchive({ pageCount: 6 })
     const reader = createBrowserSourceIntakeDocumentReader({

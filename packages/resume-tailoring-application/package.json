@@ -11,7 +11,8 @@
     "./resume-preparation": "./src/resume-preparation.ts",
     "./source-intake": "./src/source-intake.ts",
     "./structured-resume-fixtures": "./src/structured-resume-fixtures.ts",
-    "./tailored-resume": "./src/tailored-resume.ts"
+    "./tailored-resume": "./src/tailored-resume.ts",
+    "./testing": "./src/testing.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

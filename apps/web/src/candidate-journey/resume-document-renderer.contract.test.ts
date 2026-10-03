@@ -39,20 +39,21 @@ describe('structured resume PDF rendering boundary', () => {
     expect(text).toContain('Project 18:')
   }, 20_000)
 
-  it('never leaves an experience heading at the foot of a page without its dates and first achievement', async () => {
-    // Summaries of increasing length slide every experience across the page break at least once.
-    for (const summaryLines of [0, 2, 4, 6, 8, 10]) {
-      const result = await renderResumeDocument(experienceRequest({ summaryLines }))
-      expect(result.pdf).not.toBeNull()
-      if (result.pdf === null) return
-      const pages = await readPdfPages(result.pdf)
-      for (const experience of breakingExperiences) {
-        const pageOf = (text: string) => pages.findIndex((page) => page.replace(/\s+/gu, '').includes(text.replace(/\s+/gu, '')))
-        expect(pageOf(experience.dates), `${experience.role} after ${String(summaryLines)} summary lines`).toBe(pageOf(experience.role))
-        expect(pageOf(experience.achievement), `${experience.role} after ${String(summaryLines)} summary lines`).toBe(pageOf(experience.role))
-      }
+  // Summaries of increasing length slide every experience across the page break at least once.
+  it.each([0, 2, 4, 6, 8, 10])('never leaves an experience heading at the foot of a page without its dates and first achievement after %i summary lines', async (summaryLines) => {
+    const request = experienceRequest({ summaryLines })
+
+    const result = await renderResumeDocument(request)
+
+    expect(result.pdf).not.toBeNull()
+    if (result.pdf === null) return
+    const pages = await readPdfPages(result.pdf)
+    const pageOf = (text: string) => pages.findIndex((page) => page.replace(/\s+/gu, '').includes(text.replace(/\s+/gu, '')))
+    for (const experience of breakingExperiences) {
+      expect(pageOf(experience.dates), experience.role).toBe(pageOf(experience.role))
+      expect(pageOf(experience.achievement), experience.role).toBe(pageOf(experience.role))
     }
-  }, 60_000)
+  }, 20_000)
 
   it('blocks overflow beyond two pages without changing the draft', async () => {
     const request = denseRequest({ count: 55 })
@@ -67,9 +68,10 @@ describe('structured resume PDF rendering boundary', () => {
   }, 20_000)
 
   it('renders the preview while reporting missing contacts and unresolved professional changes', async () => {
-    const result = await renderResumeDocument({ draft: { revision: 'invalid',
-      document: { ...groupedResumeDocument, identity: null, contactDetails: [] } },
-    unsupportedFieldIds: ['summary-billing'] })
+    const request = { draft: { revision: 'invalid', document: { ...groupedResumeDocument, identity: null, contactDetails: [] } },
+      unsupportedFieldIds: ['summary-billing'] }
+
+    const result = await renderResumeDocument(request)
 
     expect(result.assessment.exportEligibility).toMatchObject({ status: 'blocked',
       reasons: ['unsupported-content', 'missing-identity', 'missing-contact'] })
@@ -108,7 +110,6 @@ describe('structured resume PDF rendering boundary', () => {
     expect(result.pdf).toBeNull()
     expect(request.draft.document).toEqual(groupedResumeDocument)
   }, 20_000)
-
 })
 
 
