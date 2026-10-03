@@ -433,7 +433,7 @@ class CandidateJourneyTestSystem {
   }
 
   async #returnToDocuments() {
-    await this.#page.getByRole('link', { name: 'Honest Resume', exact: true }).click()
+    await this.#page.getByRole('link', { name: 'Resume Studio', exact: true }).click()
     await expect(this.#page).toHaveURL(/\/$/u)
   }
 

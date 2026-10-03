@@ -661,7 +661,7 @@ class CandidateJourneyIntegrationSystem {
   }
 
   async deleteCandidateSession() {
-    await this.#page.getByRole('link', { name: 'Honest Resume', exact: true }).click()
+    await this.#page.getByRole('link', { name: 'Resume Studio', exact: true }).click()
     await this.#page.getByRole('button', { name: 'Delete Candidate Session' }).click()
     await this.#page.getByRole('button', { name: 'Delete session now' }).click()
     this.#completedAction = 'deleted'

@@ -224,11 +224,8 @@ function initialSource(candidateJourney: IntakeProps['candidateJourney']): Docum
 function initialPosting(candidateJourney: IntakeProps['candidateJourney']): DocumentChoice {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open') return restoreChoice()
-  const preparation = view.session.preparation
-  // A preparation always stores the posting it was given; none means "Change job posting" cleared it.
-  if (preparation !== undefined) return restoreChoice(preparation.jobPosting)
-  const posting = view.session.jobMatch?.jobPosting
-  return { method: 'paste', text: posting?.originalContent ?? '', file: null }
+  // A preparation stores the posting it was given; none means "Change job posting" cleared it.
+  return restoreChoice(view.session.preparation?.jobPosting)
 }
 
 function restoreChoice(document?: StoredIntakeDocument | null): DocumentChoice {
