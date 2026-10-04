@@ -17,7 +17,7 @@ check_protection() {
     --header 'Sec-Fetch-Site: same-origin' \
     --header "Origin: ${public_url%/}" --data '{}' \
     --output "$response_file" --write-out '%{http_code}' \
-    "${target_url%/}/api/match-analysis")
+    "${target_url%/}/api/explainable-match-evidence")
   if [[ "$actual_status" != "$expected_status" ]]; then
     printf 'Access protection failed: expected HTTP %s, received %s\n' "$expected_status" "$actual_status" >&2
     return 1
