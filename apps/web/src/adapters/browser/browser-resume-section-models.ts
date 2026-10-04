@@ -1,22 +1,15 @@
 import { z } from 'zod'
 import type { ResumeSectionModelResult } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeCoherenceChecker, ResumeFieldValidator, ResumeSectionWriter } from '@resume-tailoring/application/ports'
-import { resumeDocumentCoherenceSchema, resumeFieldValidationSchema, resumeModelUsageSchema, resumeSectionModelFailureSchema,
-  resumeSectionOutputSchemas } from '../../candidate-journey/resume-document-schemas'
-
-const resumeSectionContentSchema = z.union([
-  z.strictObject({ kind: z.literal('value-proposition'), ...resumeSectionOutputSchemas['value-proposition'].shape }),
-  z.strictObject({ kind: z.literal('experience'), experience: resumeSectionOutputSchemas.experience }),
-  z.strictObject({ kind: z.literal('skills'), ...resumeSectionOutputSchemas.skills.shape }),
-  z.strictObject({ kind: z.enum(['education', 'languages', 'projects', 'certifications']), ...resumeSectionOutputSchemas.education.shape }),
-])
+import { resumeDocumentCoherenceSchema, resumeFieldValidationResponseSchema, resumeModelUsageSchema, resumeSectionContentSchema,
+  resumeSectionModelFailureSchema } from '../../candidate-journey/resume-document-schemas'
 
 export function createBrowserResumeSectionWriter({ request = fetch }: Readonly<{ request?: typeof fetch }> = {}): ResumeSectionWriter {
   return { write: (input) => postResumeModel({ request, input, path: '/api/resume-section-writing', schema: resumeSectionContentSchema }) }
 }
 
 export function createBrowserResumeFieldValidator({ request = fetch }: Readonly<{ request?: typeof fetch }> = {}): ResumeFieldValidator {
-  return { validate: (input) => postResumeModel({ request, input, path: '/api/resume-section-validation', schema: resumeFieldValidationSchema }) }
+  return { validate: (input) => postResumeModel({ request, input, path: '/api/resume-section-validation', schema: resumeFieldValidationResponseSchema }) }
 }
 
 export function createBrowserResumeCoherenceChecker({ request = fetch }: Readonly<{ request?: typeof fetch }> = {}): ResumeCoherenceChecker {

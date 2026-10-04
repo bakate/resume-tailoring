@@ -31,6 +31,8 @@ type ResumeSectionMachineInput = Readonly<{
 type ResumeSectionMachineContext = ResumeSectionMachineInput & Readonly<{
   attempt: number
   content: ResumeSectionContent | null
+  /** The latest version written, kept while `content` is cleared for the next attempt. */
+  latestContent: ResumeSectionContent | null
   failure: ResumeSectionFailure | null
   rejectedFields: readonly ResumeRejectedField[]
   startedAt: number
@@ -50,8 +52,10 @@ const writeSection = fromPromise<ResumeSectionModelResult<ResumeSectionContent>,
   ({ input }) => callModel(() => input.models.writeSection(input.writingInput)))
 
 // A rewrite after a failed validation learns what was rejected; the text never leaves this section actor.
+/** A rewrite starts from the latest written version, so it changes only what was rejected since. */
 function readRewritingInput(context: ResumeSectionMachineContext): ResumeSectionMachineInput {
-  return { ...context, writingInput: { ...context.writingInput, rejectedFields: context.rejectedFields } }
+  return { ...context, writingInput: { ...context.writingInput, rejectedFields: context.rejectedFields,
+    previousContent: context.latestContent } }
 }
 
 const validateSectionFields = fromPromise<ResumeSectionModelResult<ResumeFieldValidation>, Readonly<{
@@ -64,7 +68,8 @@ function readWriting({ context, result }: Readonly<{
   context: ResumeSectionMachineContext; result: ResumeSectionModelResult<ResumeSectionContent>
 }>): SectionStep {
   const usage = addUsage(context.usage, result.usage)
-  if (!result.ok) return { content: null, failure: result.error.type, rejectedFields: [], usage }
+  // A failed write rejected nothing new, so its retry keeps the feedback the attempt was given.
+  if (!result.ok) return { content: null, failure: result.error.type, rejectedFields: context.rejectedFields, usage }
   const { section, purpose } = context.writingInput
   const content = normalizeSectionContent({ content: result.value, purpose, section })
   return hasSupportedSectionStructure({ content, input: context.writingInput })
@@ -79,8 +84,9 @@ function readValidation({ context, result }: Readonly<{
   if (context.content === null) return { content: null, failure: 'unsupported', rejectedFields: [], usage }
   return isSectionFullyValidated({ content: context.content, validation: result.value })
     ? { content: context.content, failure: null, rejectedFields: [], usage }
-    : { content: context.content, failure: 'unsupported', usage,
-      rejectedFields: readRejectedFields({ content: context.content, validation: result.value }) }
+    // The coherence feedback a rewritten section started from still applies to its next rewrite.
+    : { content: context.content, failure: 'unsupported', usage, rejectedFields: [...context.writingInput.rejectedFields,
+      ...readRejectedFields({ content: context.content, validation: result.value })] }
 }
 
 function canRewrite({ context, step }: Readonly<{ context: ResumeSectionMachineContext; step: SectionStep }>) {
@@ -113,13 +119,14 @@ export const resumeSectionMachine = setup({
 }).createMachine({
   id: 'resume-section',
   // A section sent back by the coherence check starts with the fields it rejected.
-  context: ({ input }) => ({ ...input, attempt: 0, content: null, failure: null,
+  context: ({ input }) => ({ ...input, attempt: 0, content: null, latestContent: input.writingInput.previousContent, failure: null,
     rejectedFields: input.writingInput.rejectedFields, startedAt: input.now(), usage: noUsage }),
   initial: 'planned',
   states: {
     planned: { always: { target: 'writing' } },
     writing: {
-      entry: [assign({ attempt: ({ context }) => context.attempt + 1, content: null, failure: null }),
+      entry: [assign({ attempt: ({ context }) => context.attempt + 1, content: null, failure: null,
+        latestContent: ({ context }) => context.content ?? context.latestContent }),
         { type: 'reportSectionProgressed', params: 'writing' }],
       invoke: {
         src: 'writeSection',
@@ -176,6 +183,10 @@ type ResumePreparationMachineContext = ResumePreparationMachineInput & Readonly<
   coherence: ResumeSectionModelResult<ResumeDocumentCoherence> | null
   /** Rejected fields per section key from the coherence check; only the first rejection triggers a rewrite. */
   coherenceRejections: Readonly<Record<string, readonly ResumeRejectedField[]>> | null
+  /** Text per section key and field id that the first coherence check accepted in a section it did not send back. */
+  coherenceAcceptedFields: Readonly<Record<string, Readonly<Record<string, string>>>> | null
+  /** The validated content per section key that the coherence check sent back to writing. */
+  coherencePreviousContents: Readonly<Record<string, ResumeSectionContent>>
   startedAt: number
 }>
 
@@ -195,7 +206,9 @@ function assembleDocument(context: ResumePreparationMachineContext) {
 /**
  * Groups the fields a failed coherence check named by the section they came from. Unknown ids are ignored, and so
  * are dates and locations: they are copied from the Candidate's source, so no rewrite may change them, and
- * concurrent experiences at one employer are a valid chronology. An issue its own verdict contradicts is ignored too.
+ * concurrent experiences at one employer are a valid chronology. An issue its own verdict contradicts is ignored too,
+ * and so is a rewrite of a field the first check accepted in a section it did not send back, while it is unchanged.
+ * A removal costs no rewrite, so a redundancy is removed even there.
  */
 function readCoherenceRejections({ context, coherence }: Readonly<{
   context: ResumePreparationMachineContext; coherence: ResumeSectionModelResult<ResumeDocumentCoherence>
@@ -207,6 +220,8 @@ function readCoherenceRejections({ context, coherence }: Readonly<{
     if (contradictsVerdict({ issue, verdict: coherence.value })) continue
     const origin = origins.get(issue.fieldId)
     if (origin === undefined || origin.copiedFromSource) continue
+    if (!isRemovable(issue.kind)
+      && context.coherenceAcceptedFields?.[origin.sectionKey]?.[origin.field.id] === origin.field.text) continue
     const fields = rejections[origin.sectionKey] ?? []
     if (!fields.some(({ fieldId }) => fieldId === origin.field.id)) {
       fields.push({ fieldId: origin.field.id, text: origin.field.text, reason: issue.kind })
@@ -229,11 +244,30 @@ function hasCoherenceRejections(rejections: Readonly<Record<string, readonly Res
 }
 
 type CoherenceResolution = Readonly<{
-  /** Validated results with every redundant list item removed: the check names only the copy placed worse. */
+  /** Validated results with every redundant or duplicated list item removed: the check names only the copy placed worse. */
   results: readonly ResumeSectionResult[]
   /** Rejected fields per section key that only a rewrite can resolve. */
   rewrites: Readonly<Record<string, readonly ResumeRejectedField[]>>
 }>
+
+/** A redundant paraphrase or a duplicated skill is a copy: removing it can neither invent content nor lose any. */
+function isRemovable(reason: ResumeRejectedField['reason']) {
+  return reason === 'redundant' || reason === 'duplicated-skill'
+}
+
+/**
+ * A redundant field is removed; a duplicated skill only while another copy with the same text stays, so a check
+ * that names every copy, or a paraphrase, sends the section to rewriting rather than losing the skill.
+ */
+function selectRemovals({ content, rejected }: Readonly<{
+  content: ResumeSectionContent; rejected: readonly ResumeRejectedField[]
+}>): readonly ResumeRejectedField[] {
+  const removed = new Set(rejected.filter(({ reason }) => isRemovable(reason)).map(({ fieldId }) => fieldId))
+  const normalize = (text: string) => text.trim().replace(/\s+/gu, ' ').toLocaleLowerCase()
+  const copyStays = ({ text }: ResumeRejectedField) => readSectionContentFields(content)
+    .some((field) => !removed.has(field.id) && normalize(field.text) === normalize(text))
+  return rejected.filter((field) => field.reason === 'redundant' || (field.reason === 'duplicated-skill' && copyStays(field)))
+}
 
 /** Removes what is merely redundant and keeps for rewriting what a removal cannot fix. */
 function resolveCoherence({ context, coherence }: Readonly<{
@@ -244,9 +278,9 @@ function resolveCoherence({ context, coherence }: Readonly<{
   const results = context.results.map((result): ResumeSectionResult => {
     const rejected = rejections[result.section.key]
     if (rejected === undefined || result.status !== 'validated') return result
-    const redundant = rejected.filter(({ reason }) => reason === 'redundant')
-    const content = removeSectionFields({ content: result.content, fieldIds: redundant.map(({ fieldId }) => fieldId) })
-    const remaining = content === null ? rejected : rejected.filter(({ reason }) => reason !== 'redundant')
+    const removals = selectRemovals({ content: result.content, rejected })
+    const content = removeSectionFields({ content: result.content, fieldIds: removals.map(({ fieldId }) => fieldId) })
+    const remaining = content === null ? rejected : rejected.filter((field) => !removals.includes(field))
     if (remaining.length > 0) rewrites[result.section.key] = remaining
     return content === null ? result : { ...result, content }
   })
@@ -271,10 +305,30 @@ function readCoherenceRewrite({ context, coherence }: Readonly<{
   const { results, rewrites: coherenceRejections } = resolveCoherence({ context, coherence })
   const rejected = (key: string) => key in coherenceRejections
   return { coherence: null, coherenceRejections,
+    coherenceAcceptedFields: readAcceptedFields({ context, rewrittenKeys: Object.keys(coherenceRejections),
+      namedFieldIds: coherence.ok ? coherence.value.issues.map(({ fieldId }) => fieldId) : [] }),
+    coherencePreviousContents: Object.fromEntries(results.flatMap((result) =>
+      rejected(result.section.key) && result.status === 'validated' ? [[result.section.key, result.content]] : [])),
     results: results.filter(({ section }) => !rejected(section.key)),
     startedKeys: context.startedKeys.filter((key) => !rejected(key)),
     sections: context.sections.map((section): ResumeSectionSnapshot => rejected(section.key)
       ? { key: section.key, kind: section.kind, status: 'planned', attempt: 0 } : section) }
+}
+
+/**
+ * The fields the verdict did not name, by section key and the section's own field id, outside the rewritten
+ * sections: a rewrite can make an unchanged field of its own section incoherent, such as a kept category label.
+ */
+function readAcceptedFields({ context, namedFieldIds, rewrittenKeys }: Readonly<{
+  context: ResumePreparationMachineContext; namedFieldIds: readonly string[]; rewrittenKeys: readonly string[]
+}>): Readonly<Record<string, Readonly<Record<string, string>>>> {
+  const named = new Set(namedFieldIds)
+  const accepted: Record<string, Record<string, string>> = {}
+  for (const [id, { sectionKey, field }] of assembleDocument(context).origins) {
+    if (named.has(id) || rewrittenKeys.includes(sectionKey)) continue
+    accepted[sectionKey] = { ...accepted[sectionKey], [field.id]: field.text }
+  }
+  return accepted
 }
 
 /** A section still rejected after its rewrite is saved as failed, so a retry writes it again and keeps the others. */
@@ -419,7 +473,8 @@ export const resumePreparationMachine = setup({
         enqueue.spawnChild('resumeSectionMachine', { id: `resume-section:${section.key}`, input: {
           models: context.models, now: context.now,
           writingInput: { ...createSectionWritingInput({ request: context.request, section }),
-            rejectedFields: context.coherenceRejections?.[section.key] ?? [] } } })
+            rejectedFields: context.coherenceRejections?.[section.key] ?? [],
+            previousContent: context.coherencePreviousContents[section.key] ?? null } } })
       }
       if (queued.length > 0) enqueue.assign({ startedKeys: [...context.startedKeys, ...queued.map(({ key }) => key)] })
     }),
@@ -427,7 +482,7 @@ export const resumePreparationMachine = setup({
 }).createMachine({
   id: 'resume-preparation',
   context: ({ input }) => ({ ...input, plan: [], sections: [], startedKeys: [], results: [], coherence: null,
-    coherenceRejections: null, startedAt: input.now() }),
+    coherenceRejections: null, coherenceAcceptedFields: null, coherencePreviousContents: {}, startedAt: input.now() }),
   initial: 'planning',
   states: {
     planning: {

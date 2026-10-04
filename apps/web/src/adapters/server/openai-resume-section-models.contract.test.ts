@@ -3,6 +3,7 @@ import { resumeSectionKinds } from '@resume-tailoring/application/candidate-jour
 import type { ResumeSectionContent, ResumeSectionKind, ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
 import { readResumeSection, groupedResumeDocument, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createOpenAiResumeCoherenceChecker, createOpenAiResumeFieldValidator, createOpenAiResumeSectionWriter } from './openai-resume-section-models'
+import { resumeSectionWritingInputSchema } from '../../candidate-journey/resume-document-schemas'
 
 describe('Resume section model adapters', () => {
   it.each(resumeSectionKinds)('writes the %s section under its own strict structured-output schema', async (kind) => {
@@ -22,8 +23,27 @@ describe('Resume section model adapters', () => {
     expect(JSON.stringify(body)).not.toContain('Alex Morgan')
   })
 
+  it('accepts a coherence rewrite with the previous version of its section and passes it to the writer', async () => {
+    let body: RequestBody | null = null
+    const previousContent = readResumeSection({ document: groupedResumeDocument, section: sectionFor('skills') })
+    const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
+      body = readBody(options)
+      return Promise.resolve(Response.json(modelResponse(sectionOutput(previousContent))))
+    } })
+    const input = resumeSectionWritingInputSchema.parse({ ...writingInput('skills'), previousContent,
+      rejectedFields: [{ fieldId: 'skills-0', text: 'Languages', reason: 'skill-category' },
+        { fieldId: 'skills-1', text: 'Kubernetes', reason: 'unsupported', unsupportedProposition: 'Kubernetes appears in none of the cited facts' }] })
+
+    await writer.write(input)
+
+    expect(input.previousContent).toEqual(previousContent)
+    expect(input.rejectedFields[1]).toMatchObject({ unsupportedProposition: 'Kubernetes appears in none of the cited facts' })
+    expect(readModelInput(body)).toMatchObject({ previousContent })
+  })
+
   it('validates only the fields of one section against the facts they cite', async () => {
-    const validation = { fields: [{ fieldId: 'degree', supported: false }] }
+    const validation = { fields: [{ fieldId: 'degree', supported: false, unsupportedProposition: 'The cited facts name no degree' },
+      { fieldId: 'institution', supported: true, unsupportedProposition: null }] }
     let body: RequestBody | null = null
     const validator = createOpenAiResumeFieldValidator({ ...structuredRole, request: (_url, options) => {
       body = readBody(options)
@@ -34,7 +54,9 @@ describe('Resume section model adapters', () => {
       fields: [{ id: 'degree', text: 'Computer Science degree', factIds: ['source-fact-education-0-qualification-0'] }],
       candidateFacts: structuredResumeSource.candidateFacts.filter(({ path }) => path.startsWith('education.')) })
 
-    expect(outcome).toMatchObject({ ok: true, value: validation })
+    // A supported field carries no proposition key, which a browser tab loaded before this field still accepts.
+    expect(outcome).toMatchObject({ ok: true, value: { fields: [validation.fields[0], { fieldId: 'institution', supported: true }] } })
+    expect(outcome.ok && outcome.value.fields[1]).not.toHaveProperty('unsupportedProposition')
     expect(body).toMatchObject({ model: 'structured-role', text: { format: { name: 'resume_section_validation', strict: true } } })
   })
 
@@ -93,7 +115,7 @@ function sectionFor(kind: ResumeSectionKind) {
 function writingInput(kind: ResumeSectionKind): ResumeSectionWritingInput {
   const section = sectionFor(kind)
   return { section, locale: 'en', purpose: 'tailored', targetRole: 'Frontend Engineer', jobRequirements: ['React'],
-    relevantFactIds: [], rejectedFields: [], candidateFacts: structuredResumeSource.candidateFacts.filter(({ path }) => kind === 'value-proposition'
+    relevantFactIds: [], rejectedFields: [], previousContent: null, candidateFacts: structuredResumeSource.candidateFacts.filter(({ path }) => kind === 'value-proposition'
       || path.startsWith(`${section.key}.`)) }
 }
 
@@ -101,6 +123,11 @@ function sectionOutput(content: ResumeSectionContent) {
   if (content.kind === 'experience') return content.experience
   if (content.kind === 'value-proposition') return { paragraphs: content.paragraphs }
   return content.kind === 'skills' ? { groups: content.groups } : { fields: content.fields }
+}
+
+function readModelInput(body: RequestBody | null): unknown {
+  const input = body?.input as readonly Readonly<{ role: string; content: readonly Readonly<{ text: string }>[] }>[] | undefined
+  return JSON.parse(input?.find(({ role }) => role === 'user')?.content[0]?.text ?? 'null')
 }
 
 function modelResponse(value: unknown) {

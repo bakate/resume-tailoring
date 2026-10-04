@@ -58,7 +58,7 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectOnlySkillsRewrittenAndResumePrepared()
   })
 
-  it('rewrites a section with the fields its validation rejected', async () => {
+  it('rewrites a section with the fields its validation rejected and the proposition it found unsupported', async () => {
     const system = createSystemUnderTest({ skillsValidation: 'unsupported-once' })
     await system.givenMatchedCandidateSession()
 
@@ -105,6 +105,64 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectOnlyProjectsRewrittenWithTheRejectedFieldAndResumePrepared()
   })
 
+  it('prepares the resume when the second coherence check objects to a field the first accepted unchanged', async () => {
+    const system = createSystemUnderTest({ coherence: 'mixed-projects-then-unchanged-education' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectOnlyProjectsRewrittenWithTheRejectedFieldAndResumePrepared()
+  })
+
+  it('rewrites a section the coherence check rejects from its previous version', async () => {
+    const system = createSystemUnderTest({ coherence: 'mixed-projects-once' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectProjectsRewrittenFromTheirPreviousVersion()
+  })
+
+  it('keeps the coherence feedback when a section rewritten for coherence then fails its validation', async () => {
+    const system = createSystemUnderTest({ coherence: 'mixed-skills-once', skillsValidation: 'unsupported-on-rewrite',
+      writtenSkills: 'versioned' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectSkillsRewrittenWithBothRejectionsAndTheirLatestVersion()
+  })
+
+  it('keeps the coherence feedback when writing a section rewritten for coherence fails transiently', async () => {
+    const system = createSystemUnderTest({ coherence: 'mixed-skills-once', skillsWritingFailure: 'transient',
+      skillsWritingFailureOn: 'rewrite' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectSkillsWrittenAgainWithTheCoherenceFeedback()
+  })
+
+  it('removes a redundancy the second coherence check finds in a field the first accepted', async () => {
+    const system = createSystemUnderTest({ coherence: 'mixed-projects-then-redundant-language' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectLastRejectedFieldRemovedAndResumePrepared()
+  })
+
+  it('still checks an unchanged field of a section rewritten for coherence', async () => {
+    const system = createSystemUnderTest({ coherence: 'mixed-skills-then-unchanged-category' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectPreparationFailure({ reason: 'incoherent-content', recovery: 'retry' })
+    system.expectSavedSections({ validated: ['value-proposition', 'experiences.0', 'experiences.1', 'education',
+      'languages', 'projects', 'certifications'], failed: ['skills'] })
+  })
+
   it('removes a field the coherence check finds redundant without rewriting or checking again', async () => {
     const system = createSystemUnderTest({ coherence: 'redundant-projects-always' })
     await system.givenMatchedCandidateSession()
@@ -112,6 +170,24 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     await system.prepareTailoredResume()
 
     system.expectRedundantProjectRemovedAndResumePrepared()
+  })
+
+  it('removes a skill the coherence check finds duplicated without rewriting or checking again', async () => {
+    const system = createSystemUnderTest({ writtenSkills: 'duplicated', coherence: 'duplicated-skill-always' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectDuplicatedSkillRemovedAndResumePrepared()
+  })
+
+  it('rewrites the skills instead of removing every copy the coherence check names as duplicated', async () => {
+    const system = createSystemUnderTest({ writtenSkills: 'duplicated', coherence: 'every-copy-duplicated-once' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectSkillsRewrittenForTheDuplicateAndResumePrepared()
   })
 
   it('keeps the other sections and asks for a retry when the resume is still incoherent after the rewrite', async () => {
@@ -272,13 +348,17 @@ function createSystemUnderTest(options: TestOptions = {}) {
 type TestOptions = Readonly<{
   writing?: 'slow'
   heldSection?: 'skills'
-  skillsValidation?: 'unsupported-once' | 'unsupported-twice'
+  skillsValidation?: 'unsupported-once' | 'unsupported-twice' | 'unsupported-on-rewrite'
   skillsWritingFailure?: Exclude<ResumeSectionModelFailure, 'permanent'>
+  skillsWritingFailureOn?: 'rewrite'
   writtenPunctuation?: 'em-dash'
+  writtenSkills?: 'duplicated' | 'versioned'
   coherence?: 'mixed-projects-once' | 'mixed-projects-twice' | 'redundant-projects-always' | 'document-level-issue'
     | 'redundant-projects-and-mixed-skills-twice' | 'chronology-on-source-dates'
     | 'unnamed-language-mismatch' | 'language-issue-while-language-matches'
-    | 'coherence-issue-while-coherent' | 'language-issues-while-language-matches-after-rewrite' | 'timeout'
+    | 'coherence-issue-while-coherent' | 'mixed-projects-then-unchanged-education'
+    | 'duplicated-skill-always' | 'every-copy-duplicated-once' | 'mixed-skills-once' | 'mixed-skills-then-unchanged-category'
+    | 'mixed-projects-then-redundant-language' | 'language-issues-while-language-matches-after-rewrite' | 'timeout'
 }>
 
 class SectionPreparationTestSystem {
@@ -486,7 +566,7 @@ class SectionPreparationTestSystem {
 
   expectSkillsRewrittenWithTheirRejectedFields() {
     expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
-    expect(this.#rejectedFields).toHaveLength(1)
+    expect(this.#rejectedFields).toEqual([expect.objectContaining({ unsupportedProposition: 'Kubernetes appears in none of the cited facts' })])
     const skillsWrites = this.#writingInputs.filter(({ section }) => section.kind === 'skills')
     expect(skillsWrites.map(({ rejectedFields }) => rejectedFields)).toEqual([[], this.#rejectedFields])
     for (const input of this.#writingInputs.filter(({ section }) => section.kind !== 'skills')) {
@@ -512,6 +592,37 @@ class SectionPreparationTestSystem {
     expect(this.#rejectedFields).toEqual([expect.objectContaining({ reason: 'language' })])
   }
 
+  expectProjectsRewrittenFromTheirPreviousVersion() {
+    const [first, rewrite] = this.#writingInputs.filter(({ section }) => section.key === 'projects')
+    expect(first?.previousContent).toBeNull()
+    expect(rewrite?.previousContent).toEqual(readGroupedResumeSection({ key: 'projects', kind: 'projects' }))
+  }
+
+  expectSkillsRewrittenWithBothRejectionsAndTheirLatestVersion() {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    const [, coherenceRewrite, validationRewrite] = this.#writingInputs.filter(({ section }) => section.key === 'skills')
+    const [coherenceRejection, validationRejection] = this.#rejectedFields
+    expect(coherenceRewrite?.rejectedFields).toEqual([coherenceRejection])
+    expect(validationRewrite?.rejectedFields).toEqual([coherenceRejection, validationRejection])
+    expect(validationRewrite?.previousContent).toEqual(withSkillsVersion({ version: 2,
+      content: readGroupedResumeSection({ key: 'skills', kind: 'skills' }) }))
+  }
+
+  expectSkillsWrittenAgainWithTheCoherenceFeedback() {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    const [, failedRewrite, retriedRewrite] = this.#writingInputs.filter(({ section }) => section.key === 'skills')
+    expect(retriedRewrite?.rejectedFields).toEqual(failedRewrite?.rejectedFields)
+    expect(retriedRewrite?.previousContent).toEqual(failedRewrite?.previousContent)
+    expect(retriedRewrite?.rejectedFields).toEqual(this.#rejectedFields)
+  }
+
+  expectLastRejectedFieldRemovedAndResumePrepared() {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    const removed = this.#rejectedFields.at(-1)
+    expect(removed?.reason).toBe('redundant')
+    expect(JSON.stringify(this.#expectOutcome()?.session.tailoredResume)).not.toContain(`"${removed?.fieldId ?? ''}"`)
+  }
+
   expectRedundantProjectRemovedAndResumePrepared() {
     expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
     expect(this.#writingInputs, 'No section is rewritten for a redundancy').toHaveLength(8)
@@ -519,6 +630,24 @@ class SectionPreparationTestSystem {
     const [removed] = this.#rejectedFields
     expect(removed).toEqual(expect.objectContaining({ reason: 'redundant' }))
     expect(JSON.stringify(this.#expectOutcome()?.session.tailoredResume)).not.toContain(removed?.text)
+  }
+
+  expectDuplicatedSkillRemovedAndResumePrepared() {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    expect(this.#writingInputs, 'No section is rewritten for a duplicated skill').toHaveLength(8)
+    expect(this.#coherenceChecks, 'Removing a duplicate needs no second check').toBe(1)
+    const [removed] = this.#rejectedFields
+    expect(removed?.fieldId).toBeDefined()
+    const skills = this.#expectOutcome()?.session.tailoredResume?.sections
+      .flatMap((section) => section.section === 'skills' ? section.groups.flatMap(({ items }) => items) : [])
+    expect(skills?.map(({ id }) => id)).not.toContain(removed?.fieldId)
+    expect(skills).not.toHaveLength(0)
+  }
+
+  expectSkillsRewrittenForTheDuplicateAndResumePrepared() {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    const skillsWrites = this.#writingInputs.filter(({ section }) => section.key === 'skills')
+    expect(skillsWrites.map(({ rejectedFields }) => rejectedFields)).toEqual([[], this.#rejectedFields])
   }
 
   expectPreparedResumeWithEnDashesOnly() {
@@ -598,17 +727,27 @@ function createDependencies({ options, persistence, models }: Readonly<{
       writeSection: async (input) => {
         await models.onWrite(input)
         const failure = options.skillsWritingFailure
-        if (input.section.kind === 'skills' && failure !== undefined && models.onSkillsWrite() === 1) return { ok: false, error: { type: failure } }
-        const content = readGroupedResumeSection(input.section)
+        const failingWrite = options.skillsWritingFailureOn === 'rewrite' ? 2 : 1
+        if (input.section.kind === 'skills' && failure !== undefined && models.onSkillsWrite() === failingWrite) {
+          return { ok: false, error: { type: failure } }
+        }
+        const written = readGroupedResumeSection(input.section)
+        const content = options.writtenSkills === 'duplicated' ? withDuplicatedSkill(written)
+          : options.writtenSkills === 'versioned' ? withSkillsVersion({ content: written, version: input.rejectedFields.length + 1 })
+            : written
         return { ok: true, value: options.writtenPunctuation === 'em-dash' ? withEmDashes(content) : content }
       },
       validateFields: ({ section, fields }) => {
         const validation = section.kind === 'skills' ? models.onSkillsValidation() : 0
         const unsupported = (options.skillsValidation === 'unsupported-once' && validation === 1)
           || (options.skillsValidation === 'unsupported-twice' && validation <= 2)
+          || (options.skillsValidation === 'unsupported-on-rewrite' && validation === 2)
         const rejected = unsupported && section.kind === 'skills' ? fields[0] : undefined
-        if (rejected !== undefined) models.onRejectedField({ fieldId: rejected.id, text: rejected.text, reason: 'unsupported' })
-        return Promise.resolve({ ok: true, value: { fields: fields.map(({ id }) => ({ fieldId: id, supported: id !== rejected?.id })) } })
+        // The validator names the proposition it found unsupported, as a cited fact that does not mention it.
+        const unsupportedProposition = 'Kubernetes appears in none of the cited facts'
+        if (rejected !== undefined) models.onRejectedField({ fieldId: rejected.id, text: rejected.text, reason: 'unsupported', unsupportedProposition })
+        return Promise.resolve({ ok: true, value: { fields: fields.map(({ id }) => id === rejected?.id
+          ? { fieldId: id, supported: false, unsupportedProposition } : { fieldId: id, supported: true }) } })
       },
       checkCoherence: ({ document }) => {
         if (options.coherence === 'timeout') return Promise.resolve({ ok: false, error: { type: 'timeout' } })
@@ -617,6 +756,20 @@ function createDependencies({ options, persistence, models }: Readonly<{
       },
     }),
   })
+}
+
+/** Marks the Skills a writer wrote with how much feedback it had, so each version differs from the previous one. */
+function withSkillsVersion({ content, version }: Readonly<{ content: ResumeSectionContent; version: number }>): ResumeSectionContent {
+  if (content.kind !== 'skills') return content
+  return { ...content, groups: content.groups.map((group) => ({ ...group,
+    items: group.items.map((item) => ({ ...item, text: `${item.text} v${String(version)}` })) })) }
+}
+
+/** Repeats the first skill in a group of its own under another id, as a writing model sometimes does. */
+function withDuplicatedSkill(content: ResumeSectionContent): ResumeSectionContent {
+  const first = content.kind === 'skills' ? content.groups[0]?.items[0] : undefined
+  if (content.kind !== 'skills' || first === undefined) return content
+  return { ...content, groups: [...content.groups, { id: 'skills-copy', category: null, items: [{ ...first, id: `${first.id}-copy` }] }] }
 }
 
 /** Appends an em-dashed detail to every written field, as a writing model often does. */
@@ -679,6 +832,49 @@ function readCoherence({ coherence, check, document, onRejectedField }: Readonly
     const issues = [...(project === undefined ? [] : [{ fieldId: project.id, kind: 'redundant' as const }]),
       ...(skill === undefined || check > 2 ? [] : [{ fieldId: skill.id, kind: 'mixed-association' as const }])]
     return issues.length === 0 ? coherent : { ...coherent, coherent: false, issues }
+  }
+  if (coherence === 'mixed-projects-then-redundant-language') {
+    // Only the second check notices that a Languages entry repeats another one.
+    const language = document.sections.flatMap((section) => section.section === 'languages' ? section.fields : [])[0]
+    if (check === 1 || language === undefined) return readCoherence({ coherence: 'mixed-projects-once', check, document, onRejectedField })
+    onRejectedField({ fieldId: language.id, text: language.text, reason: 'redundant' })
+    return { ...coherent, coherent: false, issues: [{ fieldId: language.id, kind: 'redundant' }] }
+  }
+  if (coherence === 'mixed-skills-then-unchanged-category') {
+    // After the Skills rewrite moved items, the category label it kept unchanged no longer describes them.
+    const category = document.sections.flatMap((section) => section.section === 'skills' ? section.groups : [])[0]?.category
+    if (check === 1 || category === null || category === undefined) {
+      return readCoherence({ coherence: 'mixed-skills-once', check, document, onRejectedField })
+    }
+    return { ...coherent, coherent: false, issues: [{ fieldId: category.id, kind: 'skill-category' }] }
+  }
+  if (coherence === 'mixed-skills-once') {
+    // A skill is associated with the wrong experience in the first assembled document only.
+    const skill = document.sections.flatMap((section) => section.section === 'skills' ? section.groups : [])[0]?.items[0]
+    if (check > 1 || skill === undefined) return coherent
+    onRejectedField({ fieldId: skill.id, text: skill.text, reason: 'mixed-association' })
+    return { ...coherent, coherent: false, issues: [{ fieldId: skill.id, kind: 'mixed-association' }] }
+  }
+  const skills = document.sections.flatMap((section) => section.section === 'skills' ? section.groups : []).flatMap(({ items }) => items)
+  const copies = skills.filter(({ text }) => text === skills[0]?.text)
+  if (coherence === 'duplicated-skill-always') {
+    // The copy of a skill repeats it on every check.
+    const copy = copies[1]
+    if (copy === undefined) return coherent
+    onRejectedField({ fieldId: copy.id, text: copy.text, reason: 'duplicated-skill' })
+    return { ...coherent, coherent: false, issues: [{ fieldId: copy.id, kind: 'duplicated-skill' }] }
+  }
+  if (coherence === 'every-copy-duplicated-once') {
+    // Against its instructions, the first check names both copies of a skill.
+    if (check > 1 || copies.length < 2) return coherent
+    for (const copy of copies) onRejectedField({ fieldId: copy.id, text: copy.text, reason: 'duplicated-skill' })
+    return { ...coherent, coherent: false, issues: copies.map(({ id }) => ({ fieldId: id, kind: 'duplicated-skill' as const })) }
+  }
+  if (coherence === 'mixed-projects-then-unchanged-education') {
+    // The second check objects to the Education entry the first check saw unchanged and accepted.
+    const education = document.sections.flatMap((section) => section.section === 'education' ? section.fields : [])[0]
+    if (check === 1 || education === undefined) return readCoherence({ coherence: 'mixed-projects-once', check, document, onRejectedField })
+    return { ...coherent, coherent: false, issues: [{ fieldId: education.id, kind: 'mixed-association' }] }
   }
   const rejections = coherence === 'mixed-projects-once' ? 1 : coherence === 'mixed-projects-twice' ? 2
     : coherence === 'redundant-projects-always' ? Infinity : 0
