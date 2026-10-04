@@ -54,7 +54,32 @@ export type TailoredResume = Readonly<{
   }>
 }>
 
-export type ResumeSectionName = 'value-proposition' | 'experiences' | TailoredResumeSection['section']
+type CondensableResume = Pick<TailoredResume, 'valueProposition' | 'experiences'>
+
+/**
+ * The prose a two-page condensation may shorten: Value Proposition paragraphs and each experience's context and
+ * achievements. Roles, organizations, dates, locations and every other section keep their exact wording.
+ */
+export function readCondensableResumeFields({ resume }: Readonly<{ resume: CondensableResume }>): readonly TailoredResumeField[] {
+  return [...resume.valueProposition.paragraphs, ...resume.experiences.flatMap(({ context, achievements }) =>
+    context === null ? achievements : [context, ...achievements])]
+}
+
+/** Replaces condensable prose by field identity, leaving every other value and the document structure unchanged. */
+export function replaceCondensableResumeFields<TResume extends CondensableResume>({ resume, replacements }: Readonly<{
+  resume: TResume; replacements: ReadonlyMap<string, TailoredResumeField>
+}>): TResume {
+  const replace = (field: TailoredResumeField) => replacements.get(field.id) ?? field
+  return { ...resume,
+    valueProposition: { ...resume.valueProposition, paragraphs: resume.valueProposition.paragraphs.map(replace) },
+    experiences: resume.experiences.map((experience) => ({ ...experience,
+      context: experience.context === null ? null : replace(experience.context),
+      achievements: experience.achievements.map(replace),
+    })),
+  }
+}
+
+export type ResumeSectionName ='value-proposition' | 'experiences' | TailoredResumeSection['section']
 
 export const resumeSectionKinds = ['value-proposition', 'experience', 'skills', 'education', 'languages',
   'projects', 'certifications'] as const

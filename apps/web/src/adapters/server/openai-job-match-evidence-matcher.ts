@@ -1,10 +1,5 @@
 import { z } from 'zod'
 
-import {
-  validateAdjacentEvidence,
-  validateMatchEvidence,
-  validateRelevantFactProposals,
-} from '@resume-tailoring/matching-engine'
 import type { OpenAiReasoningEffort } from '../../openai-model-configuration'
 import {
   createOpenAiRequester,
@@ -82,7 +77,7 @@ export async function requestOpenAiJobMatchEvidence({
     operation: 'explainable-match-evidence',
   })
   if (!response.ok) return response
-  return parseResponse({ matchRequest, value: response.value })
+  return parseResponse({ value: response.value })
 }
 
 function createRequestBody({ matchRequest, model, reasoningEffort, repairInstruction }: Readonly<{
@@ -107,10 +102,7 @@ function createRequestBody({ matchRequest, model, reasoningEffort, repairInstruc
   }
 }
 
-function parseResponse({ matchRequest, value }: Readonly<{
-  matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
-  value: unknown
-}>) {
+function parseResponse({ value }: Readonly<{ value: unknown }>) {
   const outputTextResult = readOutputText({ value })
   if (!outputTextResult.ok) return createInvalidModelOutputResult({ cause: outputTextResult.error })
   let parsedValue: unknown
@@ -121,7 +113,7 @@ function parseResponse({ matchRequest, value }: Readonly<{
   }
   const proposal = matchEvidenceProposalSchema.safeParse(parsedValue)
   if (!proposal.success) return createInvalidModelOutputResult({ cause: 'invalid-schema' })
-  return sanitizeProposal({ matchRequest, proposal: proposal.data })
+  return acceptProposal({ proposal: proposal.data })
 }
 
 function createInvalidModelOutputResult({ cause }: Readonly<{ cause: InvalidModelOutputCause }>) {
@@ -134,77 +126,17 @@ function createInvalidModelOutputResult({ cause }: Readonly<{ cause: InvalidMode
   return invalidModelOutputResult
 }
 
-// Each proposal is verified structurally and kept or discarded on its own (ADR-0015).
-function sanitizeProposal({ matchRequest, proposal }: Readonly<{
-  matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
-  proposal: z.infer<typeof matchEvidenceProposalSchema>
-}>) {
-  const relevance = filterValidRelevance({ matchRequest, proposal })
-  const evidence = filterValidEvidence({ matchRequest, proposal })
-  const adjacentEvidence = filterValidAdjacentEvidence({ matchRequest, proposal })
-  const isComplete = relevance.length === proposal.relevance.length
-    && evidence.length === proposal.evidence.length
-    && adjacentEvidence.length === proposal.adjacentEvidence.length
+// The matching engine verifies each proposal structurally and keeps or discards it on its own (ADR-0015).
+function acceptProposal({ proposal }: Readonly<{ proposal: z.infer<typeof matchEvidenceProposalSchema> }>) {
   console.info(JSON.stringify({
     category: 'privacy-safe-openai-request',
-    metric: isComplete ? 'accepted' : 'sanitized',
+    metric: 'accepted',
     value: 1,
     dimensions: { operation: 'explainable-match-evidence',
-      proposedRelevance: proposal.relevance.length, keptRelevance: relevance.length,
-      proposedEvidence: proposal.evidence.length, keptEvidence: evidence.length,
-      proposedAdjacentEvidence: proposal.adjacentEvidence.length,
-      keptAdjacentEvidence: adjacentEvidence.length },
+      proposedRelevance: proposal.relevance.length, proposedEvidence: proposal.evidence.length,
+      proposedAdjacentEvidence: proposal.adjacentEvidence.length },
   }))
-  return { ok: true, value: { adjacentEvidence, evidence, relevance } } as const
-}
-
-function filterValidRelevance({ matchRequest, proposal }: Readonly<{
-  matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
-  proposal: z.infer<typeof matchEvidenceProposalSchema>
-}>) {
-  const references = new Set<string>()
-  return proposal.relevance.filter((relevance) => {
-    const reference = `${relevance.requirementId}:${relevance.factMatch.factId}`
-    if (references.has(reference) || validateRelevantFactProposals({
-      candidateFacts: matchRequest.candidateFacts,
-      proposals: [relevance],
-      requirements: matchRequest.requirements,
-    }).length === 0) return false
-    references.add(reference)
-    return true
-  })
-}
-
-function filterValidEvidence({ matchRequest, proposal }: Readonly<{
-  matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
-  proposal: z.infer<typeof matchEvidenceProposalSchema>
-}>) {
-  const requirementIds = new Set<string>()
-  return proposal.evidence.filter((evidence) => {
-    if (requirementIds.has(evidence.requirementId) || validateMatchEvidence({
-      candidateFacts: matchRequest.candidateFacts,
-      proposedEvidence: [evidence],
-      requirements: matchRequest.requirements,
-    }).length === 0) return false
-    requirementIds.add(evidence.requirementId)
-    return true
-  })
-}
-
-function filterValidAdjacentEvidence({ matchRequest, proposal }: Readonly<{
-  matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
-  proposal: z.infer<typeof matchEvidenceProposalSchema>
-}>) {
-  const requirementIds = new Set<string>()
-  return proposal.adjacentEvidence.filter((adjacentEvidence) => {
-    if (requirementIds.has(adjacentEvidence.requirementId) || validateAdjacentEvidence({
-      candidateFacts: matchRequest.candidateFacts,
-      proposedAdjacentEvidence: [adjacentEvidence],
-      requirements: matchRequest.requirements,
-    }).length === 0) return false
-    requirementIds.add(adjacentEvidence.requirementId)
-    return true
-  })
+  return { ok: true, value: proposal } as const
 }
 
 function readOutputText({ value }: Readonly<{ value: unknown }>) {

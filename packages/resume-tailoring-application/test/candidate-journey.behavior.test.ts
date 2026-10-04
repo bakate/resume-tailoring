@@ -166,7 +166,7 @@ class CandidateJourneyTestSystem {
     const sourceDocumentReader = createFakeSourceDocumentReader()
     this.#candidateJourney = createCandidateJourney({
       dependencies: createFakeCandidateJourneyDependencies({
-        createSessionId: () => '00000000-0000-4000-8000-000000000039',
+        createIdentifier: () => '00000000-0000-4000-8000-000000000039',
         languageModelGateway: createFakeLanguageModelGateway({ processingPolicy }),
         now: () => currentTime,
         persistence: createInMemoryCandidateSessionPersistence({ session: storedSession }),

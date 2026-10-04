@@ -9,6 +9,9 @@ import type { CandidateJourneyDependencies, ResumeDocumentPorts } from '@resume-
 
 type TestPorts = { -readonly [Port in keyof ResumeDocumentPorts]?: ResumeDocumentPorts[Port] }
 type LayoutExample = Readonly<{ layout: ResumeLayoutOutcome; eligibility: ResumeExportEligibility }>
+type CondensationFailure = 'unavailable' | 'unsupported-content' | 'processing-consent-required'
+
+const condensedSummary = 'Accessible billing screens'
 
 describe('Candidate Journey resume editing', () => {
   it('keeps only the unsupported field unresolved when a section validation accepts the other edited field', async () => {
@@ -39,14 +42,14 @@ describe('Candidate Journey resume editing', () => {
 
     system.expectAttestedEvidenceRecovered()
   })
-  it.each(['revision', 'replacement'] as const)('keeps an edit unresolved when validation endorses another %s', async (mismatch) => {
+  it('never sends an edit whose numbers its Candidate Facts do not contain for semantic validation', async () => {
     const system = createSystemUnderTest()
     await system.givenReviewableResume()
-    system.givenMismatchedValidation({ mismatch })
+    system.givenSupportedValidation()
 
     await system.editUnsupportedSummary()
 
-    system.expectUnsupportedSummaryBlocksExport()
+    system.expectUnsupportedSummaryKeptFromSemanticValidation()
   })
 
   it('validates only the edited section while preserving unrelated resume content', async () => {
@@ -80,6 +83,7 @@ describe('Candidate Journey resume editing', () => {
   it('replaces the current draft only when its separate proposal is accepted', async () => {
     const system = createSystemUnderTest()
     await system.givenReviewableResume()
+    system.givenFaithfulCondensation()
     await system.proposeCondensation()
 
     system.acceptProposal()
@@ -89,13 +93,14 @@ describe('Candidate Journey resume editing', () => {
   it('keeps the current draft when its separate proposal is rejected', async () => {
     const system = createSystemUnderTest()
     await system.givenReviewableResume()
+    system.givenFaithfulCondensation()
     await system.proposeCondensation()
 
     system.rejectProposal()
 
     system.expectOriginalDraftWithoutProposal()
   })
-  it.each(['unavailable', 'unsupported-content'] as const)('preserves the draft after %s condensation failure', async (reason) => {
+  it.each(['unavailable', 'unsupported-content', 'processing-consent-required'] as const)('preserves the draft after %s condensation failure', async (reason) => {
     const system = createSystemUnderTest()
     await system.givenReviewableResume()
     system.givenCondensationFailure({ reason })
@@ -104,9 +109,28 @@ describe('Candidate Journey resume editing', () => {
 
     system.expectCondensationFailure({ reason })
   })
+  it('rejects a condensation that drops meaning even when the shorter wording is supported', async () => {
+    const system = createSystemUnderTest()
+    await system.givenReviewableResume()
+    system.givenMeaningLosingCondensation()
+
+    await system.proposeCondensation()
+
+    system.expectCondensationFailure({ reason: 'unsupported-content' })
+  })
+  it('condenses only Value Proposition and experience prose, keeping roles, employers, dates and skills verbatim', async () => {
+    const system = createSystemUnderTest()
+    await system.givenReviewableResume()
+    system.givenFaithfulCondensation()
+
+    await system.proposeCondensation()
+
+    system.expectOnlyProseCondensed()
+  })
   it('rejects a proposal decision after contact changes invalidate its revision', async () => {
     const system = createSystemUnderTest()
     await system.givenReviewableResume()
+    system.givenFaithfulCondensation()
     await system.proposeCondensation()
     system.givenChangedContacts()
 
@@ -219,6 +243,7 @@ describe('Candidate Journey resume editing', () => {
     await system.givenMatchedCandidateSession()
     await system.prepareTailoredResume()
     await system.givenProcessingConsent()
+    system.givenFaithfulCondensation()
 
     await system.proposeCondensation()
 
@@ -261,9 +286,10 @@ function createSystemUnderTest() {
 
 class StructuredResumeTestSystem {
   readonly #ports: TestPorts = {}
-  readonly #dependencies = createDependencies({ ports: this.#ports })
+  readonly #condensationRequests: Parameters<ResumeDocumentPorts['condenseClaim']>[0][] = []
+  readonly #dependencies = createDependencies({ ports: this.#ports, condensationRequests: this.#condensationRequests })
   #decision: ResumeProposalDecision = { proposalId: '', baseRevision: '' }
-  #validationRequests: Parameters<ResumeDocumentPorts['validateSectionChange']>[0][] = []
+  #validationRequests: Parameters<ResumeDocumentPorts['validateClaim']>[0][] = []
   #completeProposal: (() => void) | null = null
   #pendingProposal: Promise<void> | null = null
   #completeLayout: (() => void) | null = null
@@ -383,10 +409,35 @@ class StructuredResumeTestSystem {
   }
 
   givenSupportedValidation() {
-    this.#ports.validateSectionChange = (request) => {
+    this.#ports.validateClaim = (request) => {
       this.#validationRequests.push(request)
-      return Promise.resolve({ status: 'validated', change: request.change })
+      return Promise.resolve({ ok: true, value: { supported: true } })
     }
+  }
+
+  givenFaithfulCondensation() { this.givenSupportedValidation() }
+
+  givenMeaningLosingCondensation() {
+    // The shorter wording is backed by the facts, but it does not carry the original meaning back.
+    this.#ports.validateClaim = ({ verifiedFacts }) => Promise.resolve({ ok: true,
+      value: { supported: !verifiedFacts.some(({ value }) => value === condensedSummary) } })
+  }
+
+  expectUnsupportedSummaryKeptFromSemanticValidation() {
+    this.expectUnsupportedSummaryBlocksExport()
+    expect(this.#validationRequests).toEqual([])
+  }
+
+  expectOnlyProseCondensed() {
+    const draft = this.#review()?.draft.document
+    const proposal = this.#review()?.proposal?.document
+    expect(proposal?.valueProposition.paragraphs[0]?.text).toBe(condensedSummary)
+    expect(proposal?.sections).toEqual(draft?.sections)
+    expect(proposal?.experiences.map(({ role, organization, startDate, endDate }) => ({ role, organization, startDate, endDate })))
+      .toEqual(draft?.experiences.map(({ role, organization, startDate, endDate }) => ({ role, organization, startDate, endDate })))
+    const condensedTexts = this.#condensationRequests.flatMap(({ claim }) => claim.segments.map(({ text }) => text))
+    expect(condensedTexts).not.toContain('Frontend Engineer')
+    expect(condensedTexts).not.toContain('Northwind')
   }
 
   async editSupportedSummary() {
@@ -399,8 +450,11 @@ class StructuredResumeTestSystem {
       .toBe('Created accessible billing screens')
     expect(this.#expectPreparedSession()?.resumeEditing?.unsupportedFieldIds).toEqual([])
     expect(this.#validationRequests).toHaveLength(1)
-    expect(this.#validationRequests[0]?.change.section).toBe('value-proposition')
-    expect(this.#validationRequests[0]?.currentDocument).not.toHaveProperty('contactDetails')
+    const summary = this.#expectPreparedSession()?.tailoredResume?.valueProposition.paragraphs[0]
+    expect(this.#validationRequests[0]?.claim.segments).toEqual([{ text: 'Created accessible billing screens',
+      factIds: summary?.factIds }])
+    expect(this.#validationRequests[0]?.verifiedFacts.map(({ id }) => id)).toEqual(structuredResumeSource.candidateFacts
+      .filter(({ id, status }) => status === 'attested' && summary?.factIds.includes(id)).map(({ id }) => id))
     expect(this.#expectPreparedSession()?.tailoredResume?.experiences[0]?.achievements[0]?.text)
       .toBe('Built accessible billing screens')
   }
@@ -460,12 +514,15 @@ class StructuredResumeTestSystem {
     expect(this.#review()?.proposal).toBeNull()
   }
 
-  givenCondensationFailure({ reason }: Readonly<{ reason: 'unavailable' | 'unsupported-content' }>) {
-    this.#ports.proposeCondensation = () => Promise.resolve({ status: 'failed', reason,
-      recovery: reason === 'unavailable' ? 'retry' : 'correct-content' })
+  givenCondensationFailure({ reason }: Readonly<{ reason: CondensationFailure }>) {
+    this.givenSupportedValidation()
+    // An unsupported condensation drops the evidence its wording cites.
+    this.#ports.condenseClaim = () => Promise.resolve(reason === 'unsupported-content'
+      ? { ok: true, value: { segments: [{ text: 'Built screens', factIds: [] }] } }
+      : { ok: false, error: reason })
   }
 
-  expectCondensationFailure({ reason }: Readonly<{ reason: 'unavailable' | 'unsupported-content' }>) {
+  expectCondensationFailure({ reason }: Readonly<{ reason: CondensationFailure }>) {
     this.expectOriginalDraftWithoutProposal()
     expect(this.#review()?.failure?.reason).toBe(reason)
   }
@@ -489,11 +546,15 @@ class StructuredResumeTestSystem {
   }
 
   givenPendingCondensation() {
-    this.#ports.proposeCondensation = (request) => new Promise((resolve) => {
-      this.#completeProposal = () => { resolve({ status: 'proposed', proposal: { id: 'pending-proposal',
-        baseRevision: request.baseRevision, document: request.document,
-        layout: { status: 'unavailable', revision: request.baseRevision } } }) }
-    })
+    this.givenFaithfulCondensation()
+    let pending = true
+    this.#ports.condenseClaim = (request) => {
+      if (!pending) return Promise.resolve({ ok: true, value: request.claim })
+      pending = false
+      return new Promise((resolve) => {
+        this.#completeProposal = () => { resolve({ ok: true, value: request.claim }) }
+      })
+    }
     this.#pendingProposal = this.#journey.proposeResumeCondensation()
   }
 
@@ -567,14 +628,14 @@ class StructuredResumeTestSystem {
   }
 
   givenPendingSupportedEdit() {
-    this.#ports.validateSectionChange = ({ change }) => new Promise((resolve) => {
-      this.#completeValidation = () => { resolve({ status: 'validated', change }) }
+    this.#ports.validateClaim = () => new Promise((resolve) => {
+      this.#completeValidation = () => { resolve({ ok: true, value: { supported: true } }) }
     })
     this.#pendingValidation = this.#journey.editResumeField({ fieldId: this.#readSummaryId(), text: 'Created accessible billing screens' })
   }
 
   givenValidationUnavailable() {
-    this.#ports.validateSectionChange = () => Promise.resolve({ status: 'failed', reason: 'unavailable', recovery: 'retry' })
+    this.#ports.validateClaim = () => Promise.resolve({ ok: false, error: 'unavailable' })
   }
 
   async completePendingValidation() {
@@ -631,16 +692,9 @@ class StructuredResumeTestSystem {
       .toMatchObject({ status: 'attested', value: 'Led 100 engineers' })
   }
 
-  givenMismatchedValidation({ mismatch }: Readonly<{ mismatch: 'revision' | 'replacement' }>) {
-    this.#ports.validateSectionChange = ({ change }) => Promise.resolve({ status: 'validated', change: mismatch === 'revision'
-      ? { ...change, baseRevision: 'older-draft' }
-      : { baseRevision: change.baseRevision, section: 'value-proposition',
-        replacement: { kind: 'prose', paragraphs: [] } } })
-  }
-
   givenPartiallySupportedExperienceValidation() {
-    this.#ports.validateSectionChange = ({ change }) => Promise.resolve({ status: 'unsupported',
-      baseRevision: change.baseRevision, fieldIds: ['source-fact-experiences-0-role-0'] })
+    this.#ports.validateClaim = ({ claim }) => Promise.resolve({ ok: true,
+      value: { supported: claim.segments.every(({ text }) => text !== 'Chief Technology Officer') } })
   }
 
   async replaceTwoExperienceFields() {
@@ -689,7 +743,9 @@ function createMatchedSession(): CandidateSession {
   }
 }
 
-function createDependencies({ ports }: Readonly<{ ports: TestPorts }>): CandidateJourneyDependencies {
+function createDependencies({ ports, condensationRequests }: Readonly<{
+  ports: TestPorts; condensationRequests: Parameters<ResumeDocumentPorts['condenseClaim']>[0][]
+}>): CandidateJourneyDependencies {
   const session = createMatchedSession()
   return createFakeCandidateJourneyDependencies({
     now: () => session.startedAt,
@@ -698,12 +754,11 @@ function createDependencies({ ports }: Readonly<{ ports: TestPorts }>): Candidat
     }),
     // Scenarios replace individual ports on this object after the journey starts.
     resumeDocumentPorts: Object.assign(ports, createFakeResumeDocumentPorts({
-      proposeCondensation: ({ document, baseRevision }) => Promise.resolve({ status: 'proposed', proposal: {
-        id: 'proposal-one', baseRevision, layout: { status: 'unavailable', revision: baseRevision },
-        document: { ...document, valueProposition: { ...document.valueProposition, paragraphs:
-          document.valueProposition.paragraphs.map((field, index) => index === 0
-            ? { ...field, text: 'Accessible billing screens' } : field) } },
-      } }),
+      condenseClaim: (request) => {
+        condensationRequests.push(request)
+        return Promise.resolve({ ok: true, value: { segments: request.claim.segments.map((segment) => ({ ...segment,
+          text: segment.text.replace('Built accessible billing screens', condensedSummary) })) } })
+      },
     })),
     persistence: createInMemoryCandidateSessionPersistence({ session }),
   })

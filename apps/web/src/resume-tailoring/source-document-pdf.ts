@@ -41,7 +41,7 @@ export function createBrowserPdfDocumentReader({
 
 function isSupportedBrowser({ userAgent }: Readonly<{ userAgent: string }>) {
   const browserVersion = readBrowserVersion({ userAgent })
-  if (browserVersion === null) return userAgent === nonBrowserTestEnvironment.userAgent
+  if (browserVersion === null) return false
   return browserVersion.majorVersion
     >= sourceDocumentBrowserSupportPolicy.matrix[browserVersion.family].minimumMajorVersion
 }
@@ -66,7 +66,7 @@ function readBrowserVersion({ userAgent }: Readonly<{ userAgent: string }>){
 }
 
 function readCurrentBrowserEnvironment(): SourceDocumentBrowserEnvironment {
-  if (typeof window === 'undefined') return nonBrowserTestEnvironment
+  if (typeof window === 'undefined') return environmentWithoutBrowser
   return {
     capabilities: typeof Worker === 'function' ? ['worker'] : [],
     userAgent: navigator.userAgent,
@@ -295,8 +295,6 @@ const incompatiblePdfReaderRuntimeResult = {
   },
 } as const
 
-const nonBrowserTestEnvironment = {
-  capabilities: ['worker'],
-  userAgent: 'non-browser-test-environment',
-} as const
+/** Outside a browser no worker can read a PDF; pasted text stays readable. */
+const environmentWithoutBrowser = { capabilities: [], userAgent: '' } as const
 const pdfHeader = new Uint8Array([37, 80, 68, 70, 45])

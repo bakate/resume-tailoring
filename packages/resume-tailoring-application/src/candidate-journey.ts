@@ -33,6 +33,8 @@ export type { ResumeRenderInput, ResumeRenderRequest, ResumeRenderResult } from 
 import {
   candidateSessionDurationMilliseconds,
   candidateSessionStorageVersion,
+  hasValidCandidateSessionLifetime,
+  isCandidateSessionExpired,
 } from '@resume-tailoring/domain/candidate-session'
 import type {
   CandidateSession,
@@ -211,14 +213,26 @@ const restoreCandidateSession = fromPromise<
   CandidateJourneyDependencies
 >(({ input }) => Promise.resolve(restoreRecoverableSession(input)))
 
-function restoreRecoverableSession(dependencies: CandidateJourneyDependencies) {
-  const result = dependencies.persistence.restore({ now: dependencies.now() })
+function restoreRecoverableSession(dependencies: CandidateJourneyDependencies): CandidateSessionStorageResult<RestoredCandidateSession> {
+  const result = restoreLiveSession(dependencies)
   if (!result.ok || result.value.session?.preparation?.status !== 'pending') return result
   const session = result.value.session
   const preparation = session.preparation
   if (preparation === undefined) return result
   return { ok: true, value: { ...result.value,
     session: { ...session, preparation: { ...preparation, status: 'interrupted' as const } } } } as const
+}
+
+/** A stored session with a tampered lifetime is incompatible; an expired one is discarded once, with a notice. */
+function restoreLiveSession(dependencies: CandidateJourneyDependencies): CandidateSessionStorageResult<RestoredCandidateSession> {
+  const result = dependencies.persistence.restore()
+  if (!result.ok || result.value.session === null) return result
+  const session = result.value.session
+  const notice = !hasValidCandidateSessionLifetime({ session }) ? 'incompatible-session-discarded'
+    : isCandidateSessionExpired({ session, now: dependencies.now() }) ? 'expired-session-discarded' : null
+  if (notice === null) return result
+  const deletion = dependencies.persistence.delete()
+  return deletion.ok ? { ok: true, value: { notice, session: null } } : deletion
 }
 
 const startCandidateSession = fromPromise<
@@ -231,7 +245,7 @@ const startCandidateSession = fromPromise<
     jobMatch: null,
     phase: 'source-intake',
     processingConsent: null,
-    sessionId: `candidate-session-${input.createSessionId()}`,
+    sessionId: `candidate-session-${input.createIdentifier()}`,
     sourceIntake: null,
     tailoredResume: null,
     startedAt,
@@ -275,7 +289,7 @@ const submitSourceDocument = fromPromise<SourceIntakeActorResult, SourceIntakeAc
   })
   if (!sourceIntakeResult.ok) return sourceIntakeResult
   const nextSession = {
-    ...invalidatePreparation(input.session),
+    ...invalidatePreparation(input.session, input.dependencies.createIdentifier),
     jobMatch: null,
     phase: sourceIntakeResult.value.criticalAmbiguities.length === 0
       ? 'job-match' as const
@@ -308,15 +322,18 @@ const persistCriticalAmbiguityResolution = fromPromise<
     sourceIntake,
   })
   if (!resolution.ok) return Promise.resolve(resolution)
-  const nextSession = applySourceCorrection({ session: input.session, sourceIntake: resolution.value })
+  const nextSession = applySourceCorrection({ session: input.session, sourceIntake: resolution.value,
+    createIdentifier: input.dependencies.createIdentifier })
   return Promise.resolve(input.dependencies.persistence.save({ session: nextSession }))
 })
 
-function applySourceCorrection({ session, sourceIntake }: Readonly<{ session: CandidateSession; sourceIntake: SourceIntake }>): CandidateSession {
-  if (session.preparation !== undefined) return { ...invalidateEditingRevision(session), preparedResumeStatus: 'outdated',
+function applySourceCorrection({ session, sourceIntake, createIdentifier }: Readonly<{
+  session: CandidateSession; sourceIntake: SourceIntake; createIdentifier: () => string
+}>): CandidateSession {
+  if (session.preparation !== undefined) return { ...invalidateEditingRevision(session, createIdentifier), preparedResumeStatus: 'outdated',
     preparation: { ...session.preparation, status: 'outdated', sourceIntake, jobMatch: null },
   }
-  return { ...invalidatePreparation(session), sourceIntake, jobMatch: null,
+  return { ...invalidatePreparation(session, createIdentifier), sourceIntake, jobMatch: null,
     phase: sourceIntake.criticalAmbiguities.length === 0 ? 'job-match' : 'source-intake',
   }
 }
@@ -344,7 +361,7 @@ const submitJobPosting = fromPromise<JobMatchActorResult, JobMatchActorInput>(as
   })
   if (!jobMatchResult.ok) return jobMatchResult
   return input.dependencies.persistence.save({
-    session: { ...invalidatePreparation(session), jobMatch: jobMatchResult.value },
+    session: { ...invalidatePreparation(session, input.dependencies.createIdentifier), jobMatch: jobMatchResult.value },
   })
 })
 
@@ -403,7 +420,7 @@ async function persistProfileEnrichment({ fact, input, jobMatch, session, source
     ok: false, error: 'match-evidence-unavailable',
   } as const
   return input.dependencies.persistence.save({ session: {
-    ...invalidatePreparation(session),
+    ...invalidatePreparation(session, input.dependencies.createIdentifier),
     jobMatch: jobMatchResult.value,
     sourceIntake: { ...sourceIntake, candidateFacts },
   } })
@@ -427,15 +444,15 @@ const renderResumeDocument = fromPromise<ResumeRenderResult | null, Readonly<{
   return validateResumeRendering({ request: input.request, result })
 })
 
-function invalidateEditingRevision(session: CandidateSession): CandidateSession {
+function invalidateEditingRevision(session: CandidateSession, createIdentifier: () => string): CandidateSession {
   if (session.tailoredResume === null) return session
-  return { ...session, resumeEditing: { ...readResumeEditing({ session }), revision: crypto.randomUUID() } }
+  return { ...session, resumeEditing: { ...readResumeEditing({ session }), revision: createIdentifier() } }
 }
 
-function invalidatePreparation(session: CandidateSession): CandidateSession {
+function invalidatePreparation(session: CandidateSession, createIdentifier: () => string): CandidateSession {
   const { preparation, ...retained } = session
   return preparation === undefined && session.tailoredResume === null ? retained
-    : { ...invalidateEditingRevision(retained), preparedResumeStatus: 'outdated' }
+    : { ...invalidateEditingRevision(retained, createIdentifier), preparedResumeStatus: 'outdated' }
 }
 
 function withProcessingConsent({ session, dependencies }: CandidateJourneyContext) {
@@ -465,7 +482,7 @@ const emptySectionsRequest = { candidateFacts: [], locale: 'en', purpose: 'tailo
 
 function invalidateResumeInputs({ session, dependencies }: CandidateJourneyContext) {
   if (session === null || (session.preparedResumeStatus === 'outdated' && (session.preparation === undefined || session.preparation.status === 'outdated'))) return session
-  const next: CandidateSession = { ...invalidateEditingRevision(session), preparedResumeStatus: 'outdated',
+  const next: CandidateSession = { ...invalidateEditingRevision(session, dependencies.createIdentifier), preparedResumeStatus: 'outdated',
     ...(session.preparation === undefined ? {} : { preparation: { ...session.preparation, status: 'outdated' } }),
   }
   dependencies.persistence.save({ session: next })
@@ -560,7 +577,7 @@ const candidateJourneyMachine = setup({
           actions: assign({
             resumeRendering: ({ context, event }) => prepareResumeRendering({
               input: event.input, previous: context.resumeRendering, sequence: context.resumeRenderSequence + 1,
-              revision: `${context.session?.sessionId ?? 'absent'}:${context.dependencies.createSessionId()}:${String(context.resumeRenderSequence + 1)}`,
+              revision: `${context.session?.sessionId ?? 'absent'}:${context.dependencies.createIdentifier()}:${String(context.resumeRenderSequence + 1)}`,
             }),
             resumeRenderSequence: ({ context }) => context.resumeRenderSequence + 1,
           }),
@@ -590,7 +607,7 @@ const candidateJourneyMachine = setup({
             const session = context.session
             if (session?.tailoredResume === null || session === null) return {}
             const result = context.dependencies.persistence.save({ session: changedResumeSession({ session,
-              document: { ...session.tailoredResume, ...event.contacts },
+              document: { ...session.tailoredResume, ...event.contacts }, revision: context.dependencies.createIdentifier(),
             }) })
             return result.ok ? { session: result.value, resumeReview: emptyResumeReview, resumeRendering: null }
               : { resumeRendering: null, resumeReview: { ...emptyResumeReview, failure: unavailableResumeResult } }
@@ -634,7 +651,8 @@ const candidateJourneyMachine = setup({
     },
     generatingApplicationResume: {
       entry: assign({ resumeRendering: null, preparationOutcome: null, preparationPhase: null, preparedInputs: null, resumeReview: emptyResumeReview,
-        session: ({ context }) => context.session === null ? null : invalidateEditingRevision(context.session),
+        session: ({ context }) => context.session === null ? null
+          : invalidateEditingRevision(context.session, context.dependencies.createIdentifier),
       }),
       after: { candidateSessionExpiration: { target: 'removingCandidateSession', actions: [recordSessionExpiration, assign({ notice: 'expired-session-discarded' })] } },
       on: { INVALIDATE_RESUME_INPUTS: { target: 'candidateSessionAvailable', actions: assign({
@@ -925,6 +943,7 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     readSession: () => actor.getSnapshot().matches('candidateSessionAvailable')
       && view.status === 'candidate-session-open' ? view.session : null,
     hasConsent: () => view.status === 'candidate-session-open' && view.processingConsentStatus === 'granted',
+    createIdentifier: dependencies.createIdentifier,
     save: (request) => { actor.send({ type: 'SAVE_RESUME', ...request }) },
     report: (request) => { actor.send({ type: 'REPORT_RESUME', ...request }) },
   }

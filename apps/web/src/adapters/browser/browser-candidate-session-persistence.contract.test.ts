@@ -83,12 +83,11 @@ describe('browser Candidate Session persistence', () => {
       resumePhoto: { dataUrl: 'data:text/html;base64,PHNjcmlwdD4=', name: 'portrait.png' } }],
     ['the previous flat document version', { ...candidateSession, version: 5 }],
     ['an incompatible version', { ...candidateSession, version: 999 }],
-    ['an invalid lifetime', { ...candidateSession, expiresAt: sessionStartedAt + (48 * 60 * 60 * 1_000) }],
   ])('discards %s', (_caseName, storedSession) => {
     const storage = createMemoryStorage({ initialValue: JSON.stringify(storedSession) })
     const persistence = createBrowserCandidateSessionPersistence({ storage })
 
-    const restored = persistence.restore({ now: sessionStartedAt })
+    const restored = persistence.restore()
 
     expect(restored).toEqual({ ok: true, value: { notice: 'incompatible-session-discarded', session: null } })
     expect(storage.getItem(candidateSessionStorageKey)).toBeNull()
@@ -111,7 +110,7 @@ describe('browser Candidate Session persistence', () => {
 
     persistence.save({ session: consentedCandidateSession })
 
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session: candidateSession } })
+    expect(persistence.restore()).toEqual({ ok: true, value: { notice: null, session: candidateSession } })
   })
 
   it.each([
@@ -125,7 +124,7 @@ describe('browser Candidate Session persistence', () => {
 
     persistence.save({ session: consentedCandidateSession })
 
-    expect(persistence.restore({ now: sessionStartedAt })).toEqual({ ok: true, value: { notice: null, session: consentedCandidateSession } })
+    expect(persistence.restore()).toEqual({ ok: true, value: { notice: null, session: consentedCandidateSession } })
   })
 
   it.each([
@@ -146,7 +145,7 @@ describe('browser Candidate Session persistence', () => {
         jobMatch: { ...jobMatchCandidateSession.jobMatch, analysis: storedAnalysis } }),
     }) })
 
-    const restored = persistence.restore({ now: sessionStartedAt })
+    const restored = persistence.restore()
 
     expect(restored).toEqual({ ok: true, value: { notice: null, session: jobMatchCandidateSession } })
   })
@@ -172,7 +171,7 @@ describe('browser Candidate Session persistence', () => {
     const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage({
       initialValue: JSON.stringify(preparingCandidateSession) }) })
 
-    const restored = persistence.restore({ now: sessionStartedAt })
+    const restored = persistence.restore()
 
     expect(restored).toEqual({ ok: true, value: { notice: null, session: preparingCandidateSession } })
   })
@@ -182,7 +181,7 @@ describe('browser Candidate Session persistence', () => {
 function roundTrip({ session }: Readonly<{ session: CandidateSession }>) {
   const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage() })
   persistence.save({ session })
-  return persistence.restore({ now: sessionStartedAt })
+  return persistence.restore()
 }
 
 const sourceIntakeCandidateSession = {

@@ -277,7 +277,7 @@ class CombinedIntakeSystem {
 
   expectDeletedSessionStaysAbsent() {
     expect(this.#outcome?.status).toBe('candidate-session-absent')
-    expect(this.#dependencies.persistence.restore({ now: this.#dependencies.now() }))
+    expect(this.#dependencies.persistence.restore())
       .toMatchObject({ ok: true, value: { session: null } })
   }
 
@@ -503,7 +503,7 @@ class CombinedIntakeSystem {
     expect(view?.processingConsentStatus).toBe('granted')
     expect(view?.session.processingConsent?.policy).toEqual(policy)
     expect(view?.session.tailoredResume).not.toBeNull()
-    expect(this.#dependencies.persistence.restore({ now: this.#dependencies.now() }))
+    expect(this.#dependencies.persistence.restore())
       .toMatchObject({ ok: true, value: { session: { processingConsent: { policy } } } })
   }
 

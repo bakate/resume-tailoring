@@ -111,7 +111,8 @@ function createSystemUnderTest() {
     now: () => 1000,
     persistence: createInMemoryCandidateSessionPersistence({ session }),
     // Without an assessLayout port, the journey measures layout through the renderer below.
-    resumeDocumentPorts: { proposeCondensation: createFakeResumeDocumentPorts().proposeCondensation },
+    resumeDocumentPorts: { condenseClaim: createFakeResumeDocumentPorts().condenseClaim,
+      validateClaim: () => Promise.resolve({ ok: true, value: { supported: true } }) },
     resumeDocumentRenderer: createFakeResumeDocumentRenderer({ render: (request) => {
       if (request.photoDataUrl !== undefined) return Promise.resolve({ pdf: null, assessment: {
         layout: { status: 'overflow', revision: request.draft.revision, pageCount: 3 },

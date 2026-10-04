@@ -15,7 +15,7 @@ export function hideResumeContent({ access, fieldId }: FieldRequest) {
   if (reference === undefined) return
   const editing = readResumeEditing({ session })
   const document = removeResumeField({ resume: session.tailoredResume, location: reference.location })
-  access.save({ baseRevision: editing.revision, correctionKind: 'resume-claim-removal', session: changedResumeSession({ session, document,
+  access.save({ baseRevision: editing.revision, correctionKind: 'resume-claim-removal', session: changedResumeSession({ session, document, revision: access.createIdentifier(),
     editing: { ...editing, hiddenFields: [...editing.hiddenFields, { field: reference.field, location: reference.location }] } }) })
 }
 
@@ -27,7 +27,7 @@ export function restoreResumeContent({ access, fieldId }: FieldRequest) {
   if (hiddenField === undefined) return
   const parent = restoreHiddenParent({ session, document: session.tailoredResume, location: hiddenField.location })
   const document = restoreResumeField({ resume: parent.document, hiddenField })
-  access.save({ baseRevision: editing.revision, session: changedResumeSession({ session, document,
+  access.save({ baseRevision: editing.revision, session: changedResumeSession({ session, document, revision: access.createIdentifier(),
     editing: { ...parent.editing, hiddenFields: editing.hiddenFields.filter(({ field }) => field.id !== fieldId) } }) })
 }
 
@@ -55,12 +55,12 @@ export function attestResumeField({ access, fieldId }: FieldRequest) {
   if (session?.tailoredResume === null || session === null || session.sourceIntake === null) return
   const reference = readResumeFields({ resume: session.tailoredResume }).find(({ field }) => field.id === fieldId)
   if (reference === undefined || reference.field.text.trim().length === 0) return
-  const fact: CandidateFact = { id: `source-fact-${crypto.randomUUID()}`, path: `tailored-resume.${fieldId}`,
+  const fact: CandidateFact = { id: `source-fact-${access.createIdentifier()}`, path: `tailored-resume.${fieldId}`,
     status: 'attested', value: reference.field.text }
   const document = updateResumeField({ resume: session.tailoredResume, location: reference.location,
     field: { ...reference.field, factIds: [fact.id] } })
   const editing = readResumeEditing({ session })
-  const next = changedResumeSession({ session, document, editing: { ...editing,
+  const next = changedResumeSession({ session, document, revision: access.createIdentifier(), editing: { ...editing,
     unsupportedFieldIds: editing.unsupportedFieldIds.filter((id) => id !== fieldId) } })
   access.save({ baseRevision: editing.revision, session: { ...next,
     resumeFactLocations: [...(session.resumeFactLocations ?? []), { factId: fact.id, location: reference.location }],
@@ -79,7 +79,7 @@ export function restoreSourceFact({ access, factId }: Readonly<{ access: ResumeE
   const existing = readResumeFields({ resume: container }).some(({ field }) => field.id === reference.field.id)
   const document = existing ? updateResumeField({ resume: container, ...reference })
     : restoreResumeField({ resume: container, hiddenField: reference })
-  access.save({ baseRevision: parent.editing.revision, session: changedResumeSession({ session, document,
+  access.save({ baseRevision: parent.editing.revision, session: changedResumeSession({ session, document, revision: access.createIdentifier(),
     editing: { ...parent.editing, hiddenFields: parent.editing.hiddenFields.filter(({ field }) => field.id !== reference.field.id),
       unsupportedFieldIds: parent.editing.unsupportedFieldIds.filter((id) => id !== reference.field.id) } }) })
 }
@@ -105,7 +105,7 @@ function ensureRestoreContainer({ document, original, location }: Readonly<{
 function saveDocument({ access, session, document, correctionKind }: Readonly<{
   access: ResumeEditingAccess; session: CandidateSession; document: TailoredResume; correctionKind?: 'resume-claim-reorder'
 }>) { access.save({ baseRevision: readResumeEditing({ session }).revision, correctionKind,
-  session: changedResumeSession({ session, document }) }) }
+  session: changedResumeSession({ session, document, revision: access.createIdentifier() }) }) }
 
 export function hideResumeEntry({ access, experienceId }: Readonly<{ access: ResumeEditingAccess; experienceId: string }>) {
   const session = access.readSession()
@@ -115,7 +115,7 @@ export function hideResumeEntry({ access, experienceId }: Readonly<{ access: Res
   const editing = readResumeEditing({ session })
   const document = { ...session.tailoredResume,
     experiences: session.tailoredResume.experiences.filter(({ id }) => id !== experienceId) }
-  access.save({ baseRevision: editing.revision, correctionKind: 'resume-claim-removal', session: changedResumeSession({ session, document,
+  access.save({ baseRevision: editing.revision, correctionKind: 'resume-claim-removal', session: changedResumeSession({ session, document, revision: access.createIdentifier(),
     editing: { ...editing, hiddenExperiences: [...(editing.hiddenExperiences ?? []), experience] } }) })
 }
 
@@ -126,7 +126,7 @@ export function restoreResumeEntry({ access, experienceId }: Readonly<{ access: 
   const experience = editing.hiddenExperiences?.find(({ id }) => id === experienceId)
   if (experience === undefined) return
   const document = { ...session.tailoredResume, experiences: [...session.tailoredResume.experiences, experience] }
-  access.save({ baseRevision: editing.revision, session: changedResumeSession({ session, document,
+  access.save({ baseRevision: editing.revision, session: changedResumeSession({ session, document, revision: access.createIdentifier(),
     editing: { ...editing, hiddenExperiences: editing.hiddenExperiences?.filter(({ id }) => id !== experienceId) } }) })
 }
 

@@ -23,7 +23,7 @@ describe('OpenAI explainable Job Match adapters', () => {
     })
   })
 
-  it('proposes evidence without accepting unknown references', async () => {
+  it('reads the proposal from Responses API output items', async () => {
     const matcher = createOpenAiJobMatchEvidenceMatcher({
       apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
       request: createRecordedRequest({ output: evidenceProposal, requests: [] }),
@@ -45,23 +45,6 @@ describe('OpenAI explainable Job Match adapters', () => {
     expect(result).toEqual({ ok: true, value: evidenceProposal })
   })
 
-  it('discards relevance that references an unknown Candidate Fact and keeps valid evidence', async () => {
-    const matcher = createOpenAiJobMatchEvidenceMatcher({
-      apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
-      request: createRecordedRequest({
-        output: { ...evidenceProposal, relevance: [{
-          factMatch: { ...evidenceProposal.relevance[0].factMatch, factId: 'source-fact-invented' },
-          requirementId: 'job-requirement-1',
-        }] },
-        requests: [],
-      }),
-    })
-
-    const result = await matcher.match(matchRequest)
-
-    expect(result).toEqual({ ok: true, value: { ...evidenceProposal, relevance: [] } })
-  })
-
   it('requests evidence excerpts per side without an exact-versus-controlled relationship', async () => {
     const requests: Request[] = []
     const matcher = createOpenAiJobMatchEvidenceMatcher({
@@ -76,73 +59,6 @@ describe('OpenAI explainable Job Match adapters', () => {
     expect(JSON.stringify(body.text.format.schema)).toContain('"factExcerpt"')
     expect(JSON.stringify(body.text.format.schema)).toContain('"requirementExcerpt"')
     expect(JSON.stringify(body.text.format.schema)).not.toContain('relationship')
-  })
-
-  it('accepts a reformulated capability quoted verbatim from both sides', async () => {
-    const reformulatedProposal = {
-      adjacentEvidence: [],
-      evidence: [{ coverage: 'covered', factMatches: [reformulatedFactMatch], requirementId: 'job-requirement-web' }],
-      relevance: [{ factMatch: reformulatedFactMatch, requirementId: 'job-requirement-web' }],
-    } as const
-    const matcher = createOpenAiJobMatchEvidenceMatcher({
-      apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
-      request: createRecordedRequest({ output: reformulatedProposal, requests: [] }),
-    })
-
-    const result = await matcher.match(fullStackMatchRequest)
-
-    expect(result).toEqual({ ok: true, value: reformulatedProposal })
-  })
-
-  it('discards only the proposals whose excerpts are not verbatim', async () => {
-    const matcher = createOpenAiJobMatchEvidenceMatcher({
-      apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
-      request: createRecordedRequest({
-        output: {
-          adjacentEvidence: [],
-          evidence: [
-            { coverage: 'covered', factMatches: [{ ...reformulatedFactMatch, factExcerpt: 'Angular applications' }],
-              requirementId: 'job-requirement-web' },
-            ...evidenceProposal.evidence,
-          ],
-          relevance: [
-            { factMatch: { ...reformulatedFactMatch, requirementExcerpt: 'mobile applications' },
-              requirementId: 'job-requirement-web' },
-            ...evidenceProposal.relevance,
-          ],
-        },
-        requests: [],
-      }),
-    })
-
-    const result = await matcher.match(fullStackMatchRequest)
-
-    expect(result).toEqual({ ok: true, value: evidenceProposal })
-  })
-
-  it('records how many proposed links survive sanitization without Candidate content', async () => {
-    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-    const matcher = createOpenAiJobMatchEvidenceMatcher({
-      apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
-      request: createRecordedRequest({
-        output: { ...evidenceProposal, relevance: [{
-          factMatch: { ...evidenceProposal.relevance[0].factMatch, factId: 'source-fact-invented' },
-          requirementId: 'job-requirement-1',
-        }] },
-        requests: [],
-      }),
-    })
-
-    await matcher.match(matchRequest)
-
-    const records = info.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
-    info.mockRestore()
-    expect(records).toContainEqual({
-      category: 'privacy-safe-openai-request', metric: 'sanitized', value: 1,
-      dimensions: { operation: 'explainable-match-evidence', proposedRelevance: 1, keptRelevance: 0,
-        proposedEvidence: evidenceProposal.evidence.length, keptEvidence: evidenceProposal.evidence.length,
-        proposedAdjacentEvidence: 0, keptAdjacentEvidence: 0 },
-    })
   })
 
   it('requests Adjacent Evidence with one verbatim excerpt per Candidate Fact', async () => {
@@ -167,36 +83,22 @@ describe('OpenAI explainable Job Match adapters', () => {
     expect(body.input[0]?.content[0]?.text).toContain('adjacentEvidence')
   })
 
-  it('keeps structurally valid Adjacent Evidence and discards a fabricated excerpt', async () => {
+  it('returns unverified proposals for the matching engine to judge', async () => {
     const matcher = createOpenAiJobMatchEvidenceMatcher({
       apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
-      request: createRecordedRequest({
-        output: { ...adjacentStackProposal, adjacentEvidence: [
-          { factMatches: [{ factExcerpt: 'Angular', factId: 'source-fact-react' }],
-            requirementId: 'job-requirement-java-stack' },
-          ...adjacentStackProposal.adjacentEvidence,
-        ] },
-        requests: [],
-      }),
+      request: createRecordedRequest({ output: fabricatedProposal, requests: [] }),
     })
 
     const result = await matcher.match(adjacentStackMatchRequest)
 
-    expect(result).toEqual({ ok: true, value: adjacentStackProposal })
+    expect(result).toEqual({ ok: true, value: fabricatedProposal })
   })
 
-  it('records proposed and kept Adjacent Evidence counts without Candidate content', async () => {
+  it('records how many links the model proposed without Candidate content', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     const matcher = createOpenAiJobMatchEvidenceMatcher({
       apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low',
-      request: createRecordedRequest({
-        output: { ...adjacentStackProposal, adjacentEvidence: [
-          ...adjacentStackProposal.adjacentEvidence,
-          { factMatches: [{ factExcerpt: 'React', factId: 'source-fact-invented' }],
-            requirementId: 'job-requirement-java-stack' },
-        ] },
-        requests: [],
-      }),
+      request: createRecordedRequest({ output: fabricatedProposal, requests: [] }),
     })
 
     await matcher.match(adjacentStackMatchRequest)
@@ -204,11 +106,11 @@ describe('OpenAI explainable Job Match adapters', () => {
     const lines = info.mock.calls.map(([line]) => String(line))
     info.mockRestore()
     expect(lines.map((line) => JSON.parse(line) as Record<string, unknown>)).toContainEqual({
-      category: 'privacy-safe-openai-request', metric: 'sanitized', value: 1,
-      dimensions: { operation: 'explainable-match-evidence', proposedRelevance: 0, keptRelevance: 0,
-        proposedEvidence: 0, keptEvidence: 0, proposedAdjacentEvidence: 2, keptAdjacentEvidence: 1 },
+      category: 'privacy-safe-openai-request', metric: 'accepted', value: 1,
+      dimensions: { operation: 'explainable-match-evidence', proposedRelevance: 1, proposedEvidence: 0,
+        proposedAdjacentEvidence: 2 },
     })
-    expect(lines.join('\n')).not.toMatch(/React|TypeScript|Java/u)
+    expect(lines.join('\n')).not.toMatch(/React|TypeScript|Java|Angular/u)
   })
 
   it('returns a typed failure before sending an oversized matching request', async () => {
@@ -293,28 +195,6 @@ const evidenceProposal = {
   }],
 } as const
 
-const fullStackMatchRequest = {
-  candidateFacts: [
-    ...matchRequest.candidateFacts,
-    { id: 'source-fact-2', kind: 'experience', value: 'Built end-to-end Next.js applications for 40 clients' },
-  ],
-  requirements: [...matchRequest.requirements, {
-    ...matchRequest.requirements[0],
-    capability: { dimension: 'execution', name: 'Web application development' },
-    id: 'job-requirement-web' as const,
-    importance: 'central',
-    importanceRationale: 'The posting lists it among the main duties.',
-    sourceExcerpt: 'Design, build and maintain web applications.',
-    value: 'Design, build and maintain web applications',
-  }],
-} as const
-
-const reformulatedFactMatch = {
-  factExcerpt: 'end-to-end Next.js applications',
-  factId: 'source-fact-2',
-  requirementExcerpt: 'build and maintain web applications',
-} as const
-
 const adjacentStackMatchRequest = {
   candidateFacts: [
     { id: 'source-fact-react', kind: 'experience', value: 'Built customer dashboards with React and TypeScript' },
@@ -336,4 +216,16 @@ const adjacentStackProposal = {
   }],
   evidence: [],
   relevance: [],
+} as const
+
+const fabricatedProposal = {
+  adjacentEvidence: [
+    ...adjacentStackProposal.adjacentEvidence,
+    { factMatches: [{ factExcerpt: 'Angular', factId: 'source-fact-invented' }], requirementId: 'job-requirement-java-stack' },
+  ],
+  evidence: [],
+  relevance: [{
+    factMatch: { factExcerpt: 'Angular', factId: 'source-fact-react', requirementExcerpt: 'Angular' },
+    requirementId: 'job-requirement-java-stack',
+  }],
 } as const

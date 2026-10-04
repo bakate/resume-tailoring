@@ -11,15 +11,15 @@ import {
 
 describe('resume matching engine', () => {
   it.each([
-    { expectedEligibility: 'denied', relevantFactIds: [] },
-    { expectedEligibility: 'eligible', relevantFactIds: ['fact-typescript'] },
+    { expectedEligibility: 'denied', proposedRelevance: [] },
+    { expectedEligibility: 'eligible', proposedRelevance: [typeScriptRelevance] },
   ] as const)('keeps Generation Eligibility $expectedEligibility at a zero Match Score', ({
-    expectedEligibility, relevantFactIds,
+    expectedEligibility, proposedRelevance,
   }) => {
     const result = analyzeResumeMatch({
       candidateFacts,
       proposedEvidence: [],
-      relevantFactIds,
+      proposedRelevance,
       requirements,
     })
 
@@ -157,7 +157,6 @@ describe('resume matching engine', () => {
       proposedEvidence: [createEvidence({
         coverage: 'covered', factExcerpt, factId: fact.id, requirementExcerpt, requirementId: 'requirement-trap',
       })],
-      relevantFactIds: [],
       requirements: [createRoleNeutralRequirement({
         capabilityName: requirementExcerpt, requirementId: 'requirement-trap', term: requirementValue,
       })],
@@ -181,7 +180,6 @@ describe('resume matching engine', () => {
         coverage: 'covered', factExcerpt: 'TypeScript', factId: 'fact-typescript',
         requirementExcerpt: 'TypeScript', requirementId: 'requirement-typescript',
       })],
-      relevantFactIds: ['fact-typescript'],
       requirements: [{ ...requirements[0], value: requirementValue }],
     })
 
@@ -200,7 +198,6 @@ describe('resume matching engine', () => {
         coverage: 'covered', factExcerpt: 'TypeScript engineering as staff engineer', factId: 'fact-typescript',
         requirementExcerpt: 'TypeScript engineering', requirementId: 'requirement-typescript',
       })],
-      relevantFactIds: ['fact-typescript'],
       requirements: [{ ...requirements[0], value: 'Senior TypeScript engineering' }],
     })
 
@@ -216,7 +213,6 @@ describe('resume matching engine', () => {
         coverage: 'partially-covered', factExcerpt: 'Coordinated weekly releases with product managers',
         factId: 'fact-delivery', requirementExcerpt: 'stakeholder communication', requirementId: 'requirement-communication',
       })],
-      relevantFactIds: [],
       requirements: [createRoleNeutralRequirement({
         capabilityName: 'Stakeholder communication', requirementId: 'requirement-communication',
         term: 'Strong stakeholder communication',
@@ -256,7 +252,6 @@ describe('resume matching engine', () => {
         coverage: 'covered', factExcerpt, factId: 'fact-web',
         requirementExcerpt: 'web application', requirementId: 'requirement-web',
       })],
-      relevantFactIds: [],
       requirements: [createRoleNeutralRequirement({
         capabilityName: 'Web application development', requirementId: 'requirement-web', term: requirementValue,
       })],
@@ -295,7 +290,6 @@ describe('resume matching engine', () => {
         coverage: 'covered', factExcerpt, factId: 'fact-quantity',
         requirementExcerpt, requirementId: 'requirement-quantity',
       })],
-      relevantFactIds: [],
       requirements: [createRoleNeutralRequirement({
         capabilityName: requirementExcerpt, requirementId: 'requirement-quantity', term: requirementValue,
       })],
@@ -306,10 +300,23 @@ describe('resume matching engine', () => {
     expect(result.value.evidence).toMatchObject([{ coverage: 'covered', factIds: ['fact-quantity'] }])
   })
 
+  it('discards a relevance proposal whose excerpt its Candidate Fact does not contain', () => {
+    const result = analyzeResumeMatch({
+      candidateFacts,
+      proposedEvidence: [],
+      proposedRelevance: [{ ...typeScriptRelevance, factMatch: { ...typeScriptRelevance.factMatch, factExcerpt: 'Rust' } }],
+      requirements,
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toMatchObject({ generationEligibility: 'denied', relevantFactIds: [] })
+  })
+
   it('ignores duplicate relevant Candidate Facts instead of rejecting the Match Analysis', () => {
     const result = analyzeResumeMatch({
       ...weightedMatchInputs,
-      relevantFactIds: ['fact-typescript', 'fact-typescript'],
+      proposedRelevance: [typeScriptRelevance, typeScriptRelevance],
     })
 
     expect(result.ok).toBe(true)
@@ -603,10 +610,14 @@ const coveredTypeScriptEvidence = createEvidence({
   term: 'TypeScript',
 })
 
+const typeScriptRelevance = {
+  factMatch: { factExcerpt: 'TypeScript', factId: 'fact-typescript', requirementExcerpt: 'TypeScript' },
+  requirementId: 'requirement-typescript',
+} as const
+
 const weightedMatchInputs = {
   candidateFacts,
   proposedEvidence: [coveredTypeScriptEvidence],
-  relevantFactIds: ['fact-typescript'],
   requirements,
 } as const satisfies MatchInputs
 
@@ -639,7 +650,6 @@ const strategyMatchInputs = {
     requirementId: 'requirement-strategy',
     term: 'strategy',
   })],
-  relevantFactIds: ['fact-strategy'],
   requirements: [{
     capability: { dimension: 'strategy', name: 'Strategy' },
     id: 'requirement-strategy',
@@ -657,7 +667,6 @@ const crossDimensionSubstituteInputs = {
     requirementId: 'requirement-degree',
     term: 'Master of Science',
   })],
-  relevantFactIds: ['fact-degree'],
   requirements: [
     {
       capability: { dimension: 'technical-expertise', name: 'Master of Science' },
@@ -701,7 +710,6 @@ const allComplementaryInputs = {
     requirementId: 'requirement-french',
     term: 'French',
   })],
-  relevantFactIds: ['fact-french'],
   requirements: [requirements[1]],
 } as const satisfies MatchInputs
 
@@ -718,7 +726,6 @@ const reformulatedCapabilityInputs = {
     requirementExcerpt: 'design, build and maintain web applications',
     requirementId: 'requirement-web-applications',
   })],
-  relevantFactIds: [],
   requirements: [{
     capability: { dimension: 'execution', name: 'Web application development' },
     id: 'requirement-web-applications',
@@ -731,7 +738,6 @@ const reformulatedCapabilityInputs = {
 const translatedLanguageInputs = {
   candidateFacts: [{ id: 'fact-french', kind: 'language', value: 'Français courant' }],
   proposedEvidence: [],
-  relevantFactIds: [],
   requirements: [requirements[1]],
 } as const satisfies MatchInputs
 
@@ -751,7 +757,6 @@ const criticalTypeScriptRequirement = {
 const incompleteFullCoverageInputs = {
   candidateFacts: limitedTypeScriptFacts,
   proposedEvidence: [coveredTypeScriptEvidence],
-  relevantFactIds: ['fact-typescript'],
   requirements: [criticalTypeScriptRequirement],
 } as const satisfies MatchInputs
 
@@ -787,7 +792,6 @@ const adjacentStackInputs = {
     { id: 'fact-frontend-title', kind: 'experience', value: 'Frontend Developer at Acme' },
   ],
   proposedEvidence: [],
-  relevantFactIds: [],
   requirements: [{
     capability: { dimension: 'technical-expertise', name: 'Java, JEE and Angular' },
     id: 'requirement-java-stack',
@@ -841,7 +845,6 @@ function createRoleNeutralExperienceInputs({ capabilityName, factValue, term }: 
       requirementId,
       term,
     })],
-    relevantFactIds: [factId],
     requirements: [createRoleNeutralRequirement({ capabilityName, requirementId, term })],
   }
 }

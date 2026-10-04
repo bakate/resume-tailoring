@@ -3,7 +3,6 @@ import {
   type CandidateFact,
   type JobRequirement,
   type RequirementCoverage,
-  validateRelevantFactProposals,
 } from '@resume-tailoring/matching-engine'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
@@ -47,9 +46,7 @@ async function evaluateCase({ evaluationCase }: Readonly<{ evaluationCase: Evalu
     candidateFacts: evaluationCase.candidateFacts,
     proposedAdjacentEvidence: result.value.adjacentEvidence,
     proposedEvidence: result.value.evidence,
-    relevantFactIds: validateRelevantFactProposals({
-      candidateFacts: evaluationCase.candidateFacts, proposals: result.value.relevance, requirements,
-    }),
+    proposedRelevance: result.value.relevance,
     requirements,
   })
   const coverageByRequirementId = new Map<string, RequirementCoverage>(analysis.ok

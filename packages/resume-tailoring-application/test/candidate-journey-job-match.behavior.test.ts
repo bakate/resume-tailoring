@@ -368,7 +368,7 @@ function createTestDependencies({
       onResumeWriting(input)
       return Promise.resolve({ ok: false, error: { type: 'permanent' } })
     } }),
-    createSessionId: () => '00000000-0000-4000-8000-000000000042',
+    createIdentifier: () => '00000000-0000-4000-8000-000000000042',
     jobPostingExtractor: createFakeJobPostingExtractor({ extract: () => Promise.resolve({ ok: true, value: readExtraction() }) }),
     languageModelGateway: createFakeLanguageModelGateway({ processingPolicy }),
     matchEvidenceMatcher: createFakeMatchEvidenceMatcher({ match: (request) => {

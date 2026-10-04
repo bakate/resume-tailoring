@@ -1,6 +1,11 @@
-import type { ResumeDraft, ResumeLayoutOutcome, ResumeProposalDecision } from './structured-resume-contract'
+import type { CandidateFact } from '@resume-tailoring/domain/source-intake'
+import { readCondensableResumeFields, replaceCondensableResumeFields } from '@resume-tailoring/domain/tailored-resume'
+import type { TailoredResumeField } from '@resume-tailoring/domain/tailored-resume'
+import type { ProfessionalResumeDocument, ResumeCondensationOutcome, ResumeDraft, ResumeLayoutOutcome,
+  ResumeProposalDecision } from './structured-resume-contract'
+import { condenseResumeField } from './resume-claim-verification'
 import type { ResumeEditingAccess, ResumeReview } from './resume-editing'
-import { changedResumeSession, consentRequired, professionalDocument,
+import { changedResumeSession, consentRequired, professionalDocument, readModelFailure,
   reportFailure, staleResumeResult, unavailableResumeResult, unsupportedResumeResult } from './resume-editing'
 import { assessResumeExport } from './resume-export'
 import { readResumeFields } from './resume-field-editing'
@@ -34,14 +39,31 @@ export async function proposeResumeCondensation({ access, photoDataUrl }: Readon
   if (review.unsupportedFieldIds.length > 0) { reportFailure({ access, baseRevision, failure: unsupportedResumeResult }); return; }
   access.report({ baseRevision, review: { ...review, proposal: null, failure: null, operation: 'condensing' } })
   try {
-    const result = await access.ports.proposeCondensation?.({ baseRevision,
-      candidateFacts: session.sourceIntake?.candidateFacts ?? [], maximumPages: 2,
+    const result = await condenseDocument({ access, baseRevision, candidateFacts: session.sourceIntake?.candidateFacts ?? [],
       document: professionalDocument({ document: review.draft.document }) })
     if (access.readReview()?.draft.revision !== baseRevision) return
-    if (result?.status !== 'proposed') { reportFailure({ access, baseRevision,
-      failure: result?.status === 'failed' ? result : unavailableResumeResult }); return; }
+    if (result.status !== 'proposed') { reportFailure({ access, baseRevision, failure: result }); return; }
     await publishProposal({ access, review, proposal: result.proposal, photoDataUrl })
   } catch { reportFailure({ access, baseRevision, failure: unavailableResumeResult }) }
+}
+
+/** Shortens each condensable field on its own; one field that cannot be faithfully shortened rejects the proposal. */
+async function condenseDocument({ access, baseRevision, candidateFacts, document }: Readonly<{
+  access: ResumeEditingAccess; baseRevision: string; candidateFacts: readonly CandidateFact[]; document: ProfessionalResumeDocument
+}>): Promise<ResumeCondensationOutcome> {
+  const { validateClaim, condenseClaim } = access.ports
+  if (validateClaim === undefined || condenseClaim === undefined) return unavailableResumeResult
+  const replacements = new Map<string, TailoredResumeField>()
+  for (const field of readCondensableResumeFields({ resume: document })) {
+    const result = await condenseResumeField({ models: { validateClaim, condenseClaim }, candidateFacts, field,
+      locale: document.locale })
+    if (result.status === 'failed') return readModelFailure({ error: result.error })
+    if (result.status === 'unsupported') return unsupportedResumeResult
+    replacements.set(field.id, result.field)
+  }
+  return { status: 'proposed', proposal: { id: access.createIdentifier(), baseRevision,
+    document: replaceCondensableResumeFields({ resume: document, replacements }),
+    layout: { status: 'unavailable', revision: baseRevision } } }
 }
 
 async function publishProposal({ access, review, proposal, photoDataUrl }: Readonly<{
@@ -74,7 +96,7 @@ export function acceptResumeCondensation({ access, decision }: Readonly<{
     reportFailure({ access, baseRevision: review.draft.revision, failure: staleResumeResult }); return;
   }
   const document = { ...proposal.document, identity: review.draft.document.identity, contactDetails: review.draft.document.contactDetails }
-  access.save({ baseRevision: review.draft.revision, correctionKind: 'resume-claim-reformulation', session: changedResumeSession({ session, document }) })
+  access.save({ baseRevision: review.draft.revision, correctionKind: 'resume-claim-reformulation', session: changedResumeSession({ session, document, revision: access.createIdentifier() }) })
 }
 
 export function rejectResumeCondensation({ access, decision }: Readonly<{

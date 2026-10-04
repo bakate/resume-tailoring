@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
+import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourney, CandidateSession } from '@resume-tailoring/application/candidate-journey'
 import { readGroupedResumeSection, structuredResumeJobMatch } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createFakeCandidateJourneyDependencies, createFakeMatchEvidenceMatcher, createFakeResumeSectionModels,
@@ -253,13 +253,14 @@ const candidateContent = ['Northwind', 'billing', 'React', 'Frontend', 'Alex', '
 function createDependencies({ options, telemetry }: Readonly<{
   options: TestOptions; telemetry: CandidateJourneyDependencies['telemetry']
 }>): CandidateJourneyDependencies {
-  const startedAt = Date.now()
-  // Expires a millisecond after the journey restores it.
-  const session: CandidateSession | null = options.session === 'expiring' ? { expiresAt: startedAt + 1, startedAt,
+  const now = Date.now()
+  // Started almost 24 hours ago, so it expires a millisecond after the journey restores it.
+  const startedAt = now - candidateSessionDurationMilliseconds + 1
+  const session: CandidateSession | null = options.session === 'expiring' ? { expiresAt: now + 1, startedAt,
     sessionId: 'candidate-session-00000000-0000-4000-8000-000000000060', version: candidateSessionStorageVersion,
     phase: 'source-intake', processingConsent: null, sourceIntake: null, jobMatch: null, tailoredResume: null } : null
   return createFakeCandidateJourneyDependencies({
-    now: () => startedAt,
+    now: () => now,
     telemetry,
     persistence: createInMemoryCandidateSessionPersistence({ session }),
     matchEvidenceMatcher: createFakeMatchEvidenceMatcher(options.correspondence === 'none'

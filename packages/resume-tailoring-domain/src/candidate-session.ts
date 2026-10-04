@@ -42,6 +42,14 @@ export function hasValidCandidateSessionLifetime({ session }: Readonly<{
   return session.expiresAt === session.startedAt + candidateSessionDurationMilliseconds
 }
 
+/** A Candidate Session ends at its expiry instant: from then on it can no longer be reused. */
+export function isCandidateSessionExpired({ session, now }: Readonly<{
+  session: Pick<CandidateSession, 'expiresAt'>
+  now: number
+}>) {
+  return session.expiresAt <= now
+}
+
 export type StoredIntakeDocument = Readonly<{ data: string; mediaType: string; name: string }>
 
 export type ResumePreparation = Readonly<{
