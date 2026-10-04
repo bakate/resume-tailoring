@@ -28,6 +28,7 @@ RUN apt-get update \
   && apt-get install --yes --no-install-recommends \
     ca-certificates \
     chromium \
+    fonts-dejavu-core \
     fonts-liberation \
     fonts-noto-color-emoji \
   && rm -rf /var/lib/apt/lists/*

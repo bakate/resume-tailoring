@@ -100,6 +100,16 @@ describe('structured resume PDF rendering boundary', () => {
     } finally { await loading.destroy() }
   }, 20_000)
 
+  it.each(unusualCharacters)('exports a document whose text contains %s', async (_case, text) => {
+    const result = await renderResumeDocument({ draft: { revision: 'invisible', document: {
+      ...groupedResumeDocument, valueProposition: { kind: 'prose', paragraphs: [{ id: 'summary', text,
+        factIds: ['source-fact-experiences-0-achievements-0'] }] },
+    } }, unsupportedFieldIds: [] })
+
+    expect(result.assessment.layout).toMatchObject({ status: 'fits' })
+    expect(result.pdf).not.toBeNull()
+  }, 20_000)
+
   it('reports rendering failure for an unreadable photo and preserves the draft', async () => {
     const request = { draft: { document: groupedResumeDocument, revision: 'photo-failure' },
       unsupportedFieldIds: [], photoDataUrl: 'data:image/png;base64,YnJva2Vu' }
@@ -125,6 +135,10 @@ describe('structured resume PDF rendering boundary', () => {
   }, 20_000)
 })
 
+
+/** Text extracted from a PDF Source Document often carries invisible characters that a PDF never prints. */
+const unusualCharacters = [['a soft hyphen', 'acces\u00adsible'], ['a zero-width space', 'billing\u200bscreens'],
+  ['bullets and symbols', '● Built ✓ screens ★ → ≥ 90 %']] as const
 
 function denseRequest({ count }: Readonly<{ count: number }>) {
   return { draft: { revision: 'dense', document: { ...groupedResumeDocument,
