@@ -1,6 +1,6 @@
 import { groupedResumeDocument, resumeContractRevision } from '@resume-tailoring/application/structured-resume-fixtures'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 
 import { renderResumeDocument } from './resume-document-renderer'
 
@@ -109,6 +109,19 @@ describe('structured resume PDF rendering boundary', () => {
     expect(result.assessment.layout).toEqual({ status: 'unavailable', revision: 'photo-failure' })
     expect(result.pdf).toBeNull()
     expect(request.draft.document).toEqual(groupedResumeDocument)
+  }, 20_000)
+
+  it('records which rendering stage failed without recording candidate content', async () => {
+    const log = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    onTestFinished(() => { log.mockRestore() })
+
+    await renderResumeDocument({ draft: { document: groupedResumeDocument, revision: 'photo-failure' },
+      unsupportedFieldIds: [], photoDataUrl: 'data:image/png;base64,YnJva2Vu' })
+
+    const records = log.mock.calls.map(([line]) => JSON.parse(String(line)) as unknown)
+    expect(records).toContainEqual({ category: 'privacy-safe-resume-render', metric: 'unavailable', value: 1,
+      dimensions: { stage: 'photo' } })
+    expect(JSON.stringify(log.mock.calls)).not.toContain('Alex Morgan')
   }, 20_000)
 })
 
