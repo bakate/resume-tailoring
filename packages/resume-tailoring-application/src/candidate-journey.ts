@@ -1122,8 +1122,9 @@ async function requestResumeRendering({ actor, input }: Readonly<{
   const rendering = actor.getSnapshot().context.resumeRendering
   if (rendering === null) return unavailableResumeRender({ ...input, draft: { document: input.document, revision: 'unavailable' } })
   try {
+    // No timeout of its own: the renderer bounds a render, cold start and retry included, and always settles.
     const snapshot = await waitFor(actor, (current) => current.context.resumeRendering?.sequence !== rendering.sequence
-      || current.context.resumeRendering.result !== null, { timeout: 60_000 })
+      || current.context.resumeRendering.result !== null)
     const completed = snapshot.context.resumeRendering
     return completed?.sequence === rendering.sequence && completed.result !== null
       ? completed.result : staleResumeRendering({ request: rendering.request })

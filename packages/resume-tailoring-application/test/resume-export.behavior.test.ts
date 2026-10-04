@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney, unavailableResumeRender } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateSession, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import { groupedResumeDocument, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
@@ -6,6 +6,8 @@ import { createFakeCandidateJourneyDependencies, createFakeResumeDocumentPorts, 
   createInMemoryCandidateSessionPersistence } from '@resume-tailoring/application/testing'
 
 describe('Candidate Journey document rendering', () => {
+  afterEach(() => { vi.useRealTimers() })
+
   it('rejects a late layout when a newer draft was requested', async () => {
     const system = createSystemUnderTest()
     await system.givenAnOlderDraftIsRendering()
@@ -88,6 +90,15 @@ describe('Candidate Journey document rendering', () => {
     system.expectPhotoIncludedInProposalLayout()
   })
 
+  it('waits for a render that outlasts a cold server start and its retry', async () => {
+    const system = createSystemUnderTest()
+    await system.givenRenderingTakesTwoMinutes()
+
+    await system.renderCurrentDraftWhileTimePasses()
+
+    system.expectCurrentDraftCanBeExported()
+  })
+
   it('preserves the source and draft when rendering fails', async () => {
     const system = createSystemUnderTest()
     await system.givenRenderingIsUnavailable()
@@ -105,6 +116,7 @@ function createSystemUnderTest() {
   let previousResult: ResumeRenderResult | undefined
   let initialRevision: string | undefined
   let unavailable = false
+  let slow = false
   const session = createSession()
   const renderer = createFakeResumeDocumentRenderer()
   const journey = createCandidateJourney({ dependencies: createFakeCandidateJourneyDependencies({
@@ -119,6 +131,7 @@ function createSystemUnderTest() {
         exportEligibility: { status: 'blocked', revision: request.draft.revision, reasons: ['overflow'] },
       } })
       if (request.draft.document.identity?.value === 'Old Alex') return new Promise((resolve) => { settlePrevious = resolve })
+      if (slow) return new Promise((resolve) => { setTimeout(() => { resolve(renderer.render(request)) }, slowRenderMilliseconds) })
       return unavailable ? Promise.resolve(unavailableResumeRender(request)) : renderer.render(request)
     } }),
   }) })
@@ -184,6 +197,12 @@ function createSystemUnderTest() {
       expect(result?.assessment.layout.revision).toBe(initialRevision)
     },
     givenRenderingIsUnavailable: async () => { unavailable = true; await start() },
+    givenRenderingTakesTwoMinutes: async () => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }); slow = true; await start() },
+    renderCurrentDraftWhileTimePasses: async () => {
+      const rendering = journey.renderResumeDocument({ document: groupedResumeDocument, unsupportedFieldIds: [] })
+      await vi.advanceTimersByTimeAsync(slowRenderMilliseconds)
+      result = await rendering
+    },
     renderCurrentDraft: async () => {
       result = await journey.renderResumeDocument({ document: groupedResumeDocument, unsupportedFieldIds: [] })
       settlePrevious?.(successfulResult({ revision: 'old' }))
@@ -203,6 +222,11 @@ function createSystemUnderTest() {
       expect(previousResult?.pdf).toBeNull()
       expect(previousResult?.assessment.exportEligibility).toMatchObject({ status: 'blocked', reasons: ['stale-layout'] })
     },
+    expectCurrentDraftCanBeExported: () => {
+      expect(result, 'renderCurrentDraftWhileTimePasses must run first').toBeDefined()
+      expect(result?.pdf).not.toBeNull()
+      expect(result?.assessment.exportEligibility.status).toBe('eligible')
+    },
     expectDraftPreservedForRetry: () => {
       expect(result, 'renderCurrentDraft must run first').toBeDefined()
       expect(result?.assessment.layout.status).toBe('unavailable')
@@ -211,6 +235,9 @@ function createSystemUnderTest() {
     },
   }
 }
+
+/** A cold server render that times out once and is retried, both within the browser adapter's limits. */
+const slowRenderMilliseconds = 120_000
 
 function successfulResult({ revision }: Readonly<{ revision: string }>): ResumeRenderResult {
   return { assessment: { layout: { status: 'fits', revision, pageCount: 1 },
