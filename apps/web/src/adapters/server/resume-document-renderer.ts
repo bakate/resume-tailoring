@@ -1,6 +1,9 @@
 import { assessResumeExport, unavailableResumeRender } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeRenderRequest, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+// The server bundle inlines pdfjs without its worker file, so its fake worker cannot load it by relative path.
+// Importing the worker sets globalThis.pdfjsWorker, which pdfjs uses in place of that import.
+import 'pdfjs-dist/legacy/build/pdf.worker.mjs'
 import puppeteer from 'puppeteer'
 import type { Browser, Page } from 'puppeteer'
 import { hasA4Dimensions, hasExpectedEmbeddedFonts, hasExpectedPdfTextInReadingOrder } from './resume-pdf-verification'
