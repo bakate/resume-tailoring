@@ -1,12 +1,14 @@
 import { readResumeRecovery } from './resume-recovery-view'
 import type { PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
 import type { CandidateSession } from '@resume-tailoring/domain/candidate-session'
-import type { ResumeEditingState, TailoredResume } from '@resume-tailoring/domain/tailored-resume'
+import type { ResumeEditingState, TailoredResume, TailoredResumeField } from '@resume-tailoring/domain/tailored-resume'
 import type { ProfessionalResumeDocument, ResumeDocumentReview,
   ResumeOperationFailure, ResumeSectionChange } from './structured-resume-contract'
 import { assessResumeExport } from './resume-export'
 import { readResumeFields, updateResumeField } from './resume-field-editing'
-import type { ResumeDocumentPorts } from './ports'
+import type { CandidateFact } from '@resume-tailoring/domain/source-intake'
+import type { ResumeClaimModelFailure, ResumeDocumentPorts } from './ports'
+import { verifyResumeField } from './resume-claim-verification'
 
 export type ResumeReview = ResumeDocumentReview & Readonly<{
   recovery: ReturnType<typeof readResumeRecovery>
@@ -22,6 +24,7 @@ export type ResumeEditingAccess = Readonly<{
   readReview: () => ResumeReview | null
   readSession: () => CandidateSession | null
   hasConsent: () => boolean
+  createIdentifier: () => string
   ports: Partial<ResumeDocumentPorts>
   save: (request: Readonly<{ session: CandidateSession; baseRevision: string; correctionKind?: ResumeCorrectionKind }>) => void
   report: (request: Readonly<{ baseRevision: string; review: ResumeReviewState }>) => void
@@ -32,11 +35,11 @@ export function readResumeEditing({ session }: Readonly<{ session: CandidateSess
     manuallyEdited: false, unsupportedFieldIds: [] }
 }
 
-export function changedResumeSession({ session, document, editing = readResumeEditing({ session }) }: Readonly<{
-  session: CandidateSession; document: TailoredResume; editing?: ResumeEditingState
+export function changedResumeSession({ session, document, revision, editing = readResumeEditing({ session }) }: Readonly<{
+  session: CandidateSession; document: TailoredResume; revision: string; editing?: ResumeEditingState
 }>): CandidateSession {
   return { ...session, tailoredResume: document,
-    resumeEditing: { ...editing, manuallyEdited: true, revision: crypto.randomUUID() } }
+    resumeEditing: { ...editing, manuallyEdited: true, revision } }
 }
 
 export function professionalDocument({ document }: Readonly<{ document: TailoredResume }>): ProfessionalResumeDocument {
@@ -106,63 +109,69 @@ export async function applyValidatedSectionChange({ access, change }: Readonly<{
   if (session?.tailoredResume === null || session === null) return
   const editing = readResumeEditing({ session })
   if (change.baseRevision !== editing.revision) { reportFailure({ access, baseRevision: editing.revision, failure: staleResumeResult }); return; }
-  const prepared = prepareSectionEdit({ session, document: session.tailoredResume, change })
+  const prepared = prepareSectionEdit({ session, document: session.tailoredResume, change, revision: access.createIdentifier() })
   access.save({ session: prepared.next, baseRevision: editing.revision })
-  if (prepared.changedFieldIds.length === 0) return
+  if (prepared.changedFields.length === 0) return
   const revision = readResumeEditing({ session: prepared.next }).revision
   if (access.readReview()?.draft.revision !== revision) return
   if (!access.hasConsent()) { reportFailure({ access, baseRevision: revision, failure: consentRequired }); return }
   access.report({ baseRevision: revision, review: { ...emptyResumeReview, operation: 'validating-section' } })
-  await validateChangedSection({ access, session: prepared.next, previousDocument: prepared.previousDocument, change, revision })
+  await validateChangedFields({ access, session: prepared.next, changedFields: prepared.changedFields, revision })
 }
 
-function prepareSectionEdit({ session, document, change }: Readonly<{
-  session: CandidateSession; document: TailoredResume; change: ResumeSectionChange
+function prepareSectionEdit({ session, document, change, revision }: Readonly<{
+  session: CandidateSession; document: TailoredResume; change: ResumeSectionChange; revision: string
 }>) {
   const editing = readResumeEditing({ session })
   const previousDocument = readResumeFields({ resume: document }).reduce((currentDocument, reference) =>
     editing.unsupportedFieldIds.includes(reference.field.id) ? updateResumeField({ resume: currentDocument,
       location: reference.location, field: { ...reference.field, text: '' } }) : currentDocument, document)
-  const changedFieldIds = readChangedSectionFields({ document: previousDocument, change }).map(({ field }) => field.id)
-  const unsupportedFieldIds = [...new Set([...editing.unsupportedFieldIds, ...changedFieldIds])]
-  return { previousDocument, changedFieldIds, next: changedResumeSession({ session,
+  const changedFields = readChangedSectionFields({ document: previousDocument, change }).map(({ field }) => field)
+  const unsupportedFieldIds = [...new Set([...editing.unsupportedFieldIds, ...changedFields.map(({ id }) => id)])]
+  return { changedFields, next: changedResumeSession({ session, revision,
     document: applySectionChange({ document, change }), editing: { ...editing, unsupportedFieldIds } }) }
 }
 
-async function validateChangedSection({ access, session, previousDocument, change, revision }: Readonly<{
-  access: ResumeEditingAccess; session: CandidateSession; previousDocument: TailoredResume; change: ResumeSectionChange; revision: string
+/** Only the fields whose value differs from the current draft are validated, each against its own attested facts. */
+async function validateChangedFields({ access, session, changedFields, revision }: Readonly<{
+  access: ResumeEditingAccess; session: CandidateSession; changedFields: readonly TailoredResumeField[]; revision: string
 }>) {
   try {
-    const result = await access.ports.validateSectionChange?.({ candidateFacts: session.sourceIntake?.candidateFacts ?? [],
-      currentDocument: professionalDocument({ document: previousDocument }), change })
+    const result = await verifyChangedFields({ access, changedFields,
+      candidateFacts: session.sourceIntake?.candidateFacts ?? [] })
     const current = access.readSession()
     if (current === null || readResumeEditing({ session: current }).revision !== revision) return
-    const changedIds = readChangedSectionFields({ document: previousDocument, change }).map(({ field }) => field.id)
-    applySectionValidation({ access, current, change, revision, changedIds, result })
+    if (result.status === 'failed') { reportFailure({ access, baseRevision: revision, failure: result }); return }
+    const changedIds = changedFields.map(({ id }) => id)
+    const editing = readResumeEditing({ session: current })
+    access.save({ baseRevision: revision, session: { ...current, resumeEditing: { ...editing,
+      unsupportedFieldIds: editing.unsupportedFieldIds.filter((id) => !changedIds.includes(id) || result.fieldIds.includes(id)) } } })
+    if (result.fieldIds.length > 0) reportFailure({ access, baseRevision: revision, failure: unsupportedResumeResult })
   } catch { reportFailure({ access, baseRevision: revision, failure: unavailableResumeResult }) }
 }
 
-function applySectionValidation({ access, current, change, revision, changedIds, result }: Readonly<{
-  access: ResumeEditingAccess; current: CandidateSession; change: ResumeSectionChange; revision: string
-  changedIds: readonly string[]; result: Awaited<ReturnType<ResumeDocumentPorts['validateSectionChange']>> | undefined
-}>) {
-  if (result?.status !== 'validated' && result?.status !== 'unsupported') {
-    reportFailure({ access, baseRevision: revision, failure: result?.status === 'failed' ? result : unsupportedResumeResult }); return
+async function verifyChangedFields({ access, candidateFacts, changedFields }: Readonly<{
+  access: ResumeEditingAccess; candidateFacts: readonly CandidateFact[]; changedFields: readonly TailoredResumeField[]
+}>): Promise<Readonly<{ status: 'verified'; fieldIds: readonly string[] }> | ResumeOperationFailure> {
+  const validateClaim = access.ports.validateClaim
+  if (validateClaim === undefined) return unsupportedResumeResult
+  const unsupportedFieldIds: string[] = []
+  for (const field of changedFields) {
+    const verification = await verifyResumeField({ models: { validateClaim }, candidateFacts, field })
+    if (verification.status === 'failed') return readModelFailure({ error: verification.error })
+    if (verification.status === 'unsupported') unsupportedFieldIds.push(field.id)
   }
-  const matchesRequest = result.status === 'validated' ? JSON.stringify(result.change) === JSON.stringify(change)
-    : result.baseRevision === change.baseRevision && result.fieldIds.length > 0 && result.fieldIds.every((id) => changedIds.includes(id))
-  if (!matchesRequest) { reportFailure({ access, baseRevision: revision, failure: staleResumeResult }); return }
-  const rejectedIds = result.status === 'unsupported' ? result.fieldIds : []
-  const editing = readResumeEditing({ session: current })
-  access.save({ baseRevision: revision, session: { ...current, resumeEditing: { ...editing,
-    unsupportedFieldIds: editing.unsupportedFieldIds.filter((id) => !changedIds.includes(id) || rejectedIds.includes(id)) } } })
-  if (result.status === 'unsupported') reportFailure({ access, baseRevision: revision, failure: unsupportedResumeResult })
+  return { status: 'verified', fieldIds: unsupportedFieldIds }
 }
 
 function readChangedSectionFields({ document, change }: Readonly<{ document: TailoredResume; change: ResumeSectionChange }>) {
   const currentFields = readResumeFields({ resume: document })
   return readResumeFields({ resume: applySectionChange({ document, change }) }).filter(({ field }) =>
     !currentFields.some((current) => JSON.stringify(current.field) === JSON.stringify(field)))
+}
+
+export function readModelFailure({ error }: Readonly<{ error: ResumeClaimModelFailure }>): ResumeOperationFailure {
+  return error === 'processing-consent-required' ? consentRequired : unavailableResumeResult
 }
 
 export function reportFailure({ access, baseRevision, failure }: Readonly<{

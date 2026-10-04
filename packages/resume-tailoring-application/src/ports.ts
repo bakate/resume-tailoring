@@ -7,7 +7,6 @@ import type { CandidateSession } from '@resume-tailoring/domain/candidate-sessio
 import type { JobRequirement } from '@resume-tailoring/domain/job-match'
 import type { ProcessingPolicy } from '@resume-tailoring/domain/processing-policy'
 import type { ResumeClaim } from '@resume-tailoring/domain/resume-claim'
-import type { CandidateFact } from '@resume-tailoring/domain/source-intake'
 import type { ExtractedJobPosting, JobPostingDocument, JobPostingDocumentFailure, MatchEvidenceProposal } from './job-match'
 import type { PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
 import type { ProposedResumeClaim, ResumeClaimValidationFeedback, ResumeClaimWritingInputs } from './resume-claims'
@@ -15,15 +14,14 @@ import type { ResumeRenderRequest, ResumeRenderResult } from './resume-export'
 import type { ResumeCoherenceInput, ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput,
   ResumeSectionContent, ResumeSectionModelResult, ResumeSectionWritingInput } from './resume-sections'
 import type { SourceDocument, SourceDocumentFailure, StructuredSourceProfileExtraction } from './source-intake'
-import type { ProfessionalResumeDocument, ResumeCondensationOutcome, ResumeDraft, ResumeLayoutAssessment,
-  ResumeSectionChange, ResumeSectionChangeOutcome } from './structured-resume-contract'
+import type { ResumeDraft, ResumeLayoutAssessment } from './structured-resume-contract'
 
 export type CandidateJourneyDependencies = Readonly<{
   resumeDocumentRenderer?: ResumeDocumentRenderer
   telemetry?: PrivacySafeTelemetry
   resumeDocumentPorts?: Partial<ResumeDocumentPorts>
   resumeSectionModels?: ResumeSectionModels
-  createSessionId: () => string
+  createIdentifier: () => string
   jobPostingDocumentReader: JobPostingDocumentReader
   jobPostingExtractor: JobPostingExtractor
   languageModelGateway: Readonly<{ processingPolicy: ProcessingPolicy }>
@@ -48,10 +46,12 @@ export type CandidateSessionStorageResult<TValue> =
   | Readonly<{ ok: true; value: TValue }>
   | Readonly<{ ok: false; error: CandidateSessionStorageFailure }>
 
+/** Stores one Candidate Session; the application decides whether a restored session is still valid. */
 export type CandidateSessionPersistence = Readonly<{
   delete: () => CandidateSessionStorageResult<null>
-  restore: (request: Readonly<{ now: number }>) => CandidateSessionStorageResult<Readonly<{
-    notice: CandidateSessionNotice
+  /** Returns the stored session, or discards a stored value that is no longer readable as one. */
+  restore: () => CandidateSessionStorageResult<Readonly<{
+    notice: Extract<CandidateSessionNotice, 'incompatible-session-discarded'> | null
     session: CandidateSession | null
   }>>
   save: (request: Readonly<{ session: CandidateSession }>) =>
@@ -122,23 +122,30 @@ export type ResumeCoherenceChecker = Readonly<{
   check: (input: ResumeCoherenceInput) => Promise<ResumeSectionModelResult<ResumeDocumentCoherence>>
 }>
 
+export type ResumeClaimModelFailure = 'processing-consent-required' | 'unavailable'
+
+export type ResumeClaimModelResult<TValue> =
+  | Readonly<{ ok: true; value: TValue }>
+  | Readonly<{ ok: false; error: ResumeClaimModelFailure }>
+
+/** Model operations on one Resume Claim; the application decides which claims to send and what the answers mean. */
 export type ResumeDocumentPorts = Readonly<{
-  validateSectionChange: (request: Readonly<{
-    candidateFacts: readonly CandidateFact[]
-    currentDocument: ProfessionalResumeDocument
-    change: ResumeSectionChange
-  }>) => Promise<ResumeSectionChangeOutcome>
+  /** Judges whether the claim's meaning is supported by the verified facts it is given. */
+  validateClaim: (request: Readonly<{
+    claim: ResumeClaim
+    verifiedFacts: ResumeClaimWritingInputs['verifiedFacts']
+  }>) => Promise<ResumeClaimModelResult<Readonly<{ supported: boolean }>>>
+  /** Proposes shorter wording for the claim, citing fact references as the model chooses. */
+  condenseClaim: (request: Readonly<{
+    claim: ProposedResumeClaim
+    locale: ResumeClaimWritingInputs['locale']
+    verifiedFacts: ResumeClaimWritingInputs['verifiedFacts']
+  }>) => Promise<ResumeClaimModelResult<ProposedResumeClaim>>
   assessLayout: (request: Readonly<{
     draft: ResumeDraft
     photoDataUrl?: string
     unsupportedFieldIds: readonly string[]
   }>) => Promise<ResumeLayoutAssessment>
-  proposeCondensation: (request: Readonly<{
-    baseRevision: string
-    candidateFacts: readonly CandidateFact[]
-    document: ProfessionalResumeDocument
-    maximumPages: 2
-  }>) => Promise<ResumeCondensationOutcome>
 }>
 
 export type ResumeClaimReformulator = Readonly<{

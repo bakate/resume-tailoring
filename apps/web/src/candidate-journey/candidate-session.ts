@@ -4,7 +4,6 @@ import { z } from 'zod'
 import {
   candidateJourneyPhases,
   candidateSessionStorageVersion,
-  hasValidCandidateSessionLifetime,
 } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateSession } from '@resume-tailoring/application/candidate-journey'
 import { structuredSourceProfileSchema } from './structured-source-profile-schema'
@@ -208,7 +207,4 @@ export const candidateSessionSchema = z.strictObject({
   resumePhoto: z.strictObject({ dataUrl: z.string().regex(/^data:image\/(?:png|jpeg|webp);base64,/u), name: z.string() }).optional(),
   startedAt: z.number().int().nonnegative(),
   version: z.literal(candidateSessionStorageVersion),
-}).refine(
-  (session) => hasValidCandidateSessionLifetime({ session }),
-  { message: 'Candidate Session lifetime must be exactly 24 hours' },
-)
+})

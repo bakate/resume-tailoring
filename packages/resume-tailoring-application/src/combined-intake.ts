@@ -70,7 +70,7 @@ function createPreparation({ dependencies, request, session }: Readonly<{
   const sourceIntake = request.sourceDocument === undefined
     ? previous?.revision === session.preparedResumeRevision ? session.sourceIntake : previous?.sourceIntake ?? session.sourceIntake : null
   return {
-    revision: `${session.sessionId}:${dependencies.createSessionId()}`, status: 'pending', failure: null,
+    revision: `${session.sessionId}:${dependencies.createIdentifier()}`, status: 'pending', failure: null,
     sourceDocument: request.sourceDocument === undefined ? previous?.sourceDocument ?? null : storeDocument(request.sourceDocument),
     jobPosting: request.jobPosting === undefined ? previous?.jobPosting ?? null : storeDocument(request.jobPosting),
     locale, purpose, sourceIntake: correctSource({ sourceIntake, correction: request.correction }),

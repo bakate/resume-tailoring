@@ -27,15 +27,12 @@ export function createBrowserCandidateSessionPersistence({ storage, page }: Read
   for (const event of stayingEvents) page?.addEventListener(event, () => { leaving = false })
   return {
     delete: () => deleteCandidateSession({ storage }),
-    restore: ({ now }) => restoreCandidateSession({ now, storage }),
+    restore: () => restoreCandidateSession({ storage }),
     save: ({ session }) => leaving ? { ok: true, value: session } : saveCandidateSession({ session, storage }),
   }
 }
 
-function restoreCandidateSession({ now, storage }: Readonly<{
-  now: number
-  storage: BrowserStorage
-}>) {
+function restoreCandidateSession({ storage }: Readonly<{ storage: BrowserStorage }>) {
   return withBrowserStorage({ operation: () => {
     const serializedSession = storage.getItem(candidateSessionStorageKey)
     if (serializedSession === null) {
@@ -46,11 +43,7 @@ function restoreCandidateSession({ now, storage }: Readonly<{
       storage.removeItem(candidateSessionStorageKey)
       return { notice: 'incompatible-session-discarded', session: null } as const
     }
-    if (parsedSession.data.expiresAt > now) {
-      return { notice: null, session: parsedSession.data } as const
-    }
-    storage.removeItem(candidateSessionStorageKey)
-    return { notice: 'expired-session-discarded', session: null } as const
+    return { notice: null, session: parsedSession.data } as const
   } })
 }
 

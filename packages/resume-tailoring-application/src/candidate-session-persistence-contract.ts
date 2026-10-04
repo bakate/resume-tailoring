@@ -26,7 +26,7 @@ export function describeCandidateSessionPersistenceContract({ name, createPersis
     it('restores no Candidate Session when none is stored', () => {
       const persistence = createPersistence({ storedSession: null, storageAvailable: true })
 
-      const restored = persistence.restore({ now: startedAt })
+      const restored = persistence.restore()
 
       expect(restored).toEqual({ ok: true, value: { notice: null, session: null } })
     })
@@ -37,7 +37,7 @@ export function describeCandidateSessionPersistenceContract({ name, createPersis
       const saved = persistence.save({ session: storedSession })
 
       expect(saved).toEqual({ ok: true, value: storedSession })
-      expect(persistence.restore({ now: startedAt })).toEqual({ ok: true, value: { notice: null, session: storedSession } })
+      expect(persistence.restore()).toEqual({ ok: true, value: { notice: null, session: storedSession } })
     })
 
     it('forgets a deleted Candidate Session', () => {
@@ -46,20 +46,19 @@ export function describeCandidateSessionPersistenceContract({ name, createPersis
       const deleted = persistence.delete()
 
       expect(deleted).toEqual({ ok: true, value: null })
-      expect(persistence.restore({ now: startedAt })).toEqual({ ok: true, value: { notice: null, session: null } })
+      expect(persistence.restore()).toEqual({ ok: true, value: { notice: null, session: null } })
     })
 
-    it('discards an expired Candidate Session once and says so', () => {
+    it('returns a stored Candidate Session even after its expiry instant, leaving that decision to the application', () => {
       const persistence = createPersistence({ storedSession, storageAvailable: true })
 
-      const restored = persistence.restore({ now: storedSession.expiresAt })
+      const restored = persistence.restore()
 
-      expect(restored).toEqual({ ok: true, value: { notice: 'expired-session-discarded', session: null } })
-      expect(persistence.restore({ now: startedAt })).toEqual({ ok: true, value: { notice: null, session: null } })
+      expect(restored).toEqual({ ok: true, value: { notice: null, session: storedSession } })
     })
 
     it.each([
-      ['restoring', (persistence: CandidateSessionPersistence) => persistence.restore({ now: startedAt })],
+      ['restoring', (persistence: CandidateSessionPersistence) => persistence.restore()],
       ['saving', (persistence: CandidateSessionPersistence) => persistence.save({ session: storedSession })],
       ['deleting', (persistence: CandidateSessionPersistence) => persistence.delete()],
     ] as const)('reports unavailable storage when %s', (_operation, useStorage) => {

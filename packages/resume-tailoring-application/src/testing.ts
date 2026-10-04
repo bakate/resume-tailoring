@@ -36,7 +36,7 @@ export const noMatchEvidence = { adjacentEvidence: [], evidence: [], relevance: 
 
 const unavailableStorage = { ok: false, error: 'candidate-session-storage-unavailable' } as const
 
-/** Keeps one Candidate Session in memory and discards it once expired, as browser storage does. */
+/** Keeps one Candidate Session in memory and returns it as stored, as browser storage does. */
 export function createInMemoryCandidateSessionPersistence({ session = null, storageAvailable = true }: Readonly<{
   session?: CandidateSession | null
   storageAvailable?: boolean
@@ -46,11 +46,7 @@ export function createInMemoryCandidateSessionPersistence({ session = null, stor
     storageAvailable ? { ok: true, value: operation() } : unavailableStorage
   return {
     delete: () => store(() => { storedSession = null; return null }),
-    restore: ({ now }) => store(() => {
-      if (storedSession === null || storedSession.expiresAt > now) return { notice: null, session: storedSession }
-      storedSession = null
-      return { notice: 'expired-session-discarded', session: null } as const
-    }),
+    restore: () => store(() => ({ notice: null, session: storedSession })),
     save: ({ session: nextSession }) => store(() => { storedSession = nextSession; return nextSession }),
     readStoredSession: () => storedSession,
   }
@@ -118,16 +114,14 @@ export function createFakeResumeDocumentRenderer(overrides: Partial<ResumeDocume
 }
 
 /**
- * Never vouches for edited wording, lays out every draft on one page, and proposes the document unchanged. A scenario
- * that accepts an edit overrides `validateSectionChange`.
+ * Never vouches for a claim's meaning, lays out every draft on one page, and keeps condensed wording unchanged. A
+ * scenario that accepts an edit or a condensation overrides `validateClaim`.
  */
 export function createFakeResumeDocumentPorts(overrides: Partial<ResumeDocumentPorts> = {}): ResumeDocumentPorts {
   return {
-    validateSectionChange: () => Promise.resolve({ status: 'failed', reason: 'unsupported-content', recovery: 'correct-content' }),
+    validateClaim: () => Promise.resolve({ ok: true, value: { supported: false } }),
+    condenseClaim: ({ claim }) => Promise.resolve({ ok: true, value: claim }),
     assessLayout: (request) => Promise.resolve(assessOnePageLayout(request)),
-    proposeCondensation: ({ baseRevision, document }) => Promise.resolve({ status: 'proposed', proposal: {
-      id: 'condensation-proposal', baseRevision, document, layout: { status: 'fits', revision: baseRevision, pageCount: 1 },
-    } }),
     ...overrides,
   }
 }
@@ -157,7 +151,7 @@ export function createFakeCandidateJourneyDependencies(
 ): CandidateJourneyDependencies {
   let sessionCount = 0
   return {
-    createSessionId: () => {
+    createIdentifier: () => {
       sessionCount += 1
       return `00000000-0000-4000-8000-${String(sessionCount).padStart(12, '0')}`
     },

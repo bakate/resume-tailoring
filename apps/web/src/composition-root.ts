@@ -44,7 +44,7 @@ function createBrowserDependencies({ languageModelGateway }: Readonly<{
     telemetry,
     resumeDocumentPorts: createResumeDocumentModelAdapters({ gateway: languageModelGateway }),
     resumeSectionModels: createGatewayResumeSectionModels({ languageModelGateway }),
-    createSessionId: () => crypto.randomUUID(),
+    createIdentifier: () => crypto.randomUUID(),
     jobPostingDocumentReader: createBrowserJobPostingDocumentReader(),
     jobPostingExtractor: createGatewayJobPostingExtractor({ languageModelGateway }),
     languageModelGateway,

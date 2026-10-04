@@ -1,10 +1,6 @@
-import { validateAdjacentEvidence, validateMatchEvidence } from './evidence-validation'
+import { validateAdjacentEvidence, validateMatchEvidence, validateRelevantFactProposals } from './evidence-validation'
 
-export {
-  validateAdjacentEvidence,
-  validateMatchEvidence,
-  validateRelevantFactProposals,
-} from './evidence-validation'
+export { validateRelevantFactProposals } from './evidence-validation'
 import { normalizeText } from './text-normalization'
 
 export const capabilityDimensions = [
@@ -116,17 +112,21 @@ export type MatchAnalysisResult =
   | Readonly<{ ok: true; value: MatchAnalysis }>
   | Readonly<{ error: MatchAnalysisFailure; ok: false }>
 
+/**
+ * Validates every model proposal structurally, once, and keeps or discards each on its own (ADR-0015): callers pass
+ * raw Match Evidence, Adjacent Evidence and relevance proposals.
+ */
 export function analyzeResumeMatch({
   candidateFacts,
   proposedAdjacentEvidence = [],
   proposedEvidence,
-  relevantFactIds,
+  proposedRelevance = [],
   requirements,
 }: Readonly<{
   candidateFacts: readonly CandidateFact[]
   proposedAdjacentEvidence?: readonly ProposedAdjacentEvidence[]
   proposedEvidence: readonly ProposedMatchEvidence[]
-  relevantFactIds: readonly string[]
+  proposedRelevance?: readonly ProposedRelevantFact[]
   requirements: readonly JobRequirement[]
 }>): MatchAnalysisResult {
   const evidence = validateMatchEvidence({
@@ -135,13 +135,9 @@ export function analyzeResumeMatch({
     requirements,
   })
   const evidencedRelevantFactIds = [...new Set([
-    ...relevantFactIds, ...evidence.flatMap(({ factIds }) => factIds),
+    ...validateRelevantFactProposals({ candidateFacts, proposals: proposedRelevance, requirements }),
+    ...evidence.flatMap(({ factIds }) => factIds),
   ])]
-  if (!hasValidRelevantFacts({
-    candidateFacts, evidence, relevantFactIds: evidencedRelevantFactIds,
-  })) {
-    return { error: { type: 'invalid-match-input' }, ok: false }
-  }
   const result = createSuccessfulResult({ evidence, relevantFactIds: evidencedRelevantFactIds, requirements })
   if (!result.ok) return result
   return { ok: true, value: { ...result.value, adjacentEvidence: readUncoveredAdjacentEvidence({
@@ -186,18 +182,6 @@ export function readMatchBand({ matchScore }: Readonly<{ matchScore: number }>):
   if (matchScore >= matchBandThresholds.strongMinimum) return 'strong'
   if (matchScore >= matchBandThresholds.credibleMinimum) return 'credible'
   return 'ambitious'
-}
-
-function hasValidRelevantFacts({ candidateFacts, evidence, relevantFactIds }: Readonly<{
-  candidateFacts: readonly CandidateFact[]
-  evidence: readonly MatchEvidence[]
-  relevantFactIds: readonly string[]
-}>) {
-  const factIds = new Set(candidateFacts.map(({ id }) => id))
-  const relevantIds = new Set(relevantFactIds)
-  return relevantIds.size === relevantFactIds.length
-    && relevantFactIds.every((factId) => factIds.has(factId))
-    && evidence.every((item) => item.factIds.every((factId) => relevantIds.has(factId)))
 }
 
 function calculateMatchScore({ evidence, requirements }: Readonly<{

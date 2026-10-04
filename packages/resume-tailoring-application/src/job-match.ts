@@ -8,7 +8,6 @@ import type {
   ProposedMatchEvidence,
   ProposedRelevantFact,
 } from '@resume-tailoring/matching-engine'
-import { validateRelevantFactProposals } from '@resume-tailoring/matching-engine'
 import type { CandidateFact } from '@resume-tailoring/domain/source-intake'
 import { locateSourceSpan } from './source-span'
 import type {
@@ -188,9 +187,7 @@ async function analyzeCandidateFacts({
     candidateFacts: engineFacts,
     proposedAdjacentEvidence: proposalResult.value.adjacentEvidence,
     proposedEvidence: proposalResult.value.evidence,
-    relevantFactIds: validateRelevantFactProposals({
-      candidateFacts: engineFacts, proposals: proposalResult.value.relevance, requirements,
-    }),
+    proposedRelevance: proposalResult.value.relevance,
     requirements,
   })
   if (!analysisResult.ok) return matchEvidenceUnavailableResult

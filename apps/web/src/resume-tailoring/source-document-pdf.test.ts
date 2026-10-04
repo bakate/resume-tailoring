@@ -273,6 +273,7 @@ describe('browser Source Document reader', () => {
 
   it('rejects a mislabeled PDF before loading the PDF reader', async () => {
     const reader = createBrowserPdfDocumentReader({
+      readBrowserEnvironment: readSupportedBrowserEnvironment,
       loadPdfReader: () => Promise.resolve({
         ok: false,
         error: { type: 'pdf-reader-load-failure' },

@@ -6,9 +6,14 @@ Develop observable behavior one tracer bullet at a time through an agreed public
 
 - Exercise Resume Tailoring behavior through `CandidateJourney` (`createCandidateJourney` from `@resume-tailoring/application/candidate-journey`).
 - Exercise transport and interaction behavior through the rendered web application.
+- Exercise pure domain rules, such as Candidate Session expiry, Processing Consent, and condensable Resume Fields, through `packages/resume-tailoring-domain/test/` in Given / Action / Then style.
 - Use adapter contract tests only when a production boundary has behavior worth varying.
 
-Tests must not import domain internals or inspect orchestration details.
+Behavior tests must not import domain internals or inspect orchestration details.
+
+## Where rules live
+
+Adapters translate and nothing more. A business rule lives in the application, or in the domain when it is pure, and is tested there. For example, the application diffs edited Resume Fields, filters attested facts, and checks condensed wording in both directions before calling `validateClaim` or `condenseClaim`; the matching engine is the only place that validates Match Evidence; the application decides Candidate Session expiry, and persistence returns what it stored.
 
 ## Hexagon layout
 

@@ -143,7 +143,6 @@ function createFixtureMeasurement(fixture: QualificationFixture) {
   const result = analyzeResumeMatch({
     candidateFacts: fixture.candidateFacts,
     proposedEvidence: fixture.proposedEvidence,
-    relevantFactIds: fixture.relevantFactIds,
     requirements: fixture.expectedRequirements,
   })
   return { fixture, result }
