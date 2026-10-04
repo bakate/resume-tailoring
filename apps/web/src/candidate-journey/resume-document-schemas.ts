@@ -17,6 +17,14 @@ export const resumeSectionOutputSchemas = {
   education: fieldsSchema, languages: fieldsSchema, projects: fieldsSchema, certifications: fieldsSchema,
 } as const satisfies Record<ResumeSectionKind, z.ZodType>
 
+/** A Resume Section as the application holds it: each section output schema tagged with its kind. */
+export const resumeSectionContentSchema = z.union([
+  z.strictObject({ kind: z.literal('value-proposition'), ...resumeSectionOutputSchemas['value-proposition'].shape }),
+  z.strictObject({ kind: z.literal('experience'), experience: resumeSectionOutputSchemas.experience }),
+  z.strictObject({ kind: z.literal('skills'), ...resumeSectionOutputSchemas.skills.shape }),
+  z.strictObject({ kind: z.enum(['education', 'languages', 'projects', 'certifications']), ...resumeSectionOutputSchemas.education.shape }),
+])
+
 const sectionSchema = z.strictObject({ key: z.string().regex(/^(?:value-proposition|experiences\.\d+|skills|education|languages|projects|certifications)$/u),
   kind: z.enum(resumeSectionKinds) })
 const candidateFactsSchema = sourceIntakeSchema.shape.candidateFacts.max(500)
@@ -30,17 +38,27 @@ export const resumeSectionWritingInputSchema = z.strictObject({
   locale: localeSchema, purpose: purposeSchema,
   // Absent from clients loaded before rewrites learned their rejected fields, and `reason` before the coherence check named fields.
   rejectedFields: z.array(z.strictObject({ fieldId: z.string().min(1), text: z.string().max(5_000),
-    reason: z.enum(['unsupported', ...resumeCoherenceIssueKinds]).default('unsupported') })).max(200).default([]),
+    reason: z.enum(['unsupported', ...resumeCoherenceIssueKinds]).default('unsupported'),
+    unsupportedProposition: z.string().max(5_000).optional() })).max(200).default([]),
+  // Absent from clients loaded before coherence rewrites started from the previous version.
+  previousContent: resumeSectionContentSchema.nullable().default(null),
 })
 export const resumeFieldValidationInputSchema = z.strictObject({
   section: sectionSchema, fields: z.array(tailoredResumeFieldSchema).max(200), candidateFacts: candidateFactsSchema,
   locale: localeSchema, purpose: purposeSchema,
+  // Sent by browsers that read unsupported propositions; a tab loaded before them would reject the key.
+  namesUnsupportedPropositions: z.literal(true).optional(),
 })
 export const resumeCoherenceInputSchema = z.strictObject({ document: professionalResumeDocumentSchema })
 
 export const resumeFieldValidationSchema = z.strictObject({
-  fields: z.array(z.strictObject({ fieldId: z.string().min(1), supported: z.boolean() })),
+  // Strict structured output requires every key, so a supported field states a null proposition.
+  fields: z.array(z.strictObject({ fieldId: z.string().min(1), supported: z.boolean(),
+    unsupportedProposition: z.string().max(5_000).nullable() })),
 })
+/** The validation a route returns to the browser: a supported field carries no proposition. */
+export const resumeFieldValidationResponseSchema = z.strictObject({ fields: z.array(
+  resumeFieldValidationSchema.shape.fields.element.extend({ unsupportedProposition: z.string().max(5_000).optional() })) })
 export const resumeDocumentCoherenceSchema = z.strictObject({ coherent: z.boolean(), languageMatches: z.boolean(),
   issues: z.array(z.strictObject({ fieldId: z.string().min(1), kind: z.enum(resumeCoherenceIssueKinds) })).max(200) })
 

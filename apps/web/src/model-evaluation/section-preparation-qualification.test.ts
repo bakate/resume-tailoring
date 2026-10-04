@@ -124,7 +124,7 @@ function createTimedModels({ clock }: Readonly<{ clock: ReturnType<typeof create
 }
 
 function writingInput({ section }: Readonly<{ section: ResumeSectionPlanEntry }>) {
-  return { section, candidateFacts: [], targetRole: null, jobRequirements: [], relevantFactIds: [], rejectedFields: [],
+  return { section, candidateFacts: [], targetRole: null, jobRequirements: [], relevantFactIds: [], rejectedFields: [], previousContent: null,
     locale: 'en', purpose: 'tailored' } as const
 }
 

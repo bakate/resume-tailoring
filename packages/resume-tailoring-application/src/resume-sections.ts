@@ -22,11 +22,14 @@ export type ResumeSectionWritingInput = Readonly<{
   purpose: 'tailored' | 'normalized'
   /** Fields of this section's previous attempt that validation rejected; empty on a first write. */
   rejectedFields: readonly ResumeRejectedField[]
+  /** The latest written version of this section, to change only where it was rejected; null on a first write. */
+  previousContent: ResumeSectionContent | null
 }>
 
 /** Why a field was sent back to its writer: unsupported by its facts, or one of the coherence issue kinds. */
 export type ResumeFieldRejection = 'unsupported' | ResumeCoherenceIssueKind
-export type ResumeRejectedField = Readonly<{ fieldId: string; text: string; reason: ResumeFieldRejection }>
+/** `unsupportedProposition` names what validation found unsupported, so the rewrite does not repeat it. */
+export type ResumeRejectedField = Readonly<{ fieldId: string; text: string; reason: ResumeFieldRejection; unsupportedProposition?: string }>
 
 export type ResumeFieldValidationInput = Readonly<{
   section: ResumeSectionPlanEntry
@@ -35,7 +38,9 @@ export type ResumeFieldValidationInput = Readonly<{
   locale: TailoredResumeLocale
   purpose: 'tailored' | 'normalized'
 }>
-export type ResumeFieldValidation = Readonly<{ fields: readonly Readonly<{ fieldId: string; supported: boolean }>[] }>
+export type ResumeFieldValidation = Readonly<{
+  fields: readonly Readonly<{ fieldId: string; supported: boolean; unsupportedProposition?: string }>[]
+}>
 
 export type ResumeCoherenceInput = Readonly<{ document: ProfessionalResumeDocument }>
 export const resumeCoherenceIssueKinds = ['chronology', 'mixed-association', 'redundant', 'skill-category',
@@ -78,6 +83,7 @@ export function createSectionWritingInput({ request, section }: Readonly<{
   const relevantFactIds = tailored ? readRelevantFactIds(request.jobMatch) : new Set<string>()
   const candidateFacts = readSectionFacts({ candidateFacts: request.candidateFacts, section })
   return { section, candidateFacts, locale: request.locale, purpose: request.purpose, rejectedFields: [],
+    previousContent: null,
     targetRole: tailored ? request.jobMatch.targetRole?.value ?? null : null,
     jobRequirements: tailored ? request.jobMatch.requirements.map(({ value }) => value) : [],
     relevantFactIds: candidateFacts.filter(({ id }) => relevantFactIds.has(id)).map(({ id }) => id) }
@@ -223,7 +229,10 @@ export function readRejectedFields({ content, validation }: Readonly<{
   content: ResumeSectionContent; validation: ResumeFieldValidation
 }>): readonly ResumeRejectedField[] {
   return readSectionContentFields(content).filter(({ id }) => !validation.fields.some(({ fieldId, supported }) =>
-    fieldId === id && supported)).map(({ id, text }) => ({ fieldId: id, text, reason: 'unsupported' }))
+    fieldId === id && supported)).map(({ id, text }) => {
+    const unsupportedProposition = validation.fields.find(({ fieldId }) => fieldId === id)?.unsupportedProposition
+    return { fieldId: id, text, reason: 'unsupported', ...(unsupportedProposition === undefined ? {} : { unsupportedProposition }) }
+  })
 }
 
 export function citedCandidateFacts({ content, candidateFacts }: Readonly<{
