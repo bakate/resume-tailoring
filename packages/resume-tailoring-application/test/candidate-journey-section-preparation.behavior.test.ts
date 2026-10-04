@@ -172,6 +172,15 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectRedundantAchievementKeptAndResumePrepared()
   })
 
+  it('keeps the summary the coherence check finds redundant with the experiences it restates', async () => {
+    const system = createSystemUnderTest({ coherence: 'redundant-summary-always' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectRedundantSummaryKeptAndResumePrepared()
+  })
+
   it('removes a field the coherence check finds redundant without rewriting or checking again', async () => {
     const system = createSystemUnderTest({ coherence: 'redundant-projects-always' })
     await system.givenMatchedCandidateSession()
@@ -368,7 +377,7 @@ type TestOptions = Readonly<{
     | 'coherence-issue-while-coherent' | 'mixed-projects-then-unchanged-education'
     | 'duplicated-skill-always' | 'every-copy-duplicated-once' | 'mixed-skills-once' | 'mixed-skills-then-unchanged-category'
     | 'mixed-projects-then-redundant-language'
-    | 'redundant-achievement-always' | 'language-issues-while-language-matches-after-rewrite' | 'timeout'
+    | 'redundant-achievement-always' | 'redundant-summary-always' | 'language-issues-while-language-matches-after-rewrite' | 'timeout'
 }>
 
 class SectionPreparationTestSystem {
@@ -641,6 +650,14 @@ class SectionPreparationTestSystem {
     expect(achievements?.map(({ id }) => id)).toContain(kept?.fieldId)
   }
 
+  expectRedundantSummaryKeptAndResumePrepared() {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    expect(this.#writingInputs, 'The summary is not rewritten for a redundancy').toHaveLength(8)
+    const [kept] = this.#rejectedFields
+    const paragraphs = this.#expectOutcome()?.session.tailoredResume?.valueProposition.paragraphs
+    expect(paragraphs?.map(({ id }) => id)).toContain(kept?.fieldId)
+  }
+
   expectRedundantProjectRemovedAndResumePrepared() {
     expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
     expect(this.#writingInputs, 'No section is rewritten for a redundancy').toHaveLength(8)
@@ -850,6 +867,13 @@ function readCoherence({ coherence, check, document, onRejectedField }: Readonly
     const issues = [...(project === undefined ? [] : [{ fieldId: project.id, kind: 'redundant' as const }]),
       ...(skill === undefined || check > 2 ? [] : [{ fieldId: skill.id, kind: 'mixed-association' as const }])]
     return issues.length === 0 ? coherent : { ...coherent, coherent: false, issues }
+  }
+  if (coherence === 'redundant-summary-always') {
+    // Against its instructions, the check names the summary that restates the experiences.
+    const paragraph = document.valueProposition.paragraphs[0]
+    if (paragraph === undefined) return coherent
+    onRejectedField({ fieldId: paragraph.id, text: paragraph.text, reason: 'redundant' })
+    return { ...coherent, coherent: false, issues: [{ fieldId: paragraph.id, kind: 'redundant' }] }
   }
   if (coherence === 'redundant-achievement-always') {
     // Against its instructions, the check names the experience achievement that a project repeats.
