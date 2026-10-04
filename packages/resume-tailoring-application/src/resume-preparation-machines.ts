@@ -208,7 +208,8 @@ function assembleDocument(context: ResumePreparationMachineContext) {
  * are dates and locations: they are copied from the Candidate's source, so no rewrite may change them, and
  * concurrent experiences at one employer are a valid chronology. An issue its own verdict contradicts is ignored too,
  * and so is a rewrite of a field the first check accepted in a section it did not send back, while it is unchanged.
- * A removal costs no rewrite, so a redundancy is removed even there.
+ * A removal costs no rewrite, so a redundancy is removed even there, except from an experience: it is where an
+ * achievement belongs, so the copy to remove is the one a summary or a project repeats.
  */
 function readCoherenceRejections({ context, coherence }: Readonly<{
   context: ResumePreparationMachineContext; coherence: ResumeSectionModelResult<ResumeDocumentCoherence>
@@ -220,6 +221,7 @@ function readCoherenceRejections({ context, coherence }: Readonly<{
     if (contradictsVerdict({ issue, verdict: coherence.value })) continue
     const origin = origins.get(issue.fieldId)
     if (origin === undefined || origin.copiedFromSource) continue
+    if (issue.kind === 'redundant' && isExperience({ context, sectionKey: origin.sectionKey })) continue
     if (!isRemovable(issue.kind)
       && context.coherenceAcceptedFields?.[origin.sectionKey]?.[origin.field.id] === origin.field.text) continue
     const fields = rejections[origin.sectionKey] ?? []
@@ -237,6 +239,10 @@ function readCoherenceRejections({ context, coherence }: Readonly<{
  */
 function contradictsVerdict({ issue, verdict }: Readonly<{ issue: ResumeCoherenceIssue; verdict: ResumeDocumentCoherence }>) {
   return issue.kind === 'language' ? verdict.languageMatches : verdict.coherent
+}
+
+function isExperience({ context, sectionKey }: Readonly<{ context: ResumePreparationMachineContext; sectionKey: string }>) {
+  return context.plan.some(({ key, kind }) => key === sectionKey && kind === 'experience')
 }
 
 function hasCoherenceRejections(rejections: Readonly<Record<string, readonly ResumeRejectedField[]>>) {
