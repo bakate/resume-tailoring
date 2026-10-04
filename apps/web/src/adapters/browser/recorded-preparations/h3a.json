@@ -1,0 +1,1925 @@
+{
+ "id": "h3a",
+ "scenario": "Coherent on the first check",
+ "intake": {
+  "professionalContent": "   📍    \nDéveloppeur   Full-Stack   📞    |   ✉    \nLinkedIn   I   Portfolio   I   Github \nIngénieur Full-Stack Senior avec plus de 5 ans d'expérience dans la conception et le développement d'applications\nscalables. Expert sur l'écosystème JavaScript/TypeScript ( Angular ,   React.js & Node.js ). Habitué aux archsitectures\nmicroservices, aux bases de données SQL (PostgreSQL) et NoSQL (MongoDB), et au déploiement conteneurisé (Docker,\nKubernetes). \nCompétences \nFront-end \n●   Angular, RxJS, Signals \n●   React, Next.js (App Router), Shadcn/ui, MUI \n●   Redux, NgRx, Zustand, TanStack-Query, Jotai \n●   Accessibilité RGAA : structure sémantique, ARIA, \nnavigation clavier, audits automatisés \nBack-end \n●   Node.j s, TypeScript, Nest.js, architectures \nMicro-services, APIs REST \n●   PostgreSQL, MongoDB, SQLite, Prisma et\nDrizzle-ORM \nTests & Qualité \n●   Jest, Vitest, React Testing Library, MSW \nCI/CD : CircleCI, GitHub Actions \n●   Storybook \n●   Clean Architecture, DDD \nDevOps & Cloud \n●   Docker, Kubernetes (K8s) \n●   CI/CD (Github actions) \n●   GCP, AWS, Azure \n●   Git, monorepos (Turborepo, Nx) \n●   Quelques notions d’infrastructure as Code\n(Terraform) \nLangues \n●   Français : natif \n●   Anglais : professionnel \nExpérience professionnelle \nNorthwind Studio   I Fondateur & Développeur Full-Stack   Lyon I Juillet 2022 - Aujourd’hui \nKinlink   -   Plateforme de organisation familiale opérée par Northwind Studio \n●   Architecture & développement end-to-end (Next.js 15, TypeScript, Convex, Turborepo) \n●   Backend temps réel : messagerie sécurisée, sync Google Calendar, gestion documentaire, auth avancée (Clerk\nOrganizations), intégration email (Resend) \n●   Assistant juridique IA (RAG, embeddings, Vercel AI SDK, OpenAI) \n●   Design system + librairie UI interne, suite de tests (Vitest, Convex Test) \n●   Pipelines CI/CD (GitHub Actions), déploiement scalable, monitoring (Sentry) \n●   Ownership total   : produit, UX, architecture, sécurité, roadmap et pilotage opérationnel \nNorthwind Studio   I Fondateur & Développeur Full-Stack   Lyon I novembre 2021 - juin 2022 \nHarvest Link   – Plateforme logistique agricole pour réduire les pertes post-récolte au Ghana \n●   Définition produit & développement end-to-end (Next.js, tRPC, PostgreSQL, Tailwind, PWA, PayLocal) \n●   Recherche / réservation d’entrepôts & transporteurs, paiements sécurisés \nSuivi en temps réel des capacités de stockage, gestion des stocks, interface logistique \n●   Comptes multi-rôles (agriculteur, entrepôt, transporteur, admin) + permissions avancées \n●   Web app responsive & PWA offline-first \n●   Dashboard admin : utilisateurs, transactions, suivi des livraisons \nBrightlane   I Développeur Full-Stack   Lyon I novembre 2017 - novembre 2021 \n●   Développement UI Complexe :   Conception d'applications Front-End lourdes (Angular migré vers standards\nmodernes/Next.js) avec de fortes contraintes de performances sur le rendu de larges volumes de données. \n●   Outils Back-end / Node.js :   Création d'outils internes et de scripts d'automatisation en TypeScript/Node.js,\nréduisant les tâches manuelles critiques de 2 jours à quelques clics. \n●   Qualité & CI/CD :   Stabilisation de la codebase via des tests automatisés intensifs (Jest, Testing Library) intégrés\ndans les pipelines d'intégration continue. \nFormation \nDUT Techniques de Commercialisation   I.U.T d e   Valmont I septembre 2002 - juin.2004",
+  "jobPostingContent": "Développeur Fullstack Confirmé - Reactjs Nodejs H/F\nRecrutor\nLyon 2e - 75\nCDI\n50 000 - 60 000 € / an\nTélétravail partiel\nBac +5\nExp. 1 à 7 ans\nCompétences : Javascript, Node.js, React JS, Conduite de projet, React Native\n\nLes missions du poste\nTu cherches un job qui concilie impact social et ambition tech ? Ça tombe bien !\nTu arrives au moment où l'équipe s'attaque à de nouveaux enjeux et souhaite internaliser plus de compétences techniques.\nLe CTO recherche un futur Développeurs Fullstack - F/H/X pour construire de nouveaux projets.\nTu deviendras l'un des piliers d'une société en croissance constante (et raisonnée). Si tu as de l'ambition (et il en faut !), des possibilités d'évolution te seront proposées !\nL'équipe Tech actuelle compte 30 collaborateurs : Développeurs / Testeurs / Designers / Chefs de projet / Gestionnaires de parcs informatiques.\nTu travailleras en étroite collaboration avec le CTO, le Lead Développeur et 5 autres Devs Fullstack. Tu échangeras quotidiennement avec les Chefs de projet, afin de challenger les futures fonctionnalités du produit.\nAnticiper les défis technologiques, être force de proposition et concevoir des architectures robustes en lien avec les évolutions de stacks ;\nCréer, développer et maintenir des fonctionnalités complexes liées aux logiciels et applications internes (ERP, logistique, E-commerce, ventes).\nTravailler avec l'équipe produit pour comprendre leurs exigences et co-créer des solutions innovantes ;\nParticiper activement à la vie de l'équipe, partager sa vision et son savoir-faire.\nLe stack technique :\nFront : React.js, Next.js / Back : Node.js, Typescript / Mobile : React Native / GCP - Docker / MongoDB / Github / Notion.\n\nLe profil recherché\nDéveloppeur Confirmé, tu penses avoir atteint une qualité de code suffisante pour être force de proposition quant aux décisions techniques. Tu as une expérience d'au moins 5 ans en Dev JS et tu sais gérer des projets en autonomie. Tu as une bonne maîtrise de React.js et Node.js.\nCerise sur le gâteau : Tu es orienté produit et/ou tu as déjà travaillé dans le secteur du Retail / ERP / Logistique. Tu as une appétence pour l'IA et tu sais travailler avec."
+ },
+ "responses": [
+  {
+   "path": "/api/structured-source-profile-extraction",
+   "sectionKey": null,
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "certifications": [],
+     "education": [
+      {
+       "institution": "I.U.T d e Valmont",
+       "qualification": "DUT Techniques de Commercialisation"
+      }
+     ],
+     "experiences": [
+      {
+       "achievements": [
+        "Architecture et développement end-to-end avec Next.js 15, TypeScript, Convex et Turborepo.",
+        "Développement d’un backend temps réel : messagerie sécurisée, synchronisation Google Calendar, gestion documentaire, authentification avancée avec Clerk Organizations et intégration email avec Resend.",
+        "Développement d’un assistant juridique IA avec RAG, embeddings, Vercel AI SDK et OpenAI.",
+        "Création d’un design system et d’une bibliothèque UI interne, avec une suite de tests utilisant Vitest et Convex Test.",
+        "Mise en place de pipelines CI/CD avec GitHub Actions, déploiement scalable et monitoring avec Sentry.",
+        "Responsabilité produit, UX, architecture, sécurité, roadmap et pilotage opérationnel."
+       ],
+       "context": "Kinlink — plateforme de organisation familiale opérée par Northwind Studio.",
+       "endDate": "Aujourd’hui",
+       "location": "Lyon",
+       "organization": "Northwind Studio",
+       "role": "Fondateur & Développeur Full-Stack",
+       "startDate": "Juillet 2022"
+      },
+      {
+       "achievements": [
+        "Définition produit et développement end-to-end avec Next.js, tRPC, PostgreSQL, Tailwind, PWA et PayLocal.",
+        "Développement de fonctionnalités de recherche et réservation d’entrepôts et de transporteurs, avec paiements sécurisés.",
+        "Développement du suivi en temps réel des capacités de stockage, de la gestion des stocks et de l’interface logistique.",
+        "Mise en place de comptes multi-rôles pour agriculteurs, entrepôts, transporteurs et administrateurs, avec permissions avancées.",
+        "Développement d’une application web responsive et d’une PWA offline-first.",
+        "Développement d’un tableau de bord d’administration pour les utilisateurs, transactions et suivi des livraisons."
+       ],
+       "context": "Harvest Link — plateforme logistique agricole visant à réduire les pertes post-récolte au Ghana.",
+       "endDate": "juin 2022",
+       "location": "Lyon",
+       "organization": "Northwind Studio",
+       "role": "Fondateur & Développeur Full-Stack",
+       "startDate": "novembre 2021"
+      },
+      {
+       "achievements": [
+        "Conception d’applications front-end complexes, notamment avec Angular migré vers des standards modernes et Next.js, avec de fortes contraintes de performance sur le rendu de larges volumes de données.",
+        "Création d’outils internes et de scripts d’automatisation en TypeScript et Node.js, réduisant certaines tâches manuelles critiques de 2 jours à quelques clics.",
+        "Stabilisation de la codebase grâce à des tests automatisés intensifs avec Jest et Testing Library, intégrés dans les pipelines d’intégration continue."
+       ],
+       "context": null,
+       "endDate": "novembre 2021",
+       "location": "Lyon",
+       "organization": "Brightlane",
+       "role": "Développeur Full-Stack",
+       "startDate": "novembre 2017"
+      }
+     ],
+     "languages": [
+      {
+       "name": "Français",
+       "proficiency": "natif"
+      },
+      {
+       "name": "Anglais",
+       "proficiency": "professionnel"
+      }
+     ],
+     "projects": [
+      {
+       "description": "Plateforme de organisation familiale opérée par Northwind Studio. Le CV mentionne notamment une messagerie sécurisée, la synchronisation Google Calendar, la gestion documentaire et un assistant juridique IA.",
+       "name": "Kinlink"
+      },
+      {
+       "description": "Plateforme logistique agricole visant à réduire les pertes post-récolte au Ghana. Le CV mentionne la recherche et réservation d’entrepôts et de transporteurs, les paiements sécurisés, le suivi des capacités de stockage et des livraisons, ainsi qu’une PWA.",
+       "name": "Harvest Link"
+      }
+     ],
+     "skills": [
+      {
+       "category": "Front-end",
+       "name": "Angular"
+      },
+      {
+       "category": "Front-end",
+       "name": "RxJS"
+      },
+      {
+       "category": "Front-end",
+       "name": "Signals"
+      },
+      {
+       "category": "Front-end",
+       "name": "React"
+      },
+      {
+       "category": "Front-end",
+       "name": "Next.js (App Router)"
+      },
+      {
+       "category": "Front-end",
+       "name": "Shadcn/ui"
+      },
+      {
+       "category": "Front-end",
+       "name": "MUI"
+      },
+      {
+       "category": "Front-end",
+       "name": "Redux"
+      },
+      {
+       "category": "Front-end",
+       "name": "NgRx"
+      },
+      {
+       "category": "Front-end",
+       "name": "Zustand"
+      },
+      {
+       "category": "Front-end",
+       "name": "TanStack-Query"
+      },
+      {
+       "category": "Front-end",
+       "name": "Jotai"
+      },
+      {
+       "category": "Front-end",
+       "name": "Accessibilité RGAA : structure sémantique, ARIA, navigation clavier, audits automatisés"
+      },
+      {
+       "category": "Back-end",
+       "name": "Node.js"
+      },
+      {
+       "category": "Back-end",
+       "name": "TypeScript"
+      },
+      {
+       "category": "Back-end",
+       "name": "Nest.js"
+      },
+      {
+       "category": "Back-end",
+       "name": "Architectures microservices"
+      },
+      {
+       "category": "Back-end",
+       "name": "APIs REST"
+      },
+      {
+       "category": "Back-end",
+       "name": "PostgreSQL"
+      },
+      {
+       "category": "Back-end",
+       "name": "MongoDB"
+      },
+      {
+       "category": "Back-end",
+       "name": "SQLite"
+      },
+      {
+       "category": "Back-end",
+       "name": "Prisma"
+      },
+      {
+       "category": "Back-end",
+       "name": "Drizzle-ORM"
+      },
+      {
+       "category": "Tests & Qualité",
+       "name": "Jest"
+      },
+      {
+       "category": "Tests & Qualité",
+       "name": "Vitest"
+      },
+      {
+       "category": "Tests & Qualité",
+       "name": "React Testing Library"
+      },
+      {
+       "category": "Tests & Qualité",
+       "name": "MSW"
+      },
+      {
+       "category": "Tests & Qualité",
+       "name": "CircleCI"
+      },
+      {
+       "category": "Tests & Qualité",
+       "name": "GitHub Actions"
+      },
+      {
+       "category": "Tests & Qualité",
+       "name": "Storybook"
+      },
+      {
+       "category": "Tests & Qualité",
+       "name": "Clean Architecture"
+      },
+      {
+       "category": "Tests & Qualité",
+       "name": "DDD"
+      },
+      {
+       "category": "DevOps & Cloud",
+       "name": "Docker"
+      },
+      {
+       "category": "DevOps & Cloud",
+       "name": "Kubernetes (K8s)"
+      },
+      {
+       "category": "DevOps & Cloud",
+       "name": "CI/CD"
+      },
+      {
+       "category": "DevOps & Cloud",
+       "name": "GCP"
+      },
+      {
+       "category": "DevOps & Cloud",
+       "name": "AWS"
+      },
+      {
+       "category": "DevOps & Cloud",
+       "name": "Azure"
+      },
+      {
+       "category": "DevOps & Cloud",
+       "name": "Git"
+      },
+      {
+       "category": "DevOps & Cloud",
+       "name": "Monorepos"
+      },
+      {
+       "category": "DevOps & Cloud",
+       "name": "Turborepo"
+      },
+      {
+       "category": "DevOps & Cloud",
+       "name": "Nx"
+      },
+      {
+       "category": "DevOps & Cloud",
+       "name": "Terraform"
+      }
+     ],
+     "criticalAmbiguities": []
+    }
+   }
+  },
+  {
+   "path": "/api/explainable-job-posting-extraction",
+   "sectionKey": null,
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "practicalConstraints": [
+      {
+       "sourceExcerpt": "Lyon 2e - 75",
+       "value": "Lyon 2e - 75"
+      },
+      {
+       "sourceExcerpt": "Télétravail partiel",
+       "value": "Télétravail partiel"
+      },
+      {
+       "sourceExcerpt": "50 000 - 60 000 € / an",
+       "value": "50 000 - 60 000 € / an"
+      }
+     ],
+     "requirements": [
+      {
+       "capability": {
+        "dimension": "technical-expertise",
+        "name": "Anticipation technologique et architecture logicielle"
+       },
+       "importance": "central",
+       "importanceRationale": "Présentée parmi les missions du poste, cette attente porte sur l’anticipation des défis technologiques et la conception d’architectures robustes.",
+       "sourceExcerpt": "Anticiper les défis technologiques, être force de proposition et concevoir des architectures robustes en lien avec les évolutions de stacks ;",
+       "value": "Anticiper les défis technologiques, être force de proposition et concevoir des architectures robustes en lien avec les évolutions de stacks ;",
+       "id": "job-requirement-1"
+      },
+      {
+       "capability": {
+        "dimension": "execution",
+        "name": "Développement et maintenance de fonctionnalités"
+       },
+       "importance": "central",
+       "importanceRationale": "La création, le développement et la maintenance de fonctionnalités complexes constituent une mission explicitement décrite.",
+       "sourceExcerpt": "Créer, développer et maintenir des fonctionnalités complexes liées aux logiciels et applications internes (ERP, logistique, E-commerce, ventes).",
+       "value": "Créer, développer et maintenir des fonctionnalités complexes liées aux logiciels et applications internes (ERP, logistique, E-commerce, ventes).",
+       "id": "job-requirement-2"
+      },
+      {
+       "capability": {
+        "dimension": "stakeholder-communication",
+        "name": "Collaboration avec l’équipe produit"
+       },
+       "importance": "central",
+       "importanceRationale": "La collaboration avec l’équipe produit pour comprendre ses exigences et concevoir des solutions est énoncée comme une mission.",
+       "sourceExcerpt": "Travailler avec l'équipe produit pour comprendre leurs exigences et co-créer des solutions innovantes ;",
+       "value": "Travailler avec l'équipe produit pour comprendre leurs exigences et co-créer des solutions innovantes ;",
+       "id": "job-requirement-3"
+      },
+      {
+       "capability": {
+        "dimension": "leadership",
+        "name": "Contribution à la vie et aux échanges de l’équipe"
+       },
+       "importance": "complementary",
+       "importanceRationale": "Cette contribution est mentionnée comme une mission, sans être présentée comme une responsabilité centrale ou une exigence décisive.",
+       "sourceExcerpt": "Participer activement à la vie de l'équipe, partager sa vision et son savoir-faire.",
+       "value": "Participer activement à la vie de l'équipe, partager sa vision et son savoir-faire.",
+       "id": "job-requirement-4"
+      },
+      {
+       "capability": {
+        "dimension": "technical-expertise",
+        "name": "Expérience en développement JavaScript"
+       },
+       "importance": "critical",
+       "importanceRationale": "L’annonce formule une durée minimale explicite : « au moins 5 ans ».",
+       "sourceExcerpt": "Tu as une expérience d'au moins 5 ans en Dev JS",
+       "value": "Tu as une expérience d'au moins 5 ans en Dev JS",
+       "id": "job-requirement-5"
+      },
+      {
+       "capability": {
+        "dimension": "ownership",
+        "name": "Gestion autonome de projets"
+       },
+       "importance": "complementary",
+       "importanceRationale": "L’autonomie dans la gestion de projets est demandée, mais n’est pas présentée comme une exigence décisive.",
+       "sourceExcerpt": "tu sais gérer des projets en autonomie.",
+       "value": "tu sais gérer des projets en autonomie.",
+       "id": "job-requirement-6"
+      },
+      {
+       "capability": {
+        "dimension": "technical-expertise",
+        "name": "Maîtrise de React.js"
+       },
+       "importance": "central",
+       "importanceRationale": "La bonne maîtrise de React.js est explicitement demandée dans le profil recherché.",
+       "sourceExcerpt": "Tu as une bonne maîtrise de React.js et Node.js.",
+       "value": "Tu as une bonne maîtrise de React.js",
+       "id": "job-requirement-7"
+      },
+      {
+       "capability": {
+        "dimension": "technical-expertise",
+        "name": "Maîtrise de Node.js"
+       },
+       "importance": "central",
+       "importanceRationale": "La bonne maîtrise de Node.js est explicitement demandée dans le profil recherché.",
+       "sourceExcerpt": "Tu as une bonne maîtrise de React.js et Node.js.",
+       "value": "Node.js",
+       "id": "job-requirement-8"
+      },
+      {
+       "capability": {
+        "dimension": "strategy",
+        "name": "Orientation produit"
+       },
+       "importance": "complementary",
+       "importanceRationale": "L’annonce introduit cette qualité par « Cerise sur le gâteau », ce qui la présente comme un atout supplémentaire.",
+       "sourceExcerpt": "Cerise sur le gâteau : Tu es orienté produit et/ou tu as déjà travaillé dans le secteur du Retail / ERP / Logistique.",
+       "substitutableGroup": "orientation-produit-ou-experience-sectorielle",
+       "value": "Tu es orienté produit",
+       "id": "job-requirement-9"
+      },
+      {
+       "capability": {
+        "dimension": "technical-expertise",
+        "name": "Expérience dans les secteurs retail, ERP ou logistique"
+       },
+       "importance": "complementary",
+       "importanceRationale": "L’annonce présente une expérience sectorielle comme un atout (« Cerise sur le gâteau ») et la relie par « et/ou » à l’orientation produit.",
+       "sourceExcerpt": "Cerise sur le gâteau : Tu es orienté produit et/ou tu as déjà travaillé dans le secteur du Retail / ERP / Logistique.",
+       "substitutableGroup": "orientation-produit-ou-experience-sectorielle",
+       "value": "tu as déjà travaillé dans le secteur du Retail / ERP / Logistique.",
+       "id": "job-requirement-10"
+      },
+      {
+       "capability": {
+        "dimension": "technical-expertise",
+        "name": "Appétence pour l’IA et capacité à travailler avec"
+       },
+       "importance": "complementary",
+       "importanceRationale": "Cette attente est ajoutée comme un atout dans la dernière phrase du profil, sans être qualifiée de décisive.",
+       "sourceExcerpt": "Tu as une appétence pour l'IA et tu sais travailler avec.",
+       "value": "Tu as une appétence pour l'IA et tu sais travailler avec.",
+       "id": "job-requirement-11"
+      }
+     ],
+     "targetRole": {
+      "sourceExcerpt": "Développeur Fullstack Confirmé - Reactjs Nodejs H/F",
+      "value": "Développeur Fullstack Confirmé - Reactjs Nodejs H/F"
+     }
+    }
+   }
+  },
+  {
+   "path": "/api/explainable-match-evidence",
+   "sectionKey": null,
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "adjacentEvidence": [],
+     "evidence": [
+      {
+       "coverage": "partially-covered",
+       "factMatches": [
+        {
+         "factExcerpt": "Architecture et développement end-to-end avec Next.js 15, TypeScript, Convex et Turborepo.",
+         "factId": "source-fact-experiences-0-achievements-0",
+         "requirementExcerpt": "concevoir des architectures robustes"
+        },
+        {
+         "factExcerpt": "Responsabilité produit, UX, architecture, sécurité, roadmap et pilotage opérationnel.",
+         "factId": "source-fact-experiences-0-achievements-5",
+         "requirementExcerpt": "être force de proposition"
+        }
+       ],
+       "requirementId": "job-requirement-1"
+      },
+      {
+       "coverage": "partially-covered",
+       "factMatches": [
+        {
+         "factExcerpt": "Développement de fonctionnalités de recherche et réservation d’entrepôts et de transporteurs, avec paiements sécurisés.",
+         "factId": "source-fact-experiences-1-achievements-1",
+         "requirementExcerpt": "développer et maintenir des fonctionnalités complexes"
+        },
+        {
+         "factExcerpt": "Développement du suivi en temps réel des capacités de stockage, de la gestion des stocks et de l’interface logistique.",
+         "factId": "source-fact-experiences-1-achievements-2",
+         "requirementExcerpt": "applications internes (ERP, logistique, E-commerce, ventes)"
+        }
+       ],
+       "requirementId": "job-requirement-2"
+      },
+      {
+       "coverage": "partially-covered",
+       "factMatches": [
+        {
+         "factExcerpt": "Responsabilité produit, UX, architecture, sécurité, roadmap et pilotage opérationnel.",
+         "factId": "source-fact-experiences-0-achievements-5",
+         "requirementExcerpt": "co-créer des solutions innovantes"
+        }
+       ],
+       "requirementId": "job-requirement-3"
+      },
+      {
+       "coverage": "partially-covered",
+       "factMatches": [
+        {
+         "factExcerpt": "Responsabilité produit, UX, architecture, sécurité, roadmap et pilotage opérationnel.",
+         "factId": "source-fact-experiences-0-achievements-5",
+         "requirementExcerpt": "partager sa vision et son savoir-faire"
+        }
+       ],
+       "requirementId": "job-requirement-4"
+      },
+      {
+       "coverage": "partially-covered",
+       "factMatches": [
+        {
+         "factExcerpt": "Responsabilité produit, UX, architecture, sécurité, roadmap et pilotage opérationnel.",
+         "factId": "source-fact-experiences-0-achievements-5",
+         "requirementExcerpt": "gérer des projets en autonomie"
+        }
+       ],
+       "requirementId": "job-requirement-6"
+      },
+      {
+       "coverage": "covered",
+       "factMatches": [
+        {
+         "factExcerpt": "React",
+         "factId": "source-fact-skills-3-name-0",
+         "requirementExcerpt": "React.js"
+        }
+       ],
+       "requirementId": "job-requirement-7"
+      },
+      {
+       "coverage": "covered",
+       "factMatches": [
+        {
+         "factExcerpt": "Node.js",
+         "factId": "source-fact-skills-13-name-0",
+         "requirementExcerpt": "Node.js"
+        }
+       ],
+       "requirementId": "job-requirement-8"
+      },
+      {
+       "coverage": "covered",
+       "factMatches": [
+        {
+         "factExcerpt": "Responsabilité produit, UX, architecture, sécurité, roadmap et pilotage opérationnel.",
+         "factId": "source-fact-experiences-0-achievements-5",
+         "requirementExcerpt": "Tu es orienté produit"
+        }
+       ],
+       "requirementId": "job-requirement-9"
+      },
+      {
+       "coverage": "covered",
+       "factMatches": [
+        {
+         "factExcerpt": "plateforme logistique agricole visant à réduire les pertes post-récolte au Ghana.",
+         "factId": "source-fact-projects-1-description-0",
+         "requirementExcerpt": "travaillé dans le secteur du Retail / ERP / Logistique"
+        }
+       ],
+       "requirementId": "job-requirement-10"
+      },
+      {
+       "coverage": "covered",
+       "factMatches": [
+        {
+         "factExcerpt": "Développement d’un assistant juridique IA avec RAG, embeddings, Vercel AI SDK et OpenAI.",
+         "factId": "source-fact-experiences-0-achievements-2",
+         "requirementExcerpt": "tu sais travailler avec"
+        }
+       ],
+       "requirementId": "job-requirement-11"
+      }
+     ],
+     "relevance": [
+      {
+       "factMatch": {
+        "factExcerpt": "Architecture et développement end-to-end avec Next.js 15, TypeScript, Convex et Turborepo.",
+        "factId": "source-fact-experiences-0-achievements-0",
+        "requirementExcerpt": "concevoir des architectures robustes"
+       },
+       "requirementId": "job-requirement-1"
+      },
+      {
+       "factMatch": {
+        "factExcerpt": "Développement de fonctionnalités de recherche et réservation d’entrepôts et de transporteurs, avec paiements sécurisés.",
+        "factId": "source-fact-experiences-1-achievements-1",
+        "requirementExcerpt": "fonctionnalités complexes"
+       },
+       "requirementId": "job-requirement-2"
+      },
+      {
+       "factMatch": {
+        "factExcerpt": "Responsabilité produit, UX, architecture, sécurité, roadmap et pilotage opérationnel.",
+        "factId": "source-fact-experiences-0-achievements-5",
+        "requirementExcerpt": "Travailler avec l'équipe produit"
+       },
+       "requirementId": "job-requirement-3"
+      },
+      {
+       "factMatch": {
+        "factExcerpt": "Responsabilité produit, UX, architecture, sécurité, roadmap et pilotage opérationnel.",
+        "factId": "source-fact-experiences-0-achievements-5",
+        "requirementExcerpt": "partager sa vision et son savoir-faire"
+       },
+       "requirementId": "job-requirement-4"
+      },
+      {
+       "factMatch": {
+        "factExcerpt": "Responsabilité produit, UX, architecture, sécurité, roadmap et pilotage opérationnel.",
+        "factId": "source-fact-experiences-0-achievements-5",
+        "requirementExcerpt": "gérer des projets en autonomie"
+       },
+       "requirementId": "job-requirement-6"
+      },
+      {
+       "factMatch": {
+        "factExcerpt": "React",
+        "factId": "source-fact-skills-3-name-0",
+        "requirementExcerpt": "React.js"
+       },
+       "requirementId": "job-requirement-7"
+      },
+      {
+       "factMatch": {
+        "factExcerpt": "Node.js",
+        "factId": "source-fact-skills-13-name-0",
+        "requirementExcerpt": "Node.js"
+       },
+       "requirementId": "job-requirement-8"
+      },
+      {
+       "factMatch": {
+        "factExcerpt": "Responsabilité produit, UX, architecture, sécurité, roadmap et pilotage opérationnel.",
+        "factId": "source-fact-experiences-0-achievements-5",
+        "requirementExcerpt": "Tu es orienté produit"
+       },
+       "requirementId": "job-requirement-9"
+      },
+      {
+       "factMatch": {
+        "factExcerpt": "Plateforme logistique agricole visant à réduire les pertes post-récolte au Ghana.",
+        "factId": "source-fact-projects-1-description-0",
+        "requirementExcerpt": "secteur du Retail / ERP / Logistique"
+       },
+       "requirementId": "job-requirement-10"
+      },
+      {
+       "factMatch": {
+        "factExcerpt": "Développement d’un assistant juridique IA avec RAG, embeddings, Vercel AI SDK et OpenAI.",
+        "factId": "source-fact-experiences-0-achievements-2",
+        "requirementExcerpt": "appétence pour l'IA"
+       },
+       "requirementId": "job-requirement-11"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-writing",
+   "sectionKey": "experiences.2",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "kind": "experience",
+     "experience": {
+      "id": "experiences.2",
+      "chronology": "context",
+      "role": {
+       "id": "experiences.2.role",
+       "factIds": [
+        "source-fact-experiences-2-role-0"
+       ],
+       "text": "Développeur Full-Stack"
+      },
+      "organization": {
+       "id": "experiences.2.organization",
+       "factIds": [
+        "source-fact-experiences-2-organization-0"
+       ],
+       "text": "Brightlane"
+      },
+      "startDate": {
+       "id": "experiences.2.startDate",
+       "factIds": [
+        "source-fact-experiences-2-startDate-0"
+       ],
+       "text": "novembre 2017"
+      },
+      "endDate": {
+       "id": "experiences.2.endDate",
+       "factIds": [
+        "source-fact-experiences-2-endDate-0"
+       ],
+       "text": "novembre 2021"
+      },
+      "location": {
+       "id": "experiences.2.location",
+       "factIds": [
+        "source-fact-experiences-2-location-0"
+       ],
+       "text": "Lyon"
+      },
+      "context": null,
+      "achievements": [
+       {
+        "id": "experiences.2.achievements.0",
+        "factIds": [
+         "source-fact-experiences-2-achievements-0"
+        ],
+        "text": "Conception d’applications front-end complexes avec Angular, migré vers des standards modernes, et Next.js, sous de fortes contraintes de performance liées au rendu de grands volumes de données."
+       },
+       {
+        "id": "experiences.2.achievements.1",
+        "factIds": [
+         "source-fact-experiences-2-achievements-1"
+        ],
+        "text": "Création d’outils internes et de scripts d’automatisation en TypeScript et Node.js, ramenant certaines tâches manuelles critiques de 2 jours à quelques clics."
+       },
+       {
+        "id": "experiences.2.achievements.2",
+        "factIds": [
+         "source-fact-experiences-2-achievements-2"
+        ],
+        "text": "Stabilisation de la base de code par des tests automatisés intensifs avec Jest et Testing Library, intégrés aux pipelines d’intégration continue."
+       }
+      ]
+     }
+    },
+    "usage": {
+     "inputTokens": 1670,
+     "outputTokens": 467
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-writing",
+   "sectionKey": "experiences.0",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "kind": "experience",
+     "experience": {
+      "id": "experiences.0",
+      "chronology": "relevant",
+      "role": {
+       "id": "experiences.0.role",
+       "factIds": [
+        "source-fact-experiences-0-role-0"
+       ],
+       "text": "Fondateur & Développeur Full-Stack"
+      },
+      "organization": {
+       "id": "experiences.0.organization",
+       "factIds": [
+        "source-fact-experiences-0-organization-0"
+       ],
+       "text": "Northwind Studio"
+      },
+      "startDate": {
+       "id": "experiences.0.startDate",
+       "factIds": [
+        "source-fact-experiences-0-startDate-0"
+       ],
+       "text": "Juillet 2022"
+      },
+      "endDate": {
+       "id": "experiences.0.endDate",
+       "factIds": [
+        "source-fact-experiences-0-endDate-0"
+       ],
+       "text": "Aujourd’hui"
+      },
+      "location": {
+       "id": "experiences.0.location",
+       "factIds": [
+        "source-fact-experiences-0-location-0"
+       ],
+       "text": "Lyon"
+      },
+      "context": {
+       "id": "experiences.0.context",
+       "factIds": [
+        "source-fact-experiences-0-context-0"
+       ],
+       "text": "Kinlink, plateforme de organisation familiale opérée par Northwind Studio."
+      },
+      "achievements": [
+       {
+        "id": "experiences.0.achievement.0",
+        "factIds": [
+         "source-fact-experiences-0-achievements-0"
+        ],
+        "text": "Architecture et développement de bout en bout avec Next.js 15, TypeScript, Convex et Turborepo."
+       },
+       {
+        "id": "experiences.0.achievement.1",
+        "factIds": [
+         "source-fact-experiences-0-achievements-1"
+        ],
+        "text": "Développement d’un backend temps réel : messagerie sécurisée, synchronisation Google Calendar, gestion documentaire, authentification avancée avec Clerk Organizations et intégration email avec Resend."
+       },
+       {
+        "id": "experiences.0.achievement.2",
+        "factIds": [
+         "source-fact-experiences-0-achievements-2"
+        ],
+        "text": "Développement d’un assistant juridique IA avec RAG, embeddings, Vercel AI SDK et OpenAI."
+       },
+       {
+        "id": "experiences.0.achievement.3",
+        "factIds": [
+         "source-fact-experiences-0-achievements-3"
+        ],
+        "text": "Création d’un design system et d’une bibliothèque UI interne, avec une suite de tests utilisant Vitest et Convex Test."
+       },
+       {
+        "id": "experiences.0.achievement.4",
+        "factIds": [
+         "source-fact-experiences-0-achievements-4"
+        ],
+        "text": "Mise en place de pipelines CI/CD avec GitHub Actions, déploiement scalable et monitoring avec Sentry."
+       },
+       {
+        "id": "experiences.0.achievement.5",
+        "factIds": [
+         "source-fact-experiences-0-achievements-5"
+        ],
+        "text": "Responsabilité produit, UX, architecture, sécurité, roadmap et pilotage opérationnel."
+       }
+      ]
+     }
+    },
+    "usage": {
+     "inputTokens": 1904,
+     "outputTokens": 684
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-writing",
+   "sectionKey": "value-proposition",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "kind": "value-proposition",
+     "paragraphs": [
+      {
+       "id": "value-proposition-1",
+       "factIds": [
+        "source-fact-experiences-0-role-0",
+        "source-fact-experiences-0-organization-0",
+        "source-fact-experiences-0-context-0",
+        "source-fact-experiences-0-achievements-0",
+        "source-fact-experiences-0-achievements-2",
+        "source-fact-experiences-0-achievements-5",
+        "source-fact-experiences-1-context-0",
+        "source-fact-experiences-1-achievements-0",
+        "source-fact-experiences-1-achievements-1",
+        "source-fact-experiences-1-achievements-2"
+       ],
+       "text": "Fondateur & Développeur Full-Stack chez Northwind Studio, je pilote le produit et l’architecture de Kinlink, plateforme de organisation familiale que je développe de bout en bout avec Next.js et TypeScript, notamment avec un assistant juridique IA fondé sur le RAG. J’ai également défini et développé Harvest Link, plateforme logistique agricole intégrant la réservation d’entrepôts et de transporteurs ainsi que le suivi en temps réel des capacités de stockage."
+      }
+     ]
+    },
+    "usage": {
+     "inputTokens": 5818,
+     "outputTokens": 659
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-writing",
+   "sectionKey": "experiences.1",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "kind": "experience",
+     "experience": {
+      "id": "experiences.1",
+      "chronology": "relevant",
+      "role": {
+       "id": "experiences.1.role",
+       "factIds": [
+        "source-fact-experiences-1-role-0"
+       ],
+       "text": "Fondateur & Développeur Full-Stack"
+      },
+      "organization": {
+       "id": "experiences.1.organization",
+       "factIds": [
+        "source-fact-experiences-1-organization-0"
+       ],
+       "text": "Northwind Studio"
+      },
+      "startDate": {
+       "id": "experiences.1.startDate",
+       "factIds": [
+        "source-fact-experiences-1-startDate-0"
+       ],
+       "text": "novembre 2021"
+      },
+      "endDate": {
+       "id": "experiences.1.endDate",
+       "factIds": [
+        "source-fact-experiences-1-endDate-0"
+       ],
+       "text": "juin 2022"
+      },
+      "location": {
+       "id": "experiences.1.location",
+       "factIds": [
+        "source-fact-experiences-1-location-0"
+       ],
+       "text": "Lyon"
+      },
+      "context": {
+       "id": "experiences.1.context",
+       "factIds": [
+        "source-fact-experiences-1-context-0"
+       ],
+       "text": "Harvest Link : plateforme logistique agricole visant à réduire les pertes post-récolte au Ghana."
+      },
+      "achievements": [
+       {
+        "id": "experiences.1.achievements.0",
+        "factIds": [
+         "source-fact-experiences-1-achievements-0"
+        ],
+        "text": "Définition produit et développement end-to-end avec Next.js, tRPC, PostgreSQL, Tailwind, PWA et PayLocal."
+       },
+       {
+        "id": "experiences.1.achievements.1",
+        "factIds": [
+         "source-fact-experiences-1-achievements-1"
+        ],
+        "text": "Développement de la recherche et de la réservation d’entrepôts et de transporteurs, avec paiements sécurisés."
+       },
+       {
+        "id": "experiences.1.achievements.2",
+        "factIds": [
+         "source-fact-experiences-1-achievements-2"
+        ],
+        "text": "Développement du suivi en temps réel des capacités de stockage, de la gestion des stocks et de l’interface logistique."
+       },
+       {
+        "id": "experiences.1.achievements.3",
+        "factIds": [
+         "source-fact-experiences-1-achievements-3"
+        ],
+        "text": "Mise en place de comptes multi-rôles pour agriculteurs, entrepôts, transporteurs et administrateurs, avec permissions avancées."
+       },
+       {
+        "id": "experiences.1.achievements.4",
+        "factIds": [
+         "source-fact-experiences-1-achievements-5"
+        ],
+        "text": "Développement d’un tableau de bord d’administration pour les utilisateurs, les transactions et le suivi des livraisons."
+       }
+      ]
+     }
+    },
+    "usage": {
+     "inputTokens": 1895,
+     "outputTokens": 697
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-validation",
+   "sectionKey": "experiences.2",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "fields": [
+      {
+       "fieldId": "experiences.2.role",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.2.organization",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.2.startDate",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.2.endDate",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.2.location",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.2.achievements.0",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.2.achievements.1",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.2.achievements.2",
+       "supported": true
+      }
+     ]
+    },
+    "usage": {
+     "inputTokens": 1032,
+     "outputTokens": 180
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-validation",
+   "sectionKey": "value-proposition",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "fields": [
+      {
+       "fieldId": "value-proposition-1",
+       "supported": true
+      }
+     ]
+    },
+    "usage": {
+     "inputTokens": 1046,
+     "outputTokens": 209
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-validation",
+   "sectionKey": "experiences.0",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "fields": [
+      {
+       "fieldId": "experiences.0.role",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.0.organization",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.0.startDate",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.0.endDate",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.0.location",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.0.context",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.0.achievement.0",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.0.achievement.1",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.0.achievement.2",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.0.achievement.3",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.0.achievement.4",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.0.achievement.5",
+       "supported": true
+      }
+     ]
+    },
+    "usage": {
+     "inputTokens": 1405,
+     "outputTokens": 327
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-writing",
+   "sectionKey": "education",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "kind": "education",
+     "fields": [
+      {
+       "id": "education-0",
+       "factIds": [
+        "source-fact-education-0-qualification-0",
+        "source-fact-education-0-institution-0"
+       ],
+       "text": "DUT Techniques de Commercialisation – I.U.T d e Valmont"
+      }
+     ]
+    },
+    "usage": {
+     "inputTokens": 939,
+     "outputTokens": 67
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-validation",
+   "sectionKey": "experiences.1",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "fields": [
+      {
+       "fieldId": "experiences.1.role",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.1.organization",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.1.startDate",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.1.endDate",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.1.location",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.1.context",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.1.achievements.0",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.1.achievements.1",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.1.achievements.2",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.1.achievements.3",
+       "supported": true
+      },
+      {
+       "fieldId": "experiences.1.achievements.4",
+       "supported": true
+      }
+     ]
+    },
+    "usage": {
+     "inputTokens": 1324,
+     "outputTokens": 340
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-writing",
+   "sectionKey": "languages",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "kind": "languages",
+     "fields": [
+      {
+       "id": "language-fr",
+       "factIds": [
+        "source-fact-languages-0-name-0",
+        "source-fact-languages-0-proficiency-0"
+       ],
+       "text": "Français : langue maternelle"
+      },
+      {
+       "id": "language-en",
+       "factIds": [
+        "source-fact-languages-1-name-0",
+        "source-fact-languages-1-proficiency-0"
+       ],
+       "text": "Anglais : niveau professionnel"
+      }
+     ]
+    },
+    "usage": {
+     "inputTokens": 988,
+     "outputTokens": 95
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-validation",
+   "sectionKey": "education",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "fields": [
+      {
+       "fieldId": "education-0",
+       "supported": true
+      }
+     ]
+    },
+    "usage": {
+     "inputTokens": 403,
+     "outputTokens": 69
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-validation",
+   "sectionKey": "languages",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "fields": [
+      {
+       "fieldId": "language-fr",
+       "supported": true
+      },
+      {
+       "fieldId": "language-en",
+       "supported": true
+      }
+     ]
+    },
+    "usage": {
+     "inputTokens": 486,
+     "outputTokens": 62
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-writing",
+   "sectionKey": "projects",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "kind": "projects",
+     "fields": [
+      {
+       "id": "project-kinlink",
+       "factIds": [
+        "source-fact-projects-0-name-0",
+        "source-fact-projects-0-description-0"
+       ],
+       "text": "Kinlink : plateforme de organisation familiale opérée par Northwind Studio, avec messagerie sécurisée, synchronisation Google Calendar, gestion documentaire et assistant juridique IA."
+      },
+      {
+       "id": "project-harvest-link",
+       "factIds": [
+        "source-fact-projects-1-name-0",
+        "source-fact-projects-1-description-0"
+       ],
+       "text": "Harvest Link : plateforme logistique agricole visant à réduire les pertes post-récolte au Ghana. Recherche et réservation d’entrepôts et de transporteurs, paiements sécurisés, suivi des capacités de stockage et des livraisons, et PWA."
+      }
+     ]
+    },
+    "usage": {
+     "inputTokens": 1093,
+     "outputTokens": 221
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-validation",
+   "sectionKey": "projects",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "fields": [
+      {
+       "fieldId": "project-kinlink",
+       "supported": true
+      },
+      {
+       "fieldId": "project-harvest-link",
+       "supported": true
+      }
+     ]
+    },
+    "usage": {
+     "inputTokens": 656,
+     "outputTokens": 105
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-writing",
+   "sectionKey": "skills",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "kind": "skills",
+     "groups": [
+      {
+       "id": "group-front-end",
+       "category": {
+        "id": "category-front-end",
+        "factIds": [
+         "source-fact-skills-0-category-0"
+        ],
+        "text": "Front-end"
+       },
+       "items": [
+        {
+         "id": "skill-0",
+         "factIds": [
+          "source-fact-skills-0-name-0"
+         ],
+         "text": "Angular"
+        },
+        {
+         "id": "skill-1",
+         "factIds": [
+          "source-fact-skills-1-name-0"
+         ],
+         "text": "RxJS"
+        },
+        {
+         "id": "skill-2",
+         "factIds": [
+          "source-fact-skills-2-name-0"
+         ],
+         "text": "Signals"
+        },
+        {
+         "id": "skill-3",
+         "factIds": [
+          "source-fact-skills-3-name-0"
+         ],
+         "text": "React"
+        },
+        {
+         "id": "skill-4",
+         "factIds": [
+          "source-fact-skills-4-name-0"
+         ],
+         "text": "Next.js (App Router)"
+        },
+        {
+         "id": "skill-5",
+         "factIds": [
+          "source-fact-skills-5-name-0"
+         ],
+         "text": "Shadcn/ui"
+        },
+        {
+         "id": "skill-6",
+         "factIds": [
+          "source-fact-skills-6-name-0"
+         ],
+         "text": "MUI"
+        },
+        {
+         "id": "skill-7",
+         "factIds": [
+          "source-fact-skills-7-name-0"
+         ],
+         "text": "Redux"
+        },
+        {
+         "id": "skill-8",
+         "factIds": [
+          "source-fact-skills-8-name-0"
+         ],
+         "text": "NgRx"
+        },
+        {
+         "id": "skill-9",
+         "factIds": [
+          "source-fact-skills-9-name-0"
+         ],
+         "text": "Zustand"
+        },
+        {
+         "id": "skill-10",
+         "factIds": [
+          "source-fact-skills-10-name-0"
+         ],
+         "text": "TanStack-Query"
+        },
+        {
+         "id": "skill-11",
+         "factIds": [
+          "source-fact-skills-11-name-0"
+         ],
+         "text": "Jotai"
+        },
+        {
+         "id": "skill-12",
+         "factIds": [
+          "source-fact-skills-12-name-0"
+         ],
+         "text": "Accessibilité RGAA : structure sémantique, ARIA, navigation clavier, audits automatisés"
+        }
+       ]
+      },
+      {
+       "id": "group-back-end",
+       "category": {
+        "id": "category-back-end",
+        "factIds": [
+         "source-fact-skills-13-category-0"
+        ],
+        "text": "Back-end"
+       },
+       "items": [
+        {
+         "id": "skill-13",
+         "factIds": [
+          "source-fact-skills-13-name-0"
+         ],
+         "text": "Node.js"
+        },
+        {
+         "id": "skill-14",
+         "factIds": [
+          "source-fact-skills-14-name-0"
+         ],
+         "text": "TypeScript"
+        },
+        {
+         "id": "skill-15",
+         "factIds": [
+          "source-fact-skills-15-name-0"
+         ],
+         "text": "Nest.js"
+        },
+        {
+         "id": "skill-16",
+         "factIds": [
+          "source-fact-skills-16-name-0"
+         ],
+         "text": "Architectures microservices"
+        },
+        {
+         "id": "skill-17",
+         "factIds": [
+          "source-fact-skills-17-name-0"
+         ],
+         "text": "APIs REST"
+        },
+        {
+         "id": "skill-18",
+         "factIds": [
+          "source-fact-skills-18-name-0"
+         ],
+         "text": "PostgreSQL"
+        },
+        {
+         "id": "skill-19",
+         "factIds": [
+          "source-fact-skills-19-name-0"
+         ],
+         "text": "MongoDB"
+        },
+        {
+         "id": "skill-20",
+         "factIds": [
+          "source-fact-skills-20-name-0"
+         ],
+         "text": "SQLite"
+        },
+        {
+         "id": "skill-21",
+         "factIds": [
+          "source-fact-skills-21-name-0"
+         ],
+         "text": "Prisma"
+        },
+        {
+         "id": "skill-22",
+         "factIds": [
+          "source-fact-skills-22-name-0"
+         ],
+         "text": "Drizzle-ORM"
+        }
+       ]
+      },
+      {
+       "id": "group-tests-quality",
+       "category": {
+        "id": "category-tests-quality",
+        "factIds": [
+         "source-fact-skills-23-category-0"
+        ],
+        "text": "Tests et qualité"
+       },
+       "items": [
+        {
+         "id": "skill-23",
+         "factIds": [
+          "source-fact-skills-23-name-0"
+         ],
+         "text": "Jest"
+        },
+        {
+         "id": "skill-24",
+         "factIds": [
+          "source-fact-skills-24-name-0"
+         ],
+         "text": "Vitest"
+        },
+        {
+         "id": "skill-25",
+         "factIds": [
+          "source-fact-skills-25-name-0"
+         ],
+         "text": "React Testing Library"
+        },
+        {
+         "id": "skill-26",
+         "factIds": [
+          "source-fact-skills-26-name-0"
+         ],
+         "text": "MSW"
+        },
+        {
+         "id": "skill-29",
+         "factIds": [
+          "source-fact-skills-29-name-0"
+         ],
+         "text": "Storybook"
+        }
+       ]
+      },
+      {
+       "id": "group-architecture",
+       "category": {
+        "id": "category-architecture",
+        "factIds": [
+         "source-fact-skills-30-name-0",
+         "source-fact-skills-31-name-0"
+        ],
+        "text": "Architecture logicielle"
+       },
+       "items": [
+        {
+         "id": "skill-30",
+         "factIds": [
+          "source-fact-skills-30-name-0"
+         ],
+         "text": "Clean Architecture"
+        },
+        {
+         "id": "skill-31",
+         "factIds": [
+          "source-fact-skills-31-name-0"
+         ],
+         "text": "DDD"
+        }
+       ]
+      },
+      {
+       "id": "group-devops-cloud",
+       "category": {
+        "id": "category-devops-cloud",
+        "factIds": [
+         "source-fact-skills-32-category-0"
+        ],
+        "text": "DevOps et cloud"
+       },
+       "items": [
+        {
+         "id": "skill-27",
+         "factIds": [
+          "source-fact-skills-27-name-0"
+         ],
+         "text": "CircleCI"
+        },
+        {
+         "id": "skill-28",
+         "factIds": [
+          "source-fact-skills-28-name-0"
+         ],
+         "text": "GitHub Actions"
+        },
+        {
+         "id": "skill-32",
+         "factIds": [
+          "source-fact-skills-32-name-0"
+         ],
+         "text": "Docker"
+        },
+        {
+         "id": "skill-33",
+         "factIds": [
+          "source-fact-skills-33-name-0"
+         ],
+         "text": "Kubernetes (K8s)"
+        },
+        {
+         "id": "skill-34",
+         "factIds": [
+          "source-fact-skills-34-name-0"
+         ],
+         "text": "CI/CD"
+        },
+        {
+         "id": "skill-35",
+         "factIds": [
+          "source-fact-skills-35-name-0"
+         ],
+         "text": "GCP"
+        },
+        {
+         "id": "skill-36",
+         "factIds": [
+          "source-fact-skills-36-name-0"
+         ],
+         "text": "AWS"
+        },
+        {
+         "id": "skill-37",
+         "factIds": [
+          "source-fact-skills-37-name-0"
+         ],
+         "text": "Azure"
+        },
+        {
+         "id": "skill-42",
+         "factIds": [
+          "source-fact-skills-42-name-0"
+         ],
+         "text": "Terraform"
+        }
+       ]
+      },
+      {
+       "id": "group-code-organization",
+       "category": {
+        "id": "category-code-organization",
+        "factIds": [
+         "source-fact-skills-38-name-0",
+         "source-fact-skills-39-name-0",
+         "source-fact-skills-40-name-0",
+         "source-fact-skills-41-name-0"
+        ],
+        "text": "Gestion du code et monorepos"
+       },
+       "items": [
+        {
+         "id": "skill-38",
+         "factIds": [
+          "source-fact-skills-38-name-0"
+         ],
+         "text": "Git"
+        },
+        {
+         "id": "skill-39",
+         "factIds": [
+          "source-fact-skills-39-name-0"
+         ],
+         "text": "Monorepos"
+        },
+        {
+         "id": "skill-40",
+         "factIds": [
+          "source-fact-skills-40-name-0"
+         ],
+         "text": "Turborepo"
+        },
+        {
+         "id": "skill-41",
+         "factIds": [
+          "source-fact-skills-41-name-0"
+         ],
+         "text": "Nx"
+        }
+       ]
+      }
+     ]
+    },
+    "usage": {
+     "inputTokens": 3787,
+     "outputTokens": 1894
+    }
+   }
+  },
+  {
+   "path": "/api/resume-section-validation",
+   "sectionKey": "skills",
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "fields": [
+      {
+       "fieldId": "category-front-end",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-0",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-1",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-2",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-3",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-4",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-5",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-6",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-7",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-8",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-9",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-10",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-11",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-12",
+       "supported": true
+      },
+      {
+       "fieldId": "category-back-end",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-13",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-14",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-15",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-16",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-17",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-18",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-19",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-20",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-21",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-22",
+       "supported": true
+      },
+      {
+       "fieldId": "category-tests-quality",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-23",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-24",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-25",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-26",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-29",
+       "supported": true
+      },
+      {
+       "fieldId": "category-architecture",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-30",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-31",
+       "supported": true
+      },
+      {
+       "fieldId": "category-devops-cloud",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-27",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-28",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-32",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-33",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-34",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-35",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-36",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-37",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-42",
+       "supported": true
+      },
+      {
+       "fieldId": "category-code-organization",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-38",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-39",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-40",
+       "supported": true
+      },
+      {
+       "fieldId": "skill-41",
+       "supported": true
+      }
+     ]
+    },
+    "usage": {
+     "inputTokens": 3174,
+     "outputTokens": 977
+    }
+   }
+  },
+  {
+   "path": "/api/resume-document-coherence",
+   "sectionKey": null,
+   "status": 200,
+   "body": {
+    "ok": true,
+    "value": {
+     "coherent": true,
+     "languageMatches": true,
+     "issues": []
+    },
+    "usage": {
+     "inputTokens": 4040,
+     "outputTokens": 24
+    }
+   }
+  }
+ ]
+}
