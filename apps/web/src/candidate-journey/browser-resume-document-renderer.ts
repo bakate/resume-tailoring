@@ -8,8 +8,13 @@ type RenderAttempt = Readonly<{ ok: true; result: ResumeRenderResult }> | Readon
 type RendererDependencies = Readonly<{ request: typeof fetch; telemetry: PrivacySafeTelemetry; timeoutMilliseconds: number }>
 
 const transientCategories: ReadonlySet<RenderFailureCategory> = new Set(['timeout', 'server', 'network'])
+/**
+ * A render launches Chromium on the server, which takes about 25 s on a cold Lambda. Wait up to 90 s: below Cloudflare's
+ * 100 s proxy limit and the Lambda's 120 s timeout, so the browser never gives up on a render the server will finish.
+ */
+const renderTimeoutMilliseconds = 90_000
 
-export function createBrowserResumeDocumentRenderer({ request = fetch, telemetry, timeoutMilliseconds = 25_000 }: Readonly<{
+export function createBrowserResumeDocumentRenderer({ request = fetch, telemetry, timeoutMilliseconds = renderTimeoutMilliseconds }: Readonly<{
   request?: typeof fetch; telemetry: PrivacySafeTelemetry; timeoutMilliseconds?: number
 }>): ResumeDocumentRenderer {
   return { render: (input) => renderDocument({ input, dependencies: { request, telemetry, timeoutMilliseconds } }) }
