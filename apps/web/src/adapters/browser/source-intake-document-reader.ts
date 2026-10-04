@@ -3,10 +3,10 @@ import JSZip from 'jszip'
 
 import type {
   SourceDocument,
-  SourceDocumentReader,
 } from '@resume-tailoring/application/source-intake'
 import { docxMediaType } from '@resume-tailoring/application/source-intake'
-import { createBrowserPdfDocumentReader } from '../resume-tailoring/source-document-pdf'
+import { createBrowserPdfDocumentReader } from '../../resume-tailoring/source-document-pdf'
+import type { SourceDocumentReader } from '@resume-tailoring/application/ports'
 
 type PdfDocumentReader = ReturnType<typeof createBrowserPdfDocumentReader>['read']
 

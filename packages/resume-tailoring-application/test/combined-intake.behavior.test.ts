@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
-import type { CandidateJourney, CandidateJourneyDependencies, CandidateJourneyView, CandidateSession } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateJourney, CandidateJourneyView, CandidateSession } from '@resume-tailoring/application/candidate-journey'
 import { readGroupedResumeSection, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createFakeCandidateJourneyDependencies, createFakeMatchEvidenceMatcher, createFakeResumeSectionModels,
   createFakeSourceProfileExtractor, createInMemoryCandidateSessionPersistence, fixtureMatchEvidence, noMatchEvidence,
   testProcessingPolicy as policy } from '@resume-tailoring/application/testing'
+import type { CandidateJourneyDependencies } from '@resume-tailoring/application/ports'
 
 describe('Candidate Journey combined intake', () => {
   it('prepares a written resume from both inputs with one generation action', async () => {

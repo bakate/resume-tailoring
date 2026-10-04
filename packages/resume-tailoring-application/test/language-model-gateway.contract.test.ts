@@ -4,10 +4,10 @@ import {
   createLanguageModelGateway,
 } from '@resume-tailoring/application/language-model-gateway'
 import type {
-  LanguageModelGatewayAdapter,
   ProcessingConsent,
   ProcessingPolicy,
 } from '@resume-tailoring/application/language-model-gateway'
+import type { LanguageModelGatewayAdapter } from '@resume-tailoring/application/ports'
 
 const activeProcessingPolicy = {
   provider: 'Example Model Provider',

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { groupedResumeDocument, resumeContractRevision } from '@resume-tailoring/application/structured-resume-fixtures'
-import { renderResumeDocument } from '../candidate-journey/resume-document-renderer'
+import { renderResumeDocument } from '../adapters/server/resume-document-renderer'
 import { runPdfCapacityScenario } from './pdf-capacity-benchmark'
 import { createPdfCapacityReport } from './pdf-capacity-report'
 import { readProcessTreeResidentMemoryBytes } from './process-tree-memory'

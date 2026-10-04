@@ -1,12 +1,11 @@
-import type { PrivacySafeTelemetry } from '@resume-tailoring/application/privacy-safe-telemetry'
-import type { ResumeClaimReformulator, ResumeClaimSemanticValidator } from '@resume-tailoring/application/resume-claims'
 
 import {
   hasOnlyResumeClaimInputReferences,
   resumeClaimValidationResultSchema,
   resumeClaimWritingResultSchema,
-} from './resume-claim-schemas'
-import { privacySafeAnalyticsEventSchema } from './privacy-safe-analytics'
+} from '../../resume-tailoring/resume-claim-schemas'
+import { privacySafeAnalyticsEventSchema } from '../../resume-tailoring/privacy-safe-analytics'
+import type { PrivacySafeTelemetry, ResumeClaimReformulator, ResumeClaimSemanticValidator } from '@resume-tailoring/application/ports'
 
 export function createPrivacySafeBrowserTelemetry({
   request = fetch,

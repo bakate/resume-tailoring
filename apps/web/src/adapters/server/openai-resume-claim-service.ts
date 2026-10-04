@@ -1,12 +1,13 @@
-import type { ResumeClaimSemanticValidator, ResumeClaimReformulator, ResumeClaimWritingInputs } from '@resume-tailoring/application/resume-claims'
+import type { ResumeClaimWritingInputs } from '@resume-tailoring/application/resume-claims'
 import { z } from 'zod'
 
 import {
   hasOnlyResumeClaimInputReferences,
   proposedResumeClaimsSchema,
   resumeClaimSemanticValidationSchema,
-} from './resume-claim-schemas'
+} from '../../resume-tailoring/resume-claim-schemas'
 import { createOpenAiRequester } from './openai-request'
+import type { ResumeClaimReformulator, ResumeClaimSemanticValidator } from '@resume-tailoring/application/ports'
 
 type OpenAiModelConfiguration = Readonly<{
   apiKey: string

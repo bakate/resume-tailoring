@@ -67,33 +67,6 @@ export type ResumeClaimWritingInputs = Readonly<{
   verifiedFacts: readonly Pick<SourceProfileFact, 'id' | 'kind' | 'value'>[]
 }>
 
-export type ResumeClaimReformulator = Readonly<{
-  reformulate: (request: ResumeClaimWritingInputs & Readonly<{
-    claim: ProposedResumeClaim
-    feedback: readonly ResumeClaimValidationFeedback[]
-    request?: string
-  }>) => Promise<
-    | { readonly ok: true; readonly value: ProposedResumeClaim }
-    | { readonly ok: false; readonly error: { readonly type: 'resume-claim-writing-unavailable' } }
-  >
-}>
-
-export type ResumeClaimSemanticValidator = Readonly<{
-  validate: (request: Readonly<{
-    claim: ResumeClaim
-    verifiedFacts: ResumeClaimWritingInputs['verifiedFacts']
-  }>) => Promise<
-    | {
-        readonly ok: true
-        readonly value: Readonly<{
-          supported: boolean
-          feedback: readonly ResumeClaimValidationFeedback[]
-        }>
-      }
-    | { readonly ok: false; readonly error: { readonly type: 'resume-claim-validation-unavailable' } }
-  >
-}>
-
 export function validateProposedResumeClaim({
   claimId,
   proposal,

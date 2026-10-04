@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
-import type { CandidateJourneyDependencies, CandidateJourneyView, CandidateSession } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateJourneyView, CandidateSession } from '@resume-tailoring/application/candidate-journey'
 import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createFakeCandidateJourneyDependencies, createFakeResumeSectionModels, createInMemoryCandidateSessionPersistence,
   testProcessingPolicy } from '@resume-tailoring/application/testing'
+import type { CandidateJourneyDependencies } from '@resume-tailoring/application/ports'
 
 describe('Candidate Journey structured resume', () => {
   it('preserves each experience and its evidence through preparation', async () => {

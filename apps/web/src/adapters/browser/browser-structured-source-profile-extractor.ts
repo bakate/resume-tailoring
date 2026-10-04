@@ -1,7 +1,5 @@
-import type {
-  StructuredSourceProfileExtractor,
-} from '@resume-tailoring/application/source-intake'
-import { structuredSourceProfileSuccessSchema } from './structured-source-profile-schema'
+import { structuredSourceProfileSuccessSchema } from '../../candidate-journey/structured-source-profile-schema'
+import type { StructuredSourceProfileExtractor } from '@resume-tailoring/application/ports'
 
 export function createBrowserStructuredSourceProfileExtractor({
   request = fetch,

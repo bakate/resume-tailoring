@@ -2,18 +2,6 @@ import { resumeSectionKinds } from './resume-sections'
 
 export { resumeSectionKinds }
 
-export type AdapterFailure = {
-  readonly type: 'adapter-unavailable' | 'candidate-session-inactive'
-}
-
-export type AdapterResult<TValue> =
-  | { readonly ok: true; readonly value: TValue }
-  | { readonly ok: false; readonly error: AdapterFailure }
-
-export type PrivacySafeTelemetry = {
-  readonly record: (event: PrivacySafeTelemetryEvent) => Promise<AdapterResult<undefined>>
-}
-
 export const matchScoreBands = ['0-24', '25-49', '50-74', '75-100'] as const
 export const correctionKinds = [
   'source-profile-fact',

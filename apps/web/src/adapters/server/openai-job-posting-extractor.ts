@@ -2,17 +2,17 @@ import { z } from 'zod'
 
 import type {
   ExtractedJobPosting,
-  JobPostingExtractor,
 } from '@resume-tailoring/application/job-match'
-import type { OpenAiReasoningEffort } from '../openai-model-configuration'
+import type { OpenAiReasoningEffort } from '../../openai-model-configuration'
 import {
   createOpenAiRequester,
   type OpenAiRequestFailure,
-} from '../resume-tailoring/openai-request'
+} from './openai-request'
 import {
   jobPostingExtractionResponseFormat,
   jobPostingExtractionSchema,
-} from './job-match-schemas'
+} from '../../candidate-journey/job-match-schemas'
+import type { JobPostingExtractor } from '@resume-tailoring/application/ports'
 
 export function createOpenAiJobPostingExtractor({
   apiKey, model, reasoningEffort, request = fetch,

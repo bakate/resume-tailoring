@@ -1,4 +1,3 @@
-import type { CandidateFact } from './source-intake'
 import type { TailoredResume, TailoredResumeSection } from './tailored-resume'
 
 /** Shared operation vocabulary for the existing Candidate Journey, not another orchestrator. */
@@ -77,23 +76,4 @@ export type ResumeDocumentReview = Readonly<{
   proposal: ResumeCondensationProposal | null
   assessment: ResumeLayoutAssessment | null
   failure: ResumeOperationFailure | null
-}>
-
-export type ResumeDocumentPorts = Readonly<{
-  validateSectionChange: (request: Readonly<{
-    candidateFacts: readonly CandidateFact[]
-    currentDocument: ProfessionalResumeDocument
-    change: ResumeSectionChange
-  }>) => Promise<ResumeSectionChangeOutcome>
-  assessLayout: (request: Readonly<{
-    draft: ResumeDraft
-    photoDataUrl?: string
-    unsupportedFieldIds: readonly string[]
-  }>) => Promise<ResumeLayoutAssessment>
-  proposeCondensation: (request: Readonly<{
-    baseRevision: string
-    candidateFacts: readonly CandidateFact[]
-    document: ProfessionalResumeDocument
-    maximumPages: 2
-  }>) => Promise<ResumeCondensationOutcome>
 }>

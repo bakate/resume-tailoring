@@ -1,14 +1,12 @@
-import type {
-  StructuredSourceProfileExtractor,
-} from '@resume-tailoring/application/source-intake'
 import { z } from 'zod'
 
-import type { OpenAiReasoningEffort } from '../openai-model-configuration'
-import { createOpenAiRequester } from '../resume-tailoring/openai-request'
+import type { OpenAiReasoningEffort } from '../../openai-model-configuration'
+import { createOpenAiRequester } from './openai-request'
 import {
   structuredSourceProfileExtractionSchema,
   structuredSourceProfileResponseFormat,
-} from './structured-source-profile-schema'
+} from '../../candidate-journey/structured-source-profile-schema'
+import type { StructuredSourceProfileExtractor } from '@resume-tailoring/application/ports'
 
 export function createOpenAiStructuredSourceProfileExtractor({
   apiKey,

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
-import type { CandidateJourney, CandidateJourneyDependencies, CandidateSession } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateJourney, CandidateSession } from '@resume-tailoring/application/candidate-journey'
 import { readGroupedResumeSection, structuredResumeJobMatch } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createFakeCandidateJourneyDependencies, createFakeMatchEvidenceMatcher, createFakeResumeSectionModels,
   createInMemoryCandidateSessionPersistence, createRecordingTelemetry, noMatchEvidence } from '@resume-tailoring/application/testing'
+import type { CandidateJourneyDependencies } from '@resume-tailoring/application/ports'
 
 describe('Candidate Journey privacy-safe outcome telemetry', () => {
   it('records journey progression through one generation action without Candidate content', async () => {

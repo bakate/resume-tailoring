@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
-import type { CandidateJourneyDependencies, CandidateSession } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateSession } from '@resume-tailoring/application/candidate-journey'
 import { structuredResumeJobMatch, structuredResumeSource, writeResumeSectionFromFacts } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createFakeCandidateJourneyDependencies, createFakeResumeSectionModels, createInMemoryCandidateSessionPersistence } from '@resume-tailoring/application/testing'
+import type { CandidateJourneyDependencies } from '@resume-tailoring/application/ports'
 
 describe('Candidate Session result', () => {
   it('keeps the resume photo in the Candidate Session after reopening it', async () => {

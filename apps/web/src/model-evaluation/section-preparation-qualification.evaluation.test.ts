@@ -5,7 +5,7 @@ import {
   createOpenAiResumeCoherenceChecker,
   createOpenAiResumeFieldValidator,
   createOpenAiResumeSectionWriter,
-} from '../candidate-journey/openai-resume-section-models'
+} from '../adapters/server/openai-resume-section-models'
 import { validateServerEnvironment, type ServerEnvironment } from '../env'
 import { sectionPreparationBudgets } from './model-evaluation-baselines'
 import { realSizedResumeFixture } from './real-sized-resume-corpus'
