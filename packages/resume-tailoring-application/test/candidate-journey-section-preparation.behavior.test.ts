@@ -170,6 +170,35 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectPreparedWithoutRewriting()
   })
 
+  it('prepares the resume when the coherence check names a language issue although the language matches', async () => {
+    const system = createSystemUnderTest({ coherence: 'language-issue-while-language-matches' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectPreparedWithoutRewriting()
+  })
+
+  it('rewrites only the section with a language issue when a coherent verdict also names a coherence issue', async () => {
+    const system = createSystemUnderTest({ coherence: 'coherence-issue-while-coherent' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectOnlyEducationRewrittenForLanguageAndResumePrepared()
+  })
+
+  it('fails only the still incoherent section when the rewritten resume is named for a language that matches', async () => {
+    const system = createSystemUnderTest({ coherence: 'language-issues-while-language-matches-after-rewrite' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectPreparationFailure({ reason: 'incoherent-content', recovery: 'retry' })
+    system.expectSavedSections({ validated: ['value-proposition', 'experiences.0', 'experiences.1', 'education',
+      'languages', 'projects', 'certifications'], failed: ['skills'] })
+  })
+
   it('asks to retry the check when the resume language does not match without naming a field', async () => {
     const system = createSystemUnderTest({ coherence: 'unnamed-language-mismatch' })
     await system.givenMatchedCandidateSession()
@@ -248,7 +277,8 @@ type TestOptions = Readonly<{
   writtenPunctuation?: 'em-dash'
   coherence?: 'mixed-projects-once' | 'mixed-projects-twice' | 'redundant-projects-always' | 'document-level-issue'
     | 'redundant-projects-and-mixed-skills-twice' | 'chronology-on-source-dates'
-    | 'unnamed-language-mismatch' | 'timeout'
+    | 'unnamed-language-mismatch' | 'language-issue-while-language-matches'
+    | 'coherence-issue-while-coherent' | 'language-issues-while-language-matches-after-rewrite' | 'timeout'
 }>
 
 class SectionPreparationTestSystem {
@@ -474,6 +504,14 @@ class SectionPreparationTestSystem {
     expect(JSON.stringify(this.#expectOutcome()?.session)).not.toContain('rejectedFields')
   }
 
+  expectOnlyEducationRewrittenForLanguageAndResumePrepared() {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    expect(this.#writtenSectionKeys().filter((key) => key === 'projects')).toHaveLength(1)
+    const educationWrites = this.#writingInputs.filter(({ section }) => section.key === 'education')
+    expect(educationWrites.map(({ rejectedFields }) => rejectedFields)).toEqual([[], this.#rejectedFields])
+    expect(this.#rejectedFields).toEqual([expect.objectContaining({ reason: 'language' })])
+  }
+
   expectRedundantProjectRemovedAndResumePrepared() {
     expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
     expect(this.#writingInputs, 'No section is rewritten for a redundancy').toHaveLength(8)
@@ -601,6 +639,33 @@ function readCoherence({ coherence, check, document, onRejectedField }: Readonly
     return { ...coherent, coherent: false, issues: [{ fieldId: 'targetRole', kind: 'mixed-association' }] }
   }
   if (coherence === 'unnamed-language-mismatch') return { ...coherent, languageMatches: false }
+  if (coherence === 'language-issues-while-language-matches-after-rewrite') {
+    // As in production: Skills stay incoherent, and once rewritten, the language matches yet language issues are named.
+    const skill = document.sections.flatMap((section) => section.section === 'skills' ? section.groups : [])[0]?.items[0]
+    const education = document.sections.flatMap((section) => section.section === 'education' ? section.fields : [])[0]
+    const paragraph = document.valueProposition.paragraphs[0]
+    if (skill === undefined || education === undefined || paragraph === undefined) return coherent
+    const languageIssues = [{ fieldId: 'document.purpose', kind: 'language' as const },
+      { fieldId: education.id, kind: 'language' as const }, { fieldId: paragraph.id, kind: 'language' as const }]
+    return { coherent: false, languageMatches: check > 1,
+      issues: [{ fieldId: skill.id, kind: 'skill-category' }, ...(check > 1 ? languageIssues : languageIssues.slice(1, 2))] }
+  }
+  if (coherence === 'coherence-issue-while-coherent') {
+    // The verdict contradicts itself on the first check: the resume is coherent, yet it names a project as misattributed.
+    const project = document.sections.flatMap((section) => section.section === 'projects' ? section.fields : [])[0]
+    const education = document.sections.flatMap((section) => section.section === 'education' ? section.fields : [])[0]
+    if (check > 1 || project === undefined || education === undefined) return coherent
+    onRejectedField({ fieldId: education.id, text: education.text, reason: 'language' })
+    return { ...coherent, languageMatches: false, issues: [{ fieldId: project.id, kind: 'mixed-association' },
+      { fieldId: education.id, kind: 'language' }] }
+  }
+  if (coherence === 'language-issue-while-language-matches') {
+    // The verdict contradicts itself: the language matches, yet it names an education field as a language issue.
+    // As in production, it is also not coherent while naming nothing else, which leaves nothing to rewrite.
+    const education = document.sections.flatMap((section) => section.section === 'education' ? section.fields : [])[0]
+    return education === undefined ? coherent
+      : { ...coherent, coherent: false, issues: [{ fieldId: education.id, kind: 'language' }] }
+  }
   if (coherence === 'chronology-on-source-dates') {
     // Two experiences overlap in time, as concurrent roles at one employer do; their dates come from the source.
     const startDate = document.experiences[1]?.startDate

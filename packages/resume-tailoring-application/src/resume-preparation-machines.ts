@@ -5,7 +5,7 @@ import type { ResumeOperationFailure, ResumePreparationOutcome } from './structu
 import { assembleResumeDocumentWithOrigins, citedCandidateFacts, createSectionWritingInput, hasSupportedSectionStructure,
   isSectionFullyValidated, normalizeSectionContent, planResumeSections, readRejectedFields,
   readSectionContentFields, removeSectionFields } from './resume-sections'
-import type { ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage,
+import type { ResumeCoherenceIssue, ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage,
   ResumeRejectedField, ResumeSectionContent, ResumeSectionModelResult, ResumeSectionPlanEntry, ResumeSectionsRequest,
   ResumeSectionWritingInput } from './resume-sections'
 import type { ResumeSectionModels } from './ports'
@@ -195,7 +195,7 @@ function assembleDocument(context: ResumePreparationMachineContext) {
 /**
  * Groups the fields a failed coherence check named by the section they came from. Unknown ids are ignored, and so
  * are dates and locations: they are copied from the Candidate's source, so no rewrite may change them, and
- * concurrent experiences at one employer are a valid chronology.
+ * concurrent experiences at one employer are a valid chronology. An issue its own verdict contradicts is ignored too.
  */
 function readCoherenceRejections({ context, coherence }: Readonly<{
   context: ResumePreparationMachineContext; coherence: ResumeSectionModelResult<ResumeDocumentCoherence>
@@ -204,6 +204,7 @@ function readCoherenceRejections({ context, coherence }: Readonly<{
   const { origins } = assembleDocument(context)
   const rejections: Record<string, ResumeRejectedField[]> = {}
   for (const issue of coherence.value.issues) {
+    if (contradictsVerdict({ issue, verdict: coherence.value })) continue
     const origin = origins.get(issue.fieldId)
     if (origin === undefined || origin.copiedFromSource) continue
     const fields = rejections[origin.sectionKey] ?? []
@@ -213,6 +214,14 @@ function readCoherenceRejections({ context, coherence }: Readonly<{
     rejections[origin.sectionKey] = fields
   }
   return rejections
+}
+
+/**
+ * A language issue in a verdict whose language matches, or a coherence issue in a verdict that is coherent, gives
+ * nothing to rewrite: the model has named a field its own verdict accepts.
+ */
+function contradictsVerdict({ issue, verdict }: Readonly<{ issue: ResumeCoherenceIssue; verdict: ResumeDocumentCoherence }>) {
+  return issue.kind === 'language' ? verdict.languageMatches : verdict.coherent
 }
 
 function hasCoherenceRejections(rejections: Readonly<Record<string, readonly ResumeRejectedField[]>>) {

@@ -133,5 +133,7 @@ const coherenceInstructions = [
   'Distinct achievements using the same technology and purposeful repetition across summary, skills and experience are valid.',
   'Concurrent or overlapping experiences, including several roles or products at the same organization, are a valid chronology. Dates and locations are copied from the Candidate and are never an issue.',
   'Set languageMatches false unless professional prose uses document.locale. Proper nouns and standard technical terms may stay unchanged.',
+  'Institution, employer, project and product names are proper nouns, never a language issue. document.purpose, document.locale and document.targetRole are not fields and are never an issue.',
+  'Name a language issue only when languageMatches is false, and any other kind only when coherent is false.',
   'A normalized resume must not imply tailoring or relevance to a Job Posting.',
 ].join(' ')
