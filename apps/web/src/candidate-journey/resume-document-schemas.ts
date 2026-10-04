@@ -46,6 +46,8 @@ export const resumeSectionWritingInputSchema = z.strictObject({
 export const resumeFieldValidationInputSchema = z.strictObject({
   section: sectionSchema, fields: z.array(tailoredResumeFieldSchema).max(200), candidateFacts: candidateFactsSchema,
   locale: localeSchema, purpose: purposeSchema,
+  // Sent by browsers that read unsupported propositions; a tab loaded before them would reject the key.
+  namesUnsupportedPropositions: z.literal(true).optional(),
 })
 export const resumeCoherenceInputSchema = z.strictObject({ document: professionalResumeDocumentSchema })
 

@@ -9,7 +9,8 @@ export function createBrowserResumeSectionWriter({ request = fetch }: Readonly<{
 }
 
 export function createBrowserResumeFieldValidator({ request = fetch }: Readonly<{ request?: typeof fetch }> = {}): ResumeFieldValidator {
-  return { validate: (input) => postResumeModel({ request, input, path: '/api/resume-section-validation', schema: resumeFieldValidationResponseSchema }) }
+  return { validate: (input) => postResumeModel({ request, input: { ...input, namesUnsupportedPropositions: true },
+    path: '/api/resume-section-validation', schema: resumeFieldValidationResponseSchema }) }
 }
 
 export function createBrowserResumeCoherenceChecker({ request = fetch }: Readonly<{ request?: typeof fetch }> = {}): ResumeCoherenceChecker {

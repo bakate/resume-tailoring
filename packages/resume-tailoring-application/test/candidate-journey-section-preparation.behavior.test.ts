@@ -172,13 +172,22 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectRedundantAchievementKeptAndResumePrepared()
   })
 
-  it('keeps the summary the coherence check finds redundant with the experiences it restates', async () => {
-    const system = createSystemUnderTest({ coherence: 'redundant-summary-always' })
+  it('keeps the Value Proposition the coherence check finds redundant with the experiences it restates', async () => {
+    const system = createSystemUnderTest({ coherence: 'redundant-value-proposition-always' })
     await system.givenMatchedCandidateSession()
 
     await system.prepareTailoredResume()
 
-    system.expectRedundantSummaryKeptAndResumePrepared()
+    system.expectRedundantValuePropositionKeptAndResumePrepared()
+  })
+
+  it('keeps the coherence feedback when a section rewritten for coherence comes back with an unsupported structure', async () => {
+    const system = createSystemUnderTest({ coherence: 'mixed-skills-once', writtenSkills: 'uncited-on-rewrite' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectSkillsWrittenAgainWithTheCoherenceFeedback()
   })
 
   it('removes a field the coherence check finds redundant without rewriting or checking again', async () => {
@@ -370,14 +379,14 @@ type TestOptions = Readonly<{
   skillsWritingFailure?: Exclude<ResumeSectionModelFailure, 'permanent'>
   skillsWritingFailureOn?: 'rewrite'
   writtenPunctuation?: 'em-dash'
-  writtenSkills?: 'duplicated' | 'versioned'
+  writtenSkills?: 'duplicated' | 'versioned' | 'uncited-on-rewrite'
   coherence?: 'mixed-projects-once' | 'mixed-projects-twice' | 'redundant-projects-always' | 'document-level-issue'
     | 'redundant-projects-and-mixed-skills-twice' | 'chronology-on-source-dates'
     | 'unnamed-language-mismatch' | 'language-issue-while-language-matches'
     | 'coherence-issue-while-coherent' | 'mixed-projects-then-unchanged-education'
     | 'duplicated-skill-always' | 'every-copy-duplicated-once' | 'mixed-skills-once' | 'mixed-skills-then-unchanged-category'
     | 'mixed-projects-then-redundant-language'
-    | 'redundant-achievement-always' | 'redundant-summary-always' | 'language-issues-while-language-matches-after-rewrite' | 'timeout'
+    | 'redundant-achievement-always' | 'redundant-value-proposition-always' | 'language-issues-while-language-matches-after-rewrite' | 'timeout'
 }>
 
 class SectionPreparationTestSystem {
@@ -650,9 +659,9 @@ class SectionPreparationTestSystem {
     expect(achievements?.map(({ id }) => id)).toContain(kept?.fieldId)
   }
 
-  expectRedundantSummaryKeptAndResumePrepared() {
+  expectRedundantValuePropositionKeptAndResumePrepared() {
     expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
-    expect(this.#writingInputs, 'The summary is not rewritten for a redundancy').toHaveLength(8)
+    expect(this.#writingInputs, 'The Value Proposition is not rewritten for a redundancy').toHaveLength(8)
     const [kept] = this.#rejectedFields
     const paragraphs = this.#expectOutcome()?.session.tailoredResume?.valueProposition.paragraphs
     expect(paragraphs?.map(({ id }) => id)).toContain(kept?.fieldId)
@@ -769,7 +778,9 @@ function createDependencies({ options, persistence, models }: Readonly<{
         const written = readGroupedResumeSection(input.section)
         const content = options.writtenSkills === 'duplicated' ? withDuplicatedSkill(written)
           : options.writtenSkills === 'versioned' ? withSkillsVersion({ content: written, version: input.rejectedFields.length + 1 })
-            : written
+            // The first rewrite cites a fact the section was not given, which fails the structure check.
+            : options.writtenSkills === 'uncited-on-rewrite' && input.previousContent !== null && models.onSkillsWrite() === 1
+              ? withUncitedSkills(written) : written
         return { ok: true, value: options.writtenPunctuation === 'em-dash' ? withEmDashes(content) : content }
       },
       validateFields: ({ section, fields }) => {
@@ -798,6 +809,12 @@ function withSkillsVersion({ content, version }: Readonly<{ content: ResumeSecti
   if (content.kind !== 'skills') return content
   return { ...content, groups: content.groups.map((group) => ({ ...group,
     items: group.items.map((item) => ({ ...item, text: `${item.text} v${String(version)}` })) })) }
+}
+
+function withUncitedSkills(content: ResumeSectionContent): ResumeSectionContent {
+  if (content.kind !== 'skills') return content
+  return { ...content, groups: content.groups.map((group) => ({ ...group,
+    items: group.items.map((item) => ({ ...item, factIds: ['source-fact-uncited-0'] })) })) }
 }
 
 /** Repeats the first skill in a group of its own under another id, as a writing model sometimes does. */
@@ -868,8 +885,8 @@ function readCoherence({ coherence, check, document, onRejectedField }: Readonly
       ...(skill === undefined || check > 2 ? [] : [{ fieldId: skill.id, kind: 'mixed-association' as const }])]
     return issues.length === 0 ? coherent : { ...coherent, coherent: false, issues }
   }
-  if (coherence === 'redundant-summary-always') {
-    // Against its instructions, the check names the summary that restates the experiences.
+  if (coherence === 'redundant-value-proposition-always') {
+    // Against its instructions, the check names the Value Proposition that restates the experiences.
     const paragraph = document.valueProposition.paragraphs[0]
     if (paragraph === undefined) return coherent
     onRejectedField({ fieldId: paragraph.id, text: paragraph.text, reason: 'redundant' })

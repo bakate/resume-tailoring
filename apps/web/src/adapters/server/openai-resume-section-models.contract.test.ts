@@ -50,14 +50,24 @@ describe('Resume section model adapters', () => {
       return Promise.resolve(Response.json(modelResponse(validation)))
     } })
 
-    const outcome = await validator.validate({ section: sectionFor('education'), locale: 'en', purpose: 'tailored',
-      fields: [{ id: 'degree', text: 'Computer Science degree', factIds: ['source-fact-education-0-qualification-0'] }],
-      candidateFacts: structuredResumeSource.candidateFacts.filter(({ path }) => path.startsWith('education.')) })
+    const outcome = await validator.validate({ ...validationInput(), namesUnsupportedPropositions: true })
 
     // A supported field carries no proposition key, which a browser tab loaded before this field still accepts.
     expect(outcome).toMatchObject({ ok: true, value: { fields: [validation.fields[0], { fieldId: 'institution', supported: true }] } })
     expect(outcome.ok && outcome.value.fields[1]).not.toHaveProperty('unsupportedProposition')
     expect(body).toMatchObject({ model: 'structured-role', text: { format: { name: 'resume_section_validation', strict: true } } })
+    expect(JSON.stringify(body)).not.toContain('namesUnsupportedPropositions')
+  })
+
+  it('withholds the unsupported proposition from a browser loaded before it could read one', async () => {
+    const validation = { fields: [{ fieldId: 'degree', supported: false, unsupportedProposition: 'The cited facts name no degree' }] }
+    const validator = createOpenAiResumeFieldValidator({ ...structuredRole,
+      request: () => Promise.resolve(Response.json(modelResponse(validation))) })
+
+    const outcome = await validator.validate(validationInput())
+
+    expect(outcome).toMatchObject({ ok: true, value: { fields: [{ fieldId: 'degree', supported: false }] } })
+    expect(outcome.ok && outcome.value.fields[0]).not.toHaveProperty('unsupportedProposition')
   })
 
   it('checks the assembled document for coherence and language and names the fields to rewrite', async () => {
@@ -117,6 +127,12 @@ function writingInput(kind: ResumeSectionKind): ResumeSectionWritingInput {
   return { section, locale: 'en', purpose: 'tailored', targetRole: 'Frontend Engineer', jobRequirements: ['React'],
     relevantFactIds: [], rejectedFields: [], previousContent: null, candidateFacts: structuredResumeSource.candidateFacts.filter(({ path }) => kind === 'value-proposition'
       || path.startsWith(`${section.key}.`)) }
+}
+
+function validationInput() {
+  return { section: sectionFor('education'), locale: 'en', purpose: 'tailored',
+    fields: [{ id: 'degree', text: 'Computer Science degree', factIds: ['source-fact-education-0-qualification-0'] }],
+    candidateFacts: structuredResumeSource.candidateFacts.filter(({ path }) => path.startsWith('education.')) } as const
 }
 
 function sectionOutput(content: ResumeSectionContent) {

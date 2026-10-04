@@ -22,7 +22,7 @@ export type ResumeSectionWritingInput = Readonly<{
   purpose: 'tailored' | 'normalized'
   /** Fields of this section's previous attempt that validation rejected; empty on a first write. */
   rejectedFields: readonly ResumeRejectedField[]
-  /** The validated version the coherence check sent back, to change only where it rejected; null otherwise. */
+  /** The latest written version of this section, to change only where it was rejected; null on a first write. */
   previousContent: ResumeSectionContent | null
 }>
 

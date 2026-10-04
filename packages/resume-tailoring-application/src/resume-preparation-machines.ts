@@ -51,8 +51,10 @@ async function callModel<TValue>(call: () => Promise<ResumeSectionModelResult<TV
 const writeSection = fromPromise<ResumeSectionModelResult<ResumeSectionContent>, ResumeSectionMachineInput>(
   ({ input }) => callModel(() => input.models.writeSection(input.writingInput)))
 
-// A rewrite after a failed validation learns what was rejected; the text never leaves this section actor.
-/** A rewrite starts from the latest written version, so it changes only what was rejected since. */
+/**
+ * A rewrite learns what was rejected and starts from the latest written version, so it changes only that; the
+ * text never leaves this section actor.
+ */
 function readRewritingInput(context: ResumeSectionMachineContext): ResumeSectionMachineInput {
   return { ...context, writingInput: { ...context.writingInput, rejectedFields: context.rejectedFields,
     previousContent: context.latestContent } }
@@ -68,12 +70,13 @@ function readWriting({ context, result }: Readonly<{
   context: ResumeSectionMachineContext; result: ResumeSectionModelResult<ResumeSectionContent>
 }>): SectionStep {
   const usage = addUsage(context.usage, result.usage)
-  // A failed write rejected nothing new, so its retry keeps the feedback the attempt was given.
+  // A failed or unstructured write rejected no field, so its retry keeps the feedback the attempt was given.
   if (!result.ok) return { content: null, failure: result.error.type, rejectedFields: context.rejectedFields, usage }
   const { section, purpose } = context.writingInput
   const content = normalizeSectionContent({ content: result.value, purpose, section })
   return hasSupportedSectionStructure({ content, input: context.writingInput })
-    ? { content, failure: null, rejectedFields: [], usage } : { content: null, failure: 'unsupported', rejectedFields: [], usage }
+    ? { content, failure: null, rejectedFields: [], usage }
+    : { content: null, failure: 'unsupported', rejectedFields: context.rejectedFields, usage }
 }
 
 function readValidation({ context, result }: Readonly<{
@@ -209,7 +212,7 @@ function assembleDocument(context: ResumePreparationMachineContext) {
  * concurrent experiences at one employer are a valid chronology. An issue its own verdict contradicts is ignored too,
  * and so is a rewrite of a field the first check accepted in a section it did not send back, while it is unchanged.
  * A removal costs no rewrite, so a redundancy is removed even there, except from an experience, where an achievement
- * belongs, or from the summary, which restates the strongest of them on purpose.
+ * belongs, or from the Value Proposition, which restates the strongest of them on purpose.
  */
 function readCoherenceRejections({ context, coherence }: Readonly<{
   context: ResumePreparationMachineContext; coherence: ResumeSectionModelResult<ResumeDocumentCoherence>
