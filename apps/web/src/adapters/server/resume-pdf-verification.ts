@@ -64,6 +64,8 @@ function matchTextAt({ candidatePosition, expectedText, extractedText }: Readonl
 function normalizeText({ value }: Readonly<{ value: string }>) {
   return value
     .normalize('NFKC')
+    // A PDF never prints soft hyphens, zero-width spaces and other invisible characters, so they cannot be compared.
+    .replace(/\p{Default_Ignorable_Code_Point}/gu, '')
     .replace(/[\u02BC\u2018\u2019]/gu, "'")
     .replace(/\s+/gu, ' ')
     .trim()

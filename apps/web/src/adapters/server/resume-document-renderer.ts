@@ -13,12 +13,23 @@ import { renderTailoredResumeDocument } from '../../candidate-journey/tailored-r
 type RenderStage = 'launch' | 'layout' | 'photo' | 'print' | 'fonts' | 'pdf-reading' | 'page-size' | 'reading-order'
 type RenderProgress = { stage: RenderStage }
 
+/**
+ * Lambda runs Chromium in a Firecracker sandbox with no /dev/shm, no GPU and only /tmp writable: the zygote, GPU and
+ * renderer processes it would fork there close the page mid-render, so everything runs in the browser process.
+ */
+const chromiumArguments = ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox',
+  '--no-zygote', '--single-process', '--disable-gpu']
+
+/** Chromium writes its crash database, configuration and font cache under HOME, which only /tmp can hold on Lambda. */
+function chromiumEnvironment() {
+  return { ...process.env, HOME: '/tmp', XDG_CONFIG_HOME: '/tmp/.chromium', XDG_CACHE_HOME: '/tmp/.chromium' }
+}
+
 export async function renderResumeDocument(request: ResumeRenderRequest): Promise<ResumeRenderResult> {
   let browser: Browser | undefined
   const progress: RenderProgress = { stage: 'launch' }
   try {
-    browser = await puppeteer.launch({ headless: true,
-      args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox'] })
+    browser = await puppeteer.launch({ headless: true, args: chromiumArguments, env: chromiumEnvironment() })
     return await renderDocumentPages({ browser, progress, request })
   } catch (error) {
     return unavailableRender({ request, stage: progress.stage, error })
