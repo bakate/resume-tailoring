@@ -4,7 +4,7 @@ import { CandidateJourneyShell } from '../candidate-journey/candidate-journey-sh
 import { CandidateJourneyControllerProvider, useCandidateJourneyController } from '../candidate-journey/use-candidate-journey'
 import { DemoAccessGate } from '../demo-access/demo-access-gate'
 
-/** Both Candidate Journey routes share this layout, so navigating between them keeps one Candidate Journey actor (ADR-0016). */
+/** Both Candidate Journey routes share this layout, so navigating between them keeps one Candidate Journey actor. */
 export const Route = createFileRoute('/_candidate-journey')({
   component: CandidateJourneyLayout,
 })

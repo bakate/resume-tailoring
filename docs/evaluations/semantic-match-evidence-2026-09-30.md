@@ -1,6 +1,6 @@
 # Semantic Match Evidence Evaluation — 2026-09-30
 
-Issue: BAK-64, from the BAK-63 specification. Decision record: ADR-0015.
+Issue: BAK-64, from the BAK-63 specification. Decision record: BAK-106.
 
 ## Change under evaluation
 
@@ -69,7 +69,7 @@ A stricter reading of user story 8 ("stay uncovered when my facts do not state e
 
 ## Deliberate changes to expected outcomes in engine-backed tests
 
-These tests used to rely on lexical proof. They now follow ADR-0015:
+These tests used to rely on lexical proof. They now follow BAK-106:
 
 | Test | Before | After | Justification |
 | --- | --- | --- | --- |

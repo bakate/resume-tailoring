@@ -5,9 +5,9 @@ How engineering skills should consume this repository's domain documentation whe
 ## Before exploring, read these
 
 - `CONTEXT.md` at the repository root.
-- Relevant ADRs under `docs/adr/`.
+- Relevant ADRs in Linear (see below).
 
-If these files do not exist, proceed silently. Domain-modeling skills create them lazily when terminology or architectural decisions are resolved.
+If `CONTEXT.md` does not exist, proceed silently. Domain-modeling skills create it lazily when terminology is resolved.
 
 ## File structure
 
@@ -17,9 +17,27 @@ This repository uses a single-context layout:
 /
 ├── CONTEXT.md
 ├── docs/
-│   └── adr/
+│   ├── agents/
+│   └── evaluations/
 └── src/
 ```
+
+## ADRs live in Linear
+
+ADRs are Linear issues in project *Resume generator*, labelled `ADR` and titled `ADR: <title>`. An accepted ADR is `Done`; a fully superseded ADR is `Canceled`. Migrated ADRs end with `Legacy id: ADR-00NN`.
+
+Read and create them with `orca linear`:
+
+```bash
+orca linear list-issues --project "Resume generator" --label ADR --json
+orca linear issue BAK-123 --full --json
+orca linear save-issue --team BAK --project "Resume generator" --label ADR --state Done \
+  --title "ADR: <title>" --body-file - --json
+```
+
+An ADR evolves by editing its issue. Create a new ADR issue only for a new subject, and relate it to the spec or issue that motivated it. Refer to an ADR by its Linear identifier, never by a legacy number.
+
+Never recreate `docs/adr/`, and never write ADRs or specs as repository files. Specs are Linear issues titled `Spec: <title>` (see `issue-tracker.md`).
 
 ## Use the glossary's vocabulary
 

@@ -27,7 +27,7 @@ export function TailoredResumeWorkspace({ candidateJourney, localization, onChan
 
 type ResumeDocumentProps = ResumeReviewProps & Readonly<{ resume: TailoredResume }>
 
-/** Preview and Download first, then the name, then the secondary actions (ADR-0016). */
+/** Preview and Download first, then the name, then the secondary actions. */
 function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting: () => void }>) {
   const { view } = props.candidateJourney
   const photo = useResumePhoto({ photo: view.status === 'candidate-session-open' ? view.session.resumePhoto ?? null : null,

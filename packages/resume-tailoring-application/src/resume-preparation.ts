@@ -5,7 +5,7 @@ import type { ResumePreparationMachineInput, ResumePreparationMachineOutput } fr
 export type { ResumeSectionsRequest } from './resume-sections'
 
 /**
- * Model qualification seam, not a Candidate path: runs the production section-by-section preparation (ADR-0016)
+ * Model qualification seam, not a Candidate path: runs the production section-by-section preparation
  * outside the Candidate Journey, so qualification measures the same planning, concurrency, retries and coherence
  * check a Candidate gets. Behavior tests keep exercising preparation through the Candidate Journey.
  */

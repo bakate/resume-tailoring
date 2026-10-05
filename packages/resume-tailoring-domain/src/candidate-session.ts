@@ -28,7 +28,7 @@ export type CandidateSession = Readonly<{
   tailoredResume: TailoredResume | null
   resumeEditing?: ResumeEditingState
   resumeFactLocations?: readonly Readonly<{ factId: CandidateFactId; location: ResumeFieldLocation }>[]
-  /** The optional photo shown in the Tailored Resume; browser-local and deleted with the session (ADR-0002). */
+  /** The optional photo shown in the Tailored Resume; browser-local and deleted with the session. */
   resumePhoto?: ResumePhoto
   startedAt: number
   version: typeof candidateSessionStorageVersion
@@ -65,7 +65,7 @@ export type ResumePreparation = Readonly<{
   sections?: readonly ResumeSectionSnapshot[]
 }>
 
-/** One Resume Section as the preparation machine last reported it; text exists only once validated (ADR-0016). */
+/** One Resume Section as the preparation machine last reported it; text exists only once validated. */
 export type ResumeSectionSnapshot = Readonly<{ key: string; kind: ResumeSectionKind; attempt: number }> & (
   | Readonly<{ status: 'planned' | 'writing' | 'validating' | 'failed' }>
   | Readonly<{ status: 'validated'; content: ResumeSectionContent }>)

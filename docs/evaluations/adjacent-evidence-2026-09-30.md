@@ -1,6 +1,6 @@
 # Adjacent Evidence Evaluation — 2026-09-30
 
-Issue: BAK-66, from the BAK-63 specification. It builds on BAK-64 (structural Match Evidence verification). Decision record: ADR-0015.
+Issue: BAK-66, from the BAK-63 specification. It builds on BAK-64 (structural Match Evidence verification). Decision record: BAK-106.
 
 ## Change under evaluation
 

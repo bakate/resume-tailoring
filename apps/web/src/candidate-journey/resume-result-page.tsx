@@ -11,7 +11,7 @@ import { TailoredResumeWorkspace } from './tailored-resume-workspace'
 import { useCandidateJourney } from './use-candidate-journey'
 import type { CandidateJourneyController } from './use-candidate-journey'
 
-/** `/resume`: the preparation progress, then the Tailored Resume with Download as its primary action (ADR-0016). */
+/** `/resume`: the preparation progress, then the Tailored Resume with Download as its primary action. */
 export function ResumeResultPage() {
   const localizationResult = useLocalization()
   if (!localizationResult.ok) return <LocalizationFailure />

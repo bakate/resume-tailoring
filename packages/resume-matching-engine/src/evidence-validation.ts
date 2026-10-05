@@ -51,7 +51,7 @@ export function validateRelevantFactProposals({
 }
 
 // Adjacent Evidence follows the same structural rules as Match Evidence, but cites no
-// requirement excerpt and no duration or scale because it never proves coverage (ADR-0015).
+// requirement excerpt and no duration or scale because it never proves coverage.
 export function validateAdjacentEvidence({
   candidateFacts, proposedAdjacentEvidence, requirements,
 }: Readonly<{

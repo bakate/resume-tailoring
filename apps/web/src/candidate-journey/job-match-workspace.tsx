@@ -105,7 +105,7 @@ function RequirementSummary({ ids, jobMatch, localization, sourceFacts = [], tit
     ))}</List></Paper>
 }
 
-// Adjacent Evidence sits next to the gap and never reads as coverage (ADR-0015).
+// Adjacent Evidence sits next to the gap and never reads as coverage.
 function AdjacentEvidenceNote({ jobMatch, localization, requirement, sourceFacts }: Readonly<{
   jobMatch: JobMatch
   localization: Localization

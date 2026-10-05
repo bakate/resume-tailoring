@@ -90,7 +90,7 @@ export function createSectionWritingInput({ request, section }: Readonly<{
 }
 
 // Writing may highlight Adjacent Evidence facts, so they reach it as relevant facts; the
-// Match Analysis itself keeps them out of relevance and Generation Eligibility (ADR-0015).
+// Match Analysis itself keeps them out of relevance and Generation Eligibility.
 function readRelevantFactIds(jobMatch: JobMatch): ReadonlySet<string> {
   return new Set([...jobMatch.analysis.relevantFactIds,
     ...jobMatch.analysis.adjacentEvidence.flatMap(({ factIds }) => factIds)])

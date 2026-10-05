@@ -169,7 +169,7 @@ async function analyzeExtractedJobPosting({
   }) } as const
 }
 
-/** Independent model judgments of one Match Analysis; their verified evidence is combined (ADR-0015). */
+/** Independent model judgments of one Match Analysis; their verified evidence is combined. */
 const matchEvidenceJudgmentCount = 2
 
 async function analyzeCandidateFacts({
