@@ -72,8 +72,8 @@ function readWriting({ context, result }: Readonly<{
   const usage = addUsage(context.usage, result.usage)
   // A failed or unstructured write rejected no field, so its retry keeps the feedback the attempt was given.
   if (!result.ok) return { content: null, failure: result.error.type, rejectedFields: context.rejectedFields, usage }
-  const { section, purpose } = context.writingInput
-  const content = normalizeSectionContent({ content: result.value, purpose, section })
+  const { section, purpose, relevantFactIds } = context.writingInput
+  const content = normalizeSectionContent({ content: result.value, purpose, section, relevantFactIds })
   return hasSupportedSectionStructure({ content, input: context.writingInput })
     ? { content, failure: null, rejectedFields: [], usage }
     : { content: null, failure: 'unsupported', rejectedFields: context.rejectedFields, usage }

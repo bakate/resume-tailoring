@@ -105,8 +105,9 @@ function readSectionFacts({ candidateFacts, section }: Readonly<{
 }
 
 /** Applies the deterministic normalization owned by the application, never by the writing role. */
-export function normalizeSectionContent({ content: written, purpose, section }: Readonly<{
+export function normalizeSectionContent({ content: written, purpose, section, relevantFactIds }: Readonly<{
   content: ResumeSectionContent; purpose: 'tailored' | 'normalized'; section: ResumeSectionPlanEntry
+  relevantFactIds: readonly CandidateFactId[]
 }>): ResumeSectionContent {
   const content = mapSectionFields({ content: written,
     map: (field) => ({ ...field, text: replaceEmDashes(field.text) }) })
@@ -114,12 +115,21 @@ export function normalizeSectionContent({ content: written, purpose, section }: 
     const { experience } = content
     return { kind: 'experience', experience: { ...experience, id: section.key,
       chronology: purpose === 'normalized' && experience.chronology === 'relevant' ? 'context' : experience.chronology,
-      achievements: deduplicateFields(experience.achievements) } }
+      achievements: orderByRelevance({ fields: deduplicateFields(experience.achievements), relevantFactIds }) } }
   }
   if (content.kind === 'skills') {
     return { kind: 'skills', groups: content.groups.map((group) => ({ ...group, items: deduplicateFields(group.items) })) }
   }
   return content
+}
+
+/** Puts the fields citing a fact the Match Analysis found relevant first, each group keeping its written order. */
+function orderByRelevance({ fields, relevantFactIds }: Readonly<{
+  fields: readonly TailoredResumeField[]; relevantFactIds: readonly CandidateFactId[]
+}>) {
+  const relevant = new Set<string>(relevantFactIds)
+  const provesPosting = (field: TailoredResumeField) => field.factIds.some((factId) => relevant.has(factId))
+  return [...fields.filter(provesPosting), ...fields.filter((field) => !provesPosting(field))]
 }
 
 function mapSectionFields({ content, map }: Readonly<{
