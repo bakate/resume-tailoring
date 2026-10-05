@@ -167,6 +167,42 @@ describe('resume matching engine', () => {
     expect(result.value).toMatchObject({ evidence: [], matchScore: 0, relevantFactIds: [] })
   })
 
+  // Acronyms are capitalized whatever they name, so they never make an achievement look like a role title.
+  it('accepts an achievement whose acronyms would otherwise make it look like a role title', () => {
+    const fact = { id: 'fact-assistant', kind: 'experience',
+      value: 'Assistant juridique IA (RAG, embeddings, Vercel AI SDK, OpenAI)' } as const
+    const result = analyzeResumeMatch({
+      candidateFacts: [fact],
+      proposedEvidence: [createEvidence({
+        coverage: 'covered', factExcerpt: fact.value, factId: fact.id,
+        requirementExcerpt: 'mise en place d’IA', requirementId: 'requirement-ai',
+      })],
+      requirements: [createRoleNeutralRequirement({ capabilityName: 'IA', requirementId: 'requirement-ai',
+        term: 'Etre à l’aise avec la mise en place d’IA au service d’un produit' })],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.evidence).toEqual([{ coverage: 'covered', factIds: [fact.id], requirementId: 'requirement-ai' }])
+  })
+
+  it('still rejects a role title that carries an acronym', () => {
+    const fact = { id: 'fact-title', kind: 'experience', value: 'Senior AWS Engineer at Acme' } as const
+    const result = analyzeResumeMatch({
+      candidateFacts: [fact],
+      proposedEvidence: [createEvidence({
+        coverage: 'covered', factExcerpt: 'AWS Engineer', factId: fact.id,
+        requirementExcerpt: 'AWS', requirementId: 'requirement-aws',
+      })],
+      requirements: [createRoleNeutralRequirement({ capabilityName: 'AWS', requirementId: 'requirement-aws',
+        term: 'Operate AWS' })],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.evidence).toEqual([])
+  })
+
   it.each([
     { factValue: 'Built TypeScript services', requirementValue: 'Senior TypeScript engineering' },
     { factValue: 'Built TypeScript services', requirementValue: 'TypeScript in production' },
