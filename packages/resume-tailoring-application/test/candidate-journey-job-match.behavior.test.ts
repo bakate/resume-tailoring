@@ -158,6 +158,27 @@ describe('Candidate Journey Job Match', () => {
     system.expectOnlySupportedMatchEvidence()
   })
 
+  // One model judgment can miss evidence another finds; every verified link from either counts.
+  it('combines the Match Evidence that two independent judgments find', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenEachJudgmentFindsDifferentMatchEvidence()
+
+    await system.submitPastedJobPosting()
+
+    system.expectMatchEvidenceFromBothJudgments()
+  })
+
+  it('completes the Match Analysis when one of the two judgments fails', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateJourneyIsReadyForJobMatch()
+    system.givenOneJudgmentFails()
+
+    await system.submitPastedJobPosting()
+
+    system.expectOnlySupportedMatchEvidence()
+  })
+
   it('treats Candidate Facts cited by accepted Match Evidence as relevant', async () => {
     const system = createSystemUnderTest()
     await system.givenCandidateJourneyIsReadyForJobMatch()
@@ -351,9 +372,10 @@ function createSystemUnderTest({ resumeWriting = 'prepared', session = createJob
 type ResumeWritingMode = 'observed' | 'prepared'
 
 type TestDependenciesRequest = Readonly<{
-  onMatch: () => void
+  onMatch: (request: Parameters<CandidateJourneyDependencies['matchEvidenceMatcher']['match']>[0]) => void
   onResumeWriting: (input: ResumeSectionWritingInput) => void
-  readMatchEvidence: (request: Parameters<CandidateJourneyDependencies['matchEvidenceMatcher']['match']>[0]) => MatchEvidenceProposal
+  /** null answers the judgment with a failure. */
+  readMatchEvidence: (request: Parameters<CandidateJourneyDependencies['matchEvidenceMatcher']['match']>[0]) => MatchEvidenceProposal | null
   readExtraction: () => ExtractedJobPosting
   resumeWriting: ResumeWritingMode
   session: CandidateSession
@@ -372,8 +394,9 @@ function createTestDependencies({
     jobPostingExtractor: createFakeJobPostingExtractor({ extract: () => Promise.resolve({ ok: true, value: readExtraction() }) }),
     languageModelGateway: createFakeLanguageModelGateway({ processingPolicy }),
     matchEvidenceMatcher: createFakeMatchEvidenceMatcher({ match: (request) => {
-      onMatch()
-      return Promise.resolve({ ok: true, value: readMatchEvidence(request) })
+      onMatch(request)
+      const value = readMatchEvidence(request)
+      return Promise.resolve(value === null ? { ok: false, error: 'match-evidence-unavailable' } as const : { ok: true, value })
     } }),
     now: () => currentTime,
     persistence: createInMemoryCandidateSessionPersistence({ session }),
@@ -385,7 +408,10 @@ class CandidateJourneyJobMatchTestSystem {
   #directJobMatch: Awaited<ReturnType<typeof createJobMatch>> | null = null
   #extractedJobPosting: ExtractedJobPosting = extractedJobPosting
   #jobPostingText = jobPostingText
-  #matchRequestCount = 0
+  /** One analysis sends the same request to each judgment, so distinct requests count analyses. */
+  readonly #matchRequests = new Set<string>()
+  #judgmentCount = 0
+  #judgments: readonly (MatchEvidenceProposal | null)[] | null = null
   readonly #resumeWritingInputs: ResumeSectionWritingInput[] = []
   #matchEvidence: MatchEvidenceProposal = matchEvidenceProposal
   #completedAction: JobMatchAction | null = null
@@ -397,13 +423,15 @@ class CandidateJourneyJobMatchTestSystem {
   }>) {
     this.#candidateJourney = createCandidateJourney({
       dependencies: createTestDependencies({
-        onMatch: () => {
-          this.#matchRequestCount += 1
+        onMatch: (request) => {
+          this.#matchRequests.add(JSON.stringify(request))
+          this.#judgmentCount += 1
         },
         onResumeWriting: (input) => {
           this.#resumeWritingInputs.push(input)
         },
-        readMatchEvidence: () => this.#matchEvidence,
+        readMatchEvidence: () => this.#judgments === null ? this.#matchEvidence
+          : this.#judgments[(this.#judgmentCount - 1) % this.#judgments.length] ?? null,
         readExtraction: () => this.#extractedJobPosting,
         resumeWriting,
         session,
@@ -531,6 +559,16 @@ class CandidateJourneyJobMatchTestSystem {
         createAdjacentEvidence('1', 'source-fact-1', 'TypeScript'),
       ],
     }
+  }
+
+  givenEachJudgmentFindsDifferentMatchEvidence() {
+    const { evidence } = matchEvidenceProposal
+    this.#judgments = [{ ...matchEvidenceProposal, evidence: evidence.slice(0, 1) },
+      { ...matchEvidenceProposal, evidence: evidence.slice(1) }]
+  }
+
+  givenOneJudgmentFails() {
+    this.#judgments = [null, matchEvidenceProposal]
   }
 
   givenMatchEvidenceWithoutRelevanceLinks() {
@@ -704,6 +742,14 @@ class CandidateJourneyJobMatchTestSystem {
       matchEvidenceProposal.evidence.map(({ requirementId }) => requirementId))
   }
 
+  expectMatchEvidenceFromBothJudgments() {
+    this.#expectCompletedAction()
+    expect(this.#judgmentCount, 'each analysis asks two independent judgments').toBe(2)
+    const view = this.#readOpenView()
+    expect(view.session.jobMatch?.analysis.evidence.map(({ requirementId }) => requirementId).sort()).toEqual(
+      matchEvidenceProposal.evidence.map(({ requirementId }) => requirementId).sort())
+  }
+
   expectEvidencedCandidateFactsToBeRelevant() {
     this.#expectCompletedAction()
     const view = this.#readOpenView()
@@ -780,7 +826,7 @@ class CandidateJourneyJobMatchTestSystem {
       operation: null,
       status: 'candidate-session-open',
     })
-    expect(this.#matchRequestCount).toBe(0)
+    expect(this.#matchRequests.size).toBe(0)
   }
 
   expectFrenchImportanceAndAlternatives() {
@@ -827,7 +873,7 @@ class CandidateJourneyJobMatchTestSystem {
       coverage: 'covered',
       requirementId: 'job-requirement-7',
     }))
-    expect(this.#matchRequestCount).toBe(2)
+    expect(this.#matchRequests.size).toBe(2)
   }
 
   expectRejectedProfileEnrichment(expectedFailure: 'candidate-fact-invalid'
@@ -836,7 +882,7 @@ class CandidateJourneyJobMatchTestSystem {
     const view = this.#readOpenView()
     expect(view.profileEnrichmentFailure).toBe(expectedFailure)
     expect(view.session.sourceIntake?.candidateFacts).toEqual(candidateFacts)
-    expect(this.#matchRequestCount).toBe(1)
+    expect(this.#matchRequests.size).toBe(1)
   }
 
   expectTailoredResumePreparationToStart() {

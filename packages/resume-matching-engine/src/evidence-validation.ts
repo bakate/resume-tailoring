@@ -22,10 +22,13 @@ export function validateMatchEvidence({
   const requirementById = new Map(requirements.map((requirement) => [requirement.id, requirement]))
   const candidateFactById = new Map(candidateFacts.map((fact) => [fact.id, fact]))
   const evidenceByRequirementId = new Map<string, MatchEvidence>()
+  // Several proposals may cover one requirement; the first verified one with the strongest coverage stands.
   for (const proposal of proposedEvidence) {
-    if (evidenceByRequirementId.has(proposal.requirementId)) continue
+    if (evidenceByRequirementId.get(proposal.requirementId)?.coverage === 'covered') continue
     const evidence = validateEvidenceProposal({ candidateFactById, proposal, requirementById })
-    if (evidence !== null) evidenceByRequirementId.set(proposal.requirementId, evidence)
+    if (evidence !== null && (evidence.coverage === 'covered' || !evidenceByRequirementId.has(proposal.requirementId))) {
+      evidenceByRequirementId.set(proposal.requirementId, evidence)
+    }
   }
   return [...evidenceByRequirementId.values()]
 }

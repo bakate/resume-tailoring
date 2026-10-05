@@ -186,6 +186,22 @@ describe('resume matching engine', () => {
     expect(result.value.evidence).toEqual([{ coverage: 'covered', factIds: [fact.id], requirementId: 'requirement-ai' }])
   })
 
+  // Two judgments of the same posting may both prove a requirement; the stronger verified one counts.
+  it('keeps the strongest verified evidence when several proposals cover the same requirement', () => {
+    const fact = { id: 'fact-tests', kind: 'experience', value: 'Built automated test suites with Vitest' } as const
+    const requirement = createRoleNeutralRequirement({ capabilityName: 'Vitest', requirementId: 'requirement-tests',
+      term: 'Write tests with Vitest' })
+    const proposal = (coverage: ProposedMatchEvidence['coverage']) => createEvidence({ coverage,
+      factExcerpt: 'Vitest', factId: fact.id, requirementExcerpt: 'Vitest', requirementId: 'requirement-tests' })
+
+    const result = analyzeResumeMatch({ candidateFacts: [fact], requirements: [requirement],
+      proposedEvidence: [proposal('partially-covered'), proposal('covered')] })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.evidence).toEqual([{ coverage: 'covered', factIds: [fact.id], requirementId: 'requirement-tests' }])
+  })
+
   it('still rejects a role title that carries an acronym', () => {
     const fact = { id: 'fact-title', kind: 'experience', value: 'Senior AWS Engineer at Acme' } as const
     const result = analyzeResumeMatch({
