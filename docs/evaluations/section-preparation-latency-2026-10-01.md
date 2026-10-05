@@ -1,7 +1,7 @@
 # Section preparation latency on a real-sized resume (BAK-71, 2026-10-01)
 
-Scope: model qualification for section-by-section preparation of the Tailored Resume (BAK-108, spec
-BAK-67, Section-by-Section Resume Preparation). It
+Scope: model qualification for section-by-section preparation of the Tailored Resume (BAK-108,
+spec BAK-67, Section-by-Section Resume Preparation). It
 checks that a real-sized resume finishes, so a latency regression fails evaluation before release
 instead of timing out for a Candidate.
 
