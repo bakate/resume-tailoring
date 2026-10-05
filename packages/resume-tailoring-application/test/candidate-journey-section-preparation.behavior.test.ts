@@ -246,6 +246,24 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectPreparedResumeWithEnDashesOnly()
   })
 
+  it('puts the achievements that prove the Job Posting first in each experience', async () => {
+    const system = createSystemUnderTest({ writtenAchievements: 'relevant-last' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectAchievementOrder(['billing', 'billing-team'])
+  })
+
+  it('keeps the written achievement order of a Normalized Resume', async () => {
+    const system = createSystemUnderTest({ writtenAchievements: 'relevant-last' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareNormalizedResume()
+
+    system.expectAchievementOrder(['billing-team', 'billing'])
+  })
+
   it('rewrites only the still incoherent section on retry when a redundancy was removed', async () => {
     const system = createSystemUnderTest({ coherence: 'redundant-projects-and-mixed-skills-twice' })
     await system.givenFailedPreparation()
@@ -379,6 +397,8 @@ type TestOptions = Readonly<{
   skillsWritingFailure?: Exclude<ResumeSectionModelFailure, 'permanent'>
   skillsWritingFailureOn?: 'rewrite'
   writtenPunctuation?: 'em-dash'
+  /** The writer lists an achievement citing only the experience context before the one the Match Analysis found relevant. */
+  writtenAchievements?: 'relevant-last'
   writtenSkills?: 'duplicated' | 'versioned' | 'uncited-on-rewrite'
   coherence?: 'mixed-projects-once' | 'mixed-projects-twice' | 'redundant-projects-always' | 'document-level-issue'
     | 'redundant-projects-and-mixed-skills-twice' | 'chronology-on-source-dates'
@@ -701,6 +721,12 @@ class SectionPreparationTestSystem {
     expect(resume).toContain(' – détail')
   }
 
+  expectAchievementOrder(achievementIds: readonly string[]) {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    const experience = this.#expectOutcome()?.session.tailoredResume?.experiences.find(({ id }) => id === 'experiences.0')
+    expect(experience?.achievements.map(({ id }) => id)).toEqual(achievementIds)
+  }
+
   expectPreparedWithoutRewriting() {
     expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
     expect(this.#writingInputs).toHaveLength(8)
@@ -781,7 +807,8 @@ function createDependencies({ options, persistence, models }: Readonly<{
             // The first rewrite cites a fact the section was not given, which fails the structure check.
             : options.writtenSkills === 'uncited-on-rewrite' && input.previousContent !== null && models.onSkillsWrite() === 1
               ? withUncitedSkills(written) : written
-        return { ok: true, value: options.writtenPunctuation === 'em-dash' ? withEmDashes(content) : content }
+        const ordered = options.writtenAchievements === 'relevant-last' ? withContextAchievementFirst(content) : content
+        return { ok: true, value: options.writtenPunctuation === 'em-dash' ? withEmDashes(ordered) : ordered }
       },
       validateFields: ({ section, fields }) => {
         const validation = section.kind === 'skills' ? models.onSkillsValidation() : 0
@@ -822,6 +849,13 @@ function withDuplicatedSkill(content: ResumeSectionContent): ResumeSectionConten
   const first = content.kind === 'skills' ? content.groups[0]?.items[0] : undefined
   if (content.kind !== 'skills' || first === undefined) return content
   return { ...content, groups: [...content.groups, { id: 'skills-copy', category: null, items: [{ ...first, id: `${first.id}-copy` }] }] }
+}
+
+function withContextAchievementFirst(content: ResumeSectionContent): ResumeSectionContent {
+  if (content.kind !== 'experience' || content.experience.id !== 'experiences.0') return content
+  return { kind: 'experience', experience: { ...content.experience, achievements: [
+    { id: 'billing-team', text: 'Worked in the customer billing team', factIds: ['source-fact-experiences-0-context-0'] },
+    ...content.experience.achievements] } }
 }
 
 /** Appends an em-dashed detail to every written field, as a writing model often does. */
