@@ -22,10 +22,13 @@ export function validateMatchEvidence({
   const requirementById = new Map(requirements.map((requirement) => [requirement.id, requirement]))
   const candidateFactById = new Map(candidateFacts.map((fact) => [fact.id, fact]))
   const evidenceByRequirementId = new Map<string, MatchEvidence>()
+  // Several proposals may cover one requirement; the first verified one with the strongest coverage stands.
   for (const proposal of proposedEvidence) {
-    if (evidenceByRequirementId.has(proposal.requirementId)) continue
+    if (evidenceByRequirementId.get(proposal.requirementId)?.coverage === 'covered') continue
     const evidence = validateEvidenceProposal({ candidateFactById, proposal, requirementById })
-    if (evidence !== null) evidenceByRequirementId.set(proposal.requirementId, evidence)
+    if (evidence !== null && (evidence.coverage === 'covered' || !evidenceByRequirementId.has(proposal.requirementId))) {
+      evidenceByRequirementId.set(proposal.requirementId, evidence)
+    }
   }
   return [...evidenceByRequirementId.values()]
 }
@@ -262,8 +265,11 @@ function isLikelyRoleTitle({ factContext, factExcerpt }: Readonly<{
 }>) {
   if (!hasTitleLikeStart({ factContext, factExcerpt })) return false
   const words = factContext.match(/\p{L}[\p{L}\p{M}+#.-]*/gu) ?? []
-  const titleWords = words.filter((word) => !titleConnectorTerms.has(normalizeText({ value: word })))
-  if (titleWords.length === 0) return false
+  const connectedWords = words.filter((word) => !titleConnectorTerms.has(normalizeText({ value: word })))
+  if (connectedWords.length === 0) return false
+  // An acronym is capitalized whatever it names ("IA", "SDK"), so only a title made of acronyms alone ("CTO") counts them.
+  const wordsWithoutAcronyms = connectedWords.filter((word) => !acronymPattern.test(word))
+  const titleWords = wordsWithoutAcronyms.length === 0 ? connectedWords : wordsWithoutAcronyms
   const titleCaseWords = titleWords.filter((word) => /^\p{Lu}/u.test(word))
   return titleCaseWords.length / titleWords.length >= 0.75
 }
@@ -316,3 +322,4 @@ const durationPattern = /\b(\d+)(?:\s+(?:to\s+|a\s+)?\d+)?\s*\+?\s*(years?|yrs?|
 const thousandsSeparatorPattern = /(?<=\d)[,\s](?=\d{3}(?!\d))/gu
 const scalePattern = /\b(\d+(?:[.,]\d+)?)\s*(k|m|millions?|thousands?)?\s*(users?|requests?|transactions?|people|engineers?|developers?)\b/gu
 const titleConnectorTerms = new Set(['at', 'chez', 'de', 'of'])
+const acronymPattern = /^\p{Lu}{2,}$/u

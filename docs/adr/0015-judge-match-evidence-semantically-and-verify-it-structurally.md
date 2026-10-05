@@ -12,3 +12,5 @@ Lexical proof made reformulated evidence unprovable. A full-stack Next.js record
 ## Consequences
 
 Evaluation must measure recall on positive cases as well as rejection of traps. Related but distinct capabilities are reported as Adjacent Evidence. They never change Requirement Coverage, and the Tailored Resume never claims them.
+
+One judgment at low reasoning effort misses evidence that another finds: the same Candidate and Job Posting scored from 19 to 42. Each Match Analysis therefore asks two independent judgments and verifies all their proposals; when several verified links cover one Job Requirement, the strongest coverage stands. Combining stays safe because every link passes the same structural verification, and the analysis completes when one judgment fails.

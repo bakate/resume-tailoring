@@ -169,6 +169,9 @@ async function analyzeExtractedJobPosting({
   }) } as const
 }
 
+/** Independent model judgments of one Match Analysis; their verified evidence is combined (ADR-0015). */
+const matchEvidenceJudgmentCount = 2
+
 async function analyzeCandidateFacts({
   candidateFacts,
   matchEvidenceMatcher,
@@ -179,15 +182,17 @@ async function analyzeCandidateFacts({
   requirements: readonly JobRequirement[]
 }>) {
   const engineFacts = mapCandidateFacts({ candidateFacts })
-  const proposalResult = await matchEvidenceMatcher.match(
-    { candidateFacts: engineFacts, requirements },
-  )
-  if (!proposalResult.ok) return proposalResult
+  // One judgment misses evidence another finds, so the engine verifies the proposals of both and keeps the strongest.
+  const judgments = await Promise.all(Array.from({ length: matchEvidenceJudgmentCount },
+    () => matchEvidenceMatcher.match({ candidateFacts: engineFacts, requirements })))
+  const proposals = judgments.flatMap((judgment) => judgment.ok ? [judgment.value] : [])
+  const failedJudgment = judgments.find((judgment) => !judgment.ok)
+  if (proposals.length === 0 && failedJudgment !== undefined) return failedJudgment
   const analysisResult = analyzeResumeMatch({
     candidateFacts: engineFacts,
-    proposedAdjacentEvidence: proposalResult.value.adjacentEvidence,
-    proposedEvidence: proposalResult.value.evidence,
-    proposedRelevance: proposalResult.value.relevance,
+    proposedAdjacentEvidence: proposals.flatMap(({ adjacentEvidence }) => adjacentEvidence),
+    proposedEvidence: proposals.flatMap(({ evidence }) => evidence),
+    proposedRelevance: proposals.flatMap(({ relevance }) => relevance),
     requirements,
   })
   if (!analysisResult.ok) return matchEvidenceUnavailableResult
