@@ -126,7 +126,7 @@ function createInvalidModelOutputResult({ cause }: Readonly<{ cause: InvalidMode
   return invalidModelOutputResult
 }
 
-// The matching engine verifies each proposal structurally and keeps or discards it on its own (ADR-0015).
+// The matching engine verifies each proposal structurally and keeps or discards it on its own.
 function acceptProposal({ proposal }: Readonly<{ proposal: z.infer<typeof matchEvidenceProposalSchema> }>) {
   console.info(JSON.stringify({
     category: 'privacy-safe-openai-request',

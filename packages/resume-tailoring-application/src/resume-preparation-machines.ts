@@ -406,7 +406,7 @@ function readPlannedSections({ plan, restored }: Readonly<{
 
 /**
  * A validated section is kept when its key is still planned and it still passes the deterministic structure checks,
- * which include citing only attested Candidate Facts. It is not validated by a model again (ADR-0016).
+ * which include citing only attested Candidate Facts. It is not validated by a model again.
  */
 function restoreValidatedSections({ context, plan }: Readonly<{
   context: ResumePreparationMachineContext; plan: readonly ResumeSectionPlanEntry[]
@@ -458,7 +458,7 @@ function recordPreparationCompleted({ context, outcome }: Readonly<{
 
 /**
  * Writes the deterministic section plan with at most four section actors at a time, then checks the assembled
- * document once for coherence and language. `prepared` is reachable only when both have passed (ADR-0016).
+ * document once for coherence and language. `prepared` is reachable only when both have passed.
  */
 export const resumePreparationMachine = setup({
   types: {} as {

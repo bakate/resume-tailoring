@@ -45,7 +45,7 @@ export type JobRequirement = Readonly<{
 }>
 
 // Short contiguous excerpts quoted verbatim from each side; they may reformulate or
-// translate each other and are verified structurally, not compared as terms (ADR-0015).
+// translate each other and are verified structurally, not compared as terms.
 export type ProposedFactMatch = Readonly<{
   factExcerpt: string
   factId: string
@@ -64,7 +64,7 @@ export type ProposedRelevantFact = Readonly<{
 }>
 
 // A related but distinct capability cited next to an uncovered requirement; it never
-// changes Requirement Coverage, the Match Score, or Generation Eligibility (ADR-0015).
+// changes Requirement Coverage, the Match Score, or Generation Eligibility.
 export type ProposedAdjacentEvidence = Readonly<{
   factMatches: readonly Readonly<{ factExcerpt: string; factId: string }>[]
   requirementId: string
@@ -113,7 +113,7 @@ export type MatchAnalysisResult =
   | Readonly<{ error: MatchAnalysisFailure; ok: false }>
 
 /**
- * Validates every model proposal structurally, once, and keeps or discards each on its own (ADR-0015): callers pass
+ * Validates every model proposal structurally, once, and keeps or discards each on its own: callers pass
  * raw Match Evidence, Adjacent Evidence and relevance proposals.
  */
 export function analyzeResumeMatch({

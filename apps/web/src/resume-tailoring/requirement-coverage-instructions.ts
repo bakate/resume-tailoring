@@ -1,5 +1,5 @@
 // Requirement Coverage rules from CONTEXT.md shared by every matching prompt. The model judges
-// equivalence; the matching engine verifies the quoted excerpts structurally (ADR-0015).
+// equivalence; the matching engine verifies the quoted excerpts structurally.
 export const requirementCoverageInstructions = [
   'Judge whether Candidate Facts show the same capability as each Job Requirement, even in different words or another language.',
   'Use covered when Candidate Facts show the same capability at its full scope, including any explicit duration, scale, level, seniority, or production constraint.',

@@ -47,7 +47,7 @@ export type SectionPreparationReport = Readonly<{
 }>
 
 /**
- * Qualifies section-by-section preparation on a real-sized resume (ADR-0016). Each Resume Section of the plan must
+ * Qualifies section-by-section preparation on a real-sized resume. Each Resume Section of the plan must
  * meet the p95 budget across runs, the slowest run the wall-time budget, and every run must end prepared, which
  * the preparation guard reaches only when every section is validated and the coherence check passed.
  */

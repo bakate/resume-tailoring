@@ -9,7 +9,7 @@ import { z } from 'zod'
 
 import { createOpenAiJobMatchEvidenceMatcher } from './openai-job-match-evidence-matcher'
 
-// Live evaluation of Requirement Coverage judged by the model and verified by the engine (ADR-0015).
+// Live evaluation of Requirement Coverage judged by the model and verified by the engine.
 // Positive cases measure recall; traps must never receive more coverage than the rules allow,
 // and a related but distinct capability must surface as Adjacent Evidence next to its gap.
 describe('OpenAI Job Match evidence live evaluation', () => {

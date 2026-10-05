@@ -1,3 +1,0 @@
-# Collectively attest imported Candidate Facts
-
-Supplying a Source Document and continuing after extraction collectively attests its usable Candidate Facts; the Candidate does not review or confirm every extracted fact. The application asks only for targeted resolution of Critical Ambiguities and keeps an optional detailed Source Profile inspection available outside the required journey. This accepts that the Candidate's own document may contain mistakes in exchange for removing a high-friction review ceremony, while preserving correction and the provenance requirements defined by ADR-0001 and ADR-0009.

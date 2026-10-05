@@ -1167,7 +1167,7 @@ function readJourneyPhase(phase: PreparationPhase | 'tailored-resume-preparation
 }
 
 /**
- * The Journey stays the only writer of the Candidate Session (ADR-0011): each snapshot reported by the
+ * The Journey stays the only writer of the Candidate Session: each snapshot reported by the
  * preparation machine is saved with the preparation, which also keeps validated sections after a failure.
  */
 function saveResumeSectionsProgress({ context, sections }: Readonly<{

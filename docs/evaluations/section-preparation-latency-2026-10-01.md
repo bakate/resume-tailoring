@@ -1,7 +1,7 @@
 # Section preparation latency on a real-sized resume (BAK-71, 2026-10-01)
 
-Scope: model qualification for section-by-section preparation of the Tailored Resume (ADR-0016, spec
-[Section-by-Section Resume Preparation](../specs/section-by-section-resume-preparation.md)). It
+Scope: model qualification for section-by-section preparation of the Tailored Resume (BAK-108,
+spec BAK-67, Section-by-Section Resume Preparation). It
 checks that a real-sized resume finishes, so a latency regression fails evaluation before release
 instead of timing out for a Candidate.
 
@@ -140,7 +140,7 @@ the structured role.
   address the remaining failure.
 - **Coherence rejections need a separate investigation** before release. The investigation
   should decide whether the coherence check is right (sections independently repeating the same
-  achievement, which per-section writing cannot see) or a false positive. ADR-0016 keeps the
+  achievement, which per-section writing cannot see) or a false positive. BAK-108 keeps the
   validated sections visible with `correct-content` recovery, but the Candidate cannot tell what
   to correct. Options for that decision:
   - record a content-free reason with the coherence verdict;
@@ -154,6 +154,6 @@ the structured role.
   role at `low` reasoning effort first. Reasoning effort is the cheapest change, and section
   inputs are now small.
 - If only the wall time fails, look at waves first: 13 sections at 4 concurrent is 4 waves.
-  Raising concurrency is a separate decision under ADR-0016.
+  Raising concurrency is a separate decision under BAK-108.
 - If a section times out or fails validation, that is a correctness finding, not only a latency
   finding. Review it before any model change.

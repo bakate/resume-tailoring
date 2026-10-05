@@ -5,7 +5,7 @@ export type CandidateJourneyController = ReturnType<typeof useCandidateJourneyCo
 
 const CandidateJourneyContext = createContext<CandidateJourneyController | null>(null)
 
-/** Shares one Candidate Journey actor between the intake and result routes, so navigation never restarts it (ADR-0016). */
+/** Shares one Candidate Journey actor between the intake and result routes, so navigation never restarts it. */
 export const CandidateJourneyControllerProvider = CandidateJourneyContext.Provider
 
 export function useCandidateJourney(): CandidateJourneyController {

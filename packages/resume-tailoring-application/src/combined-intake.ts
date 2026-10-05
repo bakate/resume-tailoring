@@ -18,7 +18,7 @@ export type CombinedIntakeRequest = Readonly<{
   purpose?: 'tailored' | 'normalized'
   correction?: Readonly<{ ambiguityId: `critical-ambiguity-${string}`; answer: string }>
 }>
-/** Progress before the Resume Sections are written; the sections snapshot reports the rest (ADR-0016). */
+/** Progress before the Resume Sections are written; the sections snapshot reports the rest. */
 export type PreparationPhase = 'extracting-source' | 'extracting-posting' | 'matching'
 export type CombinedIntakeOutcome =
   | Readonly<{ status: 'prepared'; session: CandidateSession; revision: string }>

@@ -41,8 +41,8 @@ export function useRenderedResume({ document, renderDocument, unsupportedFieldId
 }
 
 /**
- * The photo lives in the Candidate Session, so it survives reloads and navigation and is deleted with the session
- * (ADR-0002). A chosen file is only stored once it reads as an accepted image; until then the preview waits.
+ * The photo lives in the Candidate Session, so it survives reloads and navigation and is deleted with the session.
+ * A chosen file is only stored once it reads as an accepted image; until then the preview waits.
  */
 export function useResumePhoto({ photo, onChange }: Readonly<{
   photo: ResumePhoto | null; onChange: (photo: ResumePhoto | null) => void

@@ -26,7 +26,7 @@ export const writingModelEvaluationBaseline = {
 } as const satisfies ModelEvaluationBaseline
 
 /**
- * Latency budgets for section-by-section preparation of the real-sized resume (ADR-0016). A section is measured
+ * Latency budgets for section-by-section preparation of the real-sized resume. A section is measured
  * from its first writing call to its last call, retries included; the preparation from planning to coherence.
  */
 export const sectionPreparationBudgets = {

@@ -47,7 +47,7 @@ export type MatchEvidence = Readonly<{
   requirementId: JobRequirementId
 }>
 
-// Shown next to an uncovered Job Requirement; never changes Requirement Coverage (ADR-0015).
+// Shown next to an uncovered Job Requirement; never changes Requirement Coverage.
 export type AdjacentEvidence = Readonly<{
   factIds: readonly string[]
   requirementId: JobRequirementId

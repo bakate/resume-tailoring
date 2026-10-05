@@ -1,7 +1,7 @@
 import { containsContactDetail, minimizeSensitiveContent } from './content-privacy'
 
 /**
- * Detects the Candidate name locally so it never reaches the Language Model Provider (ADR-0002).
+ * Detects the Candidate name locally so it never reaches the Language Model Provider.
  * The heuristic prefers no name to a wrong one: the Candidate can always type it before export.
  */
 export function detectCandidateName({ content }: Readonly<{ content: string }>): string | null {
