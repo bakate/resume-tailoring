@@ -1,6 +1,7 @@
 import { unavailableResumeRender } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeRenderRequest, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import type { resumeRenderFailureCategories } from '@resume-tailoring/application/privacy-safe-telemetry'
+import { apiFailureSchema } from '../../api-failure'
 import { resumeRenderResponseSchema } from '../../candidate-journey/resume-render-schema'
 import type { PrivacySafeTelemetry, ResumeDocumentRenderer } from '@resume-tailoring/application/ports'
 
@@ -44,17 +45,20 @@ async function attemptRender({ input, dependencies }: Readonly<{
   } catch (error) {
     return failed(error instanceof DOMException && error.name === 'TimeoutError' ? 'timeout' : 'network')
   }
-  if (!response.ok) return failed(classifyRejectedResponse(response.status))
+  if (!response.ok) return failed(await classifyRejectedResponse(response))
   const parsed = resumeRenderResponseSchema.safeParse(await response.json().catch(() => undefined))
   if (!parsed.success) return failed('schema')
   const { assessment } = parsed.data
   if (assessment.layout.revision !== input.draft.revision
     || assessment.exportEligibility.revision !== input.draft.revision) return failed('revision-mismatch')
-  if (assessment.layout.status === 'unavailable') return failed('render')
   return { ok: true, result: parsed.data }
 }
 
-function classifyRejectedResponse(status: number): RenderFailureCategory {
+/** The server failed to render when it answers provider-unavailable; a bare 5xx comes from the infrastructure. */
+async function classifyRejectedResponse(response: Response): Promise<RenderFailureCategory> {
+  const failure = apiFailureSchema.safeParse(await response.json().catch(() => undefined))
+  if (failure.success && failure.data.error.type === 'provider-unavailable') return 'render'
+  const { status } = response
   if (status === 504) return 'timeout'
   if (status >= 500 || status === 429) return 'server'
   if (status === 401 || status === 403) return 'access'

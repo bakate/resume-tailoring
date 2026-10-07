@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 import { z } from 'zod'
 
+import { failureResponse } from '../api-failure'
 import {
   createDemoOriginGuardResponse,
   readDemoAccessDecision,
@@ -29,7 +30,7 @@ function readAccess({ request }: Readonly<{ request: Request }>) {
     cookieHeader: request.headers.get('cookie') ?? '',
     environment: process.env,
   })
-  if (!decision.ok) return createFailureResponse({ status: 503, type: decision.error.type })
+  if (!decision.ok) return failureResponse({ type: decision.error.type })
   return decision.value.access === 'granted'
     ? Response.json({ ok: true, value: { access: 'granted' } }, { headers: privateHeaders })
     : Response.json({ ok: true, value: decision.value }, { status: 401, headers: privateHeaders })
@@ -39,10 +40,10 @@ async function establishAccess({ request }: Readonly<{ request: Request }>) {
   const originResponse = createDemoOriginGuardResponse({ request })
   if (originResponse !== null) return originResponse
   const environmentResult = validateDemoAccessEnvironment({ environment: process.env })
-  if (!environmentResult.ok) return createFailureResponse({ status: 503, type: 'demo-access-unavailable' })
+  if (!environmentResult.ok) return failureResponse({ type: 'demo-access-unavailable' })
   if (environmentResult.value.mode === 'disabled') return createAccessResponse()
   const tokenResult = await readChallengeToken({ request })
-  if (!tokenResult.ok) return createFailureResponse({ status: 400, type: 'demo-challenge-invalid' })
+  if (!tokenResult.ok) return failureResponse({ type: 'invalid-input' })
   const verification = await verifyTurnstileToken({
     expectedHostname: environmentResult.value.publicHostname,
     secretKey: environmentResult.value.turnstileSecretKey,
@@ -50,7 +51,8 @@ async function establishAccess({ request }: Readonly<{ request: Request }>) {
   })
   return verification.ok
     ? createAccessResponse({ sessionSecret: environmentResult.value.sessionSecret })
-    : createFailureResponse({ status: 403, type: 'demo-challenge-rejected' })
+    // A rejected challenge leaves access required: the Candidate passes a new challenge.
+    : failureResponse({ type: 'demo-access-required' })
 }
 
 async function readChallengeToken({ request }: Readonly<{ request: Request }>) {
@@ -71,10 +73,6 @@ function createAccessResponse({ sessionSecret }: Readonly<{ sessionSecret?: stri
     }))
   }
   return Response.json({ ok: true, value: { access: 'granted' } }, { headers })
-}
-
-function createFailureResponse({ status, type }: Readonly<{ status: number; type: string }>) {
-  return Response.json({ ok: false, error: { type } }, { status, headers: privateHeaders })
 }
 
 const privateHeaders = {

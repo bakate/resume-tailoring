@@ -3,6 +3,7 @@ import { createCsrfMiddleware } from '@tanstack/react-start'
 
 import { createOpenAiStructuredSourceProfileExtractor } from '../adapters/server/openai-structured-source-profile-extractor'
 import { structuredSourceProfileRequestSchema } from '../candidate-journey/structured-source-profile-schema'
+import { failureResponse } from '../api-failure'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
 
@@ -19,9 +20,9 @@ async function extractStructuredSourceProfile({ request }: Readonly<{ request: R
   const accessResponse = createDemoAccessGuardResponse({ request })
   if (accessResponse !== null) return accessResponse
   const contentResult = await readProfessionalContent({ request })
-  if (!contentResult.ok) return createFailureResponse({ status: contentResult.status })
+  if (!contentResult.ok) return failureResponse({ type: contentResult.type })
   const environmentResult = validateServerEnvironment({ environment: process.env })
-  if (!environmentResult.ok) return createFailureResponse({ status: 503 })
+  if (!environmentResult.ok) return failureResponse({ type: 'service-misconfigured' })
   const extractor = createOpenAiStructuredSourceProfileExtractor({
     apiKey: environmentResult.value.openAiApiKey,
     model: environmentResult.value.openAiStructuredModel,
@@ -30,7 +31,7 @@ async function extractStructuredSourceProfile({ request }: Readonly<{ request: R
   const result = await extractor.extract({ professionalContent: contentResult.value })
   return result.ok
     ? Response.json(result, { headers: privateHeaders })
-    : createFailureResponse({ status: 502 })
+    : failureResponse({ type: 'provider-unavailable' })
 }
 
 async function readProfessionalContent({ request }: Readonly<{ request: Request }>) {
@@ -40,17 +41,10 @@ async function readProfessionalContent({ request }: Readonly<{ request: Request 
     const isOversized = result.error.issues.some(
       (issue) => issue.code === 'too_big' && issue.path[0] === 'professionalContent',
     )
-    return { ok: false, status: isOversized ? 413 : 400 } as const
+    return { ok: false, type: isOversized ? 'input-too-large' : 'invalid-input' } as const
   } catch {
-    return { ok: false, status: 400 } as const
+    return { ok: false, type: 'invalid-input' } as const
   }
-}
-
-function createFailureResponse({ status }: Readonly<{ status: number }>) {
-  return Response.json(
-    { ok: false, error: 'source-profile-extraction-unavailable' },
-    { headers: privateHeaders, status },
-  )
 }
 
 const privateHeaders = {

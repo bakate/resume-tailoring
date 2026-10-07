@@ -18,7 +18,6 @@ export const resumeRenderResponseSchema = z.strictObject({
     layout: z.discriminatedUnion('status', [
       z.strictObject({ status: z.literal('fits'), revision, pageCount }),
       z.strictObject({ status: z.literal('overflow'), revision, pageCount: z.number().int().min(3) }),
-      z.strictObject({ status: z.literal('unavailable'), revision }),
     ]),
     exportEligibility: z.discriminatedUnion('status', [
       z.strictObject({ status: z.literal('eligible'), revision, pageCount }),

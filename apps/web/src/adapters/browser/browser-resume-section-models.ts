@@ -1,8 +1,10 @@
 import { z } from 'zod'
-import type { ResumeSectionModelResult } from '@resume-tailoring/application/candidate-journey'
+import type { ResumeSectionModelFailure, ResumeSectionModelResult } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeCoherenceChecker, ResumeFieldValidator, ResumeSectionWriter } from '@resume-tailoring/application/ports'
+import { apiFailureSchema } from '../../api-failure'
+import type { ApiFailureType } from '../../api-failure'
 import { resumeDocumentCoherenceSchema, resumeFieldValidationResponseSchema, resumeModelUsageSchema, resumeSectionContentSchema,
-  resumeSectionModelFailureSchema } from '../../candidate-journey/resume-document-schemas'
+} from '../../candidate-journey/resume-document-schemas'
 
 export function createBrowserResumeSectionWriter({ request = fetch }: Readonly<{ request?: typeof fetch }> = {}): ResumeSectionWriter {
   return { write: (input) => postResumeModel({ request, input, path: '/api/resume-section-writing', schema: resumeSectionContentSchema }) }
@@ -31,12 +33,25 @@ async function readModelResponse<TValue>({ response, schema }: Readonly<{
   response: Response; schema: z.ZodType<TValue>
 }>): Promise<ResumeSectionModelResult<TValue>> {
   try {
-    const result = z.union([z.strictObject({ ok: z.literal(true), value: schema, usage: resumeModelUsageSchema.optional() }),
-      resumeSectionModelFailureSchema]).safeParse(await response.json())
-    if (!result.success) return permanent
-    if (!response.ok && result.data.ok) return permanent
-    return result.data
+    const body: unknown = await response.json()
+    if (!response.ok) return readModelFailure(body)
+    const result = z.strictObject({ ok: z.literal(true), value: schema, usage: resumeModelUsageSchema.optional() }).safeParse(body)
+    return result.success ? result.data : permanent
   } catch { return permanent }
+}
+
+function readModelFailure(body: unknown): ResumeSectionModelResult<never> {
+  const failure = apiFailureSchema.safeParse(body)
+  if (!failure.success) return permanent
+  const { error, usage } = failure.data
+  return { ok: false, error: { type: sectionModelFailures[error.type] ?? 'permanent' }, ...(usage === undefined ? {} : { usage }) }
+}
+
+/** Only failures a second attempt can overcome stay transient; the rest keep their current meaning. */
+const sectionModelFailures: Partial<Record<ApiFailureType, ResumeSectionModelFailure>> = {
+  timeout: 'timeout',
+  'provider-unavailable': 'transient',
+  'rate-limited': 'transient',
 }
 
 const permanent = { ok: false, error: { type: 'permanent' } } as const

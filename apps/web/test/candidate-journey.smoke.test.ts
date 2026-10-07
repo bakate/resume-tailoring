@@ -385,14 +385,14 @@ class CandidateJourneyTestSystem {
   }
 
   async #installModelAdapters() {
-    await this.#page.route('**/api/resume-claim-validation', (route) => route.fulfill({ json: {
-      ok: false, error: { type: 'unavailable' },
+    await this.#page.route('**/api/resume-claim-validation', (route) => route.fulfill({ status: 502, json: {
+      ok: false, error: { type: 'provider-unavailable' },
     } }))
     await this.#page.route('**/api/structured-source-profile-extraction', (route) => route.fulfill({ json: {
       ok: true, value: extractionFor(this.#scenario),
     } }))
-    await this.#page.route('**/api/explainable-job-posting-extraction', (route) => route.fulfill({ json: this.#scenario === 'posting-extraction-unavailable'
-      ? { ok: false, error: 'job-posting-extraction-unavailable' } : {
+    await this.#page.route('**/api/explainable-job-posting-extraction', (route) => route.fulfill(this.#scenario === 'posting-extraction-unavailable'
+      ? { status: 502, json: { ok: false, error: { type: 'provider-unavailable' } } } : { json: {
       ok: true, value: { targetRole: structuredResumeJobMatch.targetRole, practicalConstraints: [], requirements: requirementsFor(this.#scenario) },
     } }))
     await this.#page.route('**/api/explainable-match-evidence', (route) => route.fulfill({ json: {
@@ -405,7 +405,7 @@ class CandidateJourneyTestSystem {
       if (this.#scenario === 'held-skills' && (route.request().postDataJSON() as ResumeSectionWritingInput).section.kind === 'skills') {
         return this.#heldSkills.then(() => route.fallback())
       }
-      if (this.#scenario === 'unavailable') return route.fulfill({ json: { ok: false, error: { type: 'permanent' } } })
+      if (this.#scenario === 'unavailable') return route.fulfill({ status: 502, json: { ok: false, error: { type: 'invalid-provider-response' } } })
       if (this.#scenario === 'expired-access' && !this.#hasTriggeredExpiry) {
         this.#hasTriggeredExpiry = true
         this.#isAccessExpired = true
@@ -497,14 +497,14 @@ class CandidateJourneyTestSystem {
 
   async givenFailedResumeWithOptionalCorrection() {
     await this.givenCombinedIntake()
-    await this.#page.route('**/api/resume-section-writing', (route) => route.fulfill({ json: { ok: false, error: { type: 'permanent' } } }))
+    await this.#page.route('**/api/resume-section-writing', (route) => route.fulfill({ status: 502, json: { ok: false, error: { type: 'invalid-provider-response' } } }))
     await this.generateResume()
     await expect(this.#page.getByText('Preparation could not finish.', { exact: false }).first()).toBeVisible()
     await this.#page.getByRole('button', { name: 'Back to my documents', exact: true }).click()
     await this.#page.getByText('Inspect or enrich your source evidence', { exact: true }).click()
     await this.#page.unroute('**/api/resume-section-writing')
     await this.#installModelAdapters()
-    await this.#page.route('**/api/structured-source-profile-extraction', (route) => route.fulfill({ json: { ok: false, error: 'source-profile-extraction-unavailable' } }))
+    await this.#page.route('**/api/structured-source-profile-extraction', (route) => route.fulfill({ status: 502, json: { ok: false, error: { type: 'provider-unavailable' } } }))
   }
 
   async correctSourceAndRetry() {

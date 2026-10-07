@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
+import { failureResponse } from '../api-failure'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
 import { createOpenAiResumeClaimReformulator } from '../adapters/server/openai-resume-claim-service'
@@ -18,9 +19,9 @@ async function writeResumeClaims({ request }: Readonly<{ request: Request }>) {
   const accessResponse = createDemoAccessGuardResponse({ request })
   if (accessResponse !== null) return accessResponse
   const writingRequest = await readWritingRequest({ request })
-  if (!writingRequest.ok) return createFailureResponse({ status: 400 })
+  if (!writingRequest.ok) return failureResponse({ type: 'invalid-input' })
   const environment = validateServerEnvironment({ environment: process.env })
-  if (!environment.ok) return createFailureResponse({ status: 503 })
+  if (!environment.ok) return failureResponse({ type: 'service-misconfigured' })
   const reformulator = createOpenAiResumeClaimReformulator({
     apiKey: environment.value.openAiApiKey,
     model: environment.value.openAiWritingModel,
@@ -29,7 +30,7 @@ async function writeResumeClaims({ request }: Readonly<{ request: Request }>) {
   const result = await reformulateResumeClaim({ request: writingRequest.value, reformulator })
   return result.ok
     ? Response.json({ ok: true, value: { claims: result.value } }, { headers: privateHeaders })
-    : createFailureResponse({ status: 502 })
+    : failureResponse({ type: 'provider-unavailable' })
 }
 
 function reformulateResumeClaim({
@@ -51,13 +52,6 @@ async function readWritingRequest({ request }: Readonly<{ request: Request }>) {
   } catch {
     return invalidResult
   }
-}
-
-function createFailureResponse({ status }: Readonly<{ status: number }>) {
-  return Response.json(
-    { ok: false, error: { type: 'resume-claim-writing-unavailable' } },
-    { status, headers: privateHeaders },
-  )
 }
 
 const privateHeaders = {
