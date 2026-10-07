@@ -1,15 +1,17 @@
 /** The closed catalogue of API Failure types a server route answers with. */
-export type ApiFailureType =
-  | 'demo-access-required'
-  | 'demo-origin-required'
-  | 'demo-access-unavailable'
-  | 'invalid-input'
-  | 'input-too-large'
-  | 'rate-limited'
-  | 'timeout'
-  | 'provider-unavailable'
-  | 'invalid-provider-response'
-  | 'service-misconfigured'
+export const apiFailureTypes = [
+  'demo-access-required',
+  'demo-origin-required',
+  'demo-access-unavailable',
+  'invalid-input',
+  'input-too-large',
+  'rate-limited',
+  'timeout',
+  'provider-unavailable',
+  'invalid-provider-response',
+  'service-misconfigured',
+] as const
+export type ApiFailureType = typeof apiFailureTypes[number]
 
 /**
  * What a browser adapter read from a failed request: the API Failure the server answered with, `network` when no

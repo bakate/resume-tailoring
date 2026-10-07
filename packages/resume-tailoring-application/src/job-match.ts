@@ -17,6 +17,8 @@ import type {
   PracticalConstraint,
   TargetRole,
 } from '@resume-tailoring/domain/job-match'
+import { explainFailure, explainModelFailure } from './failure-cause'
+import type { ExplainedFailure } from './failure-cause'
 import type { JobPostingDocumentReader, JobPostingExtractor, MatchEvidenceMatcher } from './ports'
 
 export type {
@@ -83,10 +85,10 @@ type CreateJobMatchRequest = Readonly<{
   matchEvidenceMatcher: MatchEvidenceMatcher
 }>
 
-type CreateJobMatchResult = Promise<Readonly<{ ok: true; value: JobMatch }> | Readonly<{
+type CreateJobMatchResult = Promise<Readonly<{ ok: true; value: JobMatch }> | (Readonly<{
   ok: false
   error: JobMatchFailure
-}>>
+}> & Partial<ExplainedFailure>)>
 
 export async function createJobMatch({
   candidateFacts,
@@ -139,7 +141,7 @@ async function extractAndAnalyzeJobMatch({
   matchEvidenceMatcher: MatchEvidenceMatcher
 }>) {
   const extractionResult = await jobPostingExtractor.extract({ jobPostingContent: content })
-  if (!extractionResult.ok) return extractionResult
+  if (!extractionResult.ok) return explainModelFailure(extractionResult)
   const extraction = readSourceBackedExtraction({ content, extraction: extractionResult.value })
   if (extraction === null) return extractionUnavailableResult
   return analyzeExtractedJobPosting({
@@ -186,8 +188,8 @@ async function analyzeCandidateFacts({
   const judgments = await Promise.all(Array.from({ length: matchEvidenceJudgmentCount },
     () => matchEvidenceMatcher.match({ candidateFacts: engineFacts, requirements })))
   const proposals = judgments.flatMap((judgment) => judgment.ok ? [judgment.value] : [])
-  const failedJudgment = judgments.find((judgment) => !judgment.ok)
-  if (proposals.length === 0 && failedJudgment !== undefined) return failedJudgment
+  const failedJudgment = judgments.flatMap((judgment) => judgment.ok ? [] : [judgment])[0]
+  if (proposals.length === 0 && failedJudgment !== undefined) return explainModelFailure(failedJudgment)
   const analysisResult = analyzeResumeMatch({
     candidateFacts: engineFacts,
     proposedAdjacentEvidence: proposals.flatMap(({ adjacentEvidence }) => adjacentEvidence),
@@ -501,11 +503,14 @@ const negatedImportancePatterns = [
 ] as const
 const emptyResult = { ok: false, error: 'empty-job-posting' } as const
 const oversizedResult = { ok: false, error: 'oversized-job-posting' } as const
+// The provider answered with requirements or evidence the source does not back, so asking again may succeed.
 const extractionUnavailableResult = {
   ok: false,
   error: 'job-posting-extraction-unavailable',
+  ...explainFailure({ type: 'invalid-provider-response' }),
 } as const
 const matchEvidenceUnavailableResult = {
   ok: false,
   error: 'match-evidence-unavailable',
+  ...explainFailure({ type: 'invalid-provider-response' }),
 } as const

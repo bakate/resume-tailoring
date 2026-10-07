@@ -56,25 +56,25 @@ describe('Candidate Journey ports over the Language Model Gateway', () => {
   })
 
   it.each([
-    [{ type: 'processing-consent-required' }, 'consent-required'],
-    [{ type: 'language-model-unavailable', cause: 'timeout' }, 'timeout'],
-    [{ type: 'language-model-unavailable', cause: 'permanent', transient: true }, 'permanent'],
-    [{ type: 'language-model-unavailable', transient: true }, 'transient'],
-    [{ type: 'language-model-unavailable' }, 'permanent'],
-  ] as const)('classifies the gateway failure %o as a %s section model failure', async (error, failure) => {
+    [{ type: 'processing-consent-required' }, { type: 'consent-required' }],
+    [{ type: 'language-model-unavailable', apiFailure: { type: 'timeout' } }, { type: 'timeout' }],
+    [{ type: 'language-model-unavailable', apiFailure: { type: 'rate-limited', retryAfterSeconds: 20 } },
+      { type: 'rate-limited', retryAfterSeconds: 20 }],
+    [{ type: 'language-model-unavailable' }, { type: 'unexpected-response' }],
+  ] as const)('reads the gateway failure %o as the section model failure %o', async (error, failure) => {
     const models = createGatewayResumeSectionModels({ languageModelGateway: createAnsweringGateway({ ok: false, error }) })
 
     const result = await models.checkCoherence(coherenceInput)
 
-    expect(result).toEqual({ ok: false, error: { type: failure } })
+    expect(result).toEqual({ ok: false, error: failure })
   })
 
-  it('treats a section model answer for another operation as a permanent failure', async () => {
+  it('treats a section model answer for another operation as an unexpected response', async () => {
     const models = createGatewayResumeSectionModels({ languageModelGateway: createAnsweringGateway(otherOperation) })
 
     const result = await models.validateFields(sectionValidationInput)
 
-    expect(result).toEqual({ ok: false, error: { type: 'permanent' } })
+    expect(result).toEqual({ ok: false, error: { type: 'unexpected-response' } })
   })
 
   it('keeps the model usage of a section model answer', async () => {

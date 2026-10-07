@@ -78,17 +78,8 @@ describe('Candidate Journey section-by-section resume preparation', () => {
       'languages', 'projects', 'certifications'], failed: ['skills'] })
   })
 
-  it('never retries a section whose writing timed out', async () => {
+  it('rewrites a section once after a writing timeout', async () => {
     const system = createSystemUnderTest({ skillsWritingFailure: 'timeout' })
-    await system.givenMatchedCandidateSession()
-
-    await system.prepareTailoredResume()
-
-    system.expectSkillsWrittenOnceAndPreparationRetryable()
-  })
-
-  it('rewrites a section once after a transient writing failure', async () => {
-    const system = createSystemUnderTest({ skillsWritingFailure: 'transient' })
     await system.givenMatchedCandidateSession()
 
     await system.prepareTailoredResume()
@@ -133,8 +124,8 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectSkillsRewrittenWithBothRejectionsAndTheirLatestVersion()
   })
 
-  it('keeps the coherence feedback when writing a section rewritten for coherence fails transiently', async () => {
-    const system = createSystemUnderTest({ coherence: 'mixed-skills-once', skillsWritingFailure: 'transient',
+  it('keeps the coherence feedback when writing a section rewritten for coherence gets an invalid provider response', async () => {
+    const system = createSystemUnderTest({ coherence: 'mixed-skills-once', skillsWritingFailure: 'invalid-provider-response',
       skillsWritingFailureOn: 'rewrite' })
     await system.givenMatchedCandidateSession()
 
@@ -349,7 +340,7 @@ describe('Candidate Journey section-by-section resume preparation', () => {
   })
 
   it('rewrites only the sections that are not yet validated when a failed preparation is retried', async () => {
-    const system = createSystemUnderTest({ skillsWritingFailure: 'timeout' })
+    const system = createSystemUnderTest({ skillsWritingFailure: 'provider-unavailable' })
     await system.givenFailedPreparation()
 
     await system.retryPreparation()
@@ -367,7 +358,7 @@ describe('Candidate Journey section-by-section resume preparation', () => {
   })
 
   it('rewrites a saved section that cites a Candidate Fact that is no longer attested', async () => {
-    const system = createSystemUnderTest({ skillsWritingFailure: 'timeout' })
+    const system = createSystemUnderTest({ skillsWritingFailure: 'provider-unavailable' })
     await system.givenFailedPreparation()
     await system.givenReloadWithSavedSectionCitingUnattestedFact('education')
 
@@ -394,7 +385,7 @@ type TestOptions = Readonly<{
   writing?: 'slow'
   heldSection?: 'skills'
   skillsValidation?: 'unsupported-once' | 'unsupported-twice' | 'unsupported-on-rewrite'
-  skillsWritingFailure?: Exclude<ResumeSectionModelFailure, 'permanent'>
+  skillsWritingFailure?: ResumeSectionModelFailure
   skillsWritingFailureOn?: 'rewrite'
   writtenPunctuation?: 'em-dash'
   /** The writer lists an achievement citing only the experience context before the one the Match Analysis found relevant. */
@@ -731,11 +722,6 @@ class SectionPreparationTestSystem {
     expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
     expect(this.#writingInputs).toHaveLength(8)
     expect(this.#coherenceChecks).toBe(1)
-  }
-
-  expectSkillsWrittenOnceAndPreparationRetryable() {
-    expect(this.#writtenSectionKeys().filter((key) => key === 'skills')).toHaveLength(1)
-    this.expectPreparationFailure({ reason: 'unavailable', recovery: 'retry' })
   }
 
   expectPreparationFailure(failure: Readonly<{ reason: string; recovery: string }>) {

@@ -167,6 +167,18 @@ describe('browser Candidate Session persistence', () => {
     expect(restored).toEqual({ ok: true, value: { notice: null, session } })
   })
 
+  it.each([
+    { type: 'rate-limited', retryAfterSeconds: 20 },
+    { type: 'access-required' },
+  ] as const)('restores the Failure Cause of a failed preparation ($type)', (failureCause) => {
+    const session: CandidateSession = { ...preparingCandidateSession, preparation: { ...preparingCandidateSession.preparation,
+      status: 'failed', failure: 'source-profile-extraction-unavailable', failureCause } }
+
+    const restored = roundTrip({ session })
+
+    expect(restored).toEqual({ ok: true, value: { notice: null, session } })
+  })
+
   it('restores a preparation stored before section-by-section preparation', () => {
     const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage({
       initialValue: JSON.stringify(preparingCandidateSession) }) })

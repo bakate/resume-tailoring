@@ -8,9 +8,12 @@ import { assembleResumeDocumentWithOrigins, citedCandidateFacts, createSectionWr
 import type { ResumeCoherenceIssue, ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage,
   ResumeRejectedField, ResumeSectionContent, ResumeSectionModelResult, ResumeSectionPlanEntry, ResumeSectionsRequest,
   ResumeSectionWritingInput } from './resume-sections'
-import type { ResumeSectionModels } from './ports'
+import type { ReadApiFailure, ResumeSectionModels } from './ports'
+import { explainFailure, isRetryable } from './failure-cause'
+import type { ExplainedFailure } from './failure-cause'
 
-type ResumeSectionFailure = Exclude<typeof resumeSectionOutcomes[number], 'validated'>
+/** Why one Resume Section failed: its content was unsupported, or its last model call failed with this error. */
+type ResumeSectionFailure = Readonly<{ type: Exclude<typeof resumeSectionOutcomes[number], 'validated'>; retryAfterSeconds?: number }>
 
 export type ResumeSectionResult = Readonly<{
   section: ResumeSectionPlanEntry
@@ -40,12 +43,16 @@ type ResumeSectionMachineContext = ResumeSectionMachineInput & Readonly<{
 }>
 
 const noUsage: ResumeModelUsage = { inputTokens: 0, outputTokens: 0 }
-const rewritableFailures: ReadonlySet<ResumeSectionFailure> = new Set(['transient', 'permanent', 'unsupported'])
+/**
+ * Only failures a second attempt can overcome cost a rewrite: unsupported content, an invalid provider response, or a
+ * timeout. Any other failure would fail the same way again, so the Candidate is told at once.
+ */
+const rewritableFailures: ReadonlySet<ResumeSectionFailure['type']> = new Set(['unsupported', 'invalid-provider-response', 'timeout'])
 const maximumSectionAttempts = 2
 const maximumConcurrentSections = 4
 
 async function callModel<TValue>(call: () => Promise<ResumeSectionModelResult<TValue>>): Promise<ResumeSectionModelResult<TValue>> {
-  try { return await call() } catch { return { ok: false, error: { type: 'permanent' } } }
+  try { return await call() } catch { return { ok: false, error: { type: 'unexpected-response' } } }
 }
 
 const writeSection = fromPromise<ResumeSectionModelResult<ResumeSectionContent>, ResumeSectionMachineInput>(
@@ -71,30 +78,32 @@ function readWriting({ context, result }: Readonly<{
 }>): SectionStep {
   const usage = addUsage(context.usage, result.usage)
   // A failed or unstructured write rejected no field, so its retry keeps the feedback the attempt was given.
-  if (!result.ok) return { content: null, failure: result.error.type, rejectedFields: context.rejectedFields, usage }
+  if (!result.ok) return { content: null, failure: result.error, rejectedFields: context.rejectedFields, usage }
   const { section, purpose, relevantFactIds } = context.writingInput
   const content = normalizeSectionContent({ content: result.value, purpose, section, relevantFactIds })
   return hasSupportedSectionStructure({ content, input: context.writingInput })
     ? { content, failure: null, rejectedFields: [], usage }
-    : { content: null, failure: 'unsupported', rejectedFields: context.rejectedFields, usage }
+    : { content: null, failure: unsupported, rejectedFields: context.rejectedFields, usage }
 }
 
 function readValidation({ context, result }: Readonly<{
   context: ResumeSectionMachineContext; result: ResumeSectionModelResult<ResumeFieldValidation>
 }>): SectionStep {
   const usage = addUsage(context.usage, result.usage)
-  if (!result.ok) return { content: context.content, failure: result.error.type, rejectedFields: [], usage }
-  if (context.content === null) return { content: null, failure: 'unsupported', rejectedFields: [], usage }
+  if (!result.ok) return { content: context.content, failure: result.error, rejectedFields: [], usage }
+  if (context.content === null) return { content: null, failure: unsupported, rejectedFields: [], usage }
   return isSectionFullyValidated({ content: context.content, validation: result.value })
     ? { content: context.content, failure: null, rejectedFields: [], usage }
     // The coherence feedback a rewritten section started from still applies to its next rewrite.
-    : { content: context.content, failure: 'unsupported', usage, rejectedFields: [...context.writingInput.rejectedFields,
+    : { content: context.content, failure: unsupported, usage, rejectedFields: [...context.writingInput.rejectedFields,
       ...readRejectedFields({ content: context.content, validation: result.value })] }
 }
 
 function canRewrite({ context, step }: Readonly<{ context: ResumeSectionMachineContext; step: SectionStep }>) {
-  return context.attempt < maximumSectionAttempts && step.failure !== null && rewritableFailures.has(step.failure)
+  return context.attempt < maximumSectionAttempts && step.failure !== null && rewritableFailures.has(step.failure.type)
 }
+
+const unsupported: ResumeSectionFailure = { type: 'unsupported' }
 
 function addUsage(total: ResumeModelUsage, usage: ResumeModelUsage | undefined): ResumeModelUsage {
   return usage === undefined ? total
@@ -106,10 +115,10 @@ function readSectionResult(context: ResumeSectionMachineContext): ResumeSectionR
     durationMilliseconds: Math.max(0, context.now() - context.startedAt) }
   return context.failure === null && context.content !== null
     ? { ...measured, status: 'validated', content: context.content }
-    : { ...measured, status: 'failed', failure: context.failure ?? 'permanent' }
+    : { ...measured, status: 'failed', failure: context.failure ?? { type: 'unexpected-response' } }
 }
 
-/** Writes and validates one Resume Section; a rewritable failure rewrites once, a timeout never. */
+/** Writes and validates one Resume Section; a rewritable failure rewrites it once. */
 export const resumeSectionMachine = setup({
   types: {} as { context: ResumeSectionMachineContext; input: ResumeSectionMachineInput },
   actors: { writeSection, validateSectionFields },
@@ -368,27 +377,41 @@ function readPreparationOutput(context: ResumePreparationMachineContext): Resume
   return readPreparationFailure(readPreparationFailures(context))
 }
 
-function readPreparationFailures(context: ResumePreparationMachineContext): readonly PreparationFailureCause[] {
+function readPreparationFailures(context: ResumePreparationMachineContext): readonly PreparationStepFailure[] {
   const { coherence } = context
   if (coherence === null) return context.results.flatMap((result) => result.status === 'failed' ? [result.failure] : [])
-  if (!coherence.ok) return [coherence.error.type]
+  if (!coherence.ok) return [coherence.error]
   // A language mismatch naming no field gives nothing to rewrite; checking again may name one.
-  return [hasCoherenceRejections(resolveCoherence({ context, coherence }).rewrites) ? 'incoherent' : 'transient']
+  return [hasCoherenceRejections(resolveCoherence({ context, coherence }).rewrites) ? { type: 'incoherent' }
+    : { type: 'invalid-provider-response' }]
 }
 
-type PreparationFailureCause = ResumeSectionFailure | 'incoherent'
+type PreparationStepFailure = ResumeSectionFailure | Readonly<{ type: 'incoherent' }>
 
 /**
  * Several sections can fail differently in one preparation (for example one timed out, another is unsupported),
  * but the Candidate sees a single failure with a single recovery action.
  */
-function readPreparationFailure(failures: readonly PreparationFailureCause[]): ResumeOperationFailure {
-  // Without consent no call can succeed. A retry rewrites only the sections that failed, including those the
-  // coherence check still rejected, so unsupported or incoherent wording is worth retrying.
-  if (failures.includes('consent-required')) return { status: 'failed', reason: 'processing-consent-required', recovery: 'renew-consent' }
-  if (failures.includes('incoherent')) return { status: 'failed', reason: 'incoherent-content', recovery: 'retry' }
-  if (failures.includes('unsupported')) return { status: 'failed', reason: 'unsupported-content', recovery: 'retry' }
-  return { status: 'failed', reason: 'unavailable', recovery: 'retry' }
+function readPreparationFailure(failures: readonly PreparationStepFailure[]): ResumeOperationFailure {
+  // Without consent no call can succeed, and a failure a retry cannot fix needs its own Recovery first. A retry
+  // rewrites only the sections that failed, including those the coherence check still rejected, so unsupported or
+  // incoherent wording is worth retrying.
+  const has = (type: PreparationStepFailure['type']) => failures.some((failure) => failure.type === type)
+  if (has('consent-required')) return { status: 'failed', reason: 'processing-consent-required', recovery: 'renew-consent' }
+  const explained = failures.flatMap((failure) => isModelCallFailure(failure) ? [explainFailure(failure)] : [])
+  const unretryable = explained.find(({ cause }) => !isRetryable(cause))
+  if (unretryable !== undefined) return unavailableFailure(unretryable)
+  if (has('incoherent')) return { status: 'failed', reason: 'incoherent-content', recovery: 'retry' }
+  if (has('unsupported')) return { status: 'failed', reason: 'unsupported-content', recovery: 'retry' }
+  return unavailableFailure(explained[0] ?? explainFailure(undefined))
+}
+
+function isModelCallFailure(failure: PreparationStepFailure): failure is ResumeSectionFailure & ReadApiFailure {
+  return failure.type !== 'incoherent' && failure.type !== 'unsupported' && failure.type !== 'consent-required'
+}
+
+function unavailableFailure({ cause, recovery }: ExplainedFailure): ResumeOperationFailure {
+  return { status: 'failed', reason: 'unavailable', cause, recovery }
 }
 
 type ResumePreparationEvent =
@@ -445,7 +468,7 @@ function readProgressedSections({ context, event }: Readonly<{
 
 function recordSectionResult({ context, result }: Readonly<{ context: ResumePreparationMachineContext; result: ResumeSectionResult }>) {
   context.recordTelemetry({ name: 'resume-section-prepared', sectionKind: result.section.kind,
-    outcome: result.status === 'validated' ? 'validated' : result.failure, attemptCount: result.attempt,
+    outcome: result.status === 'validated' ? 'validated' : result.failure.type, attemptCount: result.attempt,
     durationMilliseconds: result.durationMilliseconds, inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens })
 }
 

@@ -9,6 +9,8 @@ import type { TailoredResumeLocale } from './tailored-resume'
 import type { ResumeOperationFailure, ResumePreparationOutcome } from './structured-resume-contract'
 import type { ResumeSectionsRequest } from './resume-sections'
 import type { CandidateJourneyDependencies } from './ports'
+import { readRecovery } from './failure-cause'
+import type { FailureCause } from './failure-cause'
 
 export type CombinedIntakeRequest = Readonly<{
   grantProcessingConsent?: true
@@ -105,7 +107,7 @@ async function prepareSource(context: PreparationContext): Promise<CombinedIntak
   if (document === null) return failPreparation({ context, detail: 'empty-document' })
   reportProgress({ context, phase: 'extracting-source' })
   const result = await createSourceIntake({ ...context.dependencies, document: restoreDocument(document) })
-  if (!result.ok) return failPreparation({ context, detail: result.error })
+  if (!result.ok) return failPreparation({ context, detail: result.error, cause: result.cause })
   const next = { ...context, preparation: { ...context.preparation, sourceIntake: result.value, sourceDocument: null } }
   if (!savePreparation(next)) return failPreparation({ context: next, detail: 'candidate-session-storage-unavailable' })
   return preparePosting(next)
@@ -126,7 +128,7 @@ async function preparePosting(context: PreparationContext): Promise<CombinedInta
       reportProgress({ context, phase: 'matching' })
       return context.dependencies.matchEvidenceMatcher.match(request)
     } } })
-  if (!result.ok) return failPreparation({ context, detail: result.error })
+  if (!result.ok) return failPreparation({ context, detail: result.error, cause: result.cause })
   const next = { ...context, preparation: { ...context.preparation, jobMatch: result.value } }
   if (!savePreparation(next)) return failPreparation({ context: next, detail: 'candidate-session-storage-unavailable' })
   return prepareDocument(next)
@@ -156,7 +158,7 @@ function publishDocument({ context, outcome }: Readonly<{
   context: PreparationContext; outcome: ResumePreparationOutcome | undefined
 }>): CombinedIntakeOutcome {
   if (outcome?.status !== 'prepared') return outcome?.status === 'failed'
-    ? failPreparation({ context, detail: outcome.reason, recovery: outcome.recovery }) : failPreparation({ context, detail: 'unavailable' })
+    ? failPreparation({ context, detail: outcome.reason, recovery: outcome.recovery, cause: outcome.cause }) : failPreparation({ context, detail: 'unavailable' })
   if (outcome.revision !== context.preparation.revision) return failPreparation({ context, detail: 'stale-result' })
   const sourceIntake = context.preparation.sourceIntake
   if (sourceIntake === null) return failPreparation({ context, detail: 'unavailable' })
@@ -191,16 +193,26 @@ function awaitCorrection(context: PreparationContext): CombinedIntakeOutcome {
   return { status: 'awaiting-correction', session: { ...context.session, preparation } }
 }
 
-function failPreparation({ context, detail, recovery }: Readonly<{
+/** A failure with a Failure Cause is kept with the preparation, so its Recovery is still offered after a reload. */
+function failPreparation({ context, detail, recovery, cause }: Readonly<{
   context: PreparationContext; detail: ResumePreparationFailure; recovery?: ResumeOperationFailure['recovery']
+  cause?: FailureCause | undefined
 }>): CombinedIntakeOutcome {
-  const preparation = { ...context.preparation, status: 'failed' as const, failure: detail }
+  const preparation = { ...context.preparation, status: 'failed' as const, failure: detail,
+    ...(cause === undefined ? {} : { failureCause: cause }) }
   savePreparation({ ...context, preparation })
   const reason = detail === 'processing-consent-required' ? detail
     : detail === 'unsupported-content' || detail === 'incoherent-content' || detail === 'stale-result' ? detail : 'unavailable'
   return { status: 'failed', reason, detail, session: { ...context.session, preparation },
-    recovery: recovery ?? (reason === 'processing-consent-required' ? 'renew-consent'
-      : reason === 'unsupported-content' ? 'correct-content' : 'retry') }
+    ...(cause === undefined ? {} : { cause }),
+    recovery: recovery ?? readFailureRecovery({ reason, cause }) }
+}
+
+function readFailureRecovery({ reason, cause }: Readonly<{
+  reason: ResumeOperationFailure['reason']; cause: FailureCause | undefined
+}>): ResumeOperationFailure['recovery'] {
+  if (cause !== undefined) return readRecovery(cause)
+  return reason === 'processing-consent-required' ? 'renew-consent' : reason === 'unsupported-content' ? 'correct-content' : 'retry'
 }
 
 function savePreparation(context: PreparationContext) {

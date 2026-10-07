@@ -220,7 +220,5 @@ function toSectionGatewayResult<TOperation extends string, TValue>({ operation, 
 }>): LanguageModelResult<Readonly<{ operation: TOperation; value: TValue; usage?: ResumeModelUsage }>> {
   if (result.ok) return { ok: true, value: { operation, value: result.value, ...(result.usage === undefined ? {} : { usage: result.usage }) } }
   if (result.error.type === 'consent-required') return { ok: false, error: { type: 'processing-consent-required' } }
-  const { apiFailure, type } = result.error
-  return { ok: false, error: { type: 'language-model-unavailable', cause: type, transient: type === 'transient',
-    ...(apiFailure === undefined ? {} : { apiFailure }) } }
+  return { ok: false, error: { type: 'language-model-unavailable', apiFailure: result.error } }
 }

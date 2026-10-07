@@ -82,15 +82,15 @@ describe('Resume section model adapters', () => {
   })
 
   it.each([['malformed', { output: [{ content: [{ type: 'output_text', text: '{}' }] }] }],
-    ['incomplete', { status: 'incomplete', output: [] }]])('fails permanently on %s output', async (_label, response) => {
+    ['incomplete', { status: 'incomplete', output: [] }]])('reports an invalid provider response on %s output', async (_label, response) => {
     const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: () => Promise.resolve(Response.json(response)) })
 
     const outcome = await writer.write(writingInput('skills'))
 
-    expect(outcome).toEqual({ ok: false, error: { type: 'permanent' } })
+    expect(outcome).toEqual({ ok: false, error: { type: 'invalid-provider-response' } })
   })
 
-  it('marks an upstream outage as transient without retrying inside the adapter', async () => {
+  it('reports an upstream outage as an unavailable provider without retrying inside the adapter', async () => {
     let requests = 0
     const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: () => {
       requests += 1
@@ -99,11 +99,20 @@ describe('Resume section model adapters', () => {
 
     const outcome = await writer.write(writingInput('skills'))
 
-    expect(outcome).toEqual({ ok: false, error: { type: 'transient' } })
+    expect(outcome).toEqual({ ok: false, error: { type: 'provider-unavailable' } })
     expect(requests).toBe(1)
   })
 
-  it('reports a request timeout as a timeout, which is never retried', async () => {
+  it('reports a provider rate limit with the delay it asks for', async () => {
+    const writer = createOpenAiResumeSectionWriter({ ...writingRole,
+      request: () => Promise.resolve(new Response(null, { status: 429, headers: { 'Retry-After': '12' } })) })
+
+    const outcome = await writer.write(writingInput('skills'))
+
+    expect(outcome).toEqual({ ok: false, error: { type: 'rate-limited', retryAfterSeconds: 12 } })
+  })
+
+  it('reports a request timeout as a timeout', async () => {
     const writer = createOpenAiResumeSectionWriter({ ...writingRole,
       request: () => Promise.reject(new DOMException('The operation timed out.', 'TimeoutError')) })
 

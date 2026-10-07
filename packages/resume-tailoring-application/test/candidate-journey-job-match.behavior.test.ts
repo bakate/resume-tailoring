@@ -388,7 +388,7 @@ function createTestDependencies({
     resumeSectionModels: createFakeResumeSectionModels({ writeSection: (input) => {
       if (resumeWriting === 'prepared') return Promise.resolve({ ok: true, value: writeResumeSectionFromFacts(input) })
       onResumeWriting(input)
-      return Promise.resolve({ ok: false, error: { type: 'permanent' } })
+      return Promise.resolve({ ok: false, error: { type: 'provider-unavailable' } })
     } }),
     createIdentifier: () => '00000000-0000-4000-8000-000000000042',
     jobPostingExtractor: createFakeJobPostingExtractor({ extract: () => Promise.resolve({ ok: true, value: readExtraction() }) }),

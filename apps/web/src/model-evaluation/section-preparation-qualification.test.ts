@@ -69,7 +69,7 @@ describe('section preparation qualification on a real-sized resume', () => {
     await measured.models.checkCoherence({ document: groupedDocument })
 
     expect(measured.readMeasurements()).toEqual({
-      coherence: { durationMilliseconds: 500, usage: { inputTokens: 30, outputTokens: 3 }, verdict: 'transient' },
+      coherence: { durationMilliseconds: 500, usage: { inputTokens: 30, outputTokens: 3 }, verdict: 'invalid-provider-response' },
       sections: [{ key: 'experiences.3', kind: 'experience', durationMilliseconds: 3_000, writingCallCount: 2,
         writingUsage: { inputTokens: 200, outputTokens: 20 }, validationUsage: { inputTokens: 30, outputTokens: 3 } }],
     })
@@ -115,7 +115,7 @@ function createClock() {
 }
 
 function createTimedModels({ clock }: Readonly<{ clock: ReturnType<typeof createClock> }>): ResumeSectionModels {
-  const failure = { ok: false, error: { type: 'transient' } } as const
+  const failure = { ok: false, error: { type: 'invalid-provider-response' } } as const
   return {
     writeSection: () => { clock.advance(1_000); return Promise.resolve({ ...failure, usage: { inputTokens: 100, outputTokens: 10 } }) },
     validateFields: () => { clock.advance(1_000); return Promise.resolve({ ...failure, usage: { inputTokens: 30, outputTokens: 3 } }) },

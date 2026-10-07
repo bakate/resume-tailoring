@@ -46,6 +46,14 @@ _Avoid_: OpenAI in domain language, AI session
 The type, from one closed catalogue, with which a server route answers a failed request, together with its HTTP status; it names what went wrong, never the operation.
 _Avoid_: Error code, operation-prefixed failure
 
+**Failure Cause**:
+The provider-neutral reason a model-backed operation failed, read from its API Failure: access required, rate limited (with the delay to wait), timeout, input too large, service unavailable, network, or unexpected. It is kept with a failed preparation so it survives a reload.
+_Avoid_: Error type, transient or permanent failure
+
+**Recovery**:
+The one action the application derives from a Failure Cause to let the Candidate continue: renew access, retry after a delay, shorten the input, retry, or reload. The interface offers it; it never decides it.
+_Avoid_: Error handling, fallback, retry policy
+
 ## Candidate evidence
 
 **Source Document**:
