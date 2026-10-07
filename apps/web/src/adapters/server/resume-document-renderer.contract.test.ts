@@ -50,9 +50,10 @@ describe('structured resume PDF rendering boundary', () => {
     const pages = await readPdfPages(result.pdf)
     const pageOf = (text: string) => pages.findIndex((page) => page.replace(/\s+/gu, '').includes(text.replace(/\s+/gu, '')))
     for (const experience of breakingExperiences) {
-      expect(pageOf(experience.dates), experience.role).toBe(pageOf(experience.role))
-      for (const achievement of experience.achievements) {
-        expect(pageOf(achievement), `${experience.role}: ${achievement}`).toBe(pageOf(experience.role))
+      const headingPage = pageOf(experience.role)
+      expect(headingPage, experience.role).toBeGreaterThanOrEqual(0)
+      for (const text of [experience.organization, experience.dates, experience.context, ...experience.achievements]) {
+        expect(pageOf(text), `${experience.role}: ${text}`).toBe(headingPage)
       }
     }
   }, 20_000)
@@ -154,12 +155,12 @@ function denseRequest({ count }: Readonly<{ count: number }>) {
 const breakingExperiences = Array.from({ length: 7 }, (_value, index) => ({
   role: `Platform Engineer ${String(index + 1)}`, organization: `Organization ${String(index + 1)}`,
   dates: `${String(2010 + index)} – ${String(2011 + index)}`,
-  achievements: Array.from({ length: 4 }, (_achievement, item) => item === 0
-    ? `First achievement of experience ${String(index + 1)}`
-    : `Achievement ${String(item + 1)} of experience ${String(index + 1)}: delivered accessible features with keyboard support, clear error messages and documented interfaces for other teams.`),
+  context: `Context of experience ${String(index + 1)}: a product team building accessible billing screens.`,
+  achievements: Array.from({ length: 4 }, (_achievement, item) =>
+    `Achievement ${String(item + 1)} of experience ${String(index + 1)}: delivered accessible features with keyboard support, clear error messages and documented interfaces for other teams.`),
 }))
 
-/** Seven experiences with four achievements each, after a summary of the requested length. */
+/** Seven experiences with a context and four achievements each, after a summary of the requested length. */
 function experienceRequest({ summaryLines }: Readonly<{ summaryLines: number }>) {
   const factIds = ['source-fact-experiences-0-achievements-0' as const]
   const field = (id: string, text: string) => ({ id, text, factIds })
@@ -169,7 +170,8 @@ function experienceRequest({ summaryLines }: Readonly<{ summaryLines: number }>)
     experiences: breakingExperiences.map((experience, index) => ({ id: `experiences.${String(index)}`, chronology: 'relevant' as const,
       role: field(`role-${String(index)}`, experience.role), organization: field(`organization-${String(index)}`, experience.organization),
       startDate: field(`start-${String(index)}`, experience.dates.split(' – ')[0] ?? ''),
-      endDate: field(`end-${String(index)}`, experience.dates.split(' – ')[1] ?? ''), location: null, context: null,
+      endDate: field(`end-${String(index)}`, experience.dates.split(' – ')[1] ?? ''), location: null,
+      context: field(`context-${String(index)}`, experience.context),
       achievements: experience.achievements.map((achievement, item) => field(`achievement-${String(index)}-${String(item)}`, achievement)),
     })) } }, unsupportedFieldIds: [] }
 }
