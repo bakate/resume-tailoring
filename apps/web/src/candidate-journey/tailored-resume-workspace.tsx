@@ -11,6 +11,7 @@ import { DocumentText, TailoredResumePreview } from './tailored-resume-preview'
 import { JobMatchWorkspace } from './job-match-workspace'
 import { renderTailoredResumeDocument } from './tailored-resume-document'
 import { ResumeEditor } from './resume-editor'
+import type { EditorTab } from './resume-editor'
 import { ResumeOperationFailureAlert } from './failure-recovery'
 import { describeOverflowReduction, resumeReviewCopy } from './resume-review-copy'
 import type { ResumeReviewCopy } from './resume-review-copy'
@@ -89,8 +90,6 @@ function useRetryableOperations() {
 
 export type RetryableOperations = ReturnType<typeof useRetryableOperations>
 
-type EditorTab = 'contacts' | 'recovery'
-
 function ResumeEditorDialog({ editorTab, ...props }: ResumeDocumentProps & Readonly<{
   copy: ResumeReviewCopy; editorTab: EditorTab | null; closeEditor: () => void; operations: RetryableOperations
 }>) {
@@ -102,15 +101,16 @@ function ResumeEditorDialog({ editorTab, ...props }: ResumeDocumentProps & Reado
 }
 
 /** Says how much Hidden Content Overflow Reduction produced, and opens the editor where the Candidate restores it. */
-function OverflowReductionSummary({ candidateJourney, copy, localization, openHiddenContent }: ResumeReviewProps & Readonly<{
+function OverflowReductionSummary({ candidateJourney, copy, openHiddenContent }: ResumeReviewProps & Readonly<{
   copy: ResumeReviewCopy; openHiddenContent: () => void
 }>) {
   const { view } = candidateJourney
   const review = view.status === 'candidate-session-open' ? view.resumeReview : null
   if (review === null) return null
   const layout = review.assessment?.layout
-  const pageCount = layout?.status === 'fits' && layout.revision === review.draft.revision ? layout.pageCount : 1
-  const summary = describeOverflowReduction({ locale: localization.locale, ...review.recovery.overflowReduction, pageCount })
+  // Only a measured layout of the current draft says which Page Budget the hidden content fits.
+  const pageCount = layout?.status === 'fits' && layout.revision === review.draft.revision ? layout.pageCount : null
+  const summary = describeOverflowReduction({ locale: review.draft.document.locale, ...review.recovery.overflowReduction, pageCount })
   if (summary === null) return null
   return <Group justify="space-between"><Text>{summary}</Text>
     <Button variant="subtle" disabled={blocksResumeEditing(view)} onClick={openHiddenContent}>{copy.reviewHidden}</Button></Group>

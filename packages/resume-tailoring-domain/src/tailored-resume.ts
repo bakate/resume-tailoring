@@ -93,7 +93,8 @@ export type ResumeSectionContent =
   | Readonly<{ kind: FieldSectionKind; fields: readonly TailoredResumeField[] }>
 
 /** Who hid a piece of Hidden Content: the Candidate in the editor, or Overflow Reduction fitting the Page Budget. */
-export type HiddenContentOrigin = 'candidate' | 'overflow-reduction'
+export const hiddenContentOrigins = ['candidate', 'overflow-reduction'] as const
+export type HiddenContentOrigin = typeof hiddenContentOrigins[number]
 
 export type ResumeEditingState = Readonly<{
   revision: string

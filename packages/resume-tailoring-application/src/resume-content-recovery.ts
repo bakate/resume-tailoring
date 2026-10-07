@@ -19,24 +19,6 @@ export function hideResumeContent({ access, fieldId }: FieldRequest) {
     editing: { ...editing, hiddenFields: [...editing.hiddenFields, { field: reference.field, location: reference.location, origin: 'candidate' }] } }) })
 }
 
-/**
- * Hides the visible fields Overflow Reduction chose, tagged with their origin so the editor and the preview summary
- * can tell them from the Candidate's own choices. A field the Candidate restored is never hidden again.
- */
-export function hideOverflowContent({ session, fieldIds, revision }: Readonly<{
-  session: CandidateSession; fieldIds: readonly string[]; revision: string
-}>): CandidateSession {
-  if (session.tailoredResume === null) return session
-  const editing = readResumeEditing({ session })
-  const restoredFieldIds = new Set(editing.restoredFieldIds)
-  const hidden = readResumeFields({ resume: session.tailoredResume })
-    .filter(({ field }) => fieldIds.includes(field.id) && !restoredFieldIds.has(field.id))
-  if (hidden.length === 0) return session
-  const document = hidden.reduce((current, { location }) => removeResumeField({ resume: current, location }), session.tailoredResume)
-  return { ...session, tailoredResume: document, resumeEditing: { ...editing, revision, hiddenFields: [...editing.hiddenFields,
-    ...hidden.map(({ field, location }) => ({ field, location, origin: 'overflow-reduction' as const }))] } }
-}
-
 export function restoreResumeContent({ access, fieldId }: FieldRequest) {
   const session = access.readSession()
   if (session?.tailoredResume === null || session === null) return

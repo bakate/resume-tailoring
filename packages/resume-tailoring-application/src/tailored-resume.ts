@@ -200,7 +200,6 @@ const frenchWords: ReadonlySet<string> = new Set(['avec', 'compétences', 'conce
 const englishWords: ReadonlySet<string> = new Set(['and', 'developer', 'experience', 'for', 'requirements', 'role', 'skills', 'with'])
 
 export type { HiddenContentOrigin, ResumeEditingState, ResumeFieldLocation, ResumeSectionName } from '@resume-tailoring/domain/tailored-resume'
-export { hideOverflowContent } from './resume-content-recovery'
 
 export { isSupportedResumeFieldText, moveResumeField, readResumeFields, removeResumeField, restoreResumeField, updateResumeField } from './resume-field-editing'
 export type { HiddenResumeField, ResumeFieldReference } from './resume-field-editing'
