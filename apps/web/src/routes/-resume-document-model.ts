@@ -20,7 +20,7 @@ export async function processResumeModel<TInput>({ request, schema, processInput
     const result = await processInput(input.value, environment.value)
     return result.ok
       ? Response.json(result, { headers: privateHeaders })
-      : failureResponse({ type: apiFailureTypes[result.error.type], ...(result.usage === undefined ? {} : { usage: result.usage }) })
+      : failureResponse({ type: apiFailureForSectionModelFailure[result.error.type], ...(result.usage === undefined ? {} : { usage: result.usage }) })
   } catch { return failureResponse({ type: 'provider-unavailable' }) }
 }
 
@@ -34,7 +34,7 @@ async function readInput<TInput>({ request, schema }: Readonly<{ request: Reques
 }
 
 /** Processing consent is checked in the browser, so a server model never fails for want of it. */
-const apiFailureTypes: Record<ResumeSectionModelFailure, ApiFailureType> = {
+const apiFailureForSectionModelFailure: Record<ResumeSectionModelFailure, ApiFailureType> = {
   timeout: 'timeout',
   transient: 'provider-unavailable',
   permanent: 'invalid-provider-response',

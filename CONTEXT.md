@@ -42,6 +42,10 @@ _Avoid_: Per-document consent, per-action consent
 The disclosed external processor selected to perform model-backed operations under the current Processing Policy.
 _Avoid_: OpenAI in domain language, AI session
 
+**API Failure**:
+The type, from one closed catalogue, with which a server route answers a failed request, together with its HTTP status; it names what went wrong, never the operation.
+_Avoid_: Error code, operation-prefixed failure
+
 ## Candidate evidence
 
 **Source Document**:
