@@ -65,6 +65,7 @@ import type {
   SourceDocument,
   SourceIntakeFailure,
 } from './source-intake'
+import type { ExplainedFailure } from './failure-cause'
 import type { CandidateJourneyDependencies, CandidateSessionNotice, CandidateSessionStorageResult,
   ResumeSectionModels } from './ports'
 
@@ -103,6 +104,8 @@ type CandidateJourneyContext = Readonly<{
   notice: CandidateSessionNotice
   profileEnrichmentFailure: ProfileEnrichmentFailure | null
   sourceIntakeFailure: CandidateJourneySourceIntakeFailure | null
+  /** Why a model call failed Source Intake and what lets the Candidate continue; null for any other failure. */
+  sourceIntakeExplainedFailure: ExplainedFailure | null
   session: CandidateSession | null
 }>
 
@@ -156,6 +159,7 @@ export type CandidateJourneyView =
       profileEnrichmentFailure: ProfileEnrichmentFailure | null
       session: CandidateSession
       sourceIntakeFailure: CandidateJourneySourceIntakeFailure | null
+      sourceIntakeExplainedFailure: ExplainedFailure | null
     }>
   | Readonly<{ status: 'candidate-session-unavailable' }>
 
@@ -274,7 +278,7 @@ type SourceIntakeActorInput = Readonly<{
   session: CandidateSession | null
 }>
 type SourceIntakeActorResult = CandidateSessionStorageResult<CandidateSession>
-  | Readonly<{ ok: false; error: SourceIntakeFailure }>
+  | (Readonly<{ ok: false; error: SourceIntakeFailure }> & Partial<ExplainedFailure>)
 
 const submitSourceDocument = fromPromise<SourceIntakeActorResult, SourceIntakeActorInput>(async ({ input }: Readonly<{
   input: SourceIntakeActorInput
@@ -543,6 +547,7 @@ const candidateJourneyMachine = setup({
     notice: null,
     profileEnrichmentFailure: null,
     sourceIntakeFailure: null,
+    sourceIntakeExplainedFailure: null,
     session: null,
   }),
   id: 'candidate-journey',
@@ -637,7 +642,7 @@ const candidateJourneyMachine = setup({
           target: 'generatingApplicationResume',
         }, { target: 'resolvingCriticalAmbiguity' }],
         SUBMIT_SOURCE_DOCUMENT: {
-          actions: assign({ sourceIntakeFailure: null }),
+          actions: assign({ sourceIntakeFailure: null, sourceIntakeExplainedFailure: null }),
           target: 'processingSourceDocument',
         },
         SUBMIT_JOB_POSTING: {
@@ -784,6 +789,7 @@ const candidateJourneyMachine = setup({
             actions: assign({
               session: ({ event }) => event.output.ok ? event.output.value : null,
               sourceIntakeFailure: null,
+              sourceIntakeExplainedFailure: null,
             }),
             guard: ({ event }) => event.output.ok,
             target: 'candidateSessionAvailable',
@@ -791,12 +797,13 @@ const candidateJourneyMachine = setup({
           {
             actions: assign({
               sourceIntakeFailure: ({ event }) => readSourceIntakeFailure({ result: event.output }),
+              sourceIntakeExplainedFailure: ({ event }) => readExplainedFailure(event.output),
             }),
             target: 'candidateSessionAvailable',
           },
         ],
         onError: {
-          actions: assign({ sourceIntakeFailure: 'unreadable-document' }),
+          actions: assign({ sourceIntakeFailure: 'unreadable-document', sourceIntakeExplainedFailure: null }),
           target: 'candidateSessionAvailable',
         },
         src: 'submitSourceDocument',
@@ -902,6 +909,7 @@ const candidateJourneyMachine = setup({
             actions: assign({
               session: ({ event }) => event.output.ok ? event.output.value : null,
               sourceIntakeFailure: null,
+              sourceIntakeExplainedFailure: null,
             }),
             guard: ({ event }) => event.output.ok,
             target: 'candidateSessionAvailable',
@@ -909,12 +917,13 @@ const candidateJourneyMachine = setup({
           {
             actions: assign({
               sourceIntakeFailure: ({ event }) => readSourceIntakeFailure({ result: event.output }),
+              sourceIntakeExplainedFailure: ({ event }) => readExplainedFailure(event.output),
             }),
             target: 'candidateSessionAvailable',
           },
         ],
         onError: {
-          actions: assign({ sourceIntakeFailure: 'ambiguity-unavailable' }),
+          actions: assign({ sourceIntakeFailure: 'ambiguity-unavailable', sourceIntakeExplainedFailure: null }),
           target: 'candidateSessionAvailable',
         },
         src: 'persistCriticalAmbiguityResolution',
@@ -1047,6 +1056,7 @@ function readOpenCandidateSessionView({ snapshot, session }: Readonly<{
     profileEnrichmentFailure: snapshot.context.profileEnrichmentFailure,
     session,
     sourceIntakeFailure: snapshot.context.sourceIntakeFailure,
+    sourceIntakeExplainedFailure: snapshot.context.sourceIntakeExplainedFailure,
     status: 'candidate-session-open',
   }
 }
@@ -1082,6 +1092,11 @@ function readSourceIntakeFailure({ result }: Readonly<{
   result: SourceIntakeActorResult | ResolveAmbiguityActorResult
 }>): CandidateJourneySourceIntakeFailure | null {
   return result.ok ? null : result.error
+}
+
+function readExplainedFailure(result: SourceIntakeActorResult | ResolveAmbiguityActorResult): ExplainedFailure | null {
+  return !result.ok && 'cause' in result && result.cause !== undefined && result.recovery !== undefined
+    ? { cause: result.cause, recovery: result.recovery } : null
 }
 
 function readJobMatchFailure({ result }: Readonly<{

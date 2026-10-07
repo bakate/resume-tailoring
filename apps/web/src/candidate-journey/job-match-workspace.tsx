@@ -326,29 +326,6 @@ function readRequirements({ ids, jobMatch }: Readonly<{
   return jobMatch.requirements.filter(({ id }) => requirementIds.has(id))
 }
 
-export function JobMatchFailure({ failure, localization }: Readonly<{
-  failure: JobMatchFailureValue
-  localization: Localization
-}>) {
-  if (failure === null) return null
-  return <Text c="danger.8" role="alert">
-    {localization.translate(jobMatchFailureKeys[failure])}
-  </Text>
-}
-
-type JobMatchFailureValue =
-  | 'candidate-session-storage-unavailable'
-  | 'empty-job-posting'
-  | 'invalid-job-posting'
-  | 'job-posting-extraction-unavailable'
-  | 'match-evidence-unavailable'
-  | 'oversized-job-posting'
-  | 'processing-consent-required'
-  | 'scanned-job-posting'
-  | 'unreadable-job-posting'
-  | 'unsupported-job-posting'
-  | null
-
 export const jobMatchFailureKeys = {
   'candidate-session-storage-unavailable': 'jobMatch.failure.storage',
   'empty-job-posting': 'jobMatch.failure.empty',

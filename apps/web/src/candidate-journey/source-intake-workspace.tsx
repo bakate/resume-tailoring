@@ -1,6 +1,7 @@
 import {
   Button,
   FileInput,
+  Group,
   List,
   Paper,
   SegmentedControl,
@@ -15,6 +16,7 @@ import { useState } from 'react'
 import type { SourceIntake } from '@resume-tailoring/application/source-intake'
 import type { Localization } from '../localization/localization'
 import type { useCandidateJourney } from './use-candidate-journey'
+import { FailureExplanation, RecoveryAction } from './failure-recovery'
 
 type CandidateJourneyController = ReturnType<typeof useCandidateJourney>
 type SourceMethod = 'paste' | 'upload'
@@ -42,6 +44,9 @@ export function SourceIntakeWorkspace({
           }} />}
       <SourceIntakeFailure {...{
         failure: sourceForm.localFailure ?? view.sourceIntakeFailure, localization,
+        explained: sourceForm.localFailure === null ? view.sourceIntakeExplainedFailure : null,
+        busy: view.operation !== null,
+        onRetry: () => { void sourceForm.submitSourceDocument() },
       }} />
     </Stack>
   </Paper>
@@ -111,7 +116,7 @@ function SourceMethodInput({ localization, sourceForm }: Readonly<{
   sourceForm: SourceDocumentFormController
 }>) {
   return sourceForm.method === 'paste'
-    ? <Textarea label={localization.translate('sourceIntake.professionalText')}
+    ? <Textarea id={professionalTextId} label={localization.translate('sourceIntake.professionalText')}
         minRows={8} onChange={(event) => {
           sourceForm.setProfessionalText(event.currentTarget.value)
         }} placeholder={localization.translate('sourceIntake.professionalTextPlaceholder')}
@@ -266,19 +271,36 @@ function ProfileSection({ title, values }: Readonly<{
   </div>
 }
 
+type OpenView = Extract<CandidateJourneyController['view'], Readonly<{ status: 'candidate-session-open' }>>
+
+/** A failed model call explains its Failure Cause and offers its Recovery; any other failure says what to fix. */
 export function SourceIntakeFailure({
+  busy,
+  explained,
   failure,
   localization,
+  onRetry,
 }: Readonly<{
-  failure: CandidateJourneyController['view'] extends infer TView
-    ? TView extends Readonly<{ sourceIntakeFailure: infer TFailure }> ? TFailure : never
-    : never
+  busy: boolean
+  explained: OpenView['sourceIntakeExplainedFailure']
+  failure: OpenView['sourceIntakeFailure']
   localization: Localization
+  onRetry: () => void
 }>) {
   if (failure === null) return null
-  return <Text c="danger.8" role="alert">
-    {localization.translate(sourceIntakeFailureKeys[failure])}
-  </Text>
+  return <Stack c="danger.8" gap="xs" role="alert">
+    <Text>{localization.translate(sourceIntakeFailureKeys[failure])}</Text>
+    {explained === null ? null : <>
+      <FailureExplanation cause={explained.cause} localization={localization} />
+      <Group><RecoveryAction {...explained} {...{ busy, localization, onRetry }} onShortenInput={showProfessionalText} /></Group>
+    </>}
+  </Stack>
+}
+
+const professionalTextId = 'source-intake-professional-text'
+
+function showProfessionalText() {
+  document.getElementById(professionalTextId)?.focus()
 }
 
 export const sourceIntakeFailureKeys = {

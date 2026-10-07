@@ -22,7 +22,8 @@ export function validateResumeRendering({ request, result }: Readonly<{
 }>): ResumeRenderResult {
   if (result.assessment.exportEligibility.revision !== request.draft.revision
     || result.assessment.layout.revision !== request.draft.revision) return staleResumeRendering({ request })
-  if (result.assessment.layout.status === 'unavailable') return unavailableResumeRender(request)
+  if (result.assessment.layout.status === 'unavailable') return result.failure === undefined
+    ? unavailableResumeRender(request) : { ...unavailableResumeRender(request), failure: result.failure }
   // The rendered PDF stays displayable; only the export assessment decides whether it can be downloaded.
   const assessment = assessResumeExport({ ...request, layout: result.assessment.layout })
   if (assessment.exportEligibility.status === 'eligible' && result.pdf === null) return unavailableResumeRender(request)

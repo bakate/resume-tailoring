@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ResumePhoto, ResumeRenderInput, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
+import type { Localization } from '../localization/localization'
 
 export type ResumePreviewProps = Readonly<{
   document: TailoredResume
   /** The interface language; the document keeps its own resume language. */
-  locale: TailoredResume['locale']
+  localization: Localization
   enabled?: boolean
   paused: boolean
   photo: ReturnType<typeof useResumePhoto>
@@ -17,7 +18,7 @@ export type ResumePreviewProps = Readonly<{
   onIdentityChange: (identity: TailoredResume['identity']) => void
 }>
 
-type PreviewInput = Omit<ResumePreviewProps, 'condensation' | 'locale' | 'onDownload' | 'onIdentityChange'> & Readonly<{
+type PreviewInput = Omit<ResumePreviewProps, 'condensation' | 'localization' | 'onDownload' | 'onIdentityChange'> & Readonly<{
   attempt: number
 }>
 

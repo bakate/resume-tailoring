@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
+import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney,
+  unavailableResumeRender } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourney, CandidateJourneyView, CandidateSession, FailureCause, Recovery, ResumePreparationFailure,
-  ResumeSectionModelError } from '@resume-tailoring/application/candidate-journey'
-import { readGroupedResumeSection, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+  ResumeRenderResult, ResumeSectionModelError } from '@resume-tailoring/application/candidate-journey'
+import { groupedResumeDocument, readGroupedResumeSection, structuredResumeJobMatch,
+  structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createFakeCandidateJourneyDependencies, createFakeJobPostingExtractor, createFakeMatchEvidenceMatcher,
-  createFakeResumeSectionModels, createFakeSourceProfileExtractor, createInMemoryCandidateSessionPersistence,
-  testProcessingPolicy } from '@resume-tailoring/application/testing'
+  createFakeResumeDocumentRenderer, createFakeResumeSectionModels, createFakeSourceProfileExtractor,
+  createInMemoryCandidateSessionPersistence, testProcessingPolicy } from '@resume-tailoring/application/testing'
 import type { ReadApiFailure } from '@resume-tailoring/application/ports'
 
 describe('Failure Cause and Recovery', () => {
@@ -121,6 +123,38 @@ describe('Failure Cause and Recovery', () => {
       recovery: 'reload' })
   })
 
+  it('explains a failed Source Document submission with its Failure Cause and Recovery', async () => {
+    const system = createSystemUnderTest({ sourceExtraction: { type: 'input-too-large' } })
+    await system.givenCandidateSession()
+
+    await system.submitSourceDocument()
+
+    system.expectSourceIntakeFailure({ cause: { type: 'input-too-large' }, recovery: 'shorten-input' })
+  })
+
+  it('forgets the Source Intake Failure Cause once a submission succeeds', async () => {
+    const system = createSystemUnderTest({ sourceExtraction: { type: 'network' }, on: 'first-extraction' })
+    await system.givenFailedSourceSubmission()
+
+    await system.submitSourceDocument()
+
+    system.expectSourceIntakeSucceeded()
+  })
+
+  it.each<Readonly<{ apiFailure: ReadApiFailure | undefined; cause: FailureCause; recovery: Recovery }>>([
+    { apiFailure: { type: 'provider-unavailable' }, cause: { type: 'service-unavailable' }, recovery: 'retry' },
+    { apiFailure: { type: 'rate-limited', retryAfterSeconds: 12 }, cause: { type: 'rate-limited', retryAfterSeconds: 12 },
+      recovery: 'retry-after' },
+    { apiFailure: undefined, cause: { type: 'unexpected' }, recovery: 'reload' },
+  ])('explains an unavailable PDF render with its Failure Cause and Recovery: $recovery', async ({ apiFailure, cause, recovery }) => {
+    const system = createSystemUnderTest({ rendering: apiFailure ?? null })
+    await system.givenCandidateSession()
+
+    await system.renderResumeDocument()
+
+    system.expectRenderFailure({ cause, recovery })
+  })
+
   it('forgets the Failure Cause once a retried preparation succeeds', async () => {
     const system = createSystemUnderTest({ skillsWriting: { failure: { type: 'network' }, on: 'first-write' } })
     await system.givenFailedPreparation()
@@ -143,13 +177,19 @@ type TestOptions = Readonly<{
   sourceExtraction?: ReadApiFailure | null
   postingExtraction?: ReadApiFailure
   matching?: ReadApiFailure
+  /** Fails only the first Source Profile extraction instead of every one. */
+  on?: 'first-extraction'
+  /** Fails every PDF render with this API Failure; `null` fails it without one. */
+  rendering?: ReadApiFailure | null
 }>
 
 class FailureCauseTestSystem {
   readonly #options: TestOptions
   readonly #journey: CandidateJourney
   #skillsWrites = 0
+  #sourceExtractions = 0
   #outcome: CandidateJourneyView | null = null
+  #rendering: ResumeRenderResult | null = null
 
   constructor(options: TestOptions) {
     this.#options = options
@@ -166,6 +206,21 @@ class FailureCauseTestSystem {
     await this.givenCandidateSession()
     await this.prepareTailoredResume()
     this.expectPreparationFailed()
+  }
+
+  async givenFailedSourceSubmission() {
+    await this.givenCandidateSession()
+    await this.submitSourceDocument()
+    expect(this.#readOpenView().sourceIntakeFailure).not.toBeNull()
+  }
+
+  async submitSourceDocument() {
+    this.#journey.submitSourceDocument(documentFromText('Professional evidence'))
+    await this.#preparationFinished()
+  }
+
+  async renderResumeDocument() {
+    this.#rendering = await this.#journey.renderResumeDocument({ document: groupedResumeDocument, unsupportedFieldIds: [] })
   }
 
   async prepareTailoredResume() {
@@ -205,6 +260,24 @@ class FailureCauseTestSystem {
     expect(view.session.preparation).toMatchObject({ status: 'failed', failureCause: cause })
   }
 
+  expectSourceIntakeFailure({ cause, recovery }: Readonly<{ cause: FailureCause; recovery: Recovery }>) {
+    const view = this.#expectOutcome()
+    expect(view.sourceIntakeFailure).toBe('source-profile-extraction-unavailable')
+    expect(view.sourceIntakeExplainedFailure).toEqual({ cause, recovery })
+  }
+
+  expectSourceIntakeSucceeded() {
+    const view = this.#expectOutcome()
+    expect(view.sourceIntakeFailure).toBeNull()
+    expect(view.sourceIntakeExplainedFailure).toBeNull()
+  }
+
+  expectRenderFailure({ cause, recovery }: Readonly<{ cause: FailureCause; recovery: Recovery }>) {
+    if (this.#rendering === null) return expect.fail('Render the resume document before reading its failure')
+    expect(this.#rendering.pdf).toBeNull()
+    expect(this.#rendering.failure).toEqual({ cause, recovery })
+  }
+
   expectPreparationFailed() {
     expect(this.#expectOutcome().preparationOutcome).toMatchObject({ status: 'failed' })
   }
@@ -231,13 +304,13 @@ class FailureCauseTestSystem {
     return createFakeCandidateJourneyDependencies({
       now: () => startedAt,
       persistence: createInMemoryCandidateSessionPersistence({ session }),
-      sourceProfileExtractor: createFakeSourceProfileExtractor(options.sourceExtraction === undefined ? {} : { extract: () =>
-        Promise.resolve({ ok: false, error: 'source-profile-extraction-unavailable',
-          ...(options.sourceExtraction === null ? {} : { apiFailure: options.sourceExtraction }) }) }),
+      sourceProfileExtractor: this.#createSourceProfileExtractor(),
       jobPostingExtractor: createFakeJobPostingExtractor(options.postingExtraction === undefined ? {} : { extract: () =>
         Promise.resolve({ ok: false, error: 'job-posting-extraction-unavailable', apiFailure: options.postingExtraction }) }),
       matchEvidenceMatcher: createFakeMatchEvidenceMatcher(options.matching === undefined ? {} : { match: () =>
         Promise.resolve({ ok: false, error: 'match-evidence-unavailable', apiFailure: options.matching }) }),
+      ...(options.rendering === undefined ? {} : { resumeDocumentRenderer: createFakeResumeDocumentRenderer({ render: (request) =>
+        Promise.resolve(unavailableResumeRender(request, options.rendering ?? undefined)) }) }),
       resumeSectionModels: createFakeResumeSectionModels({
         writeSection: (input) => {
           if (input.section.kind === 'skills' && options.skillsWriting !== undefined) {
@@ -252,6 +325,18 @@ class FailureCauseTestSystem {
         },
       }),
     })
+  }
+
+  #createSourceProfileExtractor() {
+    const { sourceExtraction, on } = this.#options
+    if (sourceExtraction === undefined) return createFakeSourceProfileExtractor()
+    const fake = createFakeSourceProfileExtractor()
+    return createFakeSourceProfileExtractor({ extract: (request) => {
+      this.#sourceExtractions += 1
+      if (on === 'first-extraction' && this.#sourceExtractions > 1) return fake.extract(request)
+      return Promise.resolve({ ok: false, error: 'source-profile-extraction-unavailable',
+        ...(sourceExtraction === null ? {} : { apiFailure: sourceExtraction }) })
+    } })
   }
 }
 

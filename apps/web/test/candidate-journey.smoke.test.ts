@@ -350,6 +350,33 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectSinglePostingFailureAlert()
   })
 
+  test('waits out a rate limit before offering to try again', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenRateLimitedPreparation()
+
+    await system.retryOnceTheWaitIsOver()
+
+    await system.expectGroupedPreview()
+  })
+
+  test('leads back to the documents when the job posting is too long', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenTooLongPostingFailure()
+
+    await system.shortenInput()
+
+    await system.expectDocumentsToShorten()
+  })
+
+  test('offers a reload when the service answers unexpectedly and keeps the inputs', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenUnexpectedSourceFailure()
+
+    await system.reloadPage()
+
+    await system.expectFailureKeptAfterReload()
+  })
+
   test('discloses the Processing Policy at the generation action', async ({ page }) => {
     const system = createSystemUnderTest({ page })
 
@@ -690,13 +717,76 @@ class CandidateJourneyTestSystem {
   }
 
   async givenRenderingFails() {
-    await this.#page.route('**/api/resume-document', (route) => route.fulfill({ status: 503, body: '{}' }))
+    await this.#page.route('**/api/resume-document', (route) => route.fulfill({ status: 503,
+      json: { ok: false, error: { type: 'provider-unavailable' } } }))
   }
 
   async retryResumePreview() {
-    await this.#page.getByRole('button', { name: 'Retry preview', exact: true }).waitFor({ state: 'visible' })
+    const preview = this.#page.getByRole('region', { name: 'Preview and export' })
+    await expect(preview.getByRole('alert')).toContainText('The writing service did not answer correctly.')
     await this.#page.unroute('**/api/resume-document')
-    await this.#page.getByRole('button', { name: 'Retry preview', exact: true }).click()
+    await preview.getByRole('button', { name: 'Try again', exact: true }).click()
+  }
+
+  async givenRateLimitedPreparation() {
+    await this.givenCombinedIntake()
+    await this.#page.route('**/api/resume-section-writing', (route) => route.fulfill({ status: 429,
+      headers: { 'Retry-After': '2' }, json: { ok: false, error: { type: 'rate-limited', retryAfterSeconds: 2 } } }))
+    await this.generateResume()
+    const alert = this.#page.getByRole('alert').filter({ hasText: 'Preparation could not finish.' })
+    await expect(alert).toContainText('Too many requests were sent in a short time.')
+    await expect(alert.getByRole('button', { name: /^Try again in \d s$/u })).toBeDisabled()
+  }
+
+  async retryOnceTheWaitIsOver() {
+    await this.#page.unroute('**/api/resume-section-writing')
+    await this.#installModelAdapters()
+    const retry = this.#page.getByRole('alert').getByRole('button', { name: 'Try again', exact: true })
+    await expect(retry).toBeEnabled({ timeout: 5_000 })
+    await retry.click()
+    this.#completedAction = 'retried-after-wait'
+  }
+
+  async givenTooLongPostingFailure() {
+    await this.givenCombinedIntake()
+    await this.#page.route('**/api/explainable-job-posting-extraction', (route) => route.fulfill({ status: 413,
+      json: { ok: false, error: { type: 'input-too-large' } } }))
+    await this.generateResume()
+    await expect(this.#page.getByRole('alert')).toContainText('The text is longer than the service accepts.')
+  }
+
+  async shortenInput() {
+    await this.#page.getByRole('alert').getByRole('button', { name: 'Shorten my text', exact: true }).click()
+    this.#completedAction = 'shortening'
+  }
+
+  async expectDocumentsToShorten() {
+    this.#expectAction()
+    await expect(this.#page).toHaveURL(/\/$/u)
+    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toHaveValue(postingText)
+  }
+
+  async givenUnexpectedSourceFailure() {
+    await this.givenCombinedIntake()
+    await this.#page.route('**/api/structured-source-profile-extraction', (route) => route.fulfill({ status: 503,
+      json: { ok: false, error: { type: 'service-misconfigured' } } }))
+    await this.generateResume()
+    await expect(this.#page.getByRole('alert')).toContainText('The service answered in an unexpected way.')
+  }
+
+  async reloadPage() {
+    const reloaded = this.#page.waitForEvent('framenavigated')
+    await this.#page.getByRole('alert').getByRole('button', { name: 'Reload the page', exact: true }).click()
+    await reloaded
+    this.#completedAction = 'reloaded'
+  }
+
+  async expectFailureKeptAfterReload() {
+    this.#expectAction()
+    const alert = this.#page.getByRole('alert').filter({ hasText: 'Preparation could not finish.' })
+    await expect(alert).toContainText('We could not analyze your resume.')
+    await expect(alert).toContainText('Your inputs are kept.')
+    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toHaveValue(postingText)
   }
 
   async expectRecoveredPreview() {

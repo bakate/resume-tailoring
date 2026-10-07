@@ -2,6 +2,8 @@ import { Avatar, Button, FileButton, Group, Stack, Text, TextInput } from '@mant
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ResumeExportBlocker, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
+import type { Localization } from '../localization/localization'
+import { FailureExplanation, RecoveryAction } from './failure-recovery'
 import { renderTailoredResumeDocument } from './tailored-resume-document'
 import { ResumePdfPages } from './resume-pdf-pages'
 import { resumePreviewMessages } from './resume-preview-messages'
@@ -12,12 +14,13 @@ import './resume-preview.css'
 type PreviewMessages = typeof resumePreviewMessages['en'] | typeof resumePreviewMessages['fr']
 type CandidateNameDraft = ReturnType<typeof useCandidateNameDraft>
 type RenderedResumeProps = Readonly<{
-  current: ResumeRenderResult; document: TailoredResume; messages: PreviewMessages; name: CandidateNameDraft
+  current: ResumeRenderResult; document: TailoredResume; localization: Localization; messages: PreviewMessages; name: CandidateNameDraft
   condensation?: ResumePreviewProps['condensation']; onDownload: () => void; onRetry: () => void; paused: boolean
 }>
 
 export function TailoredResumePreview(props: ResumePreviewProps) {
-  const messages = resumePreviewMessages[props.locale]
+  const { localization } = props
+  const messages = resumePreviewMessages[localization.locale]
   const [attempt, setAttempt] = useState(0)
   const { photo } = props
   const { current } = useRenderedResume({ ...props, attempt, photo })
@@ -27,13 +30,13 @@ export function TailoredResumePreview(props: ResumePreviewProps) {
     {current === null ? <Stack><Text role="status">{photo.failed ? messages.photoInvalid : messages.pending}</Text>
       <Button disabled>{messages.download}</Button>
       <CandidateNameField identity={props.document.identity} explain={false} messages={messages} name={name} /></Stack>
-      : current.assessment.layout.status === 'unavailable' ? <RenderFailure {...{ messages, onRetry }} />
+      : current.assessment.layout.status === 'unavailable' ? <RenderFailure {...{ localization, onRetry }} failure={current.failure} />
         : <RenderedResume key={current.assessment.layout.revision} {...{ ...props, current, messages, name, onRetry }} />}
     <PhotoPicker photo={photo} messages={messages} disabled={props.enabled === false} />
   </section>
 }
 
-function RenderedResume({ condensation, current, document, messages, name, onDownload, onRetry, paused }: RenderedResumeProps) {
+function RenderedResume({ condensation, current, document, localization, messages, name, onDownload, onRetry, paused }: RenderedResumeProps) {
   const [preview, setPreview] = useState<'pending' | 'ready' | 'failed'>('pending')
   const ready = useCallback(() => { setPreview('ready') }, [])
   const failed = useCallback(() => { setPreview('failed') }, [])
@@ -43,10 +46,10 @@ function RenderedResume({ condensation, current, document, messages, name, onDow
   return <Stack gap="sm" mt="md">
     {blocker === null || blocker === 'missing-identity' ? null : <Text role="alert" c="danger.8">{messages[blocker]}</Text>}
     {current.pdf === null ? null : <ResumePdfPages bytes={current.pdf} onReady={ready} onFailure={failed} pageLabel={messages.page} />}
-    {preview === 'failed' ? <RenderFailure {...{ messages, onRetry }} /> : null}
+    {preview === 'failed' ? <RenderFailure {...{ localization, onRetry }} failure={undefined} /> : null}
     {eligibility.status === 'blocked' && eligibility.reasons.includes('overflow') && condensation !== undefined
       ? <Button disabled={condensation.disabled} onClick={condensation.propose}>{condensation.label}</Button> : null}
-    <ResumeDownload {...{ bytes, messages, onDownload, purpose: document.purpose }} />
+    <ResumeDownload {...{ bytes, localization, messages, onDownload, purpose: document.purpose }} />
     <CandidateNameField identity={document.identity} explain={blocker === 'missing-identity'} messages={messages} name={name} />
   </Stack>
 }
@@ -56,8 +59,8 @@ function readPrimaryBlocker({ reasons }: Readonly<{ reasons: readonly ResumeExpo
   return blockerPriority.find((reason) => reasons.includes(reason)) ?? null
 }
 
-const blockerPriority: readonly ResumeExportBlocker[] = ['unsupported-content', 'overflow', 'missing-identity',
-  'missing-contact', 'stale-layout']
+const blockerPriority = ['unsupported-content', 'overflow', 'missing-identity',
+  'missing-contact', 'stale-layout'] as const satisfies readonly ResumeExportBlocker[]
 
 /**
  * The name being typed lives above the preview branches, so a render landing mid-typing keeps it. It commits on blur
@@ -113,13 +116,24 @@ function PhotoPicker({ disabled, messages, photo }: Readonly<{
   </Stack></div>
 }
 
-function RenderFailure({ messages, onRetry }: Readonly<{ messages: PreviewMessages; onRetry: () => void }>) {
-  return <Stack gap="sm" mt="md"><Text role="alert" c="danger.8">{messages['layout-unavailable']}</Text>
-    <Button onClick={onRetry}>{messages.retry}</Button></Stack>
+/**
+ * A render the renderer could not complete explains its Failure Cause and offers its Recovery. Pages the browser could
+ * not display have no cause: retrying the preview renders them again.
+ */
+function RenderFailure({ failure, localization, onRetry }: Readonly<{
+  failure: ResumeRenderResult['failure']; localization: Localization; onRetry: () => void
+}>) {
+  return <Stack gap="sm" mt="md" role="alert">
+    <Text c="danger.8">{localization.translate(failure === undefined ? 'failure.preview.pagesUnavailable' : 'failure.preview.layoutUnavailable')}</Text>
+    {failure === undefined ? <Button onClick={onRetry}>{localization.translate('failure.preview.retry')}</Button> : <>
+      <FailureExplanation cause={failure.cause} localization={localization} />
+      <Group><RecoveryAction {...failure} {...{ localization, onRetry }} /></Group></>}
+  </Stack>
 }
 
-function ResumeDownload({ bytes, messages, onDownload, purpose }: Readonly<{
-  bytes: Uint8Array | null; messages: PreviewMessages; onDownload: () => void; purpose: TailoredResume['purpose']
+function ResumeDownload({ bytes, localization, messages, onDownload, purpose }: Readonly<{
+  bytes: Uint8Array | null; localization: Localization; messages: PreviewMessages; onDownload: () => void
+  purpose: TailoredResume['purpose']
 }>) {
   const [download, setDownload] = useState<'idle' | 'failed' | 'handed-off'>('idle')
   return <><Button disabled={bytes === null} onClick={() => {
@@ -129,7 +143,7 @@ function ResumeDownload({ bytes, messages, onDownload, purpose }: Readonly<{
     if (outcome) onDownload()
   }}>{messages.download}</Button>
     {download === 'idle' ? null : <Text role={download === 'failed' ? 'alert' : 'status'}>
-      {download === 'failed' ? messages.downloadFailed : messages.downloaded}</Text>}
+      {download === 'failed' ? localization.translate('failure.preview.download') : messages.downloaded}</Text>}
   </>
 }
 

@@ -1,6 +1,6 @@
 import { Button, Group, Modal, Paper, Stack, Text, Title } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
 import type { Localization } from '../localization/localization'
@@ -11,6 +11,7 @@ import { DocumentText, TailoredResumePreview } from './tailored-resume-preview'
 import { JobMatchWorkspace } from './job-match-workspace'
 import { renderTailoredResumeDocument } from './tailored-resume-document'
 import { ResumeEditor } from './resume-editor'
+import { ResumeOperationFailureAlert } from './failure-recovery'
 import { resumeReviewCopy } from './resume-review-copy'
 import type { ResumeReviewCopy } from './resume-review-copy'
 
@@ -37,6 +38,7 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
   const [downloadedRevision, setDownloadedRevision] = useState<string | null>(null)
   const revision = props.candidateJourney.view.status === 'candidate-session-open' ? props.candidateJourney.view.resumeReview?.draft.revision ?? null : null
   const copy = resumeReviewCopy[props.localization.locale]
+  const operations = useRetryableOperations()
   return <Paper aria-labelledby="tailored-resume-title" component="section"
     className="candidate-journey-workspace" p={{ base: 'md', sm: 'xl' }} shadow="xs" withBorder>
     <Stack gap="lg">
@@ -45,10 +47,11 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
       <CurrentResumePreview {...props} {...{ editorOpened, photo }} onDownload={() => {
         props.candidateJourney.recordResumeDownload(); setDownloadedRevision(revision) }}
         condensation={{ label: copy.condense, disabled: !canCondense({ candidateJourney: props.candidateJourney, photo }),
-          propose: () => { setProposalPhoto(photo.dataUrl); void props.candidateJourney.proposeResumeCondensation({ photoDataUrl: photo.dataUrl }) } }} />
+          propose: () => { operations.attempt(() => {
+            setProposalPhoto(photo.dataUrl); void props.candidateJourney.proposeResumeCondensation({ photoDataUrl: photo.dataUrl }) }) } }} />
       {downloadedRevision !== null && downloadedRevision === revision
         ? <UsabilityFeedback key={downloadedRevision} candidateJourney={props.candidateJourney} copy={copy} /> : null}
-      <ReviewStatus candidateJourney={props.candidateJourney} copy={copy} />
+      <ReviewStatus {...props} copy={copy} onRetry={operations.retry} />
       <CondensationProposal {...props} copy={copy} photoDataUrl={photo.dataUrl}
         proposalLayoutCurrent={photo.ready && !photo.failed && proposalPhoto === photo.dataUrl} />
       <Group><Button variant="default" disabled={blocksResumeEditing(view)}
@@ -57,7 +60,7 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
       <MatchAnalysisDisclosure {...props} />
       <DocumentText document={props.resume} locale={props.localization.locale} />
     </Stack>
-    <ResumeEditorDialog {...props} {...{ copy, editorOpened }} closeEditor={() => { setEditorOpened(false) }} />
+    <ResumeEditorDialog {...props} {...{ copy, editorOpened, operations }} closeEditor={() => { setEditorOpened(false) }} />
   </Paper>
 }
 
@@ -70,8 +73,22 @@ function PreparationStatus({ candidateJourney, localization, resume }: ResumeDoc
   </>
 }
 
+/**
+ * Remembers the last edit or proposal the Candidate started, so a failure's Recovery can run it again. Nothing is
+ * remembered across a reload, where no failure is shown either.
+ */
+function useRetryableOperations() {
+  const last = useRef<(() => void) | null>(null)
+  return {
+    attempt: (operation: () => void) => { last.current = operation; operation() },
+    retry: () => { last.current?.() },
+  }
+}
+
+export type RetryableOperations = ReturnType<typeof useRetryableOperations>
+
 function ResumeEditorDialog(props: ResumeDocumentProps & Readonly<{
-  copy: ResumeReviewCopy; editorOpened: boolean; closeEditor: () => void
+  copy: ResumeReviewCopy; editorOpened: boolean; closeEditor: () => void; operations: RetryableOperations
 }>) {
   const fullScreen = useMediaQuery('(max-width: 48em)')
   return <Modal opened={props.editorOpened} onClose={props.closeEditor} title={props.copy.edit}
@@ -102,7 +119,9 @@ function MatchAnalysisDisclosure({ candidateJourney, localization }: ResumeRevie
     <JobMatchWorkspace {...{ candidateJourney, localization }} /></details>
 }
 
-function ReviewStatus({ candidateJourney, copy }: Readonly<{ candidateJourney: ResumeReviewController; copy: ResumeReviewCopy }>) {
+function ReviewStatus({ candidateJourney, copy, localization, onRetry }: ResumeReviewProps & Readonly<{
+  copy: ResumeReviewCopy; onRetry: () => void
+}>) {
   const review = candidateJourney.view.status === 'candidate-session-open' ? candidateJourney.view.resumeReview : null
   if (review === null) return null
   const layout = review.assessment?.layout
@@ -111,12 +130,13 @@ function ReviewStatus({ candidateJourney, copy }: Readonly<{ candidateJourney: R
   const operationText = review.operation === 'validating-section' ? copy.validating
     : review.operation === 'condensing' ? copy.condensing : review.operation === 'assessing-layout' ? copy.checking : ''
   return <Stack gap="xs"><Text role="status" aria-live="polite">{operationText || layoutText}</Text>
-    {review.failure === null ? null : <Text c="danger.8" role="alert">{copy.failure} {copy[review.failure.recovery]}</Text>}
+    {review.failure === null ? null : <ResumeOperationFailureAlert failure={review.failure} {...{ localization, onRetry }} />}
   </Stack>
 }
 
-function CondensationProposal({ candidateJourney, copy, resume, photoDataUrl, proposalLayoutCurrent }: Readonly<{
-  candidateJourney: ResumeReviewController; copy: ResumeReviewCopy; resume: TailoredResume; photoDataUrl?: string; proposalLayoutCurrent: boolean
+function CondensationProposal({ candidateJourney, copy, localization, resume, photoDataUrl, proposalLayoutCurrent }: Readonly<{
+  candidateJourney: ResumeReviewController; copy: ResumeReviewCopy; localization: Localization; resume: TailoredResume
+  photoDataUrl?: string; proposalLayoutCurrent: boolean
 }>) {
   const review = candidateJourney.view.status === 'candidate-session-open' ? candidateJourney.view.resumeReview : null
   const proposal = review?.proposal
@@ -126,7 +146,8 @@ function CondensationProposal({ candidateJourney, copy, resume, photoDataUrl, pr
   return <Paper p="md" withBorder><Stack>
     <Title order={3}>{copy.proposal}</Title><Text>{copy.proposalDescription}</Text>
     <ResumePreview resume={proposedResume} title={copy.proposal} photoDataUrl={photoDataUrl} />
-    <Text>{!proposalLayoutCurrent ? copy.unchecked : proposal.layout.status === 'fits' ? copy.fits : proposal.layout.status === 'overflow' ? copy.overflow : copy.unavailable}</Text>
+    <Text>{!proposalLayoutCurrent ? copy.unchecked : proposal.layout.status === 'fits' ? copy.fits : proposal.layout.status === 'overflow' ? copy.overflow
+      : localization.translate('failure.review.pageCountUnavailable')}</Text>
     <Group><Button disabled={review?.draft.revision !== proposal.baseRevision}
       onClick={() => { candidateJourney.acceptResumeCondensation(decision) }}>{copy.accept}</Button>
       <Button variant="default" onClick={() => { candidateJourney.rejectResumeCondensation(decision) }}>{copy.reject}</Button></Group>
@@ -145,7 +166,7 @@ function CurrentResumePreview({ candidateJourney, condensation, localization, re
   if (view.status !== 'candidate-session-open' || view.resumeReview === null) return null
   const enabled = view.session.preparedResumeStatus !== 'outdated'
     && view.resumeReview.operation === null && (view.operation === null || view.operation === 'rendering-resume-document')
-  return <TailoredResumePreview document={resume} locale={localization.locale} enabled={enabled} paused={editorOpened} photo={photo} condensation={condensation}
+  return <TailoredResumePreview document={resume} localization={localization} enabled={enabled} paused={editorOpened} photo={photo} condensation={condensation}
     unsupportedFieldIds={view.resumeReview.unsupportedFieldIds} renderDocument={candidateJourney.renderResumeDocument}
     onDownload={onDownload} onIdentityChange={(identity) => {
       candidateJourney.updateResumeContacts({ identity, contactDetails: resume.contactDetails }) }} />

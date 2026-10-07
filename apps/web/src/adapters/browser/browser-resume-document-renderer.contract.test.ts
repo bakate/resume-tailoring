@@ -9,9 +9,9 @@ import { createBrowserResumeDocumentRenderer } from './browser-resume-document-r
 
 describe('browser resume document renderer', () => {
   const transientFailures = [
-    ['server', () => new Response(null, { status: 503 })],
-    ['network', () => { throw new TypeError('Failed to fetch') }],
-    ['timeout', 'hang'],
+    ['server', () => new Response(null, { status: 503 }), { type: 'unexpected-response' }],
+    ['network', () => { throw new TypeError('Failed to fetch') }, { type: 'network' }],
+    ['timeout', 'hang', { type: 'timeout' }],
   ] as const
 
   it.each(transientFailures)('silently retries a transient %s failure once', async (_category, failure) => {
@@ -24,25 +24,25 @@ describe('browser resume document renderer', () => {
     expect(telemetry).toEqual([])
   })
 
-  it.each(transientFailures)('records a persistent %s failure after one retry', async (category, failure) => {
+  it.each(transientFailures)('records a persistent %s failure after one retry', async (category, failure, apiFailure) => {
     const { render, telemetry, calls } = rendererAnswering([failure, failure, measuredResponse])
 
-    expect(await render(renderRequest)).toEqual(unavailableResumeRender(renderRequest))
+    expect(await render(renderRequest)).toEqual(unavailableResumeRender(renderRequest, apiFailure))
     expect(calls()).toBe(2)
     expect(telemetry).toEqual([{ name: 'resume-render-failed', category, retried: true }])
   })
 
   it.each([
-    ['access', () => new Response(null, { status: 401 })],
-    ['access', () => new Response(null, { status: 403 })],
-    ['schema', () => new Response(null, { status: 400 })],
-    ['revision-mismatch', () => Response.json(measuredBody({ revision: 'previous-revision' }))],
-    ['schema', () => failureResponse({ type: 'input-too-large' })],
-    ['render', () => failureResponse({ type: 'provider-unavailable' })],
-  ] as const)('records a deterministic %s failure without retrying', async (category, failure) => {
+    ['access', () => new Response(null, { status: 401 }), { type: 'unexpected-response' }],
+    ['access', () => failureResponse({ type: 'demo-origin-required' }), { type: 'demo-origin-required' }],
+    ['schema', () => new Response(null, { status: 400 }), { type: 'unexpected-response' }],
+    ['revision-mismatch', () => Response.json(measuredBody({ revision: 'previous-revision' })), { type: 'unexpected-response' }],
+    ['schema', () => failureResponse({ type: 'input-too-large' }), { type: 'input-too-large' }],
+    ['render', () => failureResponse({ type: 'provider-unavailable' }), { type: 'provider-unavailable' }],
+  ] as const)('records a deterministic %s failure without retrying', async (category, failure, apiFailure) => {
     const { render, telemetry, calls } = rendererAnswering([failure, measuredResponse])
 
-    expect(await render(renderRequest)).toEqual(unavailableResumeRender(renderRequest))
+    expect(await render(renderRequest)).toEqual(unavailableResumeRender(renderRequest, apiFailure))
     expect(calls()).toBe(1)
     expect(telemetry).toEqual([{ name: 'resume-render-failed', category, retried: false }])
   })

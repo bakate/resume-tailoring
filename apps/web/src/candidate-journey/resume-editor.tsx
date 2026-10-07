@@ -4,11 +4,13 @@ import type { ResumeSectionName, TailoredResume } from '@resume-tailoring/applic
 import type { Localization } from '../localization/localization'
 import { readResumeFields } from './tailored-resume-editing'
 import type { ResumeFieldReference } from './tailored-resume-editing'
-import type { ResumeReviewController } from './tailored-resume-workspace'
+import type { ResumeReviewController, RetryableOperations } from './tailored-resume-workspace'
+import { ResumeOperationFailureAlert } from './failure-recovery'
 import type { ResumeReviewCopy } from './resume-review-copy'
 
 type EditorProps = Readonly<{
   candidateJourney: ResumeReviewController; localization: Localization; resume: TailoredResume; copy: ResumeReviewCopy
+  operations: RetryableOperations
 }>
 type EditorContext = EditorProps & Readonly<{ announce: (message: string) => void }>
 
@@ -30,13 +32,14 @@ export function ResumeEditor(props: EditorProps) {
   </Tabs><Text role="status" aria-live="polite" aria-atomic="true">{announcement}</Text></Stack>
 }
 
-function EditorStatus({ candidateJourney, copy }: EditorProps) {
+function EditorStatus({ candidateJourney, copy, localization, operations }: EditorProps) {
   const { view } = candidateJourney
   const review = view.status === 'candidate-session-open' ? view.resumeReview : null
   if (review === null) return null
   return <>
     {review.operation === 'validating-section' ? <Text role="status" aria-live="polite">{copy.validating}</Text> : null}
-    {review.failure === null ? null : <Text role="alert" c="danger.8">{copy.failure} {copy[review.failure.recovery]}</Text>}
+    {review.failure === null ? null
+      : <ResumeOperationFailureAlert failure={review.failure} localization={localization} onRetry={operations.retry} />}
   </>
 }
 
@@ -107,13 +110,14 @@ function FieldEditor(props: FieldEditorProps) {
   </Stack></Paper>
 }
 
-function FieldActions({ announce, candidateJourney, copy, localization, reference, text, unsupported, busy }:
+function FieldActions({ announce, candidateJourney, copy, localization, operations, reference, text, unsupported, busy }:
 FieldEditorProps & Readonly<{ text: string; unsupported: boolean; busy: boolean }>) {
   const save = async () => {
     await candidateJourney.editResumeField({ fieldId: reference.key, text })
     announce(copy.saved)
   }
-  return <Group><Button size="compact-sm" disabled={busy || text.trim().length === 0} onClick={() => { void save() }}>
+  return <Group><Button size="compact-sm" disabled={busy || text.trim().length === 0}
+    onClick={() => { operations.attempt(() => { void save() }) }}>
     {localization.translate('tailoredResume.saveField')}</Button>
     {unsupported ? <Button size="compact-sm" disabled={text !== reference.field.text}
       onClick={() => { candidateJourney.attestResumeField({ fieldId: reference.key }); announce(copy.saved) }}>
@@ -125,7 +129,7 @@ FieldEditorProps & Readonly<{ text: string; unsupported: boolean; busy: boolean 
   </Group>
 }
 
-function FieldOrdering({ announce, candidateJourney, copy, localization, reference }: Omit<EditorContext, 'resume'> & Readonly<{ reference: ResumeFieldReference }>) {
+function FieldOrdering({ announce, candidateJourney, copy, localization, reference }: Omit<EditorContext, 'resume' | 'operations'> & Readonly<{ reference: ResumeFieldReference }>) {
   const isMovable = reference.location.kind === 'value-proposition' || reference.location.kind === 'section'
     || (reference.location.kind === 'experience' && reference.location.fieldName === 'achievements')
     || (reference.location.kind === 'skill-group' && reference.location.fieldName === 'items')
