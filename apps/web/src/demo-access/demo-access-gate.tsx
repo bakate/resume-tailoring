@@ -43,21 +43,10 @@ declare global {
 
 export function DemoAccessGate({ children }: Readonly<{ children: ReactNode }>) {
   const localizationResult = useLocalization()
-  const [state, setState] = useState<GateState>({ status: 'checking' })
-  const refreshAccess = useCallback(() => {
-    setState({ status: 'checking' })
-    void readAccess().then(setState)
-  }, [])
-  const grantAccess = useCallback(() => {
-    setState({ status: 'granted' })
-  }, [])
-  const showFailure = useCallback(() => {
-    setState({ status: 'unavailable' })
-  }, [])
+  const { grantAccess, refreshAccess, showFailure, state } = useAccessCheck()
   const [renewal, setRenewal] = useState<DemoAccessRenewal | null>(null)
   const isGranted = state.status === 'granted'
-  useEffect(refreshAccess, [refreshAccess])
-  useEffect(() => isGranted ? handleRenewals({ setRenewal }) : undefined, [isGranted])
+  useEffect(() => isGranted ? handleRenewalsWhileGranted({ setRenewal }) : undefined, [isGranted])
   const closeRenewal = useCallback(() => { setRenewal(null) }, [])
   if (!localizationResult.ok) return <LocalizationFailure />
   if (isGranted) {
@@ -95,16 +84,24 @@ export function DemoAccessGate({ children }: Readonly<{ children: ReactNode }>) 
   )
 }
 
-/** Leaving the Candidate Journey abandons a pending renewal, so interrupted requests fail instead of waiting forever. */
-function handleRenewals({ setRenewal }: Readonly<{ setRenewal: (renewal: DemoAccessRenewal | null) => void }>) {
-  let currentRenewal: DemoAccessRenewal | null = null
-  const stopHandling = demoAccessRecovery.handleRenewals((renewal) => {
-    currentRenewal = renewal
-    setRenewal(renewal)
-  })
+/** Checks demo access on mount; the gate and the renewal modal react differently once it is granted. */
+function useAccessCheck() {
+  const [state, setState] = useState<GateState>({ status: 'checking' })
+  const refreshAccess = useCallback(() => {
+    setState({ status: 'checking' })
+    void readAccess().then(setState)
+  }, [])
+  const grantAccess = useCallback(() => { setState({ status: 'granted' }) }, [])
+  const showFailure = useCallback(() => { setState({ status: 'unavailable' }) }, [])
+  useEffect(refreshAccess, [refreshAccess])
+  return { grantAccess, refreshAccess, showFailure, state }
+}
+
+/** Leaving the Candidate Journey stops handling renewals, which abandons a pending one. */
+function handleRenewalsWhileGranted({ setRenewal }: Readonly<{ setRenewal: (renewal: DemoAccessRenewal | null) => void }>) {
+  const stopHandling = demoAccessRecovery.handleRenewals(setRenewal)
   return () => {
     stopHandling()
-    currentRenewal?.settle(false)
     setRenewal(null)
   }
 }
@@ -118,22 +115,15 @@ function DemoAccessRenewalModal({ localization, onClose, renewal }: Readonly<{
   onClose: () => void
   renewal: DemoAccessRenewal
 }>) {
-  const [state, setState] = useState<GateState>({ status: 'checking' })
-  const refreshAccess = useCallback(() => {
-    setState({ status: 'checking' })
-    void readAccess().then(setState)
-  }, [])
+  const { grantAccess, refreshAccess, showFailure, state } = useAccessCheck()
   const settle = useCallback((granted: boolean) => {
     renewal.settle(granted)
     onClose()
   }, [onClose, renewal])
-  const grantAccess = useCallback(() => { settle(true) }, [settle])
   const abandon = useCallback(() => { settle(false) }, [settle])
-  const showFailure = useCallback(() => { setState({ status: 'unavailable' }) }, [])
-  useEffect(refreshAccess, [refreshAccess])
   useEffect(() => {
-    if (state.status === 'granted') grantAccess()
-  }, [grantAccess, state.status])
+    if (state.status === 'granted') settle(true)
+  }, [settle, state.status])
   const { translate } = localization
   return (
     <Modal closeOnClickOutside={false} onClose={abandon} opened title={translate('demoAccess.expiredTitle')}>

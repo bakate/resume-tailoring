@@ -2,35 +2,50 @@ import { z } from 'zod'
 
 export type DemoAccessRenewal = Readonly<{ settle: (granted: boolean) => void }>
 
+/** Counts granted renewals, so a request can tell whether access was renewed after it was sent. */
+export type DemoAccessGeneration = number
+
 export type DemoAccessRecovery = Readonly<{
-  /** Resolves true once the Candidate has passed a new security check. Concurrent callers share one renewal. */
-  renew: () => Promise<boolean>
-  /** The gate that can run the security check; without one, renewal fails immediately. */
+  readGeneration: () => DemoAccessGeneration
+  /**
+   * Resolves true once access is renewed after `sentAt`: immediately if a renewal was already granted since then,
+   * otherwise after the Candidate passes a new security check. Concurrent callers share one renewal.
+   */
+  renew: (sentAt: DemoAccessGeneration) => Promise<boolean>
+  /** The gate that can run the security check. Stopping abandons a pending renewal; without a gate, renewal fails. */
   handleRenewals: (handler: (renewal: DemoAccessRenewal) => void) => () => void
 }>
 
 export function createDemoAccessRecovery(): DemoAccessRecovery {
+  let generation: DemoAccessGeneration = 0
   let handler: ((renewal: DemoAccessRenewal) => void) | null = null
-  let pendingRenewal: Promise<boolean> | null = null
+  let pending: Readonly<{ promise: Promise<boolean>; settle: (granted: boolean) => void }> | null = null
+  const startRenewal = (startHandler: (renewal: DemoAccessRenewal) => void) => {
+    let resolveRenewal: (granted: boolean) => void = () => undefined
+    const promise = new Promise<boolean>((resolve) => { resolveRenewal = resolve })
+    const settle = (granted: boolean) => {
+      if (pending?.promise !== promise) return
+      pending = null
+      if (granted) generation += 1
+      resolveRenewal(granted)
+    }
+    pending = { promise, settle }
+    startHandler({ settle })
+    return promise
+  }
   return {
-    renew: () => {
-      if (handler === null) return Promise.resolve(false)
-      const startRenewal = handler
-      pendingRenewal ??= new Promise<boolean>((resolve) => {
-        let isSettled = false
-        startRenewal({ settle: (granted) => {
-          if (isSettled) return
-          isSettled = true
-          pendingRenewal = null
-          resolve(granted)
-        } })
-      })
-      return pendingRenewal
+    readGeneration: () => generation,
+    renew: (sentAt) => {
+      if (generation > sentAt) return Promise.resolve(true)
+      if (pending !== null) return pending.promise
+      return handler === null ? Promise.resolve(false) : startRenewal(handler)
     },
     handleRenewals: (nextHandler) => {
       handler = nextHandler
       return () => {
-        if (handler === nextHandler) handler = null
+        if (handler !== nextHandler) return
+        handler = null
+        pending?.settle(false)
       }
     },
   }
@@ -45,10 +60,28 @@ export function createAccessRecoveringRequest({ recovery, request }: Readonly<{
   request: typeof fetch
 }>): typeof fetch {
   return async (input, init) => {
+    const sentAt = recovery.readGeneration()
     const response = await request(input, init)
     if (!await requiresDemoAccess(response)) return response
-    return await recovery.renew() ? request(input, init) : response
+    return await waitUnlessAborted({ promise: recovery.renew(sentAt), signal: init?.signal }) ? request(input, init) : response
   }
+}
+
+/** A caller's timeout keeps running while the Candidate renews access, and ends the wait with the caller's reason. */
+function waitUnlessAborted<TValue>({ promise, signal }: Readonly<{
+  promise: Promise<TValue>
+  signal: AbortSignal | null | undefined
+}>): Promise<TValue> {
+  if (signal == null) return promise
+  if (signal.aborted) return Promise.reject(signal.reason as Error)
+  return new Promise((resolve, reject) => {
+    const abort = () => { reject(signal.reason as Error) }
+    signal.addEventListener('abort', abort, { once: true })
+    void promise.then((value) => {
+      signal.removeEventListener('abort', abort)
+      resolve(value)
+    })
+  })
 }
 
 async function requiresDemoAccess(response: Response) {

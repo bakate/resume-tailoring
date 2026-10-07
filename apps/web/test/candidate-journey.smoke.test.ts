@@ -373,7 +373,7 @@ class CandidateJourneyTestSystem {
   #downloadPath: string | null = null
   #scenario: Scenario
   #completedAction: string | null = null
-  #hasAccessExpired = false
+  #hasTriggeredExpiry = false
   #isAccessExpired = false
   #accessRenewals = 0
   #releaseHeldSkills: () => void = () => undefined
@@ -406,8 +406,8 @@ class CandidateJourneyTestSystem {
         return this.#heldSkills.then(() => route.fallback())
       }
       if (this.#scenario === 'unavailable') return route.fulfill({ json: { ok: false, error: { type: 'permanent' } } })
-      if (this.#scenario === 'expired-access' && !this.#hasAccessExpired) {
-        this.#hasAccessExpired = true
+      if (this.#scenario === 'expired-access' && !this.#hasTriggeredExpiry) {
+        this.#hasTriggeredExpiry = true
         this.#isAccessExpired = true
       }
       if (this.#isAccessExpired) {
@@ -446,6 +446,7 @@ class CandidateJourneyTestSystem {
   }
 
   expectAccessRenewedOnce() {
+    this.#expectAction()
     expect(this.#accessRenewals).toBe(1)
   }
 
