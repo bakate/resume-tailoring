@@ -53,11 +53,13 @@ export type ResumeDocumentCoherence = Readonly<{
   coherent: boolean; languageMatches: boolean; issues: readonly ResumeCoherenceIssue[]
 }>
 
-export type ResumeSectionModelFailure = 'transient' | 'timeout' | 'permanent' | 'consent-required'
+/** A section model call fails with the API Failure it was answered with, or for want of Processing Consent. */
+export type ResumeSectionModelFailure = ReadApiFailure['type'] | 'consent-required'
+export type ResumeSectionModelError = ReadApiFailure | Readonly<{ type: 'consent-required' }>
 export type ResumeModelUsage = Readonly<{ inputTokens: number; outputTokens: number }>
 export type ResumeSectionModelResult<TValue> =
   | Readonly<{ ok: true; value: TValue; usage?: ResumeModelUsage }>
-  | Readonly<{ ok: false; error: Readonly<{ type: ResumeSectionModelFailure; apiFailure?: ReadApiFailure }>; usage?: ResumeModelUsage }>
+  | Readonly<{ ok: false; error: ResumeSectionModelError; usage?: ResumeModelUsage }>
 
 export type ResumeSectionsRequest = Readonly<{
   candidateFacts: readonly CandidateFact[]

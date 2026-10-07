@@ -1,7 +1,7 @@
 import type { z } from 'zod'
-import type { ResumeSectionModelFailure, ResumeSectionModelResult } from '@resume-tailoring/application/candidate-journey'
+import type { ResumeSectionModelError, ResumeSectionModelResult } from '@resume-tailoring/application/candidate-journey'
 import { failureResponse } from '../api-failure'
-import type { ApiFailureType } from '../api-failure'
+import type { ApiFailure } from '../api-failure'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
 import type { ServerEnvironment } from '../env'
@@ -20,7 +20,7 @@ export async function processResumeModel<TInput>({ request, schema, processInput
     const result = await processInput(input.value, environment.value)
     return result.ok
       ? Response.json(result, { headers: privateHeaders })
-      : failureResponse({ type: apiFailureForSectionModelFailure[result.error.type], ...(result.usage === undefined ? {} : { usage: result.usage }) })
+      : failureResponse({ ...readSectionModelApiFailure(result.error), ...(result.usage === undefined ? {} : { usage: result.usage }) })
   } catch { return failureResponse({ type: 'provider-unavailable' }) }
 }
 
@@ -33,12 +33,14 @@ async function readInput<TInput>({ request, schema }: Readonly<{ request: Reques
   } catch { return { ok: false, type: 'invalid-input' } as const }
 }
 
-/** Processing consent is checked in the browser, so a server model never fails for want of it. */
-const apiFailureForSectionModelFailure: Record<ResumeSectionModelFailure, ApiFailureType> = {
-  timeout: 'timeout',
-  transient: 'provider-unavailable',
-  permanent: 'invalid-provider-response',
-  'consent-required': 'invalid-input',
+/**
+ * A server model fails with an API Failure. Processing consent is checked in the browser, so it never fails for want
+ * of it, and only a browser adapter reads a network failure or an unexpected response.
+ */
+function readSectionModelApiFailure(error: ResumeSectionModelError): ApiFailure {
+  if (error.type === 'consent-required') return { type: 'invalid-input' }
+  if (error.type === 'network' || error.type === 'unexpected-response') return { type: 'provider-unavailable' }
+  return error.retryAfterSeconds === undefined ? { type: error.type } : { type: error.type, retryAfterSeconds: error.retryAfterSeconds }
 }
 
 const privateHeaders = { 'Cache-Control': 'no-store', Pragma: 'no-cache' }

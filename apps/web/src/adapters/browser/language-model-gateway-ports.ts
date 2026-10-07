@@ -74,9 +74,9 @@ type GatewayValue = Readonly<{ operation: string; value: unknown; usage?: Resume
 function toSectionModelResult<TOperation extends string, TResult extends GatewayValue>({ operation, result }: Readonly<{
   operation: TOperation; result: LanguageModelResult<TResult>
 }>): ResumeSectionModelResult<Extract<TResult, { operation: TOperation }>['value']> {
-  if (!result.ok) return { ok: false, error: { type: result.error.type === 'processing-consent-required' ? 'consent-required'
-    : result.error.cause ?? (result.error.transient === true ? 'transient' : 'permanent'), ...readApiFailure(result) } }
-  if (!isOperation(result.value, operation)) return { ok: false, error: { type: 'permanent' } }
+  if (!result.ok) return { ok: false, error: result.error.type === 'processing-consent-required' ? { type: 'consent-required' }
+    : result.error.apiFailure ?? { type: 'unexpected-response' } }
+  if (!isOperation(result.value, operation)) return { ok: false, error: { type: 'unexpected-response' } }
   return { ok: true, value: result.value.value, ...(result.value.usage === undefined ? {} : { usage: result.value.usage }) }
 }
 

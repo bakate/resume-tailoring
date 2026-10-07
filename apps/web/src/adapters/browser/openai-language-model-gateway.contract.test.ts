@@ -56,18 +56,15 @@ describe('API Failures through the OpenAI Language Model Gateway', () => {
   })
 
   it.each([
-    [{ type: 'provider-unavailable' }, 'transient'],
-    [rateLimited, 'transient'],
-    [{ type: 'timeout' }, 'timeout'],
-    [{ type: 'demo-access-required' }, 'permanent'],
-    [{ type: 'invalid-provider-response' }, 'permanent'],
-  ] as const)('keeps the API Failure %o beside the %s section model failure', async (apiFailure, type) => {
+    { type: 'provider-unavailable' }, rateLimited, { type: 'timeout' }, { type: 'demo-access-required' },
+    { type: 'invalid-provider-response' },
+  ] as const)('fails a section model call with the API Failure %o', async (apiFailure) => {
     const gateway = createGatewayAnswering(() => failureResponse({ ...apiFailure, usage: { inputTokens: 40, outputTokens: 2 } }))
 
     const result = await createGatewayResumeSectionModels({ languageModelGateway: gateway })
       .checkCoherence({ document: groupedResumeDocument })
 
-    expect(result).toEqual({ ok: false, error: { type, apiFailure } })
+    expect(result).toEqual({ ok: false, error: apiFailure })
   })
 
   it('keeps the API Failure of a Resume Claim the model could not validate or condense', async () => {

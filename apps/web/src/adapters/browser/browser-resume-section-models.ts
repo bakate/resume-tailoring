@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { ResumeModelUsage, ResumeSectionModelFailure, ResumeSectionModelResult } from '@resume-tailoring/application/candidate-journey'
+import type { ResumeModelUsage, ResumeSectionModelResult } from '@resume-tailoring/application/candidate-journey'
 import type { ReadApiFailure, ResumeCoherenceChecker, ResumeFieldValidator, ResumeSectionWriter } from '@resume-tailoring/application/ports'
 import { apiFailureSchema } from '../../api-failure'
 import { networkFailure, readApiFailureBody, unexpectedResponse } from './api-failure-reader'
@@ -41,17 +41,11 @@ async function readModelResponse<TValue>({ response, schema }: Readonly<{
 function modelFailure({ apiFailure, usage }: Readonly<{
   apiFailure: ReadApiFailure; usage?: ResumeModelUsage
 }>): ResumeSectionModelResult<never> {
-  return { ok: false, error: { type: readSectionModelFailure(apiFailure), apiFailure }, ...(usage === undefined ? {} : { usage }) }
+  return { ok: false, error: apiFailure, ...(usage === undefined ? {} : { usage }) }
 }
 
 /** A failed model call can still have billed tokens; the failure envelope reports them. */
 function readFailureUsage(body: unknown) {
   const failure = apiFailureSchema.safeParse(body)
   return failure.success ? failure.data.usage : undefined
-}
-
-/** Only failures a second attempt can overcome stay transient; the rest keep their current meaning. */
-function readSectionModelFailure({ type }: ReadApiFailure): ResumeSectionModelFailure {
-  if (type === 'timeout') return 'timeout'
-  return type === 'network' || type === 'provider-unavailable' || type === 'rate-limited' ? 'transient' : 'permanent'
 }

@@ -2,8 +2,10 @@ export { resumePreparationFailures } from '@resume-tailoring/domain/candidate-se
 export { readProfessionalResumeFields, resumeCoherenceIssueKinds, resumeSectionKinds } from './resume-sections'
 export type { ResumeCoherenceInput, ResumeCoherenceIssue, ResumeCoherenceIssueKind, ResumeDocumentCoherence,
   ResumeFieldRejection, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage, ResumeRejectedField,
-  ResumeSectionContent, ResumeSectionKind, ResumeSectionModelFailure, ResumeSectionModelResult,
+  ResumeSectionContent, ResumeSectionKind, ResumeSectionModelError, ResumeSectionModelFailure, ResumeSectionModelResult,
   ResumeSectionPlanEntry, ResumeSectionWritingInput } from './resume-sections'
+export { failureCauseTypes, readRecovery } from './failure-cause'
+export type { ExplainedFailure, FailureCause, Recovery } from './failure-cause'
 import { resumePreparationMachine } from './resume-preparation-machines'
 import { prepareCombinedIntake, publishResumePreparation, unavailable } from './combined-intake'
 import type { CombinedIntakeOutcome, CombinedIntakeRequest, PreparationPhase, PreparedResumeInputs } from './combined-intake'
@@ -469,7 +471,8 @@ function readResumePreparationInput({ dependencies, preparedInputs }: CandidateJ
     recordTelemetry: (event: PrivacySafeTelemetryEvent) => { recordTelemetry({ dependencies, event }) } }
 }
 
-const unavailableModelResult = Promise.resolve({ ok: false, error: { type: 'permanent' } } as const)
+// Without section models nothing can be written: the service is misconfigured, so no section is rewritten.
+const unavailableModelResult = Promise.resolve({ ok: false, error: { type: 'service-misconfigured' } } as const)
 const unavailableSectionModels: ResumeSectionModels = { writeSection: () => unavailableModelResult,
   validateFields: () => unavailableModelResult, checkCoherence: () => unavailableModelResult }
 const emptySectionsRequest = { candidateFacts: [], locale: 'en', purpose: 'tailored', jobMatch: {

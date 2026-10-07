@@ -205,9 +205,6 @@ export type PrivacySafeTelemetry = {
 // Language Model Gateway: the application binds Processing Consent around this adapter.
 
 export type LanguageModelFailure = Readonly<{
-  transient?: boolean
-  /** Distinguishes a timeout, which is never retried, from other unavailability. */
-  cause?: 'transient' | 'timeout' | 'permanent'
   /** The API Failure the browser adapter read, kept so the application can tell the Candidate why. */
   apiFailure?: ReadApiFailure
   type: 'language-model-unavailable' | 'processing-consent-required'

@@ -1,4 +1,4 @@
-import { resumePreparationFailures, resumeSectionKinds } from '@resume-tailoring/application/candidate-journey'
+import { failureCauseTypes, resumePreparationFailures, resumeSectionKinds } from '@resume-tailoring/application/candidate-journey'
 import { z } from 'zod'
 
 import {
@@ -162,6 +162,10 @@ const resumeSectionSnapshotSchema = z.discriminatedUnion('status', [
   z.strictObject({ key: z.string().min(1), kind: z.enum(resumeSectionKinds), attempt: z.number().int().nonnegative(),
     status: z.literal('validated'), content: resumeSectionContentSchema }),
 ])
+const failureCauseSchema = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('rate-limited'), retryAfterSeconds: z.number().int().nonnegative() }),
+  z.strictObject({ type: z.enum(failureCauseTypes).exclude(['rate-limited']) }),
+])
 const storedIntakeDocumentSchema = z.strictObject({ data: z.string(), mediaType: z.string(), name: z.string() })
 const resumePreparationSchema = z.strictObject({
   revision: z.string().min(1),
@@ -169,7 +173,7 @@ const resumePreparationSchema = z.strictObject({
   sourceDocument: storedIntakeDocumentSchema.nullable(), jobPosting: storedIntakeDocumentSchema.nullable(),
   locale: z.enum(['en', 'fr']).nullable(), purpose: z.enum(['tailored', 'normalized']),
   sourceIntake: sourceIntakeSchema.nullable(), jobMatch: jobMatchSchema.nullable(), failure: z.enum(resumePreparationFailures).nullable(),
-  sections: z.array(resumeSectionSnapshotSchema).optional(),
+  failureCause: failureCauseSchema.optional(), sections: z.array(resumeSectionSnapshotSchema).optional(),
 })
 
 const resumeFieldLocationSchema = z.discriminatedUnion('kind', [

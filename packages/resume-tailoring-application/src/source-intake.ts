@@ -9,6 +9,8 @@ import { sourceProfileSections } from '@resume-tailoring/domain/source-intake'
 
 import { minimizeCandidateContent } from './candidate-name'
 import { locateSourceSpan } from './source-span'
+import { explainFailure } from './failure-cause'
+import type { ExplainedFailure } from './failure-cause'
 import type { SourceDocumentReader, StructuredSourceProfileExtractor } from './ports'
 
 export type {
@@ -52,7 +54,7 @@ type CreateSourceIntakeInput = Readonly<{
 }>
 type CreateSourceIntakeResult = Promise<
   | Readonly<{ ok: true; value: SourceIntake }>
-  | Readonly<{ ok: false; error: SourceIntakeFailure }>
+  | (Readonly<{ ok: false; error: SourceIntakeFailure }> & Partial<ExplainedFailure>)
 >
 
 export async function createSourceIntake(
@@ -65,7 +67,8 @@ export async function createSourceIntake(
   const extractionResult = await input.sourceProfileExtractor.extract({
     professionalContent: minimizedContent.outgoingContent,
   })
-  if (!extractionResult.ok) return extractionResult
+  if (!extractionResult.ok) return extractionResult.error === 'processing-consent-required' ? { ok: false, error: extractionResult.error }
+    : { ok: false, error: extractionResult.error, ...explainFailure(extractionResult.apiFailure) }
   const sourceIntake = buildSourceIntake({
     document: input.document, extraction: extractionResult.value,
     minimizedContent, originalContent: contentResult.value,
@@ -370,8 +373,10 @@ export const docxMediaType = 'application/vnd.openxmlformats-officedocument.word
 
 const oversizedResult = { ok: false, error: 'oversized-document' } as const
 const emptyResult = { ok: false, error: 'empty-document' } as const
+/** The extracted facts cite no source span: the provider answered badly, so extracting again may succeed. */
 const extractionUnavailableResult = {
   ok: false,
   error: 'source-profile-extraction-unavailable',
+  ...explainFailure({ type: 'invalid-provider-response' }),
 } as const
 const ambiguityUnavailableResult = { ok: false, error: 'ambiguity-unavailable' } as const

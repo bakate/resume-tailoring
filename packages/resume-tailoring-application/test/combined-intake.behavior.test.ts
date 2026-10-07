@@ -124,7 +124,7 @@ describe('Candidate Journey combined intake', () => {
     system.expectFrenchDocument()
   })
 
-  it('recovers from one transient section writing failure', async () => {
+  it('recovers from one invalid provider response while writing a section', async () => {
     const system = createSystemUnderTest({ preparation: 'transient-once' })
     await system.givenConsentedSession()
 
@@ -578,7 +578,7 @@ function createDependencies(options: () => TestOptions, writingDelivery: () => P
         const allowance = options().preparation === 'transient-once' ? 1 : options().preparation === 'transient-twice' ? 2 : 0
         if (section.kind === 'value-proposition' && valuePropositionFailures < allowance) {
           valuePropositionFailures += 1
-          return { ok: false, error: { type: 'transient' } }
+          return { ok: false, error: { type: 'invalid-provider-response' } }
         }
         if (section.kind === 'experience' && options().ambiguity === 'isolated') {
           const content = readGroupedResumeSection(section)

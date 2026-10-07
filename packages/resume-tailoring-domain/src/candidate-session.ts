@@ -62,6 +62,8 @@ export type ResumePreparation = Readonly<{
   sourceIntake: SourceIntake | null
   jobMatch: JobMatch | null
   failure: ResumePreparationFailure | null
+  /** Why a model-backed step failed; absent when the failure has no Failure Cause, such as an unreadable document. */
+  failureCause?: FailureCause
   sections?: readonly ResumeSectionSnapshot[]
 }>
 
@@ -80,3 +82,11 @@ export const resumePreparationFailures = [
   'unsupported-content', 'incoherent-content', 'stale-result',
 ] as const
 export type ResumePreparationFailure = typeof resumePreparationFailures[number]
+
+/** The provider-neutral reasons a model-backed operation fails, from which the application derives the Recovery. */
+export const failureCauseTypes = [
+  'access-required', 'rate-limited', 'timeout', 'input-too-large', 'service-unavailable', 'network', 'unexpected',
+] as const
+export type FailureCause =
+  | Readonly<{ type: 'rate-limited'; retryAfterSeconds: number }>
+  | Readonly<{ type: Exclude<typeof failureCauseTypes[number], 'rate-limited'> }>

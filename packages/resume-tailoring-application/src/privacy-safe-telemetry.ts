@@ -1,3 +1,4 @@
+import { apiFailureTypes } from './api-failure'
 import { resumeSectionKinds } from './resume-sections'
 
 export { resumeSectionKinds }
@@ -15,8 +16,9 @@ export const journeyPhases = [
   'job-match',
   'tailored-resume-preparation',
 ] as const
+/** A failed section reports the API Failure its last model call read, so retries can be measured per type. */
 export const resumeSectionOutcomes = [
-  'validated', 'unsupported', 'transient', 'timeout', 'permanent', 'consent-required',
+  'validated', 'unsupported', 'consent-required', ...apiFailureTypes, 'network', 'unexpected-response',
 ] as const
 export const resumePreparationOutcomes = ['prepared', 'failed'] as const
 export const resumeRenderFailureCategories = [

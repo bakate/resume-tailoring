@@ -1,3 +1,4 @@
+import type { FailureCause, Recovery } from './failure-cause'
 import type { TailoredResume, TailoredResumeSection } from './tailored-resume'
 
 /** Shared operation vocabulary for the existing Candidate Journey, not another orchestrator. */
@@ -9,10 +10,12 @@ export type ResumeDraft = Readonly<{
 /** Identity and contacts never cross professional model ports. */
 export type ProfessionalResumeDocument = Omit<TailoredResume, 'identity' | 'contactDetails'>
 
+/** An unavailable operation whose model call failed carries its Failure Cause, from which its Recovery is derived. */
 export type ResumeOperationFailure = Readonly<{
   status: 'failed'
   reason: 'processing-consent-required' | 'unavailable' | 'unsupported-content' | 'incoherent-content' | 'stale-result'
-  recovery: 'renew-consent' | 'retry' | 'correct-content' | 'retry-current-draft'
+  recovery: Recovery | 'renew-consent' | 'correct-content' | 'retry-current-draft'
+  cause?: FailureCause
 }>
 
 export type ResumePreparationOutcome =
