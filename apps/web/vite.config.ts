@@ -14,6 +14,9 @@ export default defineConfig(({ mode }) => {
       target: [...sourceDocumentBrowserSupportPolicy.buildTargets],
     },
     envDir: '../..',
+    optimizeDeps: {
+      include: [...sourceDocumentBrowserSupportPolicy.pdfWorkerPreBundledPackages],
+    },
     plugins: [tanstackStart(), viteReact(), nitro()],
     server: {
       hmr: isEndToEndTestServer ? { overlay: false } : undefined,
