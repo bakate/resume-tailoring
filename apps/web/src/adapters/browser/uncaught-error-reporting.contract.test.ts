@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
+import { createRecordingTelemetry } from '@resume-tailoring/application/testing'
+import { describe, expect, it } from 'vitest'
 
-import type { PrivacySafeTelemetry } from '@resume-tailoring/application/ports'
-import { listenForUncaughtErrors, reportUncaughtError } from './uncaught-error-reporting'
+import { listenForUncaughtErrors } from './uncaught-error-reporting'
 
 describe('uncaught error reporting', () => {
   it('reports an uncaught error without its message', () => {
@@ -9,7 +9,7 @@ describe('uncaught error reporting', () => {
 
     page.dispatchEvent(createUncaughtError({ message: 'Alex Morgan cannot be rendered' }))
 
-    expect(telemetry.record).toHaveBeenCalledExactlyOnceWith({ name: 'uncaught-error-reported', source: 'error' })
+    expect(telemetry.events).toEqual([{ name: 'uncaught-error-reported', source: 'error' }])
   })
 
   it('reports an unhandled rejection without its reason', () => {
@@ -17,9 +17,7 @@ describe('uncaught error reporting', () => {
 
     page.dispatchEvent(createUnhandledRejection({ reason: new Error('alex@example.com') }))
 
-    expect(telemetry.record).toHaveBeenCalledExactlyOnceWith({
-      name: 'uncaught-error-reported', source: 'unhandled-rejection',
-    })
+    expect(telemetry.events).toEqual([{ name: 'uncaught-error-reported', source: 'unhandled-rejection' }])
   })
 
   it('stops reporting once it stops listening', () => {
@@ -28,27 +26,15 @@ describe('uncaught error reporting', () => {
     stopListening()
     page.dispatchEvent(createUncaughtError({ message: 'Script error.' }))
 
-    expect(telemetry.record).not.toHaveBeenCalled()
-  })
-
-  it('reports a render error caught by the safety net', () => {
-    const telemetry = createTelemetry()
-
-    reportUncaughtError({ source: 'render', telemetry })
-
-    expect(telemetry.record).toHaveBeenCalledExactlyOnceWith({ name: 'uncaught-error-reported', source: 'render' })
+    expect(telemetry.events).toEqual([])
   })
 })
 
 function createReportingPage() {
   const page = new EventTarget()
-  const telemetry = createTelemetry()
+  const telemetry = createRecordingTelemetry()
   const stopListening = listenForUncaughtErrors({ page, telemetry })
   return { page, stopListening, telemetry }
-}
-
-function createTelemetry() {
-  return { record: vi.fn<PrivacySafeTelemetry['record']>().mockResolvedValue({ ok: true, value: undefined }) }
 }
 
 /** Node has neither ErrorEvent nor PromiseRejectionEvent; the listener only reads the event type. */

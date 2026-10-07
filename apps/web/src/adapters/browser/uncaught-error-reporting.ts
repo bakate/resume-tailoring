@@ -1,7 +1,5 @@
 import type { PrivacySafeTelemetry } from '@resume-tailoring/application/ports'
-import type { uncaughtErrorSources } from '@resume-tailoring/application/privacy-safe-telemetry'
-
-type UncaughtErrorSource = typeof uncaughtErrorSources[number]
+import type { UncaughtErrorSource } from '@resume-tailoring/application/privacy-safe-telemetry'
 
 /** Reports that an error escaped the application, never what it said: a message or stack can quote Candidate content. */
 export function reportUncaughtError({ source, telemetry }: Readonly<{

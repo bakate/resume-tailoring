@@ -84,8 +84,8 @@ function NotFound() {
   if (!localizationResult.ok) return <LocalizationFailure />
   const { translate } = localizationResult.value
   return (
-    <main className="not-found">
-      <p className="not-found-brand">{translate('brand.name')}</p>
+    <main className="standalone-page">
+      <p className="standalone-page-brand">{translate('brand.name')}</p>
       <h1>{translate('notFound.title')}</h1>
       <p>{translate('notFound.description')}</p>
       <Link to="/">{translate('notFound.return')}</Link>

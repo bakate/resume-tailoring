@@ -6,7 +6,7 @@ import { LocalizationFailure, useLocalization } from './localization/localizatio
 
 /**
  * Replaces a page that threw while rendering. The Candidate Session lives in this browser, so reloading or returning
- * to the documents restores the Candidate's work.
+ * to the documents restores the Candidate Session.
  */
 export function GlobalErrorFallback() {
   useEffect(() => { reportUncaughtRenderError() }, [])
@@ -14,8 +14,8 @@ export function GlobalErrorFallback() {
   if (!localizationResult.ok) return <LocalizationFailure />
   const { translate } = localizationResult.value
   return (
-    <main className="not-found">
-      <p className="not-found-brand">{translate('brand.name')}</p>
+    <main className="standalone-page">
+      <p className="standalone-page-brand">{translate('brand.name')}</p>
       <h1>{translate('safetyNet.title')}</h1>
       <p>{translate('safetyNet.explanation')}</p>
       <Group>
