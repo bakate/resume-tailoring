@@ -2,6 +2,7 @@ import type { CandidateSession } from '@resume-tailoring/domain/candidate-sessio
 import type { CandidateFact } from './source-intake'
 import type { ResumeFieldLocation, ResumeSectionName, TailoredResume } from './tailored-resume'
 import { createTailoredResume } from './tailored-resume'
+import { orderResumeExperiences } from './experience-chronology'
 import { moveResumeField, readResumeFields, removeResumeField, restoreResumeField, updateResumeField } from './resume-field-editing'
 import { changedResumeSession, readResumeEditing } from './resume-editing'
 import type { ResumeEditingAccess } from './resume-editing'
@@ -88,7 +89,8 @@ function ensureRestoreContainer({ document, original, location }: Readonly<{
   document: TailoredResume; original: TailoredResume; location: ReturnType<typeof readResumeFields>[number]['location']
 }>): TailoredResume {
   if (location.kind === 'experience' && !document.experiences.some(({ id }) => id === location.experienceId)) {
-    return { ...document, experiences: [...document.experiences, ...original.experiences.filter(({ id }) => id === location.experienceId)] }
+    return { ...document, experiences: orderResumeExperiences({ experiences: [...document.experiences,
+      ...original.experiences.filter(({ id }) => id === location.experienceId)] }) }
   }
   if (location.kind === 'section' && !document.sections.some(({ section }) => section === location.section)) {
     return { ...document, sections: [...document.sections, { section: location.section, fields: [] }] }
@@ -125,7 +127,8 @@ export function restoreResumeEntry({ access, experienceId }: Readonly<{ access: 
   const editing = readResumeEditing({ session })
   const experience = editing.hiddenExperiences?.find(({ id }) => id === experienceId)
   if (experience === undefined) return
-  const document = { ...session.tailoredResume, experiences: [...session.tailoredResume.experiences, experience] }
+  const document = { ...session.tailoredResume,
+    experiences: orderResumeExperiences({ experiences: [...session.tailoredResume.experiences, experience] }) }
   access.save({ baseRevision: editing.revision, session: changedResumeSession({ session, document, revision: access.createIdentifier(),
     editing: { ...editing, hiddenExperiences: editing.hiddenExperiences?.filter(({ id }) => id !== experienceId) } }) })
 }
@@ -149,6 +152,6 @@ function restoreHiddenParent({ session, document, location }: Readonly<{
   const experience = location.kind === 'experience'
     ? editing.hiddenExperiences?.find(({ id }) => id === location.experienceId) : undefined
   if (experience === undefined) return { document, editing }
-  return { document: { ...document, experiences: [...document.experiences, experience] },
+  return { document: { ...document, experiences: orderResumeExperiences({ experiences: [...document.experiences, experience] }) },
     editing: { ...editing, hiddenExperiences: editing.hiddenExperiences?.filter(({ id }) => id !== experience.id) } }
 }

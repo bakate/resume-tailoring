@@ -659,6 +659,7 @@ class StructuredResumeTestSystem {
     const session = this.#expectPreparedSession()
     const experience = session?.tailoredResume?.experiences.find(({ id }) => id === 'experiences.0')
     expect(experience?.organization?.text).toBe('Corrected Northwind')
+    expect(session?.tailoredResume?.experiences.map(({ id }) => id)).toEqual(['experiences.0', 'experiences.1'])
     expect(session?.resumeEditing?.hiddenFields).toEqual([])
     expect(session?.resumeEditing?.unsupportedFieldIds).toContain('source-fact-experiences-0-organization-0')
     expect(session?.sourceIntake).toEqual(structuredResumeSource)
@@ -727,6 +728,9 @@ class StructuredResumeTestSystem {
     expect(this.#expectPreparedSession()?.tailoredResume?.experiences.find(({ id }) => id === 'experiences.0'))
       .toMatchObject({ role: { text: 'Frontend Engineer' }, organization: { text: 'Northwind' },
         achievements: [{ text: 'Built accessible billing screens' }] })
+    // A restored experience returns to its reverse-chronological place, not to the end.
+    expect(this.#expectPreparedSession()?.tailoredResume?.experiences.map(({ id }) => id))
+      .toEqual(['experiences.0', 'experiences.1'])
     expect(this.#expectPreparedSession()?.sourceIntake).toEqual(structuredResumeSource)
     expect(this.#expectPreparedSession()?.resumeEditing?.hiddenExperiences).toEqual([])
   }

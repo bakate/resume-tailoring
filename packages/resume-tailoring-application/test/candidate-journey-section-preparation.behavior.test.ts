@@ -405,12 +405,21 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectExperienceOrder(['experiences.2', 'experiences.1', 'experiences.3', 'experiences.0'])
   })
 
-  it('keeps source order between roles with the same dates and lists undated experiences last', async () => {
-    const system = createSystemUnderTest({ experienceDates: [[null, null], ['2020', '2022'], ['Summer', 'Autumn'],
-      ['2020', '2022'], [null, '2016']] })
+  it('lists a role the source gives as ongoing from its start before a role ended later, and a year after its December', async () => {
+    const system = createSystemUnderTest({ experienceDates: [['2019', 'Dec 2020'], ['2018', '2021'], ['2023', '2024'],
+      ['Depuis mars 2021', null]] })
     await system.givenMatchedCandidateSession()
 
     await system.prepareTailoredResume()
+
+    system.expectExperienceOrder(['experiences.3', 'experiences.2', 'experiences.1', 'experiences.0'])
+  })
+
+  it('keeps source order between roles with the same dates and lists undated experiences last', async () => {
+    const system = createSystemUnderTest({ experienceDates: [[null, null], ['2020', '2022'], ['Summer', 'Autumn'],
+      ['2020', '2022'], [null, '2016']] })
+    await system.givenPreparedTailoredResume()
+
     await system.prepareTailoredResume()
 
     system.expectExperienceOrder(['experiences.1', 'experiences.3', 'experiences.4', 'experiences.0', 'experiences.2'])
@@ -501,6 +510,11 @@ class SectionPreparationTestSystem {
   async givenMatchedCandidateSession() {
     this.#journey.start()
     await expect.poll(() => this.#journey.readView().status).toBe('candidate-session-open')
+  }
+
+  async givenPreparedTailoredResume() {
+    await this.givenMatchedCandidateSession()
+    await this.prepareTailoredResume()
   }
 
   async prepareTailoredResume() {

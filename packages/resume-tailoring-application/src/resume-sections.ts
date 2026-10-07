@@ -74,8 +74,10 @@ const fieldSectionKinds = ['skills', 'education', 'languages', 'projects', 'cert
 export function planResumeSections({ candidateFacts }: Pick<ResumeSectionsRequest, 'candidateFacts'>): readonly ResumeSectionPlanEntry[] {
   const experienceIndexes = [...new Set(candidateFacts.map(({ path }) => /^experiences\.(\d+)\./u.exec(path)?.[1])
     .filter((index) => index !== undefined).map(Number))]
-  const experiences = orderExperiencesReverseChronologically(experienceIndexes.map((sourceIndex) => ({ sourceIndex,
-    facts: candidateFacts.filter(({ path }) => path.startsWith(`experiences.${String(sourceIndex)}.`)) })))
+  const readDate = (sourceIndex: number, name: 'startDate' | 'endDate') =>
+    candidateFacts.find(({ path }) => path.startsWith(`experiences.${String(sourceIndex)}.${name}.`))?.value ?? null
+  const experiences = orderExperiencesReverseChronologically({ experiences: experienceIndexes.map((sourceIndex) => ({
+    sourceIndex, startDate: readDate(sourceIndex, 'startDate'), endDate: readDate(sourceIndex, 'endDate') })) })
   return [{ key: 'value-proposition', kind: 'value-proposition' },
     ...experiences.map(({ sourceIndex }) => ({ key: `experiences.${String(sourceIndex)}`, kind: 'experience' as const })),
     ...fieldSectionKinds.filter((kind) => candidateFacts.some(({ path, value }) => path.startsWith(`${kind}.`)
