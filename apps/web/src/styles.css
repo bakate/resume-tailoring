@@ -176,7 +176,7 @@ body {
   line-height: 1.5;
 }
 
-.not-found a {
+.not-found > a {
   color: #164f3d;
   font-weight: 600;
   text-underline-offset: 5px;

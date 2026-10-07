@@ -40,6 +40,18 @@ describe('privacy-safe analytics observability', () => {
     expect(writeEvent).not.toHaveBeenCalled()
   })
 
+  it('rejects an uncaught error report that carries its message', () => {
+    const writeEvent = vi.fn()
+
+    const result = recordPrivacySafeAnalytics({
+      value: { name: 'uncaught-error-reported', source: 'error', message: 'Alex Morgan cannot be rendered' },
+      writeEvent,
+    })
+
+    expect(result).toEqual({ ok: false })
+    expect(writeEvent).not.toHaveBeenCalled()
+  })
+
   it('produces counters operators can aggregate by outcome and Match Score band', () => {
     const metric = createPrivacySafeAggregateMetric({
       name: 'resume-usefulness-rated',

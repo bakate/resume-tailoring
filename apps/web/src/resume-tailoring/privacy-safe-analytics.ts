@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { correctionKinds, journeyPhases, matchScoreBands, resumePreparationOutcomes, resumeRenderFailureCategories, resumeSectionKinds, resumeSectionOutcomes } from '@resume-tailoring/application/privacy-safe-telemetry'
+import { correctionKinds, journeyPhases, matchScoreBands, resumePreparationOutcomes, resumeRenderFailureCategories, resumeSectionKinds, resumeSectionOutcomes, uncaughtErrorSources } from '@resume-tailoring/application/privacy-safe-telemetry'
 import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/privacy-safe-telemetry'
 
 const matchScoreBandSchema = z.enum(matchScoreBands)
@@ -48,6 +48,10 @@ export const privacySafeAnalyticsEventSchema = z.discriminatedUnion('name', [
     name: z.literal('resume-render-failed'),
     category: z.enum(resumeRenderFailureCategories),
     retried: z.boolean(),
+  }),
+  z.strictObject({
+    name: z.literal('uncaught-error-reported'),
+    source: z.enum(uncaughtErrorSources),
   }),
 ]) satisfies z.ZodType<PrivacySafeTelemetryEvent>
 

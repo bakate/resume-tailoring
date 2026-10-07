@@ -6,9 +6,12 @@ import {
   createRootRoute,
 } from '@tanstack/react-router'
 import { MantineProvider } from '@mantine/core'
+import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 
 import { candidateJourneyTheme } from '../candidate-journey/candidate-journey-theme'
+import { listenForUncaughtBrowserErrors } from '../composition-root'
+import { GlobalErrorFallback } from '../global-error-fallback'
 import {
   LocalizationFailure,
   LocalizationProvider,
@@ -40,24 +43,38 @@ export const Route = createRootRoute({
     ],
   }),
   component: RootComponent,
+  errorComponent: RootErrorComponent,
   notFoundComponent: NotFound,
 })
 
 function RootComponent() {
   return (
     <LocalizationProvider>
-      <LocalizedRoot />
+      <LocalizedRoot>
+        <Outlet />
+      </LocalizedRoot>
     </LocalizationProvider>
   )
 }
 
-function LocalizedRoot() {
+/** The root route renders the document itself, so its fallback must render the document too. */
+function RootErrorComponent() {
+  return (
+    <LocalizationProvider>
+      <LocalizedRoot>
+        <GlobalErrorFallback />
+      </LocalizedRoot>
+    </LocalizationProvider>
+  )
+}
+
+function LocalizedRoot({ children }: Readonly<{ children: ReactNode }>) {
   const localizationResult = useLocalization()
   if (!localizationResult.ok) return <LocalizationUnavailableDocument />
   const { locale, readiness } = localizationResult.value
   return (
     <RootDocument locale={locale} readiness={readiness}>
-      <Outlet />
+      {children}
     </RootDocument>
   )
 }
@@ -81,6 +98,7 @@ function RootDocument({ children, locale, readiness }: Readonly<{
   locale: Locale
   readiness: Localization['readiness']
 }>) {
+  useEffect(() => listenForUncaughtBrowserErrors(), [])
   return (
     <html lang={locale}>
       <head>

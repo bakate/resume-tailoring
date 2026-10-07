@@ -24,6 +24,8 @@ export const resumePreparationOutcomes = ['prepared', 'failed'] as const
 export const resumeRenderFailureCategories = [
   'timeout', 'server', 'network', 'access', 'schema', 'revision-mismatch', 'render',
 ] as const
+/** Where an uncaught error surfaced; its message and stack are never reported, as they can quote Candidate content. */
+export const uncaughtErrorSources = ['render', 'error', 'unhandled-rejection'] as const
 
 export type MatchScoreBand = typeof matchScoreBands[number]
 
@@ -69,4 +71,8 @@ export type PrivacySafeTelemetryEvent =
       name: 'resume-render-failed'
       category: typeof resumeRenderFailureCategories[number]
       retried: boolean
+    }>
+  | Readonly<{
+      name: 'uncaught-error-reported'
+      source: typeof uncaughtErrorSources[number]
     }>

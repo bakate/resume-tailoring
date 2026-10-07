@@ -554,6 +554,10 @@ const englishCatalog = {
   'notFound.title': 'Page not found',
   'notFound.description': 'The page you requested does not belong to this Resume Tailoring workflow.',
   'notFound.return': 'Return to the workflow',
+  'safetyNet.title': 'Something went wrong',
+  'safetyNet.explanation': 'This page stopped working. Your documents stay in this browser: reload the page to continue where you left off.',
+  'safetyNet.reload': 'Reload',
+  'safetyNet.returnToDocuments': 'Back to my documents',
 } as const
 
 type TranslationKey = keyof typeof englishCatalog
@@ -1112,6 +1116,10 @@ const frenchCatalog = {
   'notFound.title': 'Page introuvable',
   'notFound.description': "La page demandée n'appartient pas à ce parcours d'adaptation de CV.",
   'notFound.return': 'Retourner au parcours',
+  'safetyNet.title': 'Un problème est survenu',
+  'safetyNet.explanation': 'Cette page a cessé de fonctionner. Tes documents restent dans ce navigateur : recharge la page pour reprendre là où tu en étais.',
+  'safetyNet.reload': 'Recharger',
+  'safetyNet.returnToDocuments': 'Revenir à mes documents',
 } as const satisfies TranslationCatalog
 
 export type Locale = 'en' | 'fr'
