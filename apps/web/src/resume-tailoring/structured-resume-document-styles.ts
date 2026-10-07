@@ -13,7 +13,7 @@ header.with-photo{display:grid;grid-template-columns:minmax(0,1fr) 24mm;column-g
 .contact-detail{white-space:nowrap}
 h1,h2{margin:0;color:#164f3d;font-family:ResumeLora,serif;font-weight:400}
 h1{font-size:25pt}h2{font-size:14pt}h3{font-size:11pt;margin:0}
-h1,h2,h3{break-after:avoid}.experience-heading{break-inside:avoid;break-after:avoid}
+h1,h2,h3{break-after:avoid}.experience-heading{break-inside:avoid;break-after:avoid}.resume-experience{break-inside:avoid}
 header p,address{margin:2mm 0 0;font-style:normal}
 section{margin-top:4mm}article,.skill-group{margin-top:3mm}
 article p,.skill-group p{margin:1mm 0 0}

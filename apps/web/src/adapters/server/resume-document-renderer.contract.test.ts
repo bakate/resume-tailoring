@@ -40,7 +40,7 @@ describe('structured resume PDF rendering boundary', () => {
   }, 20_000)
 
   // Summaries of increasing length slide every experience across the page break at least once.
-  it.each([0, 2, 4, 6, 8, 10])('never leaves an experience heading at the foot of a page without its dates and first achievement after %i summary lines', async (summaryLines) => {
+  it.each([0, 2, 4, 6, 8, 10])('keeps every experience whole on one page after %i summary lines', async (summaryLines) => {
     const request = experienceRequest({ summaryLines })
 
     const result = await renderResumeDocument(request)
@@ -51,7 +51,9 @@ describe('structured resume PDF rendering boundary', () => {
     const pageOf = (text: string) => pages.findIndex((page) => page.replace(/\s+/gu, '').includes(text.replace(/\s+/gu, '')))
     for (const experience of breakingExperiences) {
       expect(pageOf(experience.dates), experience.role).toBe(pageOf(experience.role))
-      expect(pageOf(experience.achievement), experience.role).toBe(pageOf(experience.role))
+      for (const achievement of experience.achievements) {
+        expect(pageOf(achievement), `${experience.role}: ${achievement}`).toBe(pageOf(experience.role))
+      }
     }
   }, 20_000)
 
@@ -152,7 +154,9 @@ function denseRequest({ count }: Readonly<{ count: number }>) {
 const breakingExperiences = Array.from({ length: 7 }, (_value, index) => ({
   role: `Platform Engineer ${String(index + 1)}`, organization: `Organization ${String(index + 1)}`,
   dates: `${String(2010 + index)} – ${String(2011 + index)}`,
-  achievement: `First achievement of experience ${String(index + 1)}`,
+  achievements: Array.from({ length: 4 }, (_achievement, item) => item === 0
+    ? `First achievement of experience ${String(index + 1)}`
+    : `Achievement ${String(item + 1)} of experience ${String(index + 1)}: delivered accessible features with keyboard support, clear error messages and documented interfaces for other teams.`),
 }))
 
 /** Seven experiences with four achievements each, after a summary of the requested length. */
@@ -166,9 +170,7 @@ function experienceRequest({ summaryLines }: Readonly<{ summaryLines: number }>)
       role: field(`role-${String(index)}`, experience.role), organization: field(`organization-${String(index)}`, experience.organization),
       startDate: field(`start-${String(index)}`, experience.dates.split(' – ')[0] ?? ''),
       endDate: field(`end-${String(index)}`, experience.dates.split(' – ')[1] ?? ''), location: null, context: null,
-      achievements: [field(`achievement-${String(index)}-0`, experience.achievement),
-        ...Array.from({ length: 3 }, (_value, item) => field(`achievement-${String(index)}-${String(item + 1)}`,
-          'Delivered accessible features with keyboard support, clear error messages and documented interfaces for other teams.'))],
+      achievements: experience.achievements.map((achievement, item) => field(`achievement-${String(index)}-${String(item)}`, achievement)),
     })) } }, unsupportedFieldIds: [] }
 }
 
