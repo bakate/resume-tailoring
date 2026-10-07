@@ -2,7 +2,8 @@ import { assign, enqueueActions, fromPromise, sendParent, setup } from 'xstate'
 import type { ResumeSectionSnapshot } from '@resume-tailoring/domain/candidate-session'
 import type { PrivacySafeTelemetryEvent, resumeSectionOutcomes } from './privacy-safe-telemetry'
 import type { ResumeOperationFailure, ResumePreparationOutcome } from './structured-resume-contract'
-import { assembleResumeDocumentWithOrigins, citedCandidateFacts, createSectionWritingInput, hasSupportedSectionStructure,
+import { assembleResumeDocumentWithOrigins, citedCandidateFacts, copyExperienceFromFacts, createSectionWritingInput,
+  hasSupportedSectionStructure,
   isSectionFullyValidated, normalizeSectionContent, planResumeSections, readRejectedFields,
   readSectionContentFields, removeSectionFields } from './resume-sections'
 import type { ResumeCoherenceIssue, ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage,
@@ -13,14 +14,17 @@ import { explainFailure, isRetryable } from './failure-cause'
 import type { ExplainedFailure } from './failure-cause'
 
 /** Why one Resume Section failed: its content was unsupported, or its last model call failed with this error. */
-type ResumeSectionFailure = Readonly<{ type: Exclude<typeof resumeSectionOutcomes[number], 'validated'>; retryAfterSeconds?: number }>
+type ResumeSectionFailure = Readonly<{
+  type: Exclude<typeof resumeSectionOutcomes[number], 'validated' | 'copied-from-source'>; retryAfterSeconds?: number
+}>
 
+/** A section with content was validated as written, or copied from its Candidate Facts after its rewrite still failed. */
 export type ResumeSectionResult = Readonly<{
   section: ResumeSectionPlanEntry
   attempt: number
   durationMilliseconds: number
   usage: ResumeModelUsage
-}> & (Readonly<{ status: 'validated'; content: ResumeSectionContent }>
+}> & (Readonly<{ status: 'validated' | 'copied-from-source'; content: ResumeSectionContent }>
   | Readonly<{ status: 'failed'; failure: ResumeSectionFailure }>)
 
 type SectionProgressStatus = 'writing' | 'validating'
@@ -113,9 +117,19 @@ function addUsage(total: ResumeModelUsage, usage: ResumeModelUsage | undefined):
 function readSectionResult(context: ResumeSectionMachineContext): ResumeSectionResult {
   const measured = { section: context.writingInput.section, attempt: context.attempt, usage: context.usage,
     durationMilliseconds: Math.max(0, context.now() - context.startedAt) }
-  return context.failure === null && context.content !== null
-    ? { ...measured, status: 'validated', content: context.content }
-    : { ...measured, status: 'failed', failure: context.failure ?? { type: 'unexpected-response' } }
+  if (context.failure === null && context.content !== null) return { ...measured, status: 'validated', content: context.content }
+  const copy = context.failure?.type === 'unsupported' ? readSourceCopy(context.writingInput) : null
+  return copy === null ? { ...measured, status: 'failed', failure: context.failure ?? { type: 'unexpected-response' } }
+    : { ...measured, status: 'copied-from-source', content: copy }
+}
+
+/**
+ * Unsupported content a rewrite could not fix would fail the same way on a retry, so the section takes the
+ * Candidate's own wording instead, kept only while it passes the same deterministic structure checks.
+ */
+function readSourceCopy(input: ResumeSectionWritingInput): ResumeSectionContent | null {
+  const copy = copyExperienceFromFacts(input)
+  return copy !== null && hasSupportedSectionStructure({ content: copy, input }) ? copy : null
 }
 
 /** Writes and validates one Resume Section; a rewritable failure rewrites it once. */
@@ -211,7 +225,7 @@ const checkDocumentCoherence = fromPromise<ResumeSectionModelResult<ResumeDocume
 function assembleDocument(context: ResumePreparationMachineContext) {
   return assembleResumeDocumentWithOrigins({ request: context.request, contents: context.plan.flatMap(({ key }) => {
     const result = context.results.find(({ section }) => section.key === key)
-    return result?.status === 'validated' ? [result.content] : []
+    return result === undefined || result.status === 'failed' ? [] : [result.content]
   }) })
 }
 
@@ -295,7 +309,7 @@ function resolveCoherence({ context, coherence }: Readonly<{
   const rewrites: Record<string, readonly ResumeRejectedField[]> = {}
   const results = context.results.map((result): ResumeSectionResult => {
     const rejected = rejections[result.section.key]
-    if (rejected === undefined || result.status !== 'validated') return result
+    if (rejected === undefined || result.status === 'failed') return result
     const removals = selectRemovals({ content: result.content, rejected })
     const content = removeSectionFields({ content: result.content, fieldIds: removals.map(({ fieldId }) => fieldId) })
     const remaining = content === null ? rejected : rejected.filter((field) => !removals.includes(field))
@@ -326,7 +340,7 @@ function readCoherenceRewrite({ context, coherence }: Readonly<{
     coherenceAcceptedFields: readAcceptedFields({ context, rewrittenKeys: Object.keys(coherenceRejections),
       namedFieldIds: coherence.ok ? coherence.value.issues.map(({ fieldId }) => fieldId) : [] }),
     coherencePreviousContents: Object.fromEntries(results.flatMap((result) =>
-      rejected(result.section.key) && result.status === 'validated' ? [[result.section.key, result.content]] : [])),
+      rejected(result.section.key) && result.status !== 'failed' ? [[result.section.key, result.content]] : [])),
     results: results.filter(({ section }) => !rejected(section.key)),
     startedKeys: context.startedKeys.filter((key) => !rejected(key)),
     sections: context.sections.map((section): ResumeSectionSnapshot => rejected(section.key)
@@ -363,7 +377,7 @@ function everySectionFinished(context: ResumePreparationMachineContext) {
 }
 
 function everySectionValidated(context: ResumePreparationMachineContext) {
-  return everySectionFinished(context) && context.results.every(({ status }) => status === 'validated')
+  return everySectionFinished(context) && context.results.every(({ status }) => status !== 'failed')
 }
 
 function coherencePassed(coherence: ResumePreparationMachineContext['coherence']) {
@@ -444,14 +458,15 @@ function restoreValidatedSections({ context, plan }: Readonly<{
 
 function readRestoredSection({ section, saved }: Readonly<{
   section: ResumeSectionPlanEntry; saved: ResumeSectionSnapshot
-}>): Extract<ResumeSectionResult, { status: 'validated' }> | null {
+}>): Extract<ResumeSectionResult, { content: ResumeSectionContent }> | null {
   return saved.status === 'validated' ? { section, status: 'validated', content: saved.content, attempt: saved.attempt,
     durationMilliseconds: 0, usage: noUsage } : null
 }
 
 function readSectionSnapshot(result: ResumeSectionResult): ResumeSectionSnapshot {
   const { key, kind } = result.section
-  return result.status === 'validated' ? { key, kind, attempt: result.attempt, status: 'validated', content: result.content }
+  // A copied section is saved as validated: the saved snapshot does not yet tell copied content apart.
+  return result.status !== 'failed' ? { key, kind, attempt: result.attempt, status: 'validated', content: result.content }
     : { key, kind, attempt: result.attempt, status: 'failed' }
 }
 
@@ -468,7 +483,8 @@ function readProgressedSections({ context, event }: Readonly<{
 
 function recordSectionResult({ context, result }: Readonly<{ context: ResumePreparationMachineContext; result: ResumeSectionResult }>) {
   context.recordTelemetry({ name: 'resume-section-prepared', sectionKind: result.section.kind,
-    outcome: result.status === 'validated' ? 'validated' : result.failure.type, attemptCount: result.attempt,
+    outcome: result.status === 'failed' ? result.failure.type : result.status,
+    attemptCount: result.attempt,
     durationMilliseconds: result.durationMilliseconds, inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens })
 }
 

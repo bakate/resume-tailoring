@@ -36,7 +36,7 @@ body {
 }
 
 .candidate-journey-app :where(button, input, textarea, select, [role='button']):focus-visible {
-  outline: 3px solid var(--mantine-color-forest-3);
+  outline: 3px solid var(--mantine-color-forest-7);
   outline-offset: 3px;
 }
 

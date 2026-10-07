@@ -9,7 +9,7 @@ import { MantineProvider } from '@mantine/core'
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 
-import { candidateJourneyTheme } from '../candidate-journey/candidate-journey-theme'
+import { candidateJourneyCssVariablesResolver, candidateJourneyTheme } from '../candidate-journey/candidate-journey-theme'
 import { listenForUncaughtBrowserErrors } from '../composition-root'
 import { GlobalErrorFallback } from '../global-error-fallback'
 import {
@@ -105,7 +105,7 @@ function RootDocument({ children, locale, readiness }: Readonly<{
         <HeadContent />
       </head>
       <body suppressHydrationWarning style={readiness === 'pending' ? pendingLocaleStyle : undefined}>
-        <MantineProvider theme={candidateJourneyTheme}>{children}</MantineProvider>
+        <MantineProvider cssVariablesResolver={candidateJourneyCssVariablesResolver} theme={candidateJourneyTheme}>{children}</MantineProvider>
         <Scripts />
       </body>
     </html>

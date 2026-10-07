@@ -93,7 +93,7 @@ describe('structured resume PDF rendering boundary', () => {
       const pdf = await loading.promise
       const page = await pdf.getPage(1)
       const text = (await page.getTextContent()).items.flatMap((item) => 'str' in item ? [item.str] : []).join(' ')
-      expect(text).toMatch(/CV normalisé – non adapté à l\s*[’ʼ']\s*offre/u)
+      expect(text).toMatch(/CV général – non adapté à une offre/u)
       expect(text).toMatch(/Développement d\s*[’ʼ']\s*interfaces accessibles/u)
       expect(text).toContain('Compétences')
       expect(new TextDecoder('latin1').decode(result.pdf)).toContain('/Subtype /Image')

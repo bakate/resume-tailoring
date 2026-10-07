@@ -1,11 +1,11 @@
 export const resumePreviewMessages = {
   en: {
-    normalizedTitle: 'Normalized Resume – not tailored',
+    normalizedTitle: 'General resume – not tailored to a job',
     photo: 'Optional photo', photoInvalid: 'Choose a PNG, JPEG or WebP image smaller than 1 MB.',
     photoAdd: 'Add a photo', photoChange: 'Change photo', photoRemove: 'Remove', photoHint: 'PNG, JPEG or WebP, under 1 MB.',
     title: 'Preview and export',
     pending: 'Preparing and checking the current PDF…', download: 'Download PDF',
-    page: 'Page', textVersion: 'Read the document text', previewTitle: 'Tailored Resume preview',
+    page: 'Page', textVersion: 'Read the document text', previewTitle: 'Tailored resume preview',
     downloaded: 'PDF handed to your browser for download.',
     'unsupported-content': 'Resolve or confirm the unsupported professional changes before downloading.',
     fullName: 'Full name', detectedName: 'Detected in your resume, check it.',
@@ -15,7 +15,7 @@ export const resumePreviewMessages = {
     'stale-layout': 'The document changed. Wait for the current preview before downloading.',
   },
   fr: {
-    normalizedTitle: 'CV normalisé – non adapté à l’offre',
+    normalizedTitle: 'CV général – non adapté à une offre',
     photo: 'Photo facultative', photoInvalid: 'Choisis une image PNG, JPEG ou WebP de moins de 1 Mo.',
     photoAdd: 'Ajouter une photo', photoChange: 'Changer la photo', photoRemove: 'Retirer', photoHint: 'PNG, JPEG ou WebP, moins de 1 Mo.',
     title: 'Aperçu et export',

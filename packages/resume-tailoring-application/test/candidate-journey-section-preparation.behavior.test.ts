@@ -78,6 +78,24 @@ describe('Candidate Journey section-by-section resume preparation', () => {
       'languages', 'projects', 'certifications'], failed: ['skills'] })
   })
 
+  it('accepts an experience context that cites an achievement of the same experience on its first write', async () => {
+    const system = createSystemUnderTest({ writtenExperience: 'context-citing-achievement' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectFirstExperienceWrittenOnceWithItsWidenedContext()
+  })
+
+  it('copies an experience from its Candidate Facts when its rewrite still fails, and prepares the whole resume', async () => {
+    const system = createSystemUnderTest({ writtenExperience: 'role-citing-achievement' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectFirstExperienceCopiedFromItsFactsAndResumePrepared()
+  })
+
   it('rewrites a section once after a writing timeout', async () => {
     const system = createSystemUnderTest({ skillsWritingFailure: 'timeout' })
     await system.givenMatchedCandidateSession()
@@ -390,6 +408,11 @@ type TestOptions = Readonly<{
   writtenPunctuation?: 'em-dash'
   /** The writer lists an achievement citing only the experience context before the one the Match Analysis found relevant. */
   writtenAchievements?: 'relevant-last'
+  /**
+   * The writer always widens the first experience's context, which its structure allows, or its role, which fails
+   * the structure check, with an achievement fact of the same experience.
+   */
+  writtenExperience?: 'context-citing-achievement' | 'role-citing-achievement'
   writtenSkills?: 'duplicated' | 'versioned' | 'uncited-on-rewrite'
   coherence?: 'mixed-projects-once' | 'mixed-projects-twice' | 'redundant-projects-always' | 'document-level-issue'
     | 'redundant-projects-and-mixed-skills-twice' | 'chronology-on-source-dates'
@@ -732,6 +755,29 @@ class SectionPreparationTestSystem {
     expect(view?.session.preparedResumeRevision).toBeUndefined()
   }
 
+  expectFirstExperienceWrittenOnceWithItsWidenedContext() {
+    const view = this.#expectOutcome()
+    expect(view?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    expect(this.#writtenSectionKeys().filter((key) => key === 'experiences.0')).toHaveLength(1)
+    expect(view?.session.tailoredResume?.experiences.find(({ id }) => id === 'experiences.0')?.context).toMatchObject({
+      text: 'Customer billing team building accessible screens',
+      factIds: ['source-fact-experiences-0-context-0', 'source-fact-experiences-0-achievements-0'] })
+  }
+
+  expectFirstExperienceCopiedFromItsFactsAndResumePrepared() {
+    const view = this.#expectOutcome()
+    expect(view?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    expect(this.#writtenSectionKeys().filter((key) => key === 'experiences.0')).toHaveLength(2)
+    const experience = view?.session.tailoredResume?.experiences.find(({ id }) => id === 'experiences.0')
+    expect(experience).toMatchObject({
+      role: { text: 'Frontend Engineer', factIds: ['source-fact-experiences-0-role-0'] },
+      organization: { text: 'Northwind', factIds: ['source-fact-experiences-0-organization-0'] },
+      startDate: { text: '2021' }, endDate: { text: '2024' },
+      context: { text: 'Customer billing team', factIds: ['source-fact-experiences-0-context-0'] },
+      achievements: [{ text: 'Built accessible billing screens', factIds: ['source-fact-experiences-0-achievements-0'] }],
+    })
+  }
+
   expectSavedSections(expected: Readonly<{ validated: readonly string[]; failed: readonly string[] }>) {
     const sections = this.#expectOutcome()?.session.preparation?.sections ?? []
     expect(sections.filter(({ status }) => status === 'validated').map(({ key }) => key)).toEqual(expected.validated)
@@ -793,7 +839,9 @@ function createDependencies({ options, persistence, models }: Readonly<{
             // The first rewrite cites a fact the section was not given, which fails the structure check.
             : options.writtenSkills === 'uncited-on-rewrite' && input.previousContent !== null && models.onSkillsWrite() === 1
               ? withUncitedSkills(written) : written
-        const ordered = options.writtenAchievements === 'relevant-last' ? withContextAchievementFirst(content) : content
+        const widened = options.writtenExperience === undefined ? content
+          : withFieldCitingAchievement({ content, field: options.writtenExperience === 'role-citing-achievement' ? 'role' : 'context' })
+        const ordered = options.writtenAchievements === 'relevant-last' ? withContextAchievementFirst(widened) : widened
         return { ok: true, value: options.writtenPunctuation === 'em-dash' ? withEmDashes(ordered) : ordered }
       },
       validateFields: ({ section, fields }) => {
@@ -842,6 +890,15 @@ function withContextAchievementFirst(content: ResumeSectionContent): ResumeSecti
   return { kind: 'experience', experience: { ...content.experience, achievements: [
     { id: 'billing-team', text: 'Worked in the customer billing team', factIds: ['source-fact-experiences-0-context-0'] },
     ...content.experience.achievements] } }
+}
+
+function withFieldCitingAchievement({ content, field }: Readonly<{
+  content: ResumeSectionContent; field: 'context' | 'role'
+}>): ResumeSectionContent {
+  if (content.kind !== 'experience' || content.experience.id !== 'experiences.0') return content
+  const text = field === 'role' ? 'Frontend Engineer building accessible screens' : 'Customer billing team building accessible screens'
+  return { kind: 'experience', experience: { ...content.experience, [field]: { id: `experiences.0.${field}`, text,
+    factIds: [`source-fact-experiences-0-${field}-0`, 'source-fact-experiences-0-achievements-0'] } } }
 }
 
 /** Appends an em-dashed detail to every written field, as a writing model often does. */

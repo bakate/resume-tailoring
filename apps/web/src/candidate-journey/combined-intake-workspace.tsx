@@ -17,10 +17,11 @@ import { FailureExplanation, RecoveryAction } from './failure-recovery'
 type IntakeProps = Readonly<{ candidateJourney: ReturnType<typeof useCandidateJourney>; localization: Localization }>
 type OpenIntakeProps = IntakeProps & Readonly<{ session: CandidateSession }>
 type DocumentChoice = Readonly<{ method: 'paste' | 'upload'; text: string; file: File | null }>
+type DocumentKind = 'source' | 'posting'
 type ResumePurpose = 'tailored' | 'normalized'
 type IntakeState = Readonly<{
   sourceChoice: DocumentChoice; postingChoice: DocumentChoice; locale: string | null;
-  failure: ResumePreparationFailure | null; confirmation: boolean; purpose: ResumePurpose
+  missingDocuments: readonly DocumentKind[]; confirmation: boolean; purpose: ResumePurpose
 }>
 type IntakeControls = ReturnType<typeof useIntakeForm>
 type IntakeActionsInput = OpenIntakeProps & Readonly<{
@@ -44,11 +45,13 @@ function CombinedIntakeForm(props: OpenIntakeProps) {
     <Fieldset disabled={view.operation !== null} p={0} variant="unstyled">
       <Stack><IntakeFields {...props} busy={view.operation !== null} controls={controls} /></Stack>
     </Fieldset>
-    <Button aria-describedby={processingPolicyNoticeId} disabled={view.operation !== null} loading={view.operation !== null}
-      onClick={() => { controls.requestGeneration({ purpose: 'tailored' }) }} size="lg">
-      {localization.translate(session.tailoredResume === null ? 'combinedIntake.generate' : 'combinedIntake.regenerate')}</Button>
+    {/* A failed preparation offers its own Recovery below, so the form shows one action at a time. */}
+    {readFailedPreparation(session)?.recoverable === true ? null
+      : <Button aria-describedby={processingPolicyNoticeId} disabled={view.operation !== null} loading={view.operation !== null}
+        onClick={() => { controls.requestGeneration({ purpose: 'tailored' }) }} size="lg">
+        {localization.translate(session.tailoredResume === null ? 'combinedIntake.generate' : 'combinedIntake.regenerate')}</Button>}
     <ProcessingPolicyNotice {...{ candidateJourney, localization }} />
-    <PreparationFeedback {...{ candidateJourney, localization, localFailure: controls.state.failure }}
+    <PreparationFeedback {...{ candidateJourney, localization }}
       onRetry={() => { controls.requestGeneration({ purpose: session.preparation?.purpose ?? 'tailored' }) }}
       onNormalized={() => { controls.requestGeneration({ purpose: 'normalized' }) }} />
     <RegenerationConfirmation {...{ controls, localization }} />
@@ -59,13 +62,13 @@ function useIntakeForm(props: OpenIntakeProps) {
   const navigate = useNavigate()
   const [state, setState] = useState<IntakeState>(() => ({ sourceChoice: initialSource(props.candidateJourney),
     postingChoice: initialPosting(props.candidateJourney), locale: props.session.preparation?.locale ?? 'automatic',
-    failure: null, confirmation: false, purpose: 'tailored' }))
+    missingDocuments: [], confirmation: false, purpose: 'tailored' }))
   const extractedSource = props.session.preparation === undefined ? props.session.sourceIntake : props.session.preparation.sourceIntake
   useEffect(() => {
     if (extractedSource !== null) setState((current) => ({ ...current, sourceChoice: { method: 'paste', text: '', file: null } }))
   }, [extractedSource])
   const updateInputs = (change: Partial<Pick<IntakeState, 'sourceChoice' | 'postingChoice' | 'locale'>>) => {
-    setState((current) => ({ ...current, ...change, failure: null }))
+    setState((current) => ({ ...current, ...change, missingDocuments: [] }))
     props.candidateJourney.invalidateResumeInputs()
   }
   return { state, updateInputs, ...createIntakeActions({ ...props, state, setState,
@@ -76,8 +79,13 @@ function createIntakeActions(input: IntakeActionsInput) {
   const generate = async ({ purpose }: Readonly<{ purpose: ResumePurpose }>) => {
     input.setState((current) => ({ ...current, confirmation: false }))
     const request = await readIntakeRequest({ ...input, purpose })
-    if (!request.ok) { input.setState((current) => ({ ...current, failure: request.error })); return }
-    input.setState((current) => ({ ...current, failure: null }))
+    if (!request.ok) {
+      input.setState((current) => ({ ...current, missingDocuments: request.missingDocuments }))
+      const [firstMissing] = request.missingDocuments
+      if (firstMissing !== undefined) document.getElementById(intakeTextIds[firstMissing])?.focus()
+      return
+    }
+    input.setState((current) => ({ ...current, missingDocuments: [] }))
     const { view } = input.candidateJourney
     const consentRequired = view.status === 'candidate-session-open' && view.processingConsentStatus !== 'granted'
     input.candidateJourney.startTailoredResumePreparation(consentRequired
@@ -99,8 +107,9 @@ async function readIntakeRequest({ state, session, purpose }: Readonly<{
     selectedDocument({ choice: state.sourceChoice }), selectedDocument({ choice: state.postingChoice }),
   ])
   const source = session.preparation?.sourceIntake ?? session.sourceIntake
-  if (sourceDocument === null && source === null) return { ok: false, error: 'empty-document' } as const
-  if (jobPosting === null) return { ok: false, error: 'empty-job-posting' } as const
+  const missingDocuments = [...(sourceDocument === null && source === null ? ['source' as const] : []),
+    ...(jobPosting === null ? ['posting' as const] : [])]
+  if (jobPosting === null || missingDocuments.length > 0) return { ok: false, missingDocuments } as const
   return { ok: true, value: { ...(sourceDocument === null ? {} : { sourceDocument }), jobPosting,
     locale: state.locale === 'en' || state.locale === 'fr' ? state.locale : null, purpose } } as const
 }
@@ -111,8 +120,9 @@ function IntakeFields({ session, localization, controls, busy }: OpenIntakeProps
   return <>
     <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
       <SourceDocumentCard {...{ busy, hasSource, localization }} choice={state.sourceChoice}
-        onChange={(sourceChoice) => { updateInputs({ sourceChoice }) }} />
+        missing={state.missingDocuments.includes('source')} onChange={(sourceChoice) => { updateInputs({ sourceChoice }) }} />
       <DocumentCard {...{ busy, localization }} choice={state.postingChoice} kind="posting"
+        missing={state.missingDocuments.includes('posting')}
         onChange={(postingChoice) => { updateInputs({ postingChoice }) }} />
     </SimpleGrid>
     <Select label={localization.translate('tailoredResume.language')} maw={{ sm: 320 }} value={state.locale}
@@ -124,7 +134,7 @@ function IntakeFields({ session, localization, controls, busy }: OpenIntakeProps
 }
 
 type DocumentCardProps = Readonly<{
-  busy: boolean; choice: DocumentChoice; localization: Localization; onChange: (choice: DocumentChoice) => void
+  busy: boolean; choice: DocumentChoice; localization: Localization; missing: boolean; onChange: (choice: DocumentChoice) => void
 }>
 
 function SourceDocumentCard({ hasSource, ...props }: Omit<DocumentCardProps, 'kind'> & Readonly<{ hasSource: boolean }>) {
@@ -146,13 +156,15 @@ function SourceDocumentCard({ hasSource, ...props }: Omit<DocumentCardProps, 'ki
 
 const emptyChoice: DocumentChoice = { method: 'paste', text: '', file: null }
 
+const intakeTextIds = { source: 'intake-source-text', posting: 'intake-posting-text' } as const satisfies Record<DocumentKind, string>
+
 const acceptedMediaTypes = {
   source: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
   posting: ['application/pdf', 'text/plain'],
 } as const
 
-function DocumentCard({ busy, choice, footer = null, kind, localization, onChange }: DocumentCardProps & Readonly<{
-  footer?: ReactNode; kind: 'source' | 'posting'
+function DocumentCard({ busy, choice, footer = null, kind, localization, missing, onChange }: DocumentCardProps & Readonly<{
+  footer?: ReactNode; kind: DocumentKind
 }>) {
   const [rejected, setRejected] = useState(false)
   const source = kind === 'source'
@@ -175,7 +187,8 @@ function DocumentCard({ busy, choice, footer = null, kind, localization, onChang
           {rejected ? <Text c="danger.8" role="alert" size="sm">{localization.translate('combinedIntake.rejectedFile')}</Text> : null}
           <Divider label={localization.translate('combinedIntake.orPaste')} labelPosition="center" />
           <Textarea aria-label={localization.translate(source ? 'sourceIntake.professionalText' : 'jobMatch.textLabel')}
-            autosize maxRows={16} minRows={8}
+            autosize error={missing ? localization.translate(source ? 'sourceIntake.failure.empty' : 'jobMatch.failure.empty') : undefined}
+            id={intakeTextIds[kind]} maxRows={16} minRows={8}
             placeholder={localization.translate(source ? 'combinedIntake.sourcePlaceholder' : 'combinedIntake.postingPlaceholder')}
             value={choice.text} onChange={(event) => { onChange({ method: 'paste', text: event.currentTarget.value, file: null }) }} />
         </>}
@@ -242,18 +255,17 @@ function restoreChoice(document?: StoredIntakeDocument | null): DocumentChoice {
 }
 
 /** The outcome of a preparation without a usable result; `onBack` leads from `/resume` to the documents on `/`. */
-export function PreparationFeedback({ candidateJourney, localization, localFailure, onBack, onRetry, onNormalized }: IntakeProps & Readonly<{
-  localFailure: ResumePreparationFailure | null; onBack?: () => void; onRetry: () => void; onNormalized: () => void
+export function PreparationFeedback({ candidateJourney, localization, onBack, onRetry, onNormalized }: IntakeProps & Readonly<{
+  onBack?: () => void; onRetry: () => void; onNormalized: () => void
 }>) {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open') return null
   const preparation = view.session.preparation
-  const failure = localFailure ?? preparation?.failure ?? null
-  const failedPreparation = localFailure === null && (preparation?.status === 'failed' || preparation?.status === 'interrupted')
+  const failedPreparation = readFailedPreparation(view.session)
   return <>
-    {failedPreparation ? <PreparationFailureAlert {...{ failure, localization, onBack, onRetry }}
-      cause={preparation.status === 'failed' ? preparation.failureCause : undefined} busy={view.operation !== null} hasStableResume={view.session.tailoredResume !== null}
-      interrupted={preparation.status === 'interrupted'} /> : <InputFailure {...{ failure, localization }} />}
+    {failedPreparation === null ? <InputFailure {...{ failure: preparation?.failure ?? null, localization }} />
+      : <PreparationFailureAlert {...{ ...failedPreparation, localization, onBack, onRetry }} busy={view.operation !== null}
+        hasStableResume={view.session.tailoredResume !== null} />}
     {preparation?.status === 'awaiting-correction' && preparation.sourceIntake !== null
       ? <CriticalAmbiguityQuestions {...{ candidateJourney, localization, sourceIntake: preparation.sourceIntake }} /> : null}
     {preparation?.status === 'no-relevant-evidence' ? <Alert color="caution" title={localization.translate('jobMatch.generation.denied')}>
@@ -295,18 +307,33 @@ function BackToDocuments({ localization, onBack }: Readonly<{ localization: Loca
     : <Button onClick={onBack} variant="default">{localization.translate('resumeResult.backToDocuments')}</Button>
 }
 
+type FailedPreparation = Readonly<{
+  failure: ResumePreparationFailure | null; cause: FailureCause | undefined; interrupted: boolean
+  /** Whether the alert offers an action of its own: a Recovery, or a retry when another attempt can succeed. */
+  recoverable: boolean
+}>
+
+function readFailedPreparation(session: CandidateSession): FailedPreparation | null {
+  const { preparation } = session
+  if (preparation?.status !== 'failed' && preparation?.status !== 'interrupted') return null
+  const failure = preparation.failure ?? null
+  const cause = preparation.status === 'failed' ? preparation.failureCause : undefined
+  const interrupted = preparation.status === 'interrupted'
+  return { failure, cause, interrupted,
+    recoverable: cause !== undefined || interrupted || failure === null || !inputFailures.has(failure) }
+}
+
 /**
  * The context title says which step failed; a Failure Cause adds why, and its Recovery replaces the plain retry. Without
  * a cause, an unavailable service keeps its generic wording.
  */
-function PreparationFailureAlert({ busy, cause, failure, hasStableResume, interrupted, localization, onBack, onRetry }: Readonly<{
-  busy: boolean; cause: FailureCause | undefined; failure: ResumePreparationFailure | null; hasStableResume: boolean
-  interrupted: boolean; localization: Localization; onBack: (() => void) | undefined; onRetry: () => void
+function PreparationFailureAlert({ busy, cause, failure, hasStableResume, interrupted, localization, onBack, onRetry, recoverable }:
+FailedPreparation & Readonly<{
+  busy: boolean; hasStableResume: boolean; localization: Localization; onBack: (() => void) | undefined; onRetry: () => void
 }>) {
   const step = interrupted || failure === null || (cause !== undefined && failure === 'unavailable') ? null
     : localization.translate(failure in retryableFailureCauses
       ? retryableFailureCauses[failure as keyof typeof retryableFailureCauses] : preparationFailureKeys[failure])
-  const retryable = interrupted || failure === null || !inputFailures.has(failure)
   return <Alert color={interrupted ? 'caution' : 'danger'} role="alert"
     title={localization.translate(interrupted ? 'combinedIntake.interruptedTitle' : 'combinedIntake.failedTitle')}>
     <Stack gap="sm">
@@ -315,7 +342,7 @@ function PreparationFailureAlert({ busy, cause, failure, hasStableResume, interr
       <Text c="dimmed" size="sm">{localization.translate(hasStableResume ? 'combinedIntake.inputsAndResumeKept' : 'combinedIntake.inputsKept')}</Text>
       <Group>{cause !== undefined ? <RecoveryAction {...{ busy, cause, localization, onRetry }} recovery={readRecovery(cause)}
         onShortenInput={onBack ?? showIntake} />
-        : retryable ? <Button disabled={busy} onClick={onRetry} variant="default">
+        : recoverable ? <Button disabled={busy} onClick={onRetry} variant="default">
           {localization.translate('combinedIntake.retry')}</Button> : null}
         <BackToDocuments {...{ localization, onBack }} /></Group>
     </Stack>

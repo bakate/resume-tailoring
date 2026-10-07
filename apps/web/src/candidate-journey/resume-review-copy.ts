@@ -1,6 +1,6 @@
 export const resumeReviewCopy = {
   en: {
-    previewTitle: 'Tailored Resume preview', preview: 'Preview your resume', description: 'Review the document first. Open the editor only when you want to change something.',
+    previewTitle: 'Tailored resume preview', preview: 'Preview your resume', description: 'Review the document first. Open the editor only when you want to change something.',
     hideEntry: 'Hide experience', restoreEntry: 'Restore experience', print: 'Print current resume', edit: 'Edit resume', close: 'Close editor', contacts: 'Identity and contact details', recovery: 'Restore content',
     order: 'Section order', hidden: 'Hidden content', omitted: 'Source content not included', restore: 'Restore source content',
     emptyRecovery: 'All supported source content is included.', localContacts: 'Identity and contact details stay in your browser and are never sent for professional rewriting.',

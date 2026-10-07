@@ -1,4 +1,5 @@
 import { createTheme } from '@mantine/core'
+import type { CSSVariablesResolver } from '@mantine/core'
 
 export const candidateJourneyTheme = createTheme({
   colors: {
@@ -41,4 +42,14 @@ export const candidateJourneyTheme = createTheme({
   headings: { fontFamily: 'DM Serif Display, serif', fontWeight: '400' },
   primaryColor: 'forest',
   primaryShade: 8,
+})
+
+/**
+ * Secondary text and placeholders meet the WCAG AA 4.5:1 text contrast on the white and tinted surfaces; Mantine's
+ * gray defaults reach only 3.3:1 and 2.1:1.
+ */
+export const candidateJourneyCssVariablesResolver: CSSVariablesResolver = () => ({
+  variables: {},
+  light: { '--mantine-color-dimmed': '#646b75', '--mantine-color-placeholder': '#6b7280' },
+  dark: {},
 })

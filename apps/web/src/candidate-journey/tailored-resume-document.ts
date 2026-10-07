@@ -23,7 +23,7 @@ export function renderTailoredResumeDocument({ tailoredResume, photoDataUrl }: R
   tailoredResume: TailoredResume
   photoDataUrl?: string
 }>) {
-  const title = tailoredResume.identity?.value ?? 'Tailored Resume'
+  const title = tailoredResume.identity?.value ?? 'Tailored resume'
   const heading = tailoredResume.purpose === 'normalized'
     ? readResumeHeading({ key: 'normalized', locale: tailoredResume.locale }) : tailoredResume.targetRole?.value ?? ''
   // Each detail stays on one line, so an address never splits across lines.
@@ -124,6 +124,6 @@ function renderText(value: string) {
 export type ResumeHeadingKey = keyof typeof labels.en
 
 const labels = {
-  en: { normalized: 'Normalized Resume – not tailored', certifications: 'Certifications', education: 'Education', experiences: 'Experience', languages: 'Languages', projects: 'Projects', skills: 'Skills', summary: 'Summary' },
-  fr: { normalized: 'CV normalisé – non adapté à l’offre', certifications: 'Certifications', education: 'Formation', experiences: 'Expérience', languages: 'Langues', projects: 'Projets', skills: 'Compétences', summary: 'Profil' },
+  en: { normalized: 'General resume – not tailored to a job', certifications: 'Certifications', education: 'Education', experiences: 'Experience', languages: 'Languages', projects: 'Projects', skills: 'Skills', summary: 'Summary' },
+  fr: { normalized: 'CV général – non adapté à une offre', certifications: 'Certifications', education: 'Formation', experiences: 'Expérience', languages: 'Langues', projects: 'Projets', skills: 'Compétences', summary: 'Profil' },
 } as const

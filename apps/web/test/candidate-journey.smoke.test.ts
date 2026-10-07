@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import type { ResumeCoherenceInput, ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
 import { routeResumeSectionModels, writeFixtureSection } from './resume-section-model-routes'
@@ -258,6 +258,15 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectGroupedPreview()
   })
 
+  test('offers a single retry action on the documents after an interrupted preparation', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'interrupted' })
+    await system.givenCombinedIntake()
+
+    await system.interruptPreparationByReloading()
+
+    await system.expectOneRetryActionOnTheDocuments()
+  })
+
   test('retains a stable preview after failed regeneration', async ({ page }) => {
     const system = createSystemUnderTest({ page })
     await system.givenStablePreview()
@@ -304,6 +313,32 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.downloadCurrentResume()
 
     await system.expectCurrentResumePdfDownloaded()
+  })
+
+  test('points to each missing document and focuses the first one', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.openUnconsentedIntake()
+
+    await system.requestGenerationWithoutDocuments()
+
+    await system.expectEachMissingDocumentExplainedAtItsField()
+  })
+
+  test('announces the writing phase and the step reached while the resume is being written', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'pending-writing' })
+    await system.givenCombinedIntake()
+
+    await system.generateResume()
+
+    await system.expectWritingPhaseAnnouncedWithItsStep()
+  })
+
+  test('keeps secondary text, the consent notice and the focus ring readable', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    await system.openUnconsentedIntake()
+
+    await system.expectReadableSecondaryTextAndFocusRing()
   })
 
   test('locks the intake while the resume is being prepared', async ({ page }) => {
@@ -471,7 +506,7 @@ class CandidateJourneyTestSystem {
   async openUnconsentedIntake() {
     await this.#installModelAdapters()
     await this.#page.goto('/')
-    await this.#page.getByRole('button', { name: 'Start a Candidate Session' }).click()
+    await this.#page.getByRole('button', { name: 'Get started', exact: true }).click()
     this.#completedAction = 'intake-opened'
   }
 
@@ -479,7 +514,7 @@ class CandidateJourneyTestSystem {
     await this.openUnconsentedIntake()
     await this.#page.getByRole('textbox', { name: 'Professional text', exact: true }).fill(
       'Alex Morgan\nalex@example.com\nFrontend Engineer at Northwind. Built accessible billing screens. React and TypeScript.')
-    await this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true }).fill(postingText)
+    await this.#page.getByRole('textbox', { name: 'Job posting text', exact: true }).fill(postingText)
   }
 
   expectAccessRenewedOnce() {
@@ -516,7 +551,7 @@ class CandidateJourneyTestSystem {
     await this.givenCombinedIntake()
     await this.generateResume()
     await expect(this.#page.getByRole('textbox', { name: 'Which skill did you use?' })).toBeVisible()
-    await expect(this.#page.getByTitle('Tailored Resume preview')).toHaveCount(0)
+    await expect(this.#page.getByTitle('Tailored resume preview')).toHaveCount(0)
   }
 
   async correctBlockingAmbiguity() {
@@ -528,7 +563,7 @@ class CandidateJourneyTestSystem {
   async givenNoCorrespondenceResult() {
     await this.givenCombinedIntake()
     await this.generateResume()
-    await expect(this.#page.getByTitle('Tailored Resume preview')).toHaveCount(0)
+    await expect(this.#page.getByTitle('Tailored resume preview')).toHaveCount(0)
     await expect(this.#page.getByRole('button', { name: 'Prepare a non-tailored resume' })).toBeVisible()
   }
 
@@ -538,7 +573,7 @@ class CandidateJourneyTestSystem {
     await this.generateResume()
     await expect(this.#page.getByText('Preparation could not finish.', { exact: false }).first()).toBeVisible()
     await this.#page.getByRole('button', { name: 'Back to my documents', exact: true }).click()
-    await this.#page.getByText('Inspect or enrich your source evidence', { exact: true }).click()
+    await this.#page.getByText('See or add to what we took from your resume', { exact: true }).click()
     await this.#page.unroute('**/api/resume-section-writing')
     await this.#installModelAdapters()
     await this.#page.route('**/api/structured-source-profile-extraction', (route) => route.fulfill({ status: 502, json: { ok: false, error: { type: 'provider-unavailable' } } }))
@@ -561,20 +596,20 @@ class CandidateJourneyTestSystem {
 
   async inspectSourceProfile() {
     await this.#page.getByRole('button', { name: 'Back to my documents', exact: true }).click()
-    await this.#page.getByText('Inspect or enrich your source evidence', { exact: true }).click()
-    await this.#page.getByRole('button', { name: 'Inspect Source Profile', exact: true }).click()
+    await this.#page.getByText('See or add to what we took from your resume', { exact: true }).click()
+    await this.#page.getByRole('button', { name: 'See what we took from your resume', exact: true }).click()
     this.#completedAction = 'inspected'
   }
 
   async replacePosting() {
     await this.#returnToDocuments()
-    await this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true }).fill('Rust engineer. Rust is required.')
+    await this.#page.getByRole('textbox', { name: 'Job posting text', exact: true }).fill('Rust engineer. Rust is required.')
     this.#completedAction = 'posting-replaced'
   }
 
   async expectCurrentSourceEvidence() {
     this.#expectAction()
-    const source = this.#page.getByRole('region', { name: 'Complete your Source Intake' })
+    const source = this.#page.getByRole('region', { name: 'Add your resume' })
     await expect(source.getByText('Frontend Engineer – Northwind', { exact: true })).toBeVisible()
     await expect(source.getByText('Built accessible billing screens', { exact: true })).toBeVisible()
   }
@@ -582,7 +617,7 @@ class CandidateJourneyTestSystem {
   async expectOutdatedCorrectionRemoved() {
     this.#expectAction()
     await expect(this.#page.getByRole('textbox', { name: 'Which skill did you use?' })).toHaveCount(0)
-    await expect(this.#page.getByTitle('Tailored Resume preview')).toHaveCount(0)
+    await expect(this.#page.getByTitle('Tailored resume preview')).toHaveCount(0)
   }
 
   async prepareNormalizedResume() {
@@ -592,17 +627,23 @@ class CandidateJourneyTestSystem {
 
   async givenInterruptedPreparation() {
     await this.givenCombinedIntake()
+    await this.interruptPreparationByReloading()
+    await this.#page.unroute('**/api/resume-section-writing')
+    this.#scenario = 'normal'
+    await this.#installModelAdapters()
+  }
+
+  /** Reloads while a section is being written, which leaves the preparation interrupted. */
+  async interruptPreparationByReloading() {
     await this.#page.route('**/api/resume-section-writing', async (route) => {
       await new Promise((resolve) => { setTimeout(resolve, 2_000) })
       await route.abort().catch(() => undefined)
     })
     await this.generateResume()
-    await expect(this.#page.getByRole('region', { name: 'Candidate Journey progress' })).toContainText('Writing')
+    await expect(this.#page.getByRole('region', { name: 'Progress', exact: true })).toContainText('Writing')
     await this.#page.reload()
     await expect(this.#page.getByText('Generation was interrupted.', { exact: false })).toBeVisible()
-    await this.#page.unroute('**/api/resume-section-writing')
-    this.#scenario = 'normal'
-    await this.#installModelAdapters()
+    this.#completedAction = 'interrupted'
   }
 
   async resumePreparation() {
@@ -637,7 +678,7 @@ class CandidateJourneyTestSystem {
   async editUnsupportedWordingAndReload() {
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
     await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
-    await this.#page.getByLabel('Resume Field', { exact: true }).first().fill('Led 100 engineers')
+    await this.#page.getByLabel('Resume field', { exact: true }).first().fill('Led 100 engineers')
     await this.#page.getByRole('button', { name: 'Save wording', exact: true }).first().click()
     await this.#page.reload()
     this.#completedAction = 'wording-edited-and-reloaded'
@@ -650,12 +691,12 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeDisabled()
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
     await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
-    await expect(this.#page.getByText('This professional edit is not supported by the current Candidate Facts.', { exact: true })).toBeVisible()
+    await expect(this.#page.getByText("This edit adds something your resume doesn't mention.", { exact: true })).toBeVisible()
   }
 
   async expectPreviewFirstReview() {
     await expect(this.#page.getByRole('button', { name: 'Edit resume', exact: true })).toBeVisible()
-    await expect(this.#page.getByLabel('Resume Field', { exact: true })).toHaveCount(0)
+    await expect(this.#page.getByLabel('Resume field', { exact: true })).toHaveCount(0)
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeVisible()
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
     await expect(this.#page.getByRole('dialog')).toBeVisible()
@@ -701,7 +742,7 @@ class CandidateJourneyTestSystem {
   async enterUnsupportedProfessionalText() {
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
     await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
-    await this.#page.getByRole('textbox', { name: 'Resume Field', exact: true }).first()
+    await this.#page.getByRole('textbox', { name: 'Resume field', exact: true }).first()
       .fill('Built accessible billing screens and led 500 engineers')
   }
 
@@ -720,7 +761,7 @@ class CandidateJourneyTestSystem {
   }
 
   async expectUnsupportedDownloadBlocked() {
-    await expect(this.#page.getByRole('button', { name: 'Attest as a new Candidate Fact', exact: true })).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Confirm this is accurate', exact: true })).toBeVisible()
     await this.#page.keyboard.press('Escape')
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeDisabled({ timeout: 20_000 })
     await expect(this.#page.getByText('Resolve or confirm the unsupported professional changes before downloading.', { exact: true })).toBeVisible()
@@ -773,7 +814,7 @@ class CandidateJourneyTestSystem {
   async expectDocumentsToShorten() {
     this.#expectAction()
     await expect(this.#page).toHaveURL(/\/$/u)
-    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toHaveValue(postingText)
+    await expect(this.#page.getByRole('textbox', { name: 'Job posting text', exact: true })).toHaveValue(postingText)
   }
 
   async givenUnexpectedSourceFailure() {
@@ -822,7 +863,7 @@ class CandidateJourneyTestSystem {
     this.#expectAction()
     await expect(this.#page.getByRole('heading', { name: 'Something went wrong', exact: true })).toHaveCount(0)
     await expect(this.#page.getByRole('textbox', { name: 'Professional text', exact: true })).toHaveValue(/Northwind/u)
-    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toHaveValue(postingText)
+    await expect(this.#page.getByRole('textbox', { name: 'Job posting text', exact: true })).toHaveValue(postingText)
   }
 
   async expectFailureKeptAfterReload() {
@@ -830,7 +871,7 @@ class CandidateJourneyTestSystem {
     const alert = this.#page.getByRole('alert').filter({ hasText: 'Preparation could not finish.' })
     await expect(alert).toContainText('We could not analyze your resume.')
     await expect(alert).toContainText('Your inputs are kept.')
-    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toHaveValue(postingText)
+    await expect(this.#page.getByRole('textbox', { name: 'Job posting text', exact: true })).toHaveValue(postingText)
   }
 
   async expectRecoveredPreview() {
@@ -849,7 +890,7 @@ class CandidateJourneyTestSystem {
       const pdf = await loading.promise
       const pdfPage = await pdf.getPage(1)
       const text = (await pdfPage.getTextContent()).items.flatMap((item) => 'str' in item ? item.str : []).join(' ')
-      expect(text).toContain('Normalized Resume – not tailored')
+      expect(text).toContain('General resume – not tailored to a job')
       expect(text).toContain('Alex Morgan')
       expect(pdf.numPages).toBe(1)
     } finally { await loading.destroy() }
@@ -908,8 +949,8 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeVisible()
     await this.#returnToDocuments()
     await expect(this.#page.getByText(/^Processed by .+, with nothing stored on our servers.$/)).toBeVisible()
-    await this.#page.getByRole('button', { name: 'Delete Candidate Session' }).click()
-    await this.#page.getByRole('button', { name: 'Delete session now' }).click()
+    await this.#page.getByRole('button', { name: 'Delete my data', exact: true }).click()
+    await this.#page.getByRole('button', { name: 'Delete my data now', exact: true }).click()
     this.#completedAction = 'deleted'
   }
 
@@ -933,7 +974,7 @@ class CandidateJourneyTestSystem {
 
   async expectIsolatedAmbiguityWithPreview() {
     await this.expectGroupedPreview()
-    await expect(this.#page.getByText('Ambiguous evidence was left out.', { exact: false })).toBeVisible()
+    await expect(this.#page.getByText('Unclear details were left out.', { exact: false })).toBeVisible()
     await expect(this.#page.frameLocator('iframe').getByText('Customer billing team')).toHaveCount(0)
   }
 
@@ -947,19 +988,19 @@ class CandidateJourneyTestSystem {
 
   async expectLowCoveragePreview() {
     await this.expectGroupedPreview()
-    await expect(this.#page.getByText('A low Match Score', { exact: false })).toBeVisible()
+    await expect(this.#page.getByText('A low match score', { exact: false })).toBeVisible()
   }
 
   async expectAdjacentEvidenceNextToTheGap() {
     await this.expectGroupedPreview()
-    await this.#page.getByText('Match Analysis and supporting evidence', { exact: true }).click()
+    await this.#page.getByText('Job match and the experience behind it', { exact: true }).click()
     const gaps = this.#page.getByRole('listitem').filter({ hasText: /^Java/u })
     await expect(gaps.first()).toContainText(
       'Related experience you can highlight instead (it does not meet this requirement): TypeScript')
-    await this.#page.getByText('Complete requirement-to-evidence details', { exact: true }).click()
+    await this.#page.getByText('All requirements and the experience that meets them', { exact: true }).click()
     const javaDetail = this.#page.locator('.mantine-Paper-root').filter({ hasText: 'Java is required.' }).last()
     await expect(javaDetail).toContainText('Uncovered')
-    await expect(javaDetail).toContainText('No supporting Candidate Fact.')
+    await expect(javaDetail).toContainText('Nothing in your resume supports it.')
     await expect(javaDetail).toContainText('it does not meet this requirement): TypeScript')
     await expect(javaDetail.getByText('Covered', { exact: true })).toHaveCount(0)
   }
@@ -968,7 +1009,7 @@ class CandidateJourneyTestSystem {
     this.#expectAction()
     await expect(this.#page.getByText('Non-tailored resume ready', { exact: true })).toBeVisible()
     await this.#showDocumentText()
-    await expect(this.#page.frameLocator('iframe').getByText('Normalized Resume', { exact: false })).toBeVisible()
+    await expect(this.#page.frameLocator('iframe').getByText('General resume – not tailored to a job', { exact: false })).toBeVisible()
   }
 
   async expectFrenchPreview() {
@@ -991,8 +1032,8 @@ class CandidateJourneyTestSystem {
 
   async expectUnsafeOutputRejected() {
     this.#expectAction()
-    await expect(this.#page.getByText('The generated wording could not be supported', { exact: false })).toBeVisible()
-    await expect(this.#page.getByTitle('Tailored Resume preview')).toHaveCount(0)
+    await expect(this.#page.getByText("The generated wording isn't backed by your resume", { exact: false })).toBeVisible()
+    await expect(this.#page.getByTitle('Tailored resume preview')).toHaveCount(0)
   }
 
   async expectStablePreviewAfterFailure() {
@@ -1003,8 +1044,8 @@ class CandidateJourneyTestSystem {
 
   async expectDeletedSession() {
     this.#expectAction()
-    await expect(this.#page.getByRole('button', { name: 'Start a Candidate Session' })).toBeVisible()
-    await expect(this.#page.getByText('Candidate Session deleted from this browser.')).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Get started', exact: true })).toBeVisible()
+    await expect(this.#page.getByText('Your data was deleted from this browser.')).toBeVisible()
     await expect(this.#page.getByRole('button', { name: 'Generate my resume' })).toHaveCount(0)
   }
 
@@ -1071,20 +1112,67 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.frameLocator('iframe').getByText('React', { exact: false }).first()).toBeVisible()
   }
 
+  async requestGenerationWithoutDocuments() {
+    await this.#page.getByRole('button', { name: 'Generate my resume', exact: true }).click()
+    this.#completedAction = 'generation-requested'
+  }
+
+  async expectEachMissingDocumentExplainedAtItsField() {
+    this.#expectAction()
+    const source = this.#page.getByRole('textbox', { name: 'Professional text', exact: true })
+    const posting = this.#page.getByRole('textbox', { name: 'Job posting text', exact: true })
+    await expect(source).toHaveAttribute('aria-invalid', 'true')
+    await expect(source).toHaveAccessibleDescription('Add your resume as a file or pasted text before continuing.')
+    await expect(posting).toHaveAttribute('aria-invalid', 'true')
+    await expect(posting).toHaveAccessibleDescription('Add the job posting text before continuing.')
+    await expect(source).toBeFocused()
+    await expect(this.#page).not.toHaveURL(/\/resume$/u)
+  }
+
+  async expectWritingPhaseAnnouncedWithItsStep() {
+    this.#expectAction()
+    const progress = this.#page.getByRole('region', { name: 'Progress', exact: true })
+    await expect(progress).toContainText('Writing')
+    await expect(progress).toContainText('Step 3 of 3')
+    await expect(progress).not.toContainText('orchestration')
+    await expect(this.#page.locator('.sr-only[role="status"]')).toContainText('Current step: Your tailored resume.')
+  }
+
+  async expectReadableSecondaryTextAndFocusRing() {
+    this.#expectAction()
+    const notice = this.#page.locator('#processing-policy-notice')
+    await expect(notice).toBeVisible()
+    expect(await readContrast(notice)).toBeGreaterThanOrEqual(4.5)
+    expect(parseFloat(await notice.evaluate((element) => getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(14)
+    expect(await readContrast(this.#page.getByText('Drop your file here or click to choose it').first().locator('xpath=following-sibling::*[1]')))
+      .toBeGreaterThanOrEqual(4.5)
+    const source = this.#page.getByRole('textbox', { name: 'Professional text', exact: true })
+    await source.focus()
+    await this.#page.keyboard.press('Shift+Tab')
+    await this.#page.keyboard.press('Tab')
+    expect(await readContrast(source, 'outlineColor')).toBeGreaterThanOrEqual(3)
+  }
+
+  async expectOneRetryActionOnTheDocuments() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('button', { name: 'Try again', exact: true })).toHaveCount(1)
+    await expect(this.#page.getByRole('button', { name: 'Generate my resume', exact: true })).toHaveCount(0)
+  }
+
   async expectIntakeLockedDuringPreparation() {
     this.#expectAction()
-    await expect(this.#page.getByRole('region', { name: 'Candidate Journey progress' })).toBeVisible()
+    await expect(this.#page.getByRole('region', { name: 'Progress', exact: true })).toBeVisible()
     await this.#page.goBack()
     await expect(this.#page.getByText('Your resume is being prepared', { exact: true })).toBeVisible()
-    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toBeDisabled()
+    await expect(this.#page.getByRole('textbox', { name: 'Job posting text', exact: true })).toBeDisabled()
     await expect(this.#page.getByRole('combobox', { name: 'Resume language', exact: true })).toBeDisabled()
   }
 
   async expectNoEmptyResultDisclosures() {
     this.#expectAction()
-    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toBeVisible()
-    await expect(this.#page.getByText('Match Analysis and supporting evidence', { exact: true })).toHaveCount(0)
-    await expect(this.#page.getByText('Inspect or enrich your source evidence', { exact: true })).toHaveCount(0)
+    await expect(this.#page.getByRole('textbox', { name: 'Job posting text', exact: true })).toBeVisible()
+    await expect(this.#page.getByText('Job match and the experience behind it', { exact: true })).toHaveCount(0)
+    await expect(this.#page.getByText('See or add to what we took from your resume', { exact: true })).toHaveCount(0)
   }
 
   async expectPolicyDisclosedAtGeneration() {
@@ -1093,7 +1181,7 @@ class CandidateJourneyTestSystem {
     await expect(generate).toHaveAccessibleDescription(/OpenAI/)
     await expect(generate).toBeEnabled()
     await expect(this.#page.getByRole('textbox', { name: 'Professional text' })).toBeVisible()
-    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text' })).toBeVisible()
+    await expect(this.#page.getByRole('textbox', { name: 'Job posting text' })).toBeVisible()
   }
 
   async #showDocumentText() {
@@ -1140,3 +1228,12 @@ function matchFor(scenario: Scenario) {
   relevance: [{ requirementId: 'job-requirement-react', factMatch }] }
 }
 
+/** The WCAG contrast ratio of an element's color, or another color property, against the white page. */
+async function readContrast(locator: Locator, property: 'color' | 'outlineColor' = 'color') {
+  const color = await locator.evaluate((element, name) => getComputedStyle(element)[name], property)
+  const [red = 0, green = 0, blue = 0] = (color.match(/\d+(\.\d+)?/gu) ?? []).slice(0, 3).map(Number).map((channel) => {
+    const value = channel / 255
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+  })
+  return 1.05 / (0.2126 * red + 0.7152 * green + 0.0722 * blue + 0.05)
+}
