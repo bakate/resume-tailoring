@@ -528,7 +528,7 @@ class CandidateJourneyIntegrationSystem {
     const box = await dialog.boundingBox()
     expect(box?.width, 'The section editor fills the small screen').toBeGreaterThanOrEqual(400)
     await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
-    await this.#page.getByRole('textbox', { name: 'Resume Field', exact: true }).first().fill(correctedSummary)
+    await this.#page.getByRole('textbox', { name: 'Resume field', exact: true }).first().fill(correctedSummary)
     await this.#page.getByRole('button', { name: 'Save wording', exact: true }).first().click()
     await expect(dialog.getByRole('status').filter({ hasText: 'Resume updated.' })).toBeVisible()
     await this.#page.getByRole('button', { name: 'Close editor', exact: true }).click()
@@ -576,7 +576,7 @@ class CandidateJourneyIntegrationSystem {
 
   async #saveCorrectedSummary() {
     await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
-    await this.#page.getByRole('textbox', { name: 'Resume Field', exact: true }).first().fill(correctedSummary)
+    await this.#page.getByRole('textbox', { name: 'Resume field', exact: true }).first().fill(correctedSummary)
     await this.#page.getByRole('button', { name: 'Save wording', exact: true }).first().click()
     await expect(this.#page.getByRole('dialog').getByRole('status').filter({ hasText: 'Resume updated.' })).toBeVisible()
   }
@@ -705,7 +705,7 @@ class CandidateJourneyIntegrationSystem {
   async deleteCandidateSession() {
     await this.#page.getByRole('link', { name: 'Resume Studio', exact: true }).click()
     await this.#page.getByRole('button', { name: 'Delete my data', exact: true }).click()
-    await this.#page.getByRole('button', { name: 'Delete session now' }).click()
+    await this.#page.getByRole('button', { name: 'Delete my data now', exact: true }).click()
     this.#completedAction = 'deleted'
   }
 
