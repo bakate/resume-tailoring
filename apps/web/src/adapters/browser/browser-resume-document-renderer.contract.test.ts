@@ -4,6 +4,7 @@ import { createRecordingTelemetry } from '@resume-tailoring/application/testing'
 import { groupedResumeDocument, resumeContractRevision } from '@resume-tailoring/application/structured-resume-fixtures'
 import { describe, expect, it, vi } from 'vitest'
 
+import { failureResponse } from '../../api-failure'
 import { createBrowserResumeDocumentRenderer } from './browser-resume-document-renderer'
 
 describe('browser resume document renderer', () => {
@@ -36,7 +37,8 @@ describe('browser resume document renderer', () => {
     ['access', () => new Response(null, { status: 403 })],
     ['schema', () => new Response(null, { status: 400 })],
     ['revision-mismatch', () => Response.json(measuredBody({ revision: 'previous-revision' }))],
-    ['render', () => Response.json({ ...unavailableResumeRender(renderRequest), pdf: null })],
+    ['schema', () => failureResponse({ type: 'input-too-large' })],
+    ['render', () => failureResponse({ type: 'provider-unavailable' })],
   ] as const)('records a deterministic %s failure without retrying', async (category, failure) => {
     const { render, telemetry, calls } = rendererAnswering([failure, measuredResponse])
 

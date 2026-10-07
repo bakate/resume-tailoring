@@ -63,9 +63,6 @@ export const resumeDocumentCoherenceSchema = z.strictObject({ coherent: z.boolea
   issues: z.array(z.strictObject({ fieldId: z.string().min(1), kind: z.enum(resumeCoherenceIssueKinds) })).max(200) })
 
 export const resumeModelUsageSchema = z.strictObject({ inputTokens: z.number().int().min(0), outputTokens: z.number().int().min(0) })
-export const resumeSectionModelFailureSchema = z.strictObject({ ok: z.literal(false),
-  error: z.strictObject({ type: z.enum(['transient', 'timeout', 'permanent']) }), usage: resumeModelUsageSchema.optional() })
-
 export function resumeStructuredOutputFormat({ name, schema }: Readonly<{ name: string; schema: z.ZodType }>) {
   const jsonSchema = z.toJSONSchema(schema, { target: 'draft-7', override: useAnyOfForUnions })
   return { type: 'json_schema', name, strict: true,

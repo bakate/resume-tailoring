@@ -3,9 +3,10 @@ import { createCsrfMiddleware } from '@tanstack/react-start'
 
 import { requestOpenAiJobMatchEvidence } from '../adapters/server/openai-job-match-evidence-matcher'
 import { matchEvidenceRequestSchema } from '../candidate-journey/job-match-schemas'
+import { failureResponse } from '../api-failure'
+import { readOpenAiApiFailure } from '../adapters/server/openai-api-failure'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
-import { createOpenAiFailureResponse } from './-openai-failure-response'
 
 export const Route = createFileRoute('/api/explainable-match-evidence')({
   server: { middleware: [createCsrfMiddleware()], handlers: {
@@ -17,9 +18,9 @@ async function matchEvidence({ request }: Readonly<{ request: Request }>) {
   const accessResponse = createDemoAccessGuardResponse({ request })
   if (accessResponse !== null) return accessResponse
   const bodyResult = await readRequestBody({ request })
-  if (!bodyResult.ok) return failureResponse({ error: 'match-evidence-invalid-input', retryable: false, status: 400 })
+  if (!bodyResult.ok) return failureResponse({ type: 'invalid-input' })
   const environmentResult = validateServerEnvironment({ environment: process.env })
-  if (!environmentResult.ok) return failureResponse({ error: 'service-unavailable', retryable: true, status: 503 })
+  if (!environmentResult.ok) return failureResponse({ type: 'service-misconfigured' })
   const result = await requestOpenAiJobMatchEvidence({
     apiKey: environmentResult.value.openAiApiKey,
     matchRequest: bodyResult.value,
@@ -28,7 +29,7 @@ async function matchEvidence({ request }: Readonly<{ request: Request }>) {
   })
   return result.ok
     ? Response.json(result, { headers: privateHeaders })
-    : createOpenAiFailureResponse({ failure: result.error, operation: 'match-evidence' })
+    : failureResponse(readOpenAiApiFailure(result.error))
 }
 
 async function readRequestBody({ request }: Readonly<{ request: Request }>) {
@@ -40,12 +41,6 @@ async function readRequestBody({ request }: Readonly<{ request: Request }>) {
   } catch {
     return { ok: false } as const
   }
-}
-
-function failureResponse({ error, retryable, status }: Readonly<{ error: string; retryable: boolean; status: number }>) {
-  return Response.json({ ok: false, error, retryable }, {
-    headers: privateHeaders, status,
-  })
 }
 
 const privateHeaders = { 'Cache-Control': 'no-store, max-age=0', Pragma: 'no-cache' } as const

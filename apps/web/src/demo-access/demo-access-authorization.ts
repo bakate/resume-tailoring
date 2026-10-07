@@ -1,3 +1,4 @@
+import { failureResponse } from '../api-failure'
 import { validateDemoAccessEnvironment } from './demo-access-environment'
 import { hasValidDemoAccess } from './demo-access-session'
 
@@ -36,9 +37,9 @@ export function createDemoAccessGuardResponse({
     cookieHeader: request.headers.get('cookie') ?? '',
     environment,
   })
-  if (!decision.ok) return createPrivateResponse({ status: 503, type: decision.error.type })
+  if (!decision.ok) return failureResponse({ type: decision.error.type })
   if (decision.value.access === 'granted') return null
-  return createPrivateResponse({ status: 401, type: 'demo-access-required' })
+  return failureResponse({ type: 'demo-access-required' })
 }
 
 export function createDemoOriginGuardResponse({
@@ -49,22 +50,15 @@ export function createDemoOriginGuardResponse({
   request: Request
 }>) {
   const environmentResult = validateDemoAccessEnvironment({ environment })
-  if (!environmentResult.ok) return createPrivateResponse({ status: 503, type: 'demo-access-unavailable' })
+  if (!environmentResult.ok) return failureResponse({ type: 'demo-access-unavailable' })
   if (environmentResult.value.mode === 'disabled') return null
   return request.headers.get(originHeaderName) === environmentResult.value.originSecret
     ? null
-    : createPrivateResponse({ status: 403, type: 'demo-origin-required' })
+    : failureResponse({ type: 'demo-origin-required' })
 }
 
 function createChallengeResult({ siteKey }: Readonly<{ siteKey: string }>) {
   return { ok: true, value: { access: 'challenge-required', siteKey } } as const
-}
-
-function createPrivateResponse({ status, type }: Readonly<{ status: number; type: string }>) {
-  return Response.json(
-    { ok: false, error: { type } },
-    { status, headers: { 'Cache-Control': 'no-store, max-age=0', Pragma: 'no-cache' } },
-  )
 }
 
 const disabledAccessResult = {

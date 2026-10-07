@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
+import { failureResponse } from '../api-failure'
 import {
   recordPrivacySafeAnalytics,
   writePrivacySafeAnalyticsEvent,
@@ -19,9 +20,11 @@ async function recordAnalytics({ request }: Readonly<{ request: Request }>) {
       value: await request.json() as unknown,
       writeEvent: writePrivacySafeAnalyticsEvent,
     })
-    return new Response(null, { status: result.ok ? 202 : 400, headers: privateHeaders })
+    return result.ok
+      ? new Response(null, { status: 202, headers: privateHeaders })
+      : failureResponse({ type: 'invalid-input' })
   } catch {
-    return new Response(null, { status: 400, headers: privateHeaders })
+    return failureResponse({ type: 'invalid-input' })
   }
 }
 

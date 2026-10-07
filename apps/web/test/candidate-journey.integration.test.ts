@@ -999,8 +999,8 @@ class CandidateJourneyIntegrationSystem {
       this.#analytics.push(route.request().postDataJSON() as AnalyticsEvent)
       await route.fulfill({ status: 204, body: '' })
     })
-    await this.#page.route('**/api/structured-source-profile-extraction', (route) => route.fulfill({ json: this.#sourceExtraction === 'unavailable'
-      ? { ok: false, error: 'source-profile-extraction-unavailable' } : {
+    await this.#page.route('**/api/structured-source-profile-extraction', (route) => route.fulfill(this.#sourceExtraction === 'unavailable'
+      ? { status: 502, json: { ok: false, error: { type: 'provider-unavailable' } } } : { json: {
       ok: true, value: { ...(this.#source === 'dense' ? denseSourceProfile : structuredResumeSource.sourceProfile), criticalAmbiguities: [] },
     } }))
     await this.#page.route('**/api/explainable-job-posting-extraction', (route) => {
@@ -1018,7 +1018,7 @@ class CandidateJourneyIntegrationSystem {
       ok: true, value: { supported: true, feedback: [] },
     } }))
     await this.#page.route('**/api/resume-claim-writing', (route) => {
-      if (this.#condensation === 'unavailable') return route.fulfill({ json: { ok: false, error: { type: 'resume-claim-writing-unavailable' } } })
+      if (this.#condensation === 'unavailable') return route.fulfill({ status: 502, json: { ok: false, error: { type: 'provider-unavailable' } } })
       const input = route.request().postDataJSON() as Readonly<{ claim: Readonly<{ segments: readonly Readonly<{ text: string; factIds: readonly string[] }>[] }> }>
       const segments = input.claim.segments.map((segment) => ({ ...segment,
         text: this.#condensation === 'insufficient' ? segment.text : condense(segment.text) }))
