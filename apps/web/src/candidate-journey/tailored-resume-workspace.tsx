@@ -12,7 +12,7 @@ import { JobMatchWorkspace } from './job-match-workspace'
 import { renderTailoredResumeDocument } from './tailored-resume-document'
 import { ResumeEditor } from './resume-editor'
 import { ResumeOperationFailureAlert } from './failure-recovery'
-import { resumeReviewCopy } from './resume-review-copy'
+import { describeOverflowReduction, resumeReviewCopy } from './resume-review-copy'
 import type { ResumeReviewCopy } from './resume-review-copy'
 
 export type ResumeReviewController = ReturnType<typeof useCandidateJourney>
@@ -34,7 +34,8 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
   const photo = useResumePhoto({ photo: view.status === 'candidate-session-open' ? view.session.resumePhoto ?? null : null,
     onChange: props.candidateJourney.updateResumePhoto })
   const [proposalPhoto, setProposalPhoto] = useState<string | undefined>(undefined)
-  const [editorOpened, setEditorOpened] = useState(false)
+  const [editorTab, setEditorTab] = useState<EditorTab | null>(null)
+  const editorOpened = editorTab !== null
   const [downloadedRevision, setDownloadedRevision] = useState<string | null>(null)
   const revision = props.candidateJourney.view.status === 'candidate-session-open' ? props.candidateJourney.view.resumeReview?.draft.revision ?? null : null
   const copy = resumeReviewCopy[props.localization.locale]
@@ -44,6 +45,7 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
     <Stack gap="lg">
       <PreparationStatus {...props} />
       <div><Title id="tailored-resume-title" order={2}>{copy.preview}</Title><Text c="dimmed">{copy.description}</Text></div>
+      <OverflowReductionSummary {...props} copy={copy} openHiddenContent={() => { setEditorTab('recovery') }} />
       <CurrentResumePreview {...props} {...{ editorOpened, photo }} onDownload={() => {
         props.candidateJourney.recordResumeDownload(); setDownloadedRevision(revision) }}
         condensation={{ label: copy.condense, disabled: !canCondense({ candidateJourney: props.candidateJourney, photo }),
@@ -55,12 +57,12 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
       <CondensationProposal {...props} copy={copy} photoDataUrl={photo.dataUrl}
         proposalLayoutCurrent={photo.ready && !photo.failed && proposalPhoto === photo.dataUrl} />
       <Group><Button variant="default" disabled={blocksResumeEditing(view)}
-        onClick={() => { setEditorOpened(true) }}>{copy.edit}</Button>
+        onClick={() => { setEditorTab('contacts') }}>{copy.edit}</Button>
         <Button variant="default" onClick={props.onChangeJobPosting}>{copy.changeJobPosting}</Button></Group>
       <MatchAnalysisDisclosure {...props} />
       <DocumentText document={props.resume} locale={props.localization.locale} />
     </Stack>
-    <ResumeEditorDialog {...props} {...{ copy, editorOpened, operations }} closeEditor={() => { setEditorOpened(false) }} />
+    <ResumeEditorDialog {...props} {...{ copy, editorTab, operations }} closeEditor={() => { setEditorTab(null) }} />
   </Paper>
 }
 
@@ -87,14 +89,31 @@ function useRetryableOperations() {
 
 export type RetryableOperations = ReturnType<typeof useRetryableOperations>
 
-function ResumeEditorDialog(props: ResumeDocumentProps & Readonly<{
-  copy: ResumeReviewCopy; editorOpened: boolean; closeEditor: () => void; operations: RetryableOperations
+type EditorTab = 'contacts' | 'recovery'
+
+function ResumeEditorDialog({ editorTab, ...props }: ResumeDocumentProps & Readonly<{
+  copy: ResumeReviewCopy; editorTab: EditorTab | null; closeEditor: () => void; operations: RetryableOperations
 }>) {
   const fullScreen = useMediaQuery('(max-width: 48em)')
-  return <Modal opened={props.editorOpened} onClose={props.closeEditor} title={props.copy.edit}
+  return <Modal opened={editorTab !== null} onClose={props.closeEditor} title={props.copy.edit}
     fullScreen={fullScreen} size="xl" returnFocus closeButtonProps={{ 'aria-label': props.copy.close }}>
-    <ResumeEditor {...props} />
+    <ResumeEditor {...props} initialTab={editorTab ?? 'contacts'} />
   </Modal>
+}
+
+/** Says how much Hidden Content Overflow Reduction produced, and opens the editor where the Candidate restores it. */
+function OverflowReductionSummary({ candidateJourney, copy, localization, openHiddenContent }: ResumeReviewProps & Readonly<{
+  copy: ResumeReviewCopy; openHiddenContent: () => void
+}>) {
+  const { view } = candidateJourney
+  const review = view.status === 'candidate-session-open' ? view.resumeReview : null
+  if (review === null) return null
+  const layout = review.assessment?.layout
+  const pageCount = layout?.status === 'fits' && layout.revision === review.draft.revision ? layout.pageCount : 1
+  const summary = describeOverflowReduction({ locale: localization.locale, ...review.recovery.overflowReduction, pageCount })
+  if (summary === null) return null
+  return <Group justify="space-between"><Text>{summary}</Text>
+    <Button variant="subtle" disabled={blocksResumeEditing(view)} onClick={openHiddenContent}>{copy.reviewHidden}</Button></Group>
 }
 
 /** A preview render is background work: disabling the button for it drops keyboard focus when the editor closes. */

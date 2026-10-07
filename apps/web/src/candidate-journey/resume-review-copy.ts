@@ -7,8 +7,9 @@ export const resumeReviewCopy = {
     condense: 'Propose a shorter version', changeJobPosting: 'Change job posting', proposal: 'Shorter version proposal',
     proposalDescription: 'Your current resume stays unchanged until you accept this proposal.', accept: 'Accept shorter version', reject: 'Keep current version',
     checking: 'Checking the current document…', validating: 'Checking the edited section…', condensing: 'Preparing a shorter proposal…',
-    unchecked: 'Page count has not been checked for this version.', fits: 'The current version fits within two pages.',
-    overflow: 'This version exceeds two pages. Try a shorter proposal, or choose content to hide in the editor. Nothing is removed automatically.',
+    unchecked: 'Page count has not been checked for this version.', fits: 'The current version fits within two pages. Nothing is deleted: hidden content can be restored from the editor.',
+    overflow: 'This version exceeds two pages. Try a shorter proposal, or choose content to hide in the editor. Nothing is deleted: hidden content can be restored from the editor.',
+    reviewHidden: 'Review hidden content', hiddenByReduction: 'Hidden to fit the page',
     'value-proposition': 'Summary', experiences: 'Experience', skills: 'Skills', education: 'Education',
     certifications: 'Certifications', languages: 'Languages', projects: 'Projects', analysis: 'Review match analysis',
     saved: 'Resume updated.', hiddenNotice: 'Content hidden from the resume.', restored: 'Content restored.', ordered: 'Order updated.',
@@ -24,8 +25,9 @@ export const resumeReviewCopy = {
     condense: 'Proposer une version plus courte', changeJobPosting: 'Changer d’offre d’emploi', proposal: 'Proposition de version courte',
     proposalDescription: 'Ton CV actuel reste inchangé jusqu’à ce que tu acceptes cette proposition.', accept: 'Accepter la version courte', reject: 'Garder la version actuelle',
     checking: 'Vérification du document actuel…', validating: 'Vérification de la rubrique modifiée…', condensing: 'Préparation d’une proposition plus courte…',
-    unchecked: 'Le nombre de pages de cette version n’a pas été vérifié.', fits: 'La version actuelle tient sur deux pages maximum.',
-    overflow: 'Cette version dépasse deux pages. Essaie une proposition plus courte ou choisis le contenu à masquer dans l’éditeur. Rien n’est supprimé automatiquement.',
+    unchecked: 'Le nombre de pages de cette version n’a pas été vérifié.', fits: 'La version actuelle tient sur deux pages maximum. Rien n’est supprimé : le contenu masqué se restaure depuis l’éditeur.',
+    overflow: 'Cette version dépasse deux pages. Essaie une proposition plus courte ou choisis le contenu à masquer dans l’éditeur. Rien n’est supprimé : le contenu masqué se restaure depuis l’éditeur.',
+    reviewHidden: 'Voir le contenu masqué', hiddenByReduction: 'Masqué pour tenir sur la page',
     'value-proposition': 'Profil', experiences: 'Expérience', skills: 'Compétences', education: 'Formation',
     certifications: 'Certifications', languages: 'Langues', projects: 'Projets', analysis: 'Consulter l’analyse de correspondance',
     saved: 'CV mis à jour.', hiddenNotice: 'Contenu masqué dans le CV.', restored: 'Contenu restauré.', ordered: 'Ordre mis à jour.',
@@ -36,3 +38,27 @@ export const resumeReviewCopy = {
 } as const
 
 export type ResumeReviewCopy = typeof resumeReviewCopy[keyof typeof resumeReviewCopy]
+
+type OverflowReduction = Readonly<{ locale: keyof typeof resumeReviewCopy; achievements: number; other: number; pageCount: 1 | 2 }>
+
+/** The summary above the preview of the Hidden Content Overflow Reduction produced, or null when it hid nothing. */
+export function describeOverflowReduction({ locale, achievements, other, pageCount }: OverflowReduction) {
+  if (achievements + other === 0) return null
+  return locale === 'fr' ? describeInFrench({ achievements, other, pageCount }) : describeInEnglish({ achievements, other, pageCount })
+}
+
+function describeInEnglish({ achievements, other, pageCount }: Omit<OverflowReduction, 'locale'>) {
+  const achievementText = `${String(achievements)} ${achievements === 1 ? 'achievement' : 'achievements'}`
+  const otherText = `${String(other)} ${achievements > 0 ? 'other ' : ''}${other === 1 ? 'item' : 'items'}`
+  const counted = [achievements > 0 ? achievementText : null, other > 0 ? otherText : null].filter(Boolean).join(' and ')
+  return `${counted} hidden to fit ${pageCount === 1 ? 'one page' : 'two pages'}.`
+}
+
+function describeInFrench({ achievements, other, pageCount }: Omit<OverflowReduction, 'locale'>) {
+  const achievementText = `${String(achievements)} ${achievements === 1 ? 'réalisation' : 'réalisations'}`
+  const otherText = `${String(other)} ${achievements > 0 ? (other === 1 ? 'autre ' : 'autres ') : ''}${other === 1 ? 'élément' : 'éléments'}`
+  const counted = [achievements > 0 ? achievementText : null, other > 0 ? otherText : null].filter(Boolean).join(' et ')
+  // A count of achievements alone agrees in the feminine; any mention of « élément » makes the participle masculine.
+  const hidden = other > 0 ? (achievements + other === 1 ? 'masqué' : 'masqués') : (achievements === 1 ? 'masquée' : 'masquées')
+  return `${counted} ${hidden} pour tenir sur ${pageCount === 1 ? 'une page' : 'deux pages'}.`
+}
