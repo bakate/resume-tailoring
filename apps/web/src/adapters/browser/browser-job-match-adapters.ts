@@ -2,7 +2,8 @@ import {
   jobPostingExtractionSuccessSchema,
   matchEvidenceSuccessSchema,
 } from '../../candidate-journey/job-match-schemas'
-import type { JobPostingExtractor, MatchEvidenceMatcher } from '@resume-tailoring/application/ports'
+import type { JobPostingExtractor, MatchEvidenceMatcher, ReadApiFailure } from '@resume-tailoring/application/ports'
+import { networkFailure, readApiFailure, unexpectedResponse } from './api-failure-reader'
 
 export function createBrowserJobPostingExtractor({
   request = fetch,
@@ -28,7 +29,7 @@ export function createBrowserJobMatchEvidenceMatcher({
   }) }
 }
 
-async function postJson<TValue, TFailure>({
+async function postJson<TValue, TFailure extends Readonly<{ ok: false }>>({
   body, failure, path, request, schema,
 }: Readonly<{
   body: unknown
@@ -39,7 +40,7 @@ async function postJson<TValue, TFailure>({
     success: boolean
     data?: Readonly<{ ok: true; value: TValue }>
   }> }>
-}>): Promise<Readonly<{ ok: true; value: TValue }> | TFailure> {
+}>): Promise<Readonly<{ ok: true; value: TValue }> | TFailure & Readonly<{ apiFailure: ReadApiFailure }>> {
   try {
     const response = await request(path, {
       body: JSON.stringify(body),
@@ -47,11 +48,11 @@ async function postJson<TValue, TFailure>({
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
     })
-    if (!response.ok) return failure
-    const parsed = schema.safeParse(await response.json())
-    return parsed.success && parsed.data !== undefined ? parsed.data : failure
+    if (!response.ok) return { ...failure, apiFailure: await readApiFailure(response) }
+    const parsed = schema.safeParse(await response.json().catch(() => undefined))
+    return parsed.success && parsed.data !== undefined ? parsed.data : { ...failure, apiFailure: unexpectedResponse }
   } catch {
-    return failure
+    return { ...failure, apiFailure: networkFailure }
   }
 }
 

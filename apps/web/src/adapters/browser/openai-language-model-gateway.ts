@@ -19,7 +19,7 @@ import {
   createBrowserJobPostingExtractor,
 } from './browser-job-match-adapters'
 import type { JobPostingExtractor as ExplainableJobPostingExtractor, LanguageModelGatewayAdapter,
-  LanguageModelResult, MatchEvidenceMatcher as ExplainableMatchEvidenceMatcher, ResumeClaimReformulator,
+  LanguageModelResult, MatchEvidenceMatcher as ExplainableMatchEvidenceMatcher, ReadApiFailure, ResumeClaimReformulator,
   ResumeClaimSemanticValidator, StructuredSourceProfileExtractor } from '@resume-tailoring/application/ports'
 
 type StructuredModelRequest =
@@ -203,25 +203,24 @@ async function processWriting({ modelAdapters, modelRequest }: Readonly<{
   return toGatewayResult({ operation: modelRequest.operation, result })
 }
 
+/** Keeps the API Failure an adapter read, whether it reports it beside its error or inside it. */
 function toGatewayResult<TOperation extends string, TValue>({ operation, result }: Readonly<{
   operation: TOperation
-  result: Readonly<{ ok: true; value: TValue }> | Readonly<{ ok: false }>
+  result: Readonly<{ ok: true; value: TValue }> | Readonly<{
+    ok: false; apiFailure?: ReadApiFailure; error: string | Readonly<{ apiFailure?: ReadApiFailure }>
+  }>
 }>): LanguageModelResult<Readonly<{ operation: TOperation; value: TValue }>> {
-  return result.ok
-    ? { ok: true, value: { operation, value: result.value } }
-    : unavailableResult
+  if (result.ok) return { ok: true, value: { operation, value: result.value } }
+  const apiFailure = typeof result.error === 'string' ? result.apiFailure : result.error.apiFailure
+  return { ok: false, error: { type: 'language-model-unavailable', ...(apiFailure === undefined ? {} : { apiFailure }) } }
 }
-
-const unavailableResult = {
-  ok: false,
-  error: { type: 'language-model-unavailable' },
-} as const
 
 function toSectionGatewayResult<TOperation extends string, TValue>({ operation, result }: Readonly<{
   operation: TOperation; result: ResumeSectionModelResult<TValue>
 }>): LanguageModelResult<Readonly<{ operation: TOperation; value: TValue; usage?: ResumeModelUsage }>> {
   if (result.ok) return { ok: true, value: { operation, value: result.value, ...(result.usage === undefined ? {} : { usage: result.usage }) } }
   if (result.error.type === 'consent-required') return { ok: false, error: { type: 'processing-consent-required' } }
-  return { ok: false, error: { type: 'language-model-unavailable', cause: result.error.type,
-    transient: result.error.type === 'transient' } }
+  const { apiFailure, type } = result.error
+  return { ok: false, error: { type: 'language-model-unavailable', cause: type, transient: type === 'transient',
+    ...(apiFailure === undefined ? {} : { apiFailure }) } }
 }

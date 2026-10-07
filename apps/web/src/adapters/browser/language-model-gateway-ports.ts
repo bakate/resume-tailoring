@@ -12,7 +12,7 @@ export function createGatewayJobPostingExtractor({ languageModelGateway }: Gatew
     })
     return result.ok && result.value.operation === 'explainable-job-posting-extraction'
       ? { ok: true, value: result.value.value }
-      : { ok: false, error: 'job-posting-extraction-unavailable' as const }
+      : { ok: false, error: 'job-posting-extraction-unavailable' as const, ...readApiFailure(result) }
   } }
 }
 
@@ -23,7 +23,7 @@ export function createGatewayMatchEvidenceMatcher({ languageModelGateway }: Gate
     })
     return result.ok && result.value.operation === 'explainable-match-evidence'
       ? { ok: true, value: result.value.value }
-      : { ok: false, error: 'match-evidence-unavailable' as const }
+      : { ok: false, error: 'match-evidence-unavailable' as const, ...readApiFailure(result) }
   } }
 }
 
@@ -49,7 +49,13 @@ function readSourceProfileFailure({ result }: Readonly<{
     error: !result.ok && result.error.type === 'processing-consent-required'
       ? 'processing-consent-required' as const
       : 'source-profile-extraction-unavailable' as const,
+    ...readApiFailure(result),
   }
+}
+
+/** The API Failure the gateway kept, when a browser adapter read one; an answer for another operation has none. */
+function readApiFailure(result: LanguageModelResult<unknown>) {
+  return result.ok || result.error.apiFailure === undefined ? {} : { apiFailure: result.error.apiFailure }
 }
 
 export function createGatewayResumeSectionModels({ languageModelGateway: gateway }: GatewayDependencies): ResumeSectionModels {
@@ -69,7 +75,7 @@ function toSectionModelResult<TOperation extends string, TResult extends Gateway
   operation: TOperation; result: LanguageModelResult<TResult>
 }>): ResumeSectionModelResult<Extract<TResult, { operation: TOperation }>['value']> {
   if (!result.ok) return { ok: false, error: { type: result.error.type === 'processing-consent-required' ? 'consent-required'
-    : result.error.cause ?? (result.error.transient === true ? 'transient' : 'permanent') } }
+    : result.error.cause ?? (result.error.transient === true ? 'transient' : 'permanent'), ...readApiFailure(result) } }
   if (!isOperation(result.value, operation)) return { ok: false, error: { type: 'permanent' } }
   return { ok: true, value: result.value.value, ...(result.value.usage === undefined ? {} : { usage: result.value.usage }) }
 }

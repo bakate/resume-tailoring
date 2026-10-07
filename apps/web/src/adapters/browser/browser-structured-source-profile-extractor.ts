@@ -1,5 +1,6 @@
 import { structuredSourceProfileSuccessSchema } from '../../candidate-journey/structured-source-profile-schema'
-import type { StructuredSourceProfileExtractor } from '@resume-tailoring/application/ports'
+import type { ReadApiFailure, StructuredSourceProfileExtractor } from '@resume-tailoring/application/ports'
+import { networkFailure, readApiFailure, unexpectedResponse } from './api-failure-reader'
 
 export function createBrowserStructuredSourceProfileExtractor({
   request = fetch,
@@ -23,15 +24,14 @@ async function extractStructuredSourceProfile({
       headers: { 'Content-Type': 'application/json' },
       method: 'POST',
     })
-    if (!response.ok) return unavailableResult
-    const result = structuredSourceProfileSuccessSchema.safeParse(await response.json())
-    return result.success ? result.data : unavailableResult
+    if (!response.ok) return unavailableResult(await readApiFailure(response))
+    const result = structuredSourceProfileSuccessSchema.safeParse(await response.json().catch(() => undefined))
+    return result.success ? result.data : unavailableResult(unexpectedResponse)
   } catch {
-    return unavailableResult
+    return unavailableResult(networkFailure)
   }
 }
 
-const unavailableResult = {
-  ok: false,
-  error: 'source-profile-extraction-unavailable',
-} as const
+function unavailableResult(apiFailure: ReadApiFailure) {
+  return { ok: false, error: 'source-profile-extraction-unavailable', apiFailure } as const
+}

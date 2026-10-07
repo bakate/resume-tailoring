@@ -5,7 +5,9 @@ import {
   resumeClaimWritingResultSchema,
 } from '../../resume-tailoring/resume-claim-schemas'
 import { privacySafeAnalyticsEventSchema } from '../../resume-tailoring/privacy-safe-analytics'
-import type { PrivacySafeTelemetry, ResumeClaimReformulator, ResumeClaimSemanticValidator } from '@resume-tailoring/application/ports'
+import type { PrivacySafeTelemetry, ReadApiFailure, ResumeClaimReformulator, ResumeClaimSemanticValidator,
+} from '@resume-tailoring/application/ports'
+import { networkFailure, readApiFailure, unexpectedResponse } from './api-failure-reader'
 
 export function createPrivacySafeBrowserTelemetry({
   request = fetch,
@@ -55,9 +57,10 @@ async function reformulateBrowserResumeClaim({ request, reformulation }: Readonl
     ...(candidateRequest === undefined ? {} : { request: candidateRequest }),
   }
   const result = await requestResumeClaimWriting({ request, value, writingInputs })
-  return result.ok && result.value.claims.length === 1
+  if (!result.ok) return result
+  return result.value.claims.length === 1
     ? { ok: true, value: result.value.claims[0] ?? claim } as const
-    : resumeClaimWritingUnavailableResult
+    : resumeClaimWritingUnavailable(unexpectedResponse)
 }
 
 async function requestResumeClaimValidation({ request, validationRequest }: Readonly<{
@@ -66,10 +69,11 @@ async function requestResumeClaimValidation({ request, validationRequest }: Read
 }>) {
   try {
     const response = await request('/api/resume-claim-validation', createJsonRequest(validationRequest))
-    const result = resumeClaimValidationResultSchema.safeParse(await response.json())
-    return result.success ? result.data : resumeClaimValidationUnavailableResult
+    if (!response.ok) return resumeClaimValidationUnavailable(await readApiFailure(response))
+    const result = resumeClaimValidationResultSchema.safeParse(await response.json().catch(() => undefined))
+    return result.success && result.data.ok ? result.data : resumeClaimValidationUnavailable(unexpectedResponse)
   } catch {
-    return resumeClaimValidationUnavailableResult
+    return resumeClaimValidationUnavailable(networkFailure)
   }
 }
 
@@ -84,14 +88,15 @@ async function requestResumeClaimWriting({
   }>) {
   try {
     const response = await request('/api/resume-claim-writing', createJsonRequest(value))
-    const result = resumeClaimWritingResultSchema.safeParse(await response.json())
-    if (!result.success || !result.data.ok) return resumeClaimWritingUnavailableResult
+    if (!response.ok) return resumeClaimWritingUnavailable(await readApiFailure(response))
+    const result = resumeClaimWritingResultSchema.safeParse(await response.json().catch(() => undefined))
+    if (!result.success || !result.data.ok) return resumeClaimWritingUnavailable(unexpectedResponse)
     return hasOnlyResumeClaimInputReferences({
       claims: result.data.value.claims,
       inputs: writingInputs,
-    }) ? result.data : resumeClaimWritingUnavailableResult
+    }) ? result.data : resumeClaimWritingUnavailable(unexpectedResponse)
   } catch {
-    return resumeClaimWritingUnavailableResult
+    return resumeClaimWritingUnavailable(networkFailure)
   }
 }
 
@@ -109,12 +114,10 @@ const unavailableResult = {
   error: { type: 'adapter-unavailable' },
 } as const
 
-const resumeClaimWritingUnavailableResult = {
-  ok: false,
-  error: { type: 'resume-claim-writing-unavailable' },
-} as const
+function resumeClaimWritingUnavailable(apiFailure: ReadApiFailure) {
+  return { ok: false, error: { type: 'resume-claim-writing-unavailable', apiFailure } } as const
+}
 
-const resumeClaimValidationUnavailableResult = {
-  ok: false,
-  error: { type: 'resume-claim-validation-unavailable' },
-} as const
+function resumeClaimValidationUnavailable(apiFailure: ReadApiFailure) {
+  return { ok: false, error: { type: 'resume-claim-validation-unavailable', apiFailure } } as const
+}

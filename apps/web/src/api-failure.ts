@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import type { ApiFailureType } from '@resume-tailoring/application/ports'
 import { resumeModelUsageSchema } from './candidate-journey/resume-document-schemas'
 
 /**
@@ -17,9 +18,9 @@ export const apiFailureStatuses = {
   'provider-unavailable': 502,
   'invalid-provider-response': 502,
   'service-misconfigured': 503,
-} as const
+} as const satisfies Record<ApiFailureType, number>
 
-export type ApiFailureType = keyof typeof apiFailureStatuses
+export type { ApiFailureType }
 export type ApiFailure = Readonly<{ type: ApiFailureType; retryAfterSeconds?: number }>
 
 const apiFailureTypes = Object.keys(apiFailureStatuses) as [ApiFailureType, ...ApiFailureType[]]
