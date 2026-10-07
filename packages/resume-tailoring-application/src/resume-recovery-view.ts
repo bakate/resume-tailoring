@@ -13,5 +13,12 @@ export function readResumeRecovery({ document, editing, session }: Readonly<{
     ...hiddenExperiences.flatMap((experience) => readExperienceFields({ experience }).flatMap(({ factIds }) => factIds))])
   const omittedFacts = (session.sourceIntake?.candidateFacts ?? [])
     .filter(({ id, status }) => status === 'attested' && !retainedIds.has(id))
-  return { hiddenExperiences, hiddenFields, omittedFacts }
+  return { hiddenExperiences, hiddenFields, omittedFacts, overflowReduction: readOverflowReduction({ editing }) }
+}
+
+/** How much Hidden Content Overflow Reduction produced, achievements apart, for the summary above the preview. */
+function readOverflowReduction({ editing }: Readonly<{ editing: ResumeEditingState }>) {
+  const reduced = editing.hiddenFields.filter(({ origin }) => origin === 'overflow-reduction')
+  const achievements = reduced.filter(({ location }) => location.kind === 'experience' && location.fieldName === 'achievements').length
+  return { achievements, other: reduced.length - achievements }
 }

@@ -53,11 +53,39 @@ describe('browser Candidate Session persistence', () => {
     const session: CandidateSession = { ...candidateSession, tailoredResume: { ...groupedResumeDocument,
       sectionOrder: ['experiences', 'value-proposition', 'skills', 'education', 'languages', 'projects', 'certifications'] },
       resumeEditing: { revision: 'revision-edited', manuallyEdited: true, unsupportedFieldIds: [field.id],
-        hiddenFields: [{ field: { ...field, text: '' }, location }], hiddenExperiences: [groupedResumeDocument.experiences[0]] },
+        hiddenFields: [{ field: { ...field, text: '' }, location, origin: 'candidate' }], hiddenExperiences: [groupedResumeDocument.experiences[0]] },
       resumeFactLocations: [{ factId: 'source-fact-added', location }],
     }
 
     const restored = roundTrip({ session })
+
+    expect(restored).toEqual({ ok: true, value: { notice: null, session } })
+  })
+
+  it('keeps the origin of Hidden Content and the fields the Candidate restored', () => {
+    const experience = groupedResumeDocument.experiences[0]
+    const achievement = experience.achievements[0]
+    const location = { kind: 'experience', experienceId: experience.id, fieldName: 'achievements', fieldId: achievement.id } as const
+    const session: CandidateSession = { ...candidateSession, tailoredResume: groupedResumeDocument,
+      resumeEditing: { revision: 'revision-reduced', manuallyEdited: false, unsupportedFieldIds: [],
+        hiddenFields: [{ field: achievement, location, origin: 'overflow-reduction' }],
+        restoredFieldIds: [groupedResumeDocument.valueProposition.paragraphs[0].id] } }
+
+    const restored = roundTrip({ session })
+
+    expect(restored).toEqual({ ok: true, value: { notice: null, session } })
+  })
+
+  it('reads Hidden Content saved before origins existed as hidden by the Candidate', () => {
+    const field = groupedResumeDocument.valueProposition.paragraphs[0]
+    const location = { kind: 'value-proposition', fieldId: field.id } as const
+    const session: CandidateSession = { ...candidateSession, tailoredResume: groupedResumeDocument,
+      resumeEditing: { revision: 'revision-hidden', manuallyEdited: true, unsupportedFieldIds: [],
+        hiddenFields: [{ field, location, origin: 'candidate' }] } }
+    const storedSession = { ...session, resumeEditing: { ...session.resumeEditing, hiddenFields: [{ field, location }] } }
+
+    const restored = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage({
+      initialValue: JSON.stringify(storedSession) }) }).restore()
 
     expect(restored).toEqual({ ok: true, value: { notice: null, session } })
   })
