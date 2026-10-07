@@ -1036,10 +1036,10 @@ const correctedSummary = 'Built accessible billing screens with React.'
 const candidateContent = ['Northwind', 'Contoso', 'billing', 'Alex', 'Morgan', 'example.com', 'Frontend', 'Accessibility'] as const
 const reactMatch = { factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' } as const
 
+/** Enough to overflow two pages in full (from 16), few enough that the condensed experience still fits whole (up to 28). */
 const denseTopics = ['checkout', 'invoicing', 'refunds', 'onboarding', 'reporting', 'search', 'navigation', 'settings',
   'notifications', 'permissions', 'exports', 'imports', 'dashboards', 'forms', 'tables', 'charts', 'filters', 'tooltips',
-  'dialogs', 'menus', 'carousels', 'uploads', 'downloads', 'profiles', 'messaging', 'calendars', 'payments', 'subscriptions',
-  'discounts', 'receipts', 'audits', 'translations', 'themes', 'layouts', 'typography', 'icons', 'errors', 'loading states']
+  'dialogs', 'menus', 'carousels', 'uploads']
 const denseAchievements = denseTopics.map((topic) => `Coordinated the ${topic} interface workstream with product, design and support partners, documenting accessible interaction patterns, reviewing keyboard behaviour and publishing guidance that other delivery teams reused`)
 const denseSourceProfile = { ...structuredResumeSource.sourceProfile,
   experiences: structuredResumeSource.sourceProfile.experiences.map((experience, index) => index === 0
