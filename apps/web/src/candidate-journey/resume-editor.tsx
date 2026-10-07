@@ -10,15 +10,16 @@ import type { ResumeReviewCopy } from './resume-review-copy'
 
 type EditorProps = Readonly<{
   candidateJourney: ResumeReviewController; localization: Localization; resume: TailoredResume; copy: ResumeReviewCopy
-  operations: RetryableOperations; initialTab?: 'contacts' | 'recovery'
+  operations: RetryableOperations
 }>
+export type EditorTab = 'contacts' | 'recovery'
 type EditorContext = EditorProps & Readonly<{ announce: (message: string) => void }>
 
-export function ResumeEditor(props: EditorProps) {
+export function ResumeEditor({ initialTab, ...props }: EditorProps & Readonly<{ initialTab: EditorTab }>) {
   const [announcement, announce] = useState('')
   const { copy, resume } = props
   const sections = readSections({ resume })
-  return <Stack><EditorStatus {...props} /><Tabs defaultValue={props.initialTab ?? 'contacts'} keepMounted={false}>
+  return <Stack><EditorStatus {...props} /><Tabs defaultValue={initialTab} keepMounted={false}>
     <Tabs.List aria-label={copy.edit}>
       <Tabs.Tab value="contacts">{copy.contacts}</Tabs.Tab>
       {sections.map((section) => <Tabs.Tab key={section} value={section}>{copy[section]}</Tabs.Tab>)}
