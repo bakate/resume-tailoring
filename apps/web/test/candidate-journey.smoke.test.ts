@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import type { ResumeCoherenceInput, ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
 import { routeResumeSectionModels, writeFixtureSection } from './resume-section-model-routes'
@@ -252,6 +252,7 @@ test.describe('Candidate Journey preview-first preparation', () => {
   test('recovers interrupted preparation after reload', async ({ page }) => {
     const system = createSystemUnderTest({ page, scenario: 'interrupted' })
     await system.givenInterruptedPreparation()
+    await system.expectOneRetryActionOnTheDocuments()
 
     await system.resumePreparation()
 
@@ -304,6 +305,32 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.downloadCurrentResume()
 
     await system.expectCurrentResumePdfDownloaded()
+  })
+
+  test('points to each missing document and focuses the first one', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.openUnconsentedIntake()
+
+    await system.requestGenerationWithoutDocuments()
+
+    await system.expectEachMissingDocumentExplainedAtItsField()
+  })
+
+  test('announces the writing phase and the step reached while the resume is being written', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'pending-writing' })
+    await system.givenCombinedIntake()
+
+    await system.generateResume()
+
+    await system.expectWritingPhaseAnnouncedWithItsStep()
+  })
+
+  test('keeps secondary text, the consent notice and the focus ring readable', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    await system.openUnconsentedIntake()
+
+    await system.expectReadableSecondaryTextAndFocusRing()
   })
 
   test('locks the intake while the resume is being prepared', async ({ page }) => {
@@ -1071,6 +1098,52 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.frameLocator('iframe').getByText('React', { exact: false }).first()).toBeVisible()
   }
 
+  async requestGenerationWithoutDocuments() {
+    await this.#page.getByRole('button', { name: 'Generate my resume', exact: true }).click()
+    this.#completedAction = 'generation-requested'
+  }
+
+  async expectEachMissingDocumentExplainedAtItsField() {
+    this.#expectAction()
+    const source = this.#page.getByRole('textbox', { name: 'Professional text', exact: true })
+    const posting = this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })
+    await expect(source).toHaveAttribute('aria-invalid', 'true')
+    await expect(source).toHaveAccessibleDescription('Add professional text before continuing.')
+    await expect(posting).toHaveAttribute('aria-invalid', 'true')
+    await expect(posting).toHaveAccessibleDescription('Add Job Posting text before continuing.')
+    await expect(source).toBeFocused()
+    await expect(this.#page).not.toHaveURL(/\/resume$/u)
+  }
+
+  async expectWritingPhaseAnnouncedWithItsStep() {
+    this.#expectAction()
+    const progress = this.#page.getByRole('region', { name: 'Candidate Journey progress' })
+    await expect(progress).toContainText('Writing')
+    await expect(progress).toContainText('Step 3 of 3')
+    await expect(progress).not.toContainText('orchestration')
+    await expect(this.#page.locator('.sr-only[role="status"]')).toContainText('Current phase: Tailored Resume Preparation.')
+  }
+
+  async expectReadableSecondaryTextAndFocusRing() {
+    this.#expectAction()
+    const notice = this.#page.locator('#processing-policy-notice')
+    await expect(notice).toBeVisible()
+    expect(await readContrast(notice)).toBeGreaterThanOrEqual(4.5)
+    expect(parseFloat(await notice.evaluate((element) => getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(14)
+    expect(await readContrast(this.#page.getByText('Drop your file here or click to choose it').first().locator('xpath=following-sibling::*[1]')))
+      .toBeGreaterThanOrEqual(4.5)
+    const source = this.#page.getByRole('textbox', { name: 'Professional text', exact: true })
+    await source.focus()
+    await this.#page.keyboard.press('Shift+Tab')
+    await this.#page.keyboard.press('Tab')
+    expect(await readContrast(source, 'outlineColor')).toBeGreaterThanOrEqual(3)
+  }
+
+  async expectOneRetryActionOnTheDocuments() {
+    await expect(this.#page.getByRole('button', { name: 'Try again', exact: true })).toHaveCount(1)
+    await expect(this.#page.getByRole('button', { name: 'Generate my resume', exact: true })).toHaveCount(0)
+  }
+
   async expectIntakeLockedDuringPreparation() {
     this.#expectAction()
     await expect(this.#page.getByRole('region', { name: 'Candidate Journey progress' })).toBeVisible()
@@ -1140,3 +1213,12 @@ function matchFor(scenario: Scenario) {
   relevance: [{ requirementId: 'job-requirement-react', factMatch }] }
 }
 
+/** The WCAG contrast ratio of an element's color, or another color property, against the white page. */
+async function readContrast(locator: Locator, property: 'color' | 'outlineColor' = 'color') {
+  const color = await locator.evaluate((element, name) => getComputedStyle(element)[name], property)
+  const [red = 0, green = 0, blue = 0] = (color.match(/\d+(\.\d+)?/gu) ?? []).slice(0, 3).map(Number).map((channel) => {
+    const value = channel / 255
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+  })
+  return 1.05 / (0.2126 * red + 0.7152 * green + 0.0722 * blue + 0.05)
+}

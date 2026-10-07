@@ -79,8 +79,15 @@ function CandidateIntake({ localization }: LocalizationProps) {
 type LocalizationProps = Readonly<{ localization: Localization }>
 type CandidateJourneyProps = LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>
 
-function readActivePhase({ view }: CandidateJourneyController) {
-  return view.status === 'candidate-session-open' ? view.session.phase : null
+/**
+ * While a preparation runs, the phase it has reached; the saved session only moves on once a phase succeeds, so it
+ * would still name the Source Intake while the resume is being written.
+ */
+function readActivePhase({ view }: CandidateJourneyController): CandidateJourneyPhase | null {
+  if (view.status !== 'candidate-session-open') return null
+  if (view.preparationPhase === 'extracting-source') return 'source-intake'
+  if (view.preparationPhase !== null) return 'job-match'
+  return view.operation === 'preparing-tailored-resume' ? 'tailored-resume-preparation' : view.session.phase
 }
 
 /** Preparing and rendering the Tailored Resume are shown on `/resume`, not on the intake. */
@@ -305,13 +312,23 @@ LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) 
       <Stack flex={1} gap="xs">
         <Text fw={700}>{localization.translate(readOperationKey({ candidateJourney, operation }))}</Text>
         <Text c="dimmed" id="candidate-journey-progress-description" size="sm">
-          {localization.translate('candidateJourney.progressDescription')}
+          {readProgressDescription({ candidateJourney, localization })}
         </Text>
         <Skeleton aria-hidden="true" height={10} radius="xl" width="72%" />
         <Skeleton aria-hidden="true" height={10} radius="xl" width="48%" />
       </Stack>
     </Group>
   </Paper>
+}
+
+/** A resume preparation names the step it has reached out of three; other operations only say how long they may take. */
+function readProgressDescription({ candidateJourney, localization }: CandidateJourneyProps) {
+  const phase = readActivePhase(candidateJourney)
+  const preparing = candidateJourney.view.status === 'candidate-session-open'
+    && candidateJourney.view.operation === 'preparing-tailored-resume'
+  if (!preparing || phase === null) return localization.translate('candidateJourney.progressDescription')
+  return formatJourneyMessage({ template: localization.translate('candidateJourney.progressStep'), token: 'step',
+    value: String(candidateJourneyPhases.findIndex(({ id }) => id === phase) + 1) })
 }
 
 function readValidatedResultMessage({ candidateJourney, localization }:

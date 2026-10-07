@@ -32,7 +32,7 @@ function ResumeResult({ localization }: Readonly<{ localization: Localization }>
     </Anchor>
     {isResultOperation(candidateJourney) ? <CandidateJourneyProgress {...{ candidateJourney, localization }} /> : null}
     <ResumeSectionsPreview {...{ candidateJourney, localization }} />
-    <PreparationFeedback {...{ candidateJourney, localization }} localFailure={null} onBack={toDocuments}
+    <PreparationFeedback {...{ candidateJourney, localization }} onBack={toDocuments}
       onRetry={() => { candidateJourney.startTailoredResumePreparation({ purpose }) }}
       onNormalized={() => { candidateJourney.startTailoredResumePreparation({ purpose: 'normalized' }) }} />
     <TailoredResumeWorkspace {...{ candidateJourney, localization }} onChangeJobPosting={() => {

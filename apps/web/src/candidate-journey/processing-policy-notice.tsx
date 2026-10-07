@@ -18,7 +18,7 @@ export function ProcessingPolicyNotice({ candidateJourney, localization }: Local
     ? 'processingPolicy.grantedSummary' : 'processingPolicy.consentByGeneration')
     .replace('{provider}', processingPolicy.provider)
   return <Box className="processing-policy-notice">
-    <Text c="dimmed" id={processingPolicyNoticeId} size="xs">{summary}</Text>
+    <Text c="dimmed" id={processingPolicyNoticeId} size="sm">{summary}</Text>
     <details><summary>{localization.translate('combinedIntake.policyDetails')}</summary>
       <Stack gap="xs" mt="xs"><ProcessingPolicyDetails {...{ localization, processingPolicy }} /></Stack></details>
   </Box>
