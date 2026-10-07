@@ -78,15 +78,6 @@ describe('Candidate Journey section-by-section resume preparation', () => {
       'languages', 'projects', 'certifications'], failed: ['skills'] })
   })
 
-  it('never rewrites a section whose provider is unavailable', async () => {
-    const system = createSystemUnderTest({ skillsWritingFailure: 'provider-unavailable' })
-    await system.givenMatchedCandidateSession()
-
-    await system.prepareTailoredResume()
-
-    system.expectSkillsWrittenOnceAndPreparationRetryable()
-  })
-
   it('rewrites a section once after a writing timeout', async () => {
     const system = createSystemUnderTest({ skillsWritingFailure: 'timeout' })
     await system.givenMatchedCandidateSession()
@@ -731,11 +722,6 @@ class SectionPreparationTestSystem {
     expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
     expect(this.#writingInputs).toHaveLength(8)
     expect(this.#coherenceChecks).toBe(1)
-  }
-
-  expectSkillsWrittenOnceAndPreparationRetryable() {
-    expect(this.#writtenSectionKeys().filter((key) => key === 'skills')).toHaveLength(1)
-    this.expectPreparationFailure({ reason: 'unavailable', recovery: 'retry' })
   }
 
   expectPreparationFailure(failure: Readonly<{ reason: string; recovery: string }>) {

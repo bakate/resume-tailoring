@@ -17,9 +17,9 @@ import type {
   PracticalConstraint,
   TargetRole,
 } from '@resume-tailoring/domain/job-match'
-import { explainFailure } from './failure-cause'
+import { explainFailure, explainModelFailure } from './failure-cause'
 import type { ExplainedFailure } from './failure-cause'
-import type { JobPostingDocumentReader, JobPostingExtractor, MatchEvidenceMatcher, ReadApiFailure } from './ports'
+import type { JobPostingDocumentReader, JobPostingExtractor, MatchEvidenceMatcher } from './ports'
 
 export type {
   JobMatch,
@@ -514,9 +514,3 @@ const matchEvidenceUnavailableResult = {
   error: 'match-evidence-unavailable',
   ...explainFailure({ type: 'invalid-provider-response' }),
 } as const
-
-function explainModelFailure<TError extends JobMatchFailure>({ error, apiFailure }: Readonly<{
-  error: TError; apiFailure?: ReadApiFailure
-}>) {
-  return { ok: false, error, ...explainFailure(apiFailure) } as const
-}

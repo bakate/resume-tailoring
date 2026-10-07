@@ -9,7 +9,7 @@ import { sourceProfileSections } from '@resume-tailoring/domain/source-intake'
 
 import { minimizeCandidateContent } from './candidate-name'
 import { locateSourceSpan } from './source-span'
-import { explainFailure } from './failure-cause'
+import { explainFailure, explainModelFailure } from './failure-cause'
 import type { ExplainedFailure } from './failure-cause'
 import type { SourceDocumentReader, StructuredSourceProfileExtractor } from './ports'
 
@@ -67,8 +67,8 @@ export async function createSourceIntake(
   const extractionResult = await input.sourceProfileExtractor.extract({
     professionalContent: minimizedContent.outgoingContent,
   })
-  if (!extractionResult.ok) return extractionResult.error === 'processing-consent-required' ? { ok: false, error: extractionResult.error }
-    : { ok: false, error: extractionResult.error, ...explainFailure(extractionResult.apiFailure) }
+  if (!extractionResult.ok) return extractionResult.error === 'processing-consent-required'
+    ? { ok: false, error: extractionResult.error } : explainModelFailure(extractionResult)
   const sourceIntake = buildSourceIntake({
     document: input.document, extraction: extractionResult.value,
     minimizedContent, originalContent: contentResult.value,

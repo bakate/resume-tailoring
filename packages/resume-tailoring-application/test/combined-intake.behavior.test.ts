@@ -125,7 +125,7 @@ describe('Candidate Journey combined intake', () => {
   })
 
   it('recovers from one invalid provider response while writing a section', async () => {
-    const system = createSystemUnderTest({ preparation: 'transient-once' })
+    const system = createSystemUnderTest({ preparation: 'invalid-response-once' })
     await system.givenConsentedSession()
 
     await system.requestResumePreparation()
@@ -134,7 +134,7 @@ describe('Candidate Journey combined intake', () => {
   })
 
   it('never rewrites a section a second time within the same preparation', async () => {
-    const system = createSystemUnderTest({ preparation: 'transient-twice' })
+    const system = createSystemUnderTest({ preparation: 'invalid-response-twice' })
     await system.givenConsentedSession()
 
     await system.requestResumePreparation()
@@ -238,7 +238,7 @@ describe('Candidate Journey combined intake', () => {
 function createSystemUnderTest(options: TestOptions = {}) { return new CombinedIntakeSystem(options) }
 
 type TestOptions = Readonly<{ correspondence?: 'none'; ambiguity?: 'blocking' | 'isolated' | 'no-usable-evidence'; extraction?: 'unavailable'; consent?: 'outdated';
-  preparation?: 'interrupted' | 'unsafe' | 'transient-once' | 'transient-twice' | 'no-model' | 'partial-validation' }>
+  preparation?: 'interrupted' | 'unsafe' | 'invalid-response-once' | 'invalid-response-twice' | 'no-model' | 'partial-validation' }>
 
 class CombinedIntakeSystem {
   #journey: CandidateJourney
@@ -575,7 +575,7 @@ function createDependencies(options: () => TestOptions, writingDelivery: () => P
         writtenSectionKeys.push(section.key)
         await writingDelivery()
         if (options().preparation === 'interrupted') return new Promise(() => undefined)
-        const allowance = options().preparation === 'transient-once' ? 1 : options().preparation === 'transient-twice' ? 2 : 0
+        const allowance = options().preparation === 'invalid-response-once' ? 1 : options().preparation === 'invalid-response-twice' ? 2 : 0
         if (section.kind === 'value-proposition' && valuePropositionFailures < allowance) {
           valuePropositionFailures += 1
           return { ok: false, error: { type: 'invalid-provider-response' } }

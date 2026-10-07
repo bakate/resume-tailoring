@@ -15,8 +15,8 @@ const defaultRetryAfterSeconds = 30
 
 /**
  * Reads the provider-neutral Failure Cause of what a browser adapter read; a failure without an API Failure is
- * unexpected. A provider that answered badly, or a misconfigured service, is unavailable for now: retrying later may
- * succeed. An invalid request is a defect of this page, which only a reload can fix.
+ * unexpected. A provider that answered badly is unavailable for now: retrying later may succeed. A misconfigured
+ * service, an invalid request or a foreign origin is a defect no retry can fix, so it is unexpected.
  */
 export function readFailureCause(apiFailure: ReadApiFailure | undefined): FailureCause {
   switch (apiFailure?.type) {
@@ -26,10 +26,10 @@ export function readFailureCause(apiFailure: ReadApiFailure | undefined): Failur
     case 'input-too-large': return { type: 'input-too-large' }
     case 'demo-access-unavailable':
     case 'provider-unavailable':
-    case 'invalid-provider-response':
-    case 'service-misconfigured': return { type: 'service-unavailable' }
+    case 'invalid-provider-response': return { type: 'service-unavailable' }
     case 'network': return { type: 'network' }
     case 'demo-origin-required':
+    case 'service-misconfigured':
     case 'invalid-input':
     case 'unexpected-response':
     case undefined: return { type: 'unexpected' }
@@ -51,6 +51,13 @@ export function readRecovery(cause: FailureCause): Recovery {
 export function explainFailure(apiFailure: ReadApiFailure | undefined): ExplainedFailure {
   const cause = readFailureCause(apiFailure)
   return { cause, recovery: readRecovery(cause) }
+}
+
+/** A failed model call, with its Failure Cause and Recovery read from the API Failure the adapter kept. */
+export function explainModelFailure<TError extends string>({ error, apiFailure }: Readonly<{
+  error: TError; apiFailure?: ReadApiFailure
+}>) {
+  return { ok: false, error, ...explainFailure(apiFailure) } as const
 }
 
 /** Whether retrying as is can succeed; when several steps fail, the Candidate is told first about one that cannot. */

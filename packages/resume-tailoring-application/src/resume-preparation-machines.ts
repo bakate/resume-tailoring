@@ -377,7 +377,7 @@ function readPreparationOutput(context: ResumePreparationMachineContext): Resume
   return readPreparationFailure(readPreparationFailures(context))
 }
 
-function readPreparationFailures(context: ResumePreparationMachineContext): readonly PreparationFailureCause[] {
+function readPreparationFailures(context: ResumePreparationMachineContext): readonly PreparationStepFailure[] {
   const { coherence } = context
   if (coherence === null) return context.results.flatMap((result) => result.status === 'failed' ? [result.failure] : [])
   if (!coherence.ok) return [coherence.error]
@@ -386,17 +386,17 @@ function readPreparationFailures(context: ResumePreparationMachineContext): read
     : { type: 'invalid-provider-response' }]
 }
 
-type PreparationFailureCause = ResumeSectionFailure | Readonly<{ type: 'incoherent' }>
+type PreparationStepFailure = ResumeSectionFailure | Readonly<{ type: 'incoherent' }>
 
 /**
  * Several sections can fail differently in one preparation (for example one timed out, another is unsupported),
  * but the Candidate sees a single failure with a single recovery action.
  */
-function readPreparationFailure(failures: readonly PreparationFailureCause[]): ResumeOperationFailure {
+function readPreparationFailure(failures: readonly PreparationStepFailure[]): ResumeOperationFailure {
   // Without consent no call can succeed, and a failure a retry cannot fix needs its own Recovery first. A retry
   // rewrites only the sections that failed, including those the coherence check still rejected, so unsupported or
   // incoherent wording is worth retrying.
-  const has = (type: PreparationFailureCause['type']) => failures.some((failure) => failure.type === type)
+  const has = (type: PreparationStepFailure['type']) => failures.some((failure) => failure.type === type)
   if (has('consent-required')) return { status: 'failed', reason: 'processing-consent-required', recovery: 'renew-consent' }
   const explained = failures.flatMap((failure) => isModelCallFailure(failure) ? [explainFailure(failure)] : [])
   const unretryable = explained.find(({ cause }) => !isRetryable(cause))
@@ -406,7 +406,7 @@ function readPreparationFailure(failures: readonly PreparationFailureCause[]): R
   return unavailableFailure(explained[0] ?? explainFailure(undefined))
 }
 
-function isModelCallFailure(failure: PreparationFailureCause): failure is ResumeSectionFailure & ReadApiFailure {
+function isModelCallFailure(failure: PreparationStepFailure): failure is ResumeSectionFailure & ReadApiFailure {
   return failure.type !== 'incoherent' && failure.type !== 'unsupported' && failure.type !== 'consent-required'
 }
 

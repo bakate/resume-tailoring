@@ -205,8 +205,14 @@ function failPreparation({ context, detail, recovery, cause }: Readonly<{
     : detail === 'unsupported-content' || detail === 'incoherent-content' || detail === 'stale-result' ? detail : 'unavailable'
   return { status: 'failed', reason, detail, session: { ...context.session, preparation },
     ...(cause === undefined ? {} : { cause }),
-    recovery: recovery ?? (cause === undefined ? undefined : readRecovery(cause)) ?? (reason === 'processing-consent-required'
-      ? 'renew-consent' : reason === 'unsupported-content' ? 'correct-content' : 'retry') }
+    recovery: recovery ?? readFailureRecovery({ reason, cause }) }
+}
+
+function readFailureRecovery({ reason, cause }: Readonly<{
+  reason: ResumeOperationFailure['reason']; cause: FailureCause | undefined
+}>): ResumeOperationFailure['recovery'] {
+  if (cause !== undefined) return readRecovery(cause)
+  return reason === 'processing-consent-required' ? 'renew-consent' : reason === 'unsupported-content' ? 'correct-content' : 'retry'
 }
 
 function savePreparation(context: PreparationContext) {
