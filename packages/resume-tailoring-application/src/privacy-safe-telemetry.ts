@@ -18,7 +18,7 @@ export const journeyPhases = [
 ] as const
 /** A failed section reports the API Failure its last model call read, so retries can be measured per type. */
 export const resumeSectionOutcomes = [
-  'validated', 'unsupported', 'consent-required', ...apiFailureTypes, 'network', 'unexpected-response',
+  'validated', 'copied-from-source', 'unsupported', 'consent-required', ...apiFailureTypes, 'network', 'unexpected-response',
 ] as const
 export const resumePreparationOutcomes = ['prepared', 'failed'] as const
 export const resumeRenderFailureCategories = [

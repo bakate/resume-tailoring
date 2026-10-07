@@ -201,6 +201,29 @@ function readListItemFields(content: ResumeSectionContent): readonly TailoredRes
   return content.fields
 }
 
+/**
+ * An experience written word for word from its attested Candidate Facts, or null for any other section kind: what
+ * the Candidate wrote is supported by definition, so an experience whose rewrite still fails keeps its place in the
+ * resume instead of failing the whole preparation.
+ */
+export function copyExperienceFromFacts(input: ResumeSectionWritingInput): ResumeSectionContent | null {
+  const { key, kind } = input.section
+  if (kind !== 'experience') return null
+  const facts = input.candidateFacts.filter(({ status, value }) => status === 'attested' && value.trim().length > 0)
+  const copy = (name: string): TailoredResumeField | null => {
+    const named = facts.filter(({ path }) => path.startsWith(`${key}.${name}.`))
+    return named.length === 0 ? null
+      : { id: `${key}.${name}`, text: named.map(({ value }) => value.trim()).join(' '), factIds: named.map(({ id }) => id) }
+  }
+  const achievements = facts.filter(({ path }) => path.startsWith(`${key}.achievements.`))
+    .map(({ id, value }, index) => ({ id: `${key}.achievements.${String(index)}`, text: value.trim(), factIds: [id] }))
+  const relevant = input.purpose === 'tailored' && input.relevantFactIds.length > 0
+  return normalizeSectionContent({ purpose: input.purpose, section: input.section, relevantFactIds: input.relevantFactIds,
+    content: { kind: 'experience', experience: { id: key, chronology: relevant ? 'relevant' : 'context',
+      role: copy('role'), organization: copy('organization'), startDate: copy('startDate'), endDate: copy('endDate'),
+      location: copy('location'), context: copy('context'), achievements } } })
+}
+
 /** The existing deterministic structure checks, restricted to one section and the facts it may cite. */
 export function hasSupportedSectionStructure({ content, input }: Readonly<{
   content: ResumeSectionContent; input: ResumeSectionWritingInput
@@ -224,6 +247,9 @@ function experienceRetainsAssociations({ candidateFacts, experience }: Readonly<
     const field = experience[name] ?? null
     // Context and location may be left out; a role, an employer or a date the facts hold must be kept.
     if (field === null) return name === 'context' || name === 'location' || expectedFacts.length === 0
+    // The context sums up the experience, so it may cite any of its facts; no other experience's fact ever reaches it.
+    if (name === 'context') return field.factIds.every((factId) => candidateFacts.some(({ id, path }) =>
+      id === factId && path.startsWith(`${experience.id}.`)))
     return expectedFacts.length > 0 && field.factIds.every((factId) => expectedFacts.some(({ id }) => id === factId))
   })
 }

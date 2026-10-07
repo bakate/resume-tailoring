@@ -2,7 +2,8 @@ import { assign, enqueueActions, fromPromise, sendParent, setup } from 'xstate'
 import type { ResumeSectionSnapshot } from '@resume-tailoring/domain/candidate-session'
 import type { PrivacySafeTelemetryEvent, resumeSectionOutcomes } from './privacy-safe-telemetry'
 import type { ResumeOperationFailure, ResumePreparationOutcome } from './structured-resume-contract'
-import { assembleResumeDocumentWithOrigins, citedCandidateFacts, createSectionWritingInput, hasSupportedSectionStructure,
+import { assembleResumeDocumentWithOrigins, citedCandidateFacts, copyExperienceFromFacts, createSectionWritingInput,
+  hasSupportedSectionStructure,
   isSectionFullyValidated, normalizeSectionContent, planResumeSections, readRejectedFields,
   readSectionContentFields, removeSectionFields } from './resume-sections'
 import type { ResumeCoherenceIssue, ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage,
@@ -13,14 +14,16 @@ import { explainFailure, isRetryable } from './failure-cause'
 import type { ExplainedFailure } from './failure-cause'
 
 /** Why one Resume Section failed: its content was unsupported, or its last model call failed with this error. */
-type ResumeSectionFailure = Readonly<{ type: Exclude<typeof resumeSectionOutcomes[number], 'validated'>; retryAfterSeconds?: number }>
+type ResumeSectionFailure = Readonly<{
+  type: Exclude<typeof resumeSectionOutcomes[number], 'validated' | 'copied-from-source'>; retryAfterSeconds?: number
+}>
 
 export type ResumeSectionResult = Readonly<{
   section: ResumeSectionPlanEntry
   attempt: number
   durationMilliseconds: number
   usage: ResumeModelUsage
-}> & (Readonly<{ status: 'validated'; content: ResumeSectionContent }>
+}> & (Readonly<{ status: 'validated'; content: ResumeSectionContent; copiedFromSource?: true }>
   | Readonly<{ status: 'failed'; failure: ResumeSectionFailure }>)
 
 type SectionProgressStatus = 'writing' | 'validating'
@@ -113,9 +116,19 @@ function addUsage(total: ResumeModelUsage, usage: ResumeModelUsage | undefined):
 function readSectionResult(context: ResumeSectionMachineContext): ResumeSectionResult {
   const measured = { section: context.writingInput.section, attempt: context.attempt, usage: context.usage,
     durationMilliseconds: Math.max(0, context.now() - context.startedAt) }
-  return context.failure === null && context.content !== null
-    ? { ...measured, status: 'validated', content: context.content }
-    : { ...measured, status: 'failed', failure: context.failure ?? { type: 'unexpected-response' } }
+  if (context.failure === null && context.content !== null) return { ...measured, status: 'validated', content: context.content }
+  const copy = context.failure?.type === 'unsupported' ? readSourceCopy(context.writingInput) : null
+  return copy === null ? { ...measured, status: 'failed', failure: context.failure ?? { type: 'unexpected-response' } }
+    : { ...measured, status: 'validated', content: copy, copiedFromSource: true }
+}
+
+/**
+ * Unsupported content a rewrite could not fix would fail the same way on a retry, so the section falls back to the
+ * Candidate's own wording, kept only while it passes the same deterministic structure checks.
+ */
+function readSourceCopy(input: ResumeSectionWritingInput): ResumeSectionContent | null {
+  const copy = copyExperienceFromFacts(input)
+  return copy !== null && hasSupportedSectionStructure({ content: copy, input }) ? copy : null
 }
 
 /** Writes and validates one Resume Section; a rewritable failure rewrites it once. */
@@ -468,7 +481,8 @@ function readProgressedSections({ context, event }: Readonly<{
 
 function recordSectionResult({ context, result }: Readonly<{ context: ResumePreparationMachineContext; result: ResumeSectionResult }>) {
   context.recordTelemetry({ name: 'resume-section-prepared', sectionKind: result.section.kind,
-    outcome: result.status === 'validated' ? 'validated' : result.failure.type, attemptCount: result.attempt,
+    outcome: result.status === 'failed' ? result.failure.type : result.copiedFromSource === true ? 'copied-from-source' : 'validated',
+    attemptCount: result.attempt,
     durationMilliseconds: result.durationMilliseconds, inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens })
 }
 
