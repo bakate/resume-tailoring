@@ -1,9 +1,9 @@
 import { unavailableResumeRender } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeRenderRequest, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import type { resumeRenderFailureCategories } from '@resume-tailoring/application/privacy-safe-telemetry'
-import { apiFailureSchema } from '../../api-failure'
 import { resumeRenderResponseSchema } from '../../candidate-journey/resume-render-schema'
 import type { PrivacySafeTelemetry, ResumeDocumentRenderer } from '@resume-tailoring/application/ports'
+import { readApiFailure } from './api-failure-reader'
 
 type RenderFailureCategory = typeof resumeRenderFailureCategories[number]
 type RenderAttempt = Readonly<{ ok: true; result: ResumeRenderResult }> | Readonly<{ ok: false; category: RenderFailureCategory }>
@@ -56,8 +56,7 @@ async function attemptRender({ input, dependencies }: Readonly<{
 
 /** The server failed to render when it answers provider-unavailable; a bare 5xx comes from the infrastructure. */
 async function classifyRejectedResponse(response: Response): Promise<RenderFailureCategory> {
-  const failure = apiFailureSchema.safeParse(await response.json().catch(() => undefined))
-  if (failure.success && failure.data.error.type === 'provider-unavailable') return 'render'
+  if ((await readApiFailure(response)).type === 'provider-unavailable') return 'render'
   const { status } = response
   if (status === 504) return 'timeout'
   if (status >= 500 || status === 429) return 'server'

@@ -1,8 +1,8 @@
 import { z } from 'zod'
-import type { ResumeSectionModelFailure, ResumeSectionModelResult } from '@resume-tailoring/application/candidate-journey'
-import type { ResumeCoherenceChecker, ResumeFieldValidator, ResumeSectionWriter } from '@resume-tailoring/application/ports'
+import type { ResumeModelUsage, ResumeSectionModelFailure, ResumeSectionModelResult } from '@resume-tailoring/application/candidate-journey'
+import type { ReadApiFailure, ResumeCoherenceChecker, ResumeFieldValidator, ResumeSectionWriter } from '@resume-tailoring/application/ports'
 import { apiFailureSchema } from '../../api-failure'
-import type { ApiFailureType } from '../../api-failure'
+import { networkFailure, readApiFailureBody, unexpectedResponse } from './api-failure-reader'
 import { resumeDocumentCoherenceSchema, resumeFieldValidationResponseSchema, resumeModelUsageSchema, resumeSectionContentSchema,
 } from '../../candidate-journey/resume-document-schemas'
 
@@ -26,32 +26,32 @@ async function postResumeModel<TValue>({ request, input, path, schema }: Readonl
     const response = await request(path, { method: 'POST', cache: 'no-store',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
     return await readModelResponse({ response, schema })
-  } catch { return { ok: false, error: { type: 'transient' } } }
+  } catch { return modelFailure({ apiFailure: networkFailure }) }
 }
 
 async function readModelResponse<TValue>({ response, schema }: Readonly<{
   response: Response; schema: z.ZodType<TValue>
 }>): Promise<ResumeSectionModelResult<TValue>> {
-  try {
-    const body: unknown = await response.json()
-    if (!response.ok) return readModelFailure(body)
-    const result = z.strictObject({ ok: z.literal(true), value: schema, usage: resumeModelUsageSchema.optional() }).safeParse(body)
-    return result.success ? result.data : permanent
-  } catch { return permanent }
+  const body: unknown = await response.json().catch(() => undefined)
+  if (!response.ok) return modelFailure({ apiFailure: readApiFailureBody({ response, body }), usage: readFailureUsage(body) })
+  const result = z.strictObject({ ok: z.literal(true), value: schema, usage: resumeModelUsageSchema.optional() }).safeParse(body)
+  return result.success ? result.data : modelFailure({ apiFailure: unexpectedResponse })
 }
 
-function readModelFailure(body: unknown): ResumeSectionModelResult<never> {
+function modelFailure({ apiFailure, usage }: Readonly<{
+  apiFailure: ReadApiFailure; usage?: ResumeModelUsage
+}>): ResumeSectionModelResult<never> {
+  return { ok: false, error: { type: readSectionModelFailure(apiFailure), apiFailure }, ...(usage === undefined ? {} : { usage }) }
+}
+
+/** A failed model call can still have billed tokens; the failure envelope reports them. */
+function readFailureUsage(body: unknown) {
   const failure = apiFailureSchema.safeParse(body)
-  if (!failure.success) return permanent
-  const { error, usage } = failure.data
-  return { ok: false, error: { type: sectionModelFailures[error.type] ?? 'permanent' }, ...(usage === undefined ? {} : { usage }) }
+  return failure.success ? failure.data.usage : undefined
 }
 
 /** Only failures a second attempt can overcome stay transient; the rest keep their current meaning. */
-const sectionModelFailures: Partial<Record<ApiFailureType, ResumeSectionModelFailure>> = {
-  timeout: 'timeout',
-  'provider-unavailable': 'transient',
-  'rate-limited': 'transient',
+function readSectionModelFailure({ type }: ReadApiFailure): ResumeSectionModelFailure {
+  if (type === 'timeout') return 'timeout'
+  return type === 'network' || type === 'provider-unavailable' || type === 'rate-limited' ? 'transient' : 'permanent'
 }
-
-const permanent = { ok: false, error: { type: 'permanent' } } as const

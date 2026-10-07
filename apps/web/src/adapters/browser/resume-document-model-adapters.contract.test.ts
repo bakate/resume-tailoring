@@ -51,14 +51,14 @@ describe('resume document professional model boundary', () => {
     expect(request).not.toHaveBeenCalled()
   })
 
-  it('reports an unavailable model when the claim service fails', async () => {
+  it('reports an unavailable model, and its unexpected response, when the claim service fails outside the envelope', async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ ok: false }, { status: 503 }))
     const adapters = createResumeDocumentModelAdapters({ gateway: createConsentedGateway({ request }) })
 
     const outcomes = await Promise.all([adapters.validateClaim({ claim, verifiedFacts }),
       adapters.condenseClaim(condensationRequest)])
 
-    const failure = { ok: false, error: 'unavailable' }
+    const failure = { ok: false, error: 'unavailable', apiFailure: { type: 'unexpected-response' } }
     expect(outcomes).toEqual([failure, failure])
   })
 })

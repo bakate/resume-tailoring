@@ -10,6 +10,7 @@ import type { ResumeClaim } from '@resume-tailoring/domain/resume-claim'
 import type { ExtractedJobPosting, JobPostingDocument, JobPostingDocumentFailure, MatchEvidenceProposal } from './job-match'
 import type { PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
 import type { ProposedResumeClaim, ResumeClaimValidationFeedback, ResumeClaimWritingInputs } from './resume-claims'
+import type { ReadApiFailure } from './api-failure'
 import type { ResumeRenderRequest, ResumeRenderResult } from './resume-export'
 import type { ResumeCoherenceInput, ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput,
   ResumeSectionContent, ResumeSectionModelResult, ResumeSectionWritingInput } from './resume-sections'
@@ -58,6 +59,10 @@ export type CandidateSessionPersistence = Readonly<{
     CandidateSessionStorageResult<CandidateSession>
 }>
 
+// API Failures read by the browser adapters
+
+export type { ApiFailureType, ReadApiFailure } from './api-failure'
+
 // Source Intake
 
 export type SourceDocumentReader = Readonly<{
@@ -73,6 +78,7 @@ export type StructuredSourceProfileExtractor = Readonly<{
     | Readonly<{
         ok: false
         error: 'processing-consent-required' | 'source-profile-extraction-unavailable'
+        apiFailure?: ReadApiFailure
       }>
   >
 }>
@@ -89,7 +95,7 @@ export type JobPostingDocumentReader = Readonly<{
 export type JobPostingExtractor = Readonly<{
   extract: (request: Readonly<{ jobPostingContent: string }>) => Promise<
     | Readonly<{ ok: true; value: ExtractedJobPosting }>
-    | Readonly<{ ok: false; error: 'job-posting-extraction-unavailable' }>
+    | Readonly<{ ok: false; error: 'job-posting-extraction-unavailable'; apiFailure?: ReadApiFailure }>
   >
 }>
 
@@ -99,7 +105,7 @@ export type MatchEvidenceMatcher = Readonly<{
     requirements: readonly JobRequirement[]
   }>) => Promise<
     | Readonly<{ ok: true; value: MatchEvidenceProposal }>
-    | Readonly<{ ok: false; error: 'match-evidence-unavailable' }>
+    | Readonly<{ ok: false; error: 'match-evidence-unavailable'; apiFailure?: ReadApiFailure }>
   >
 }>
 
@@ -126,7 +132,7 @@ export type ResumeClaimModelFailure = 'processing-consent-required' | 'unavailab
 
 export type ResumeClaimModelResult<TValue> =
   | Readonly<{ ok: true; value: TValue }>
-  | Readonly<{ ok: false; error: ResumeClaimModelFailure }>
+  | Readonly<{ ok: false; error: ResumeClaimModelFailure; apiFailure?: ReadApiFailure }>
 
 /** Model operations on one Resume Claim; the application decides which claims to send and what the answers mean. */
 export type ResumeDocumentPorts = Readonly<{
@@ -155,7 +161,7 @@ export type ResumeClaimReformulator = Readonly<{
     request?: string
   }>) => Promise<
     | { readonly ok: true; readonly value: ProposedResumeClaim }
-    | { readonly ok: false; readonly error: { readonly type: 'resume-claim-writing-unavailable' } }
+    | { readonly ok: false; readonly error: { readonly type: 'resume-claim-writing-unavailable'; readonly apiFailure?: ReadApiFailure } }
   >
 }>
 
@@ -171,7 +177,10 @@ export type ResumeClaimSemanticValidator = Readonly<{
           feedback: readonly ResumeClaimValidationFeedback[]
         }>
       }
-    | { readonly ok: false; readonly error: { readonly type: 'resume-claim-validation-unavailable' } }
+    | { readonly ok: false; readonly error: {
+      readonly type: 'resume-claim-validation-unavailable'
+      readonly apiFailure?: ReadApiFailure
+    } }
   >
 }>
 
@@ -199,6 +208,8 @@ export type LanguageModelFailure = Readonly<{
   transient?: boolean
   /** Distinguishes a timeout, which is never retried, from other unavailability. */
   cause?: 'transient' | 'timeout' | 'permanent'
+  /** The API Failure the browser adapter read, kept so the application can tell the Candidate why. */
+  apiFailure?: ReadApiFailure
   type: 'language-model-unavailable' | 'processing-consent-required'
 }>
 

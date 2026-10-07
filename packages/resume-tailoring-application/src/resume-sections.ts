@@ -3,6 +3,7 @@ import type { CandidateFact, CandidateFactId } from '@resume-tailoring/domain/so
 import { readExperienceFields, readSectionFields, replaceEmDashes } from './tailored-resume'
 import type { TailoredResumeExperience, TailoredResumeField, TailoredResumeLocale, TailoredResumeSection } from './tailored-resume'
 import type { ProfessionalResumeDocument } from './structured-resume-contract'
+import type { ReadApiFailure } from './api-failure'
 import type { ResumeSectionContent, ResumeSectionKind } from '@resume-tailoring/domain/tailored-resume'
 
 export { resumeSectionKinds } from '@resume-tailoring/domain/tailored-resume'
@@ -56,7 +57,7 @@ export type ResumeSectionModelFailure = 'transient' | 'timeout' | 'permanent' | 
 export type ResumeModelUsage = Readonly<{ inputTokens: number; outputTokens: number }>
 export type ResumeSectionModelResult<TValue> =
   | Readonly<{ ok: true; value: TValue; usage?: ResumeModelUsage }>
-  | Readonly<{ ok: false; error: Readonly<{ type: ResumeSectionModelFailure }>; usage?: ResumeModelUsage }>
+  | Readonly<{ ok: false; error: Readonly<{ type: ResumeSectionModelFailure; apiFailure?: ReadApiFailure }>; usage?: ResumeModelUsage }>
 
 export type ResumeSectionsRequest = Readonly<{
   candidateFacts: readonly CandidateFact[]
