@@ -4,13 +4,15 @@ import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { inferTailoredResumeLocale } from '@resume-tailoring/application/tailored-resume'
-import type { CandidateSession, ResumePreparationFailure, StoredIntakeDocument } from '@resume-tailoring/application/candidate-journey'
+import { readRecovery } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateSession, FailureCause, ResumePreparationFailure, StoredIntakeDocument } from '@resume-tailoring/application/candidate-journey'
 import type { SourceDocument } from '@resume-tailoring/application/source-intake'
 import type { Localization } from '../localization/localization'
 import type { useCandidateJourney } from './use-candidate-journey'
 import { CriticalAmbiguityQuestions, sourceIntakeFailureKeys } from './source-intake-workspace'
 import { jobMatchFailureKeys } from './job-match-workspace'
 import { ProcessingPolicyNotice, processingPolicyNoticeId } from './processing-policy-notice'
+import { FailureExplanation, RecoveryAction } from './failure-recovery'
 
 type IntakeProps = Readonly<{ candidateJourney: ReturnType<typeof useCandidateJourney>; localization: Localization }>
 type OpenIntakeProps = IntakeProps & Readonly<{ session: CandidateSession }>
@@ -250,7 +252,7 @@ export function PreparationFeedback({ candidateJourney, localization, localFailu
   const failedPreparation = localFailure === null && (preparation?.status === 'failed' || preparation?.status === 'interrupted')
   return <>
     {failedPreparation ? <PreparationFailureAlert {...{ failure, localization, onBack, onRetry }}
-      busy={view.operation !== null} hasStableResume={view.session.tailoredResume !== null}
+      cause={preparation.status === 'failed' ? preparation.failureCause : undefined} busy={view.operation !== null} hasStableResume={view.session.tailoredResume !== null}
       interrupted={preparation.status === 'interrupted'} /> : <InputFailure {...{ failure, localization }} />}
     {preparation?.status === 'awaiting-correction' && preparation.sourceIntake !== null
       ? <CriticalAmbiguityQuestions {...{ candidateJourney, localization, sourceIntake: preparation.sourceIntake }} /> : null}
@@ -293,24 +295,36 @@ function BackToDocuments({ localization, onBack }: Readonly<{ localization: Loca
     : <Button onClick={onBack} variant="default">{localization.translate('resumeResult.backToDocuments')}</Button>
 }
 
-function PreparationFailureAlert({ busy, failure, hasStableResume, interrupted, localization, onBack, onRetry }: Readonly<{
-  busy: boolean; failure: ResumePreparationFailure | null; hasStableResume: boolean; interrupted: boolean
-  localization: Localization; onBack: (() => void) | undefined; onRetry: () => void
+/**
+ * The context title says which step failed; a Failure Cause adds why, and its Recovery replaces the plain retry. Without
+ * a cause, an unavailable service keeps its generic wording.
+ */
+function PreparationFailureAlert({ busy, cause, failure, hasStableResume, interrupted, localization, onBack, onRetry }: Readonly<{
+  busy: boolean; cause: FailureCause | undefined; failure: ResumePreparationFailure | null; hasStableResume: boolean
+  interrupted: boolean; localization: Localization; onBack: (() => void) | undefined; onRetry: () => void
 }>) {
-  const cause = interrupted || failure === null ? null
+  const step = interrupted || failure === null || (cause !== undefined && failure === 'unavailable') ? null
     : localization.translate(failure in retryableFailureCauses
       ? retryableFailureCauses[failure as keyof typeof retryableFailureCauses] : preparationFailureKeys[failure])
   const retryable = interrupted || failure === null || !inputFailures.has(failure)
   return <Alert color={interrupted ? 'caution' : 'danger'} role="alert"
     title={localization.translate(interrupted ? 'combinedIntake.interruptedTitle' : 'combinedIntake.failedTitle')}>
     <Stack gap="sm">
-      {cause === null ? null : <Text size="sm">{cause}</Text>}
+      {step === null ? null : <Text size="sm">{step}</Text>}
+      {cause === undefined ? null : <FailureExplanation {...{ cause, localization }} />}
       <Text c="dimmed" size="sm">{localization.translate(hasStableResume ? 'combinedIntake.inputsAndResumeKept' : 'combinedIntake.inputsKept')}</Text>
-      <Group>{retryable ? <Button disabled={busy} onClick={onRetry} variant="default">
-        {localization.translate('combinedIntake.retry')}</Button> : null}
+      <Group>{cause !== undefined ? <RecoveryAction {...{ busy, cause, localization, onRetry }} recovery={readRecovery(cause)}
+        onShortenInput={onBack ?? showIntake} />
+        : retryable ? <Button disabled={busy} onClick={onRetry} variant="default">
+          {localization.translate('combinedIntake.retry')}</Button> : null}
         <BackToDocuments {...{ localization, onBack }} /></Group>
     </Stack>
   </Alert>
+}
+
+/** On the intake page, the texts to shorten are right below its title. */
+function showIntake() {
+  document.getElementById('combined-intake-title')?.scrollIntoView({ block: 'start' })
 }
 
 function InputFailure({ failure, localization }: Readonly<{ failure: ResumePreparationFailure | null; localization: Localization }>) {

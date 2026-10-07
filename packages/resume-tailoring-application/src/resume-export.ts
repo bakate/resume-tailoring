@@ -1,3 +1,6 @@
+import { explainFailure } from './failure-cause'
+import type { ExplainedFailure } from './failure-cause'
+import type { ReadApiFailure } from './api-failure'
 import type { ResumeDraft, ResumeExportBlocker, ResumeLayoutAssessment, ResumeLayoutOutcome } from './structured-resume-contract'
 
 export type ResumeRenderRequest = Readonly<{
@@ -8,9 +11,11 @@ export type ResumeRenderRequest = Readonly<{
 
 export type ResumeRenderInput = Omit<ResumeRenderRequest, 'draft'> & Readonly<{ document: ResumeDraft['document'] }>
 
+/** A render the renderer could not complete explains its failure, so the preview offers its Recovery. */
 export type ResumeRenderResult = Readonly<{
   assessment: ResumeLayoutAssessment
   pdf: Uint8Array | null
+  failure?: ExplainedFailure
 }>
 
 export function assessResumeExport({ draft, layout, unsupportedFieldIds }: ResumeRenderRequest & Readonly<{
@@ -37,7 +42,8 @@ function readExportBlockers({ draft, layout, unsupportedFieldIds }: ResumeRender
   return reasons
 }
 
-export function unavailableResumeRender(request: ResumeRenderRequest): ResumeRenderResult {
+/** A render that failed with this API Failure; without one, the failure is unexpected. */
+export function unavailableResumeRender(request: ResumeRenderRequest, apiFailure?: ReadApiFailure): ResumeRenderResult {
   return { assessment: assessResumeExport({ ...request,
-    layout: { status: 'unavailable', revision: request.draft.revision } }), pdf: null }
+    layout: { status: 'unavailable', revision: request.draft.revision } }), pdf: null, failure: explainFailure(apiFailure) }
 }

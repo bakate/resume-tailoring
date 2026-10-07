@@ -2,11 +2,12 @@ import { unavailableResumeRender } from '@resume-tailoring/application/candidate
 import type { ResumeRenderRequest, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import type { resumeRenderFailureCategories } from '@resume-tailoring/application/privacy-safe-telemetry'
 import { resumeRenderResponseSchema } from '../../candidate-journey/resume-render-schema'
-import type { PrivacySafeTelemetry, ResumeDocumentRenderer } from '@resume-tailoring/application/ports'
-import { readApiFailure } from './api-failure-reader'
+import type { PrivacySafeTelemetry, ReadApiFailure, ResumeDocumentRenderer } from '@resume-tailoring/application/ports'
+import { networkFailure, readApiFailure, unexpectedResponse } from './api-failure-reader'
 
 type RenderFailureCategory = typeof resumeRenderFailureCategories[number]
-type RenderAttempt = Readonly<{ ok: true; result: ResumeRenderResult }> | Readonly<{ ok: false; category: RenderFailureCategory }>
+type RenderAttempt = Readonly<{ ok: true; result: ResumeRenderResult }>
+  | Readonly<{ ok: false; category: RenderFailureCategory; apiFailure: ReadApiFailure }>
 type RendererDependencies = Readonly<{ request: typeof fetch; telemetry: PrivacySafeTelemetry; timeoutMilliseconds: number }>
 
 const transientCategories: ReadonlySet<RenderFailureCategory> = new Set(['timeout', 'server', 'network'])
@@ -30,7 +31,7 @@ async function renderDocument({ input, dependencies }: Readonly<{
   const final = retried ? await attemptRender({ input, dependencies }) : first
   if (final.ok) return final.result
   void dependencies.telemetry.record({ name: 'resume-render-failed', category: final.category, retried })
-  return unavailableResumeRender(input)
+  return unavailableResumeRender(input, final.apiFailure)
 }
 
 async function attemptRender({ input, dependencies }: Readonly<{
@@ -43,20 +44,26 @@ async function attemptRender({ input, dependencies }: Readonly<{
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
       signal: AbortSignal.timeout(timeoutMilliseconds) })
   } catch (error) {
-    return failed(error instanceof DOMException && error.name === 'TimeoutError' ? 'timeout' : 'network')
+    return error instanceof DOMException && error.name === 'TimeoutError'
+      ? failed('timeout', { type: 'timeout' }) : failed('network', networkFailure)
   }
-  if (!response.ok) return failed(await classifyRejectedResponse(response))
+  if (!response.ok) {
+    const apiFailure = await readApiFailure(response)
+    return failed(classifyRejectedResponse({ response, apiFailure }), apiFailure)
+  }
   const parsed = resumeRenderResponseSchema.safeParse(await response.json().catch(() => undefined))
-  if (!parsed.success) return failed('schema')
+  if (!parsed.success) return failed('schema', unexpectedResponse)
   const { assessment } = parsed.data
   if (assessment.layout.revision !== input.draft.revision
-    || assessment.exportEligibility.revision !== input.draft.revision) return failed('revision-mismatch')
+    || assessment.exportEligibility.revision !== input.draft.revision) return failed('revision-mismatch', unexpectedResponse)
   return { ok: true, result: parsed.data }
 }
 
 /** The server failed to render when it answers provider-unavailable; a bare 5xx comes from the infrastructure. */
-async function classifyRejectedResponse(response: Response): Promise<RenderFailureCategory> {
-  if ((await readApiFailure(response)).type === 'provider-unavailable') return 'render'
+function classifyRejectedResponse({ response, apiFailure }: Readonly<{
+  response: Response; apiFailure: ReadApiFailure
+}>): RenderFailureCategory {
+  if (apiFailure.type === 'provider-unavailable') return 'render'
   const { status } = response
   if (status === 504) return 'timeout'
   if (status >= 500 || status === 429) return 'server'
@@ -64,6 +71,7 @@ async function classifyRejectedResponse(response: Response): Promise<RenderFailu
   return 'schema'
 }
 
-function failed(category: RenderFailureCategory): RenderAttempt {
-  return { ok: false, category }
+/** The API Failure is kept for the application, which explains it to the Candidate. */
+function failed(category: RenderFailureCategory, apiFailure: ReadApiFailure): RenderAttempt {
+  return { ok: false, category, apiFailure }
 }
