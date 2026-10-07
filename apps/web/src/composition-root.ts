@@ -18,6 +18,7 @@ import { createOpenAiLanguageModelGateway } from './adapters/browser/openai-lang
 import type { OpenAiLanguageModelGateway } from './adapters/browser/openai-language-model-gateway'
 import { createResumeDocumentModelAdapters } from './adapters/browser/resume-document-model-adapters'
 import { createBrowserSourceIntakeDocumentReader } from './adapters/browser/source-intake-document-reader'
+import { listenForUncaughtErrors, reportUncaughtError } from './adapters/browser/uncaught-error-reporting'
 import { createAccessRecoveringRequest, demoAccessRecovery } from './demo-access/demo-access-recovery'
 
 export type BrowserCandidateJourneySystem = Readonly<{
@@ -66,4 +67,14 @@ function readProcessingConsent({ candidateJourney }: Readonly<{
 }>) {
   const view = candidateJourney?.readView()
   return view?.status === 'candidate-session-open' ? view.session.processingConsent : null
+}
+
+/** Reports errors nothing else handled through privacy-safe telemetry; returns the function that stops listening. */
+export function listenForUncaughtBrowserErrors() {
+  return listenForUncaughtErrors({ page: window, telemetry: createPrivacySafeBrowserTelemetry() })
+}
+
+/** Reports a render error the global safety net replaced with its fallback page. */
+export function reportUncaughtRenderError() {
+  reportUncaughtError({ source: 'render', telemetry: createPrivacySafeBrowserTelemetry() })
 }

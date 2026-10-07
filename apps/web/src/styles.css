@@ -149,7 +149,7 @@ body {
   margin-top: 34px;
 }
 
-.not-found {
+.standalone-page {
   display: flex;
   min-height: 100vh;
   flex-direction: column;
@@ -158,17 +158,17 @@ body {
   padding: clamp(24px, 7vw, 112px);
 }
 
-.not-found-brand {
+.standalone-page-brand {
   margin: 0 0 38px;
   color: #164f3d;
   font-weight: 600;
 }
 
-.not-found h1 {
+.standalone-page h1 {
   font-size: clamp(52px, 8vw, 104px);
 }
 
-.not-found > p:not(.not-found-brand) {
+.standalone-page > p:not(.standalone-page-brand) {
   max-width: 580px;
   margin: 28px 0;
   color: #555b68;
@@ -176,7 +176,7 @@ body {
   line-height: 1.5;
 }
 
-.not-found a {
+.standalone-page > a {
   color: #164f3d;
   font-weight: 600;
   text-underline-offset: 5px;

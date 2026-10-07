@@ -377,6 +377,16 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectFailureKeptAfterReload()
   })
 
+  test('replaces a page that crashed while rendering and restores the Candidate Session on reload', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenUnexpectedSourceFailure()
+    await system.givenPageCrashedWhileRendering()
+
+    await system.reloadFromSafetyNet()
+
+    await system.expectInputsRestored()
+  })
+
   test('discloses the Processing Policy at the generation action', async ({ page }) => {
     const system = createSystemUnderTest({ page })
 
@@ -774,11 +784,45 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByRole('alert')).toContainText('The service answered in an unexpected way.')
   }
 
+  /** A file over 1 MB shows its size through Intl.NumberFormat, which this page can no longer build. */
+  async givenPageCrashedWhileRendering() {
+    const reports: string[] = []
+    await this.#page.route('**/api/analytics', (route) => {
+      const body = route.request().postData() ?? ''
+      if (body.includes('uncaught-error-reported')) reports.push(body)
+      return route.fulfill({ status: 202 })
+    })
+    await this.#returnToDocuments()
+    await this.#page.evaluate(() => {
+      Intl.NumberFormat = function () { throw new Error('Intl.NumberFormat is unavailable') } as unknown as typeof Intl.NumberFormat
+    })
+    await this.#page.locator('.intake-dropzone input[type="file"]').first()
+      .setInputFiles({ name: 'alex-morgan.pdf', mimeType: 'application/pdf', buffer: Buffer.alloc(2 * 1024 * 1024) })
+    await expect(this.#page.getByRole('heading', { name: 'Something went wrong', exact: true })).toBeVisible()
+    await expect(this.#page.getByRole('link', { name: 'Back to my documents', exact: true })).toHaveAttribute('href', '/')
+    await expect.poll(() => reports).toContain(JSON.stringify({ name: 'uncaught-error-reported', source: 'render' }))
+    expect(reports.join()).not.toContain('Intl.NumberFormat')
+  }
+
+  async reloadFromSafetyNet() {
+    const reloaded = this.#page.waitForEvent('framenavigated')
+    await this.#page.getByRole('button', { name: 'Reload', exact: true }).click()
+    await reloaded
+    this.#completedAction = 'reloaded'
+  }
+
   async reloadPage() {
     const reloaded = this.#page.waitForEvent('framenavigated')
     await this.#page.getByRole('alert').getByRole('button', { name: 'Reload the page', exact: true }).click()
     await reloaded
     this.#completedAction = 'reloaded'
+  }
+
+  async expectInputsRestored() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('heading', { name: 'Something went wrong', exact: true })).toHaveCount(0)
+    await expect(this.#page.getByRole('textbox', { name: 'Professional text', exact: true })).toHaveValue(/Northwind/u)
+    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toHaveValue(postingText)
   }
 
   async expectFailureKeptAfterReload() {
