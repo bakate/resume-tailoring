@@ -376,7 +376,7 @@ class CandidateJourneyIntegrationSystem {
     await this.#page.emulateMedia({ reducedMotion: 'reduce' })
     await this.#installModelAdapters()
     await this.#page.goto('/')
-    await this.#page.getByRole('button', { name: 'Start a Candidate Session' }).focus()
+    await this.#page.getByRole('button', { name: 'Get started', exact: true }).focus()
     await this.#page.keyboard.press('Enter')
     await this.#fillIntake()
   }
@@ -431,7 +431,7 @@ class CandidateJourneyIntegrationSystem {
   async expectDocumentsOfferingRegeneration() {
     this.#expectAction()
     await expect(this.#page).toHaveURL(/\/$/u)
-    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toHaveValue(firstPosting)
+    await expect(this.#page.getByRole('textbox', { name: 'Job posting text', exact: true })).toHaveValue(firstPosting)
     await expect(this.#page.getByRole('button', { name: 'Regenerate my resume', exact: true })).toBeEnabled()
     await expect(this.#page.getByRole('button', { name: 'Generate my resume', exact: true })).toHaveCount(0)
   }
@@ -453,13 +453,13 @@ class CandidateJourneyIntegrationSystem {
   async expectProgressThenPreviewOnResultRoute() {
     this.#expectAction()
     await expect(this.#page).toHaveURL(/\/resume$/u)
-    await expect(this.#page.getByRole('region', { name: 'Candidate Journey progress' })).toBeVisible()
+    await expect(this.#page.getByRole('region', { name: 'Progress', exact: true })).toBeVisible()
     await expect(this.#page.locator('#combined-intake-title')).toHaveCount(0)
     await expect(this.#page.locator('.sr-only[aria-live="polite"]')).toContainText('Writing')
     await expect(this.#page.locator('.sr-only[aria-live="polite"]')).not.toContainText('last stable result')
     this.#releaseWriting()
     await this.#expectCurrentPreview()
-    await expect(this.#page.getByRole('region', { name: 'Candidate Journey progress' })).toHaveCount(0)
+    await expect(this.#page.getByRole('region', { name: 'Progress', exact: true })).toHaveCount(0)
     await expect(this.#page).toHaveURL(/\/resume$/u)
   }
 
@@ -483,13 +483,13 @@ class CandidateJourneyIntegrationSystem {
   async expectIntakeRoute() {
     this.#expectAction()
     await expect(this.#page).toHaveURL(/\/$/u)
-    await expect(this.#page.getByRole('button', { name: 'Start a Candidate Session' })).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Get started', exact: true })).toBeVisible()
   }
 
   async expectIntakeWithAnalyzedResumeAndNoPosting() {
     this.#expectAction()
     await expect(this.#page).toHaveURL(/\/$/u)
-    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toHaveValue('')
+    await expect(this.#page.getByRole('textbox', { name: 'Job posting text', exact: true })).toHaveValue('')
     await expect(this.#page.getByRole('textbox', { name: 'Professional text', exact: true })).toHaveCount(0)
     await expect(this.#page.getByText('Your latest resume is ready', { exact: true })).toBeVisible()
   }
@@ -512,7 +512,7 @@ class CandidateJourneyIntegrationSystem {
   async expectIntakeWithDocumentsKept() {
     this.#expectAction()
     await expect(this.#page).toHaveURL(/\/$/u)
-    await expect(this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true })).toHaveValue(firstPosting)
+    await expect(this.#page.getByRole('textbox', { name: 'Job posting text', exact: true })).toHaveValue(firstPosting)
     await expect(this.#page.getByRole('button', { name: 'Try again', exact: true })).toBeEnabled()
   }
 
@@ -692,7 +692,7 @@ class CandidateJourneyIntegrationSystem {
   async replaceJobPosting() {
     this.#posting = secondPosting
     await this.changeJobPosting()
-    await this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true }).fill(secondPosting)
+    await this.#page.getByRole('textbox', { name: 'Job posting text', exact: true }).fill(secondPosting)
     this.#completedAction = 'posting-replaced'
   }
 
@@ -704,7 +704,7 @@ class CandidateJourneyIntegrationSystem {
 
   async deleteCandidateSession() {
     await this.#page.getByRole('link', { name: 'Resume Studio', exact: true }).click()
-    await this.#page.getByRole('button', { name: 'Delete Candidate Session' }).click()
+    await this.#page.getByRole('button', { name: 'Delete my data', exact: true }).click()
     await this.#page.getByRole('button', { name: 'Delete session now' }).click()
     this.#completedAction = 'deleted'
   }
@@ -845,12 +845,12 @@ class CandidateJourneyIntegrationSystem {
 
   async expectNoStaleOutputAfterDeletion() {
     this.#expectAction()
-    await expect(this.#page.getByText('Candidate Session deleted from this browser.')).toBeVisible()
+    await expect(this.#page.getByText('Your data was deleted from this browser.')).toBeVisible()
     await expect(this.#page.getByRole('button', { name: 'Download PDF' })).toHaveCount(0)
     await expect(this.#page.locator('iframe')).toHaveCount(0)
     expect(await this.#page.evaluate(() => localStorage.getItem('honest-resume:candidate-session'))).toBeNull()
     await this.#page.reload()
-    await expect(this.#page.getByRole('button', { name: 'Start a Candidate Session' })).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Get started', exact: true })).toBeVisible()
     await expect(this.#page.getByText('Northwind')).toHaveCount(0)
     await this.#expectPrivacySafeAnalytics(['candidate-session-deleted'])
   }
@@ -877,7 +877,7 @@ class CandidateJourneyIntegrationSystem {
     this.#expectAction()
     await this.#expectGeneratedResume()
     await this.#expectResultRouteOnly()
-    await expect(this.#page.locator('.sr-only[aria-live="polite"]')).toContainText('Tailored Resume is validated and ready.')
+    await expect(this.#page.locator('.sr-only[aria-live="polite"]')).toContainText('Ready: your tailored resume.')
     const transition = await this.#page.getByRole('button', { name: 'Edit resume', exact: true })
       .evaluate((element) => getComputedStyle(element).transitionDuration)
     expect(transition.split(',').every((duration) => parseFloat(duration) <= 0.00001)).toBe(true)
@@ -899,13 +899,13 @@ class CandidateJourneyIntegrationSystem {
   async #openConsentedIntake() {
     await this.#installModelAdapters()
     await this.#page.goto('/')
-    await this.#page.getByRole('button', { name: 'Start a Candidate Session' }).click()
+    await this.#page.getByRole('button', { name: 'Get started', exact: true }).click()
     await this.#fillIntake()
   }
 
   async #fillIntake() {
     await this.#page.getByRole('textbox', { name: 'Professional text', exact: true }).fill(this.#source === 'unnamed' ? unnamedSourceText : sourceText)
-    await this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true }).fill(this.#posting)
+    await this.#page.getByRole('textbox', { name: 'Job posting text', exact: true }).fill(this.#posting)
   }
 
   async #generate() {
@@ -927,7 +927,7 @@ class CandidateJourneyIntegrationSystem {
   }
 
   async #expectNoNormalPathCheckpoint() {
-    await expect(this.#page.locator('details').filter({ hasText: 'Match Analysis and supporting evidence' }).first()).not.toHaveAttribute('open')
+    await expect(this.#page.locator('details').filter({ hasText: 'Job match and the experience behind it' }).first()).not.toHaveAttribute('open')
     await expect(this.#page.getByRole('button', { name: /Approve|Confirm analysis|Continue to/ })).toHaveCount(0)
     await this.#expectResultRouteOnly()
   }
@@ -960,9 +960,9 @@ class CandidateJourneyIntegrationSystem {
   }
 
   async #openDocumentText() {
-    const frame = this.#page.getByTitle('Tailored Resume preview')
+    const frame = this.#page.getByTitle('Tailored resume preview')
     if (!await frame.isVisible()) await this.#page.locator('summary').filter({ hasText: 'Read the document text' }).click()
-    return this.#page.frameLocator('iframe[title="Tailored Resume preview"]')
+    return this.#page.frameLocator('iframe[title="Tailored resume preview"]')
   }
 
   async #expectDocumentTextContains(text: string) {

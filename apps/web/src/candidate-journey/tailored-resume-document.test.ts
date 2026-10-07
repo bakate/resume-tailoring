@@ -33,7 +33,7 @@ describe('Tailored Resume export document', () => {
 
     expect(html).not.toContain('—')
     expect(html).toContain('Parent Up – Plateforme de co-parentalité')
-    expect(html).toContain('CV normalisé – non adapté à l’offre')
+    expect(html).toContain('CV général – non adapté à une offre')
   })
 
   it('ends the dates line of an experience with its location', () => {
@@ -90,7 +90,7 @@ describe('Tailored Resume export document', () => {
 
     const html = renderTailoredResumeDocument({ tailoredResume })
 
-    expect(html).toContain('Normalized Resume – not tailored')
+    expect(html).toContain('General resume – not tailored to a job')
     expect(html).not.toContain('<p>Frontend Engineer</p>')
   })
 
