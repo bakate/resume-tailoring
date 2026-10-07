@@ -140,6 +140,16 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectGroupedPreview()
   })
 
+  test('renews expired demo access and resumes the preparation it interrupted', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'expired-access' })
+    await system.givenCombinedIntake()
+
+    await system.generateResume()
+
+    await system.expectGroupedPreview()
+    system.expectAccessRenewedOnce()
+  })
+
   test('isolates nonblocking ambiguity and still produces a usable preview', async ({ page }) => {
     const system = createSystemUnderTest({ page, scenario: 'isolated-ambiguity' })
     await system.givenCombinedIntake()
@@ -355,7 +365,7 @@ function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: P
 
 type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-coverage' | 'adjacent-evidence' | 'no-correspondence'
   | 'unsafe-output' | 'interrupted' | 'unavailable' | 'pending-writing' | 'posting-extraction-unavailable' | 'held-skills'
-  | 'incoherent'
+  | 'incoherent' | 'expired-access'
 
 class CandidateJourneyTestSystem {
   readonly #page: Page
@@ -363,6 +373,9 @@ class CandidateJourneyTestSystem {
   #downloadPath: string | null = null
   #scenario: Scenario
   #completedAction: string | null = null
+  #hasAccessExpired = false
+  #isAccessExpired = false
+  #accessRenewals = 0
   #releaseHeldSkills: () => void = () => undefined
   readonly #heldSkills = new Promise<void>((resolve) => { this.#releaseHeldSkills = resolve })
 
@@ -393,6 +406,19 @@ class CandidateJourneyTestSystem {
         return this.#heldSkills.then(() => route.fallback())
       }
       if (this.#scenario === 'unavailable') return route.fulfill({ json: { ok: false, error: { type: 'permanent' } } })
+      if (this.#scenario === 'expired-access' && !this.#hasAccessExpired) {
+        this.#hasAccessExpired = true
+        this.#isAccessExpired = true
+      }
+      if (this.#isAccessExpired) {
+        return route.fulfill({ status: 401, json: { ok: false, error: { type: 'demo-access-required' } } })
+      }
+      return route.fallback()
+    })
+    // The demo access cookie stays expired until the Candidate passes a new security check.
+    await this.#page.route('**/api/demo-access', (route) => {
+      if (this.#isAccessExpired) this.#accessRenewals += 1
+      this.#isAccessExpired = false
       return route.fallback()
     })
     await this.#page.route('**/api/resume-document-coherence', (route) => {
@@ -417,6 +443,10 @@ class CandidateJourneyTestSystem {
     await this.#page.getByRole('textbox', { name: 'Professional text', exact: true }).fill(
       'Alex Morgan\nalex@example.com\nFrontend Engineer at Northwind. Built accessible billing screens. React and TypeScript.')
     await this.#page.getByRole('textbox', { name: 'Job Posting text', exact: true }).fill(postingText)
+  }
+
+  expectAccessRenewedOnce() {
+    expect(this.#accessRenewals).toBe(1)
   }
 
   async givenCombinedIntakeInFrench() {

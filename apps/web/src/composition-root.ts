@@ -18,6 +18,7 @@ import { createOpenAiLanguageModelGateway } from './adapters/browser/openai-lang
 import type { OpenAiLanguageModelGateway } from './adapters/browser/openai-language-model-gateway'
 import { createResumeDocumentModelAdapters } from './adapters/browser/resume-document-model-adapters'
 import { createBrowserSourceIntakeDocumentReader } from './adapters/browser/source-intake-document-reader'
+import { createAccessRecoveringRequest, demoAccessRecovery } from './demo-access/demo-access-recovery'
 
 export type BrowserCandidateJourneySystem = Readonly<{
   candidateJourney: CandidateJourney
@@ -26,21 +27,24 @@ export type BrowserCandidateJourneySystem = Readonly<{
 
 export function createBrowserCandidateJourneySystem(): BrowserCandidateJourneySystem {
   let candidateJourney: CandidateJourney | null = null
+  const request = createAccessRecoveringRequest({ recovery: demoAccessRecovery, request: fetch })
   const languageModelGateway = createOpenAiLanguageModelGateway({
     readProcessingConsent: () => readProcessingConsent({ candidateJourney }),
+    request,
   })
   candidateJourney = createCandidateJourney({
-    dependencies: createBrowserDependencies({ languageModelGateway }),
+    dependencies: createBrowserDependencies({ languageModelGateway, request }),
   })
   return { candidateJourney, languageModelGateway }
 }
 
-function createBrowserDependencies({ languageModelGateway }: Readonly<{
+function createBrowserDependencies({ languageModelGateway, request }: Readonly<{
   languageModelGateway: OpenAiLanguageModelGateway
+  request: typeof fetch
 }>): CandidateJourneyDependencies {
   const telemetry = createPrivacySafeBrowserTelemetry()
   return {
-    resumeDocumentRenderer: createBrowserResumeDocumentRenderer({ telemetry }),
+    resumeDocumentRenderer: createBrowserResumeDocumentRenderer({ request, telemetry }),
     telemetry,
     resumeDocumentPorts: createResumeDocumentModelAdapters({ gateway: languageModelGateway }),
     resumeSectionModels: createGatewayResumeSectionModels({ languageModelGateway }),

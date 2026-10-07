@@ -1,8 +1,12 @@
+import { Button, Group, Modal, Stack, Text } from '@mantine/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { z } from 'zod'
 
 import { LocalizationFailure, useLocalization } from '../localization/localization'
+import type { Localization } from '../localization/localization'
+import { demoAccessRecovery } from './demo-access-recovery'
+import type { DemoAccessRenewal } from './demo-access-recovery'
 
 const accessResponseSchema = z.object({
   ok: z.literal(true),
@@ -50,9 +54,20 @@ export function DemoAccessGate({ children }: Readonly<{ children: ReactNode }>) 
   const showFailure = useCallback(() => {
     setState({ status: 'unavailable' })
   }, [])
+  const [renewal, setRenewal] = useState<DemoAccessRenewal | null>(null)
+  const isGranted = state.status === 'granted'
   useEffect(refreshAccess, [refreshAccess])
+  useEffect(() => isGranted ? handleRenewals({ setRenewal }) : undefined, [isGranted])
+  const closeRenewal = useCallback(() => { setRenewal(null) }, [])
   if (!localizationResult.ok) return <LocalizationFailure />
-  if (state.status === 'granted') return children
+  if (isGranted) {
+    return <>
+      {children}
+      {renewal === null
+        ? null
+        : <DemoAccessRenewalModal localization={localizationResult.value} onClose={closeRenewal} renewal={renewal} />}
+    </>
+  }
   const { translate } = localizationResult.value
   return (
     <main className="demo-access-gate">
@@ -77,6 +92,65 @@ export function DemoAccessGate({ children }: Readonly<{ children: ReactNode }>) 
           : null}
       </section>
     </main>
+  )
+}
+
+/** Leaving the Candidate Journey abandons a pending renewal, so interrupted requests fail instead of waiting forever. */
+function handleRenewals({ setRenewal }: Readonly<{ setRenewal: (renewal: DemoAccessRenewal | null) => void }>) {
+  let currentRenewal: DemoAccessRenewal | null = null
+  const stopHandling = demoAccessRecovery.handleRenewals((renewal) => {
+    currentRenewal = renewal
+    setRenewal(renewal)
+  })
+  return () => {
+    stopHandling()
+    currentRenewal?.settle(false)
+    setRenewal(null)
+  }
+}
+
+/**
+ * Access expired while the Candidate was working: the security check runs above the current page so nothing is
+ * unmounted, and the interrupted requests resume once it passes.
+ */
+function DemoAccessRenewalModal({ localization, onClose, renewal }: Readonly<{
+  localization: Localization
+  onClose: () => void
+  renewal: DemoAccessRenewal
+}>) {
+  const [state, setState] = useState<GateState>({ status: 'checking' })
+  const refreshAccess = useCallback(() => {
+    setState({ status: 'checking' })
+    void readAccess().then(setState)
+  }, [])
+  const settle = useCallback((granted: boolean) => {
+    renewal.settle(granted)
+    onClose()
+  }, [onClose, renewal])
+  const grantAccess = useCallback(() => { settle(true) }, [settle])
+  const abandon = useCallback(() => { settle(false) }, [settle])
+  const showFailure = useCallback(() => { setState({ status: 'unavailable' }) }, [])
+  useEffect(refreshAccess, [refreshAccess])
+  useEffect(() => {
+    if (state.status === 'granted') grantAccess()
+  }, [grantAccess, state.status])
+  const { translate } = localization
+  return (
+    <Modal closeOnClickOutside={false} onClose={abandon} opened title={translate('demoAccess.expiredTitle')}>
+      <Stack aria-live="polite">
+        <Text>{translate('demoAccess.expiredDescription')}</Text>
+        {state.status === 'checking' ? <Text c="dimmed">{translate('demoAccess.verifying')}</Text> : null}
+        {state.status === 'challenge'
+          ? <TurnstileChallenge onFailure={showFailure} onGranted={grantAccess} siteKey={state.siteKey} />
+          : null}
+        {state.status === 'unavailable'
+          ? <Group justify="flex-end">
+              <Button onClick={abandon} variant="default">{translate('demoAccess.abandon')}</Button>
+              <Button onClick={refreshAccess}>{translate('demoAccess.retry')}</Button>
+            </Group>
+          : null}
+      </Stack>
+    </Modal>
   )
 }
 
