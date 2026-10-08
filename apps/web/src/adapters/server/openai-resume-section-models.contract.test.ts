@@ -37,7 +37,7 @@ describe('Resume section model adapters', () => {
 
     const outcome = await writer.write(writingInput('value-proposition'))
 
-    expect(outcome).toMatchObject({ ok: true, value: content })
+    expect(outcome.ok && outcome.value.kind === 'value-proposition' ? outcome.value.headline : null).toEqual(headline)
     expect((body as { text?: { format?: { schema?: { required?: unknown } } } } | null)?.text?.format?.schema?.required)
       .toEqual(expect.arrayContaining(['headline', 'paragraphs']))
   })

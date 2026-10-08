@@ -45,7 +45,8 @@ export function changedResumeSession({ session, document, revision, editing = re
 export function professionalDocument({ document }: Readonly<{ document: TailoredResume }>): ProfessionalResumeDocument {
   return { purpose: document.purpose, locale: document.locale, targetRole: document.targetRole,
     valueProposition: document.valueProposition, experiences: document.experiences, sections: document.sections,
-    ...(document.sectionOrder === undefined ? {} : { sectionOrder: document.sectionOrder }) }
+    ...(document.sectionOrder === undefined ? {} : { sectionOrder: document.sectionOrder }),
+    ...(document.headline === undefined ? {} : { headline: document.headline }) }
 }
 
 export function readResumeReview({ session, review }: Readonly<{

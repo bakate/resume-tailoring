@@ -14,6 +14,10 @@ describe('Candidate Journey resume writing rules enforced by code', () => {
     ['Frontend Engineer, Freelance'],
     ['Frontend Engineer (stage)'],
     ['Frontend Engineer (CDD – 6 mois)'],
+    ["Frontend Engineer (Stage de fin d'études)"],
+    ['Frontend Engineer (CDI de chantier)'],
+    ['Frontend Engineer – Contractor'],
+    ['Frontend Engineer | Portage salarial'],
     ['Frontend Engineer - full-time'],
     ['Frontend Engineer freelance'],
   ])('keeps the contract type of "%s" out of the job title', async (writtenRole) => {
@@ -25,14 +29,15 @@ describe('Candidate Journey resume writing rules enforced by code', () => {
     system.expectFirstExperienceRole('Frontend Engineer')
   })
 
-  it('keeps a job title that only looks like a contract type', async () => {
-    const system = createSystemUnderTest({ writtenRole: 'Contract Manager (Stage Lighting)' })
-    await system.givenMatchedCandidateSession()
+  it.each([['Contract Manager (Stage Lighting)'], ['Set Designer (Stage design)'], ['Responsable de stage']])(
+    'keeps "%s", a job title that only looks like a contract type', async (writtenRole) => {
+      const system = createSystemUnderTest({ writtenRole })
+      await system.givenMatchedCandidateSession()
 
-    await system.prepareTailoredResume()
+      await system.prepareTailoredResume()
 
-    system.expectFirstExperienceRole('Contract Manager (Stage Lighting)')
-  })
+      system.expectFirstExperienceRole(writtenRole)
+    })
 
   it('drops the label of a skills group whose only item repeats it', async () => {
     const system = createSystemUnderTest({ writtenSkills: 'label-repeated-by-its-only-item' })
@@ -63,6 +68,16 @@ describe('Candidate Journey resume writing rules enforced by code', () => {
     system.expectHeadline({ text: 'Frontend Engineer', factIds: ['source-fact-experiences-0-role-0'] })
   })
 
+  it('heads it with the latest role, without a rewrite, when validation rejects only the written headline', async () => {
+    const system = createSystemUnderTest({ writtenHeadline: 'Senior Frontend Engineer', headlineValidation: 'unsupported' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectHeadline({ text: 'Frontend Engineer', factIds: ['source-fact-experiences-0-role-0'] })
+    system.expectValuePropositionWrittenOnce()
+  })
+
   it('gives a Normalized Resume no headline', async () => {
     const system = createSystemUnderTest({ writtenHeadline: 'Frontend Engineer – React' })
     await system.givenMatchedCandidateSession()
@@ -84,21 +99,28 @@ type TestOptions = Readonly<{
   writtenHeadline?: string
   /** The writer adds a group labelled "Accessibility" whose only item is "Accessibility WCAG". */
   writtenSkills?: 'label-repeated-by-its-only-item'
+  /** Validation finds the written headline unsupported, and every other field supported. */
+  headlineValidation?: 'unsupported'
 }>
 
 class ResumeWritingRulesTestSystem {
   readonly #journey: CandidateJourney
   readonly #validations: ResumeFieldValidationInput[] = []
+  #valuePropositionWrites = 0
   #outcome: CandidateJourneyView | null = null
 
   constructor(options: TestOptions) {
     this.#journey = createCandidateJourney({ dependencies: createFakeCandidateJourneyDependencies({
       persistence: createInMemoryCandidateSessionPersistence({ session: createMatchedSession() }),
       resumeSectionModels: createFakeResumeSectionModels({
-        writeSection: ({ section }) => Promise.resolve({ ok: true, value: write({ content: readGroupedResumeSection(section), options }) }),
+        writeSection: ({ section }) => {
+          if (section.kind === 'value-proposition') this.#valuePropositionWrites += 1
+          return Promise.resolve({ ok: true, value: write({ content: readGroupedResumeSection(section), options }) })
+        },
         validateFields: (input) => {
           this.#validations.push(input)
-          return Promise.resolve({ ok: true, value: { fields: input.fields.map(({ id }) => ({ fieldId: id, supported: true })) } })
+          return Promise.resolve({ ok: true, value: { fields: input.fields.map(({ id }) => ({ fieldId: id,
+            supported: !(options.headlineValidation === 'unsupported' && id === 'headline') })) } })
         },
       }),
     }) })
@@ -137,6 +159,11 @@ class ResumeWritingRulesTestSystem {
     const validated = this.#validations.filter(({ section }) => section.kind === 'value-proposition')
       .flatMap(({ fields }) => fields.map(({ text }) => text))
     expect(validated).toContain('Frontend Engineer – React')
+  }
+
+  expectValuePropositionWrittenOnce() {
+    this.#readResume()
+    expect(this.#valuePropositionWrites).toBe(1)
   }
 
   expectNoHeadline() {

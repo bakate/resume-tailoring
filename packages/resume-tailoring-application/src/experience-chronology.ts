@@ -61,10 +61,13 @@ export function readExperienceMonths({ experience, today }: Readonly<{ experienc
   return span === null ? null : span.last - span.first + 1
 }
 
-/** The first and last calendar months of an experience, both included, under the same rules as its duration. */
+/** The first and last calendar months of an experience, both included, counted from year zero. */
+export type MonthSpan = Readonly<{ first: number; last: number }>
+
+/** The span of an experience under the same rules as its duration; null when its duration is unknown. */
 export function readExperienceMonthSpan({ experience, today }: Readonly<{
   experience: ExperienceDates; today: number
-}>): Readonly<{ first: number; last: number }> | null {
+}>): MonthSpan | null {
   const start = readMonth({ date: experience.startDate })
   const ongoing = readExperienceDates({ experience }).end === 'ongoing'
   const end = ongoing ? null : readMonth({ date: experience.endDate })
@@ -76,7 +79,7 @@ export function readExperienceMonthSpan({ experience, today }: Readonly<{
 }
 
 /** How many calendar months the spans cover together, each month counted once however many spans overlap it. */
-export function countCoveredMonths(spans: readonly Readonly<{ first: number; last: number }>[]) {
+export function countCoveredMonths({ spans }: Readonly<{ spans: readonly MonthSpan[] }>) {
   const ordered = spans.toSorted((left, right) => left.first - right.first)
   let total = 0
   let coveredUntil = -Infinity

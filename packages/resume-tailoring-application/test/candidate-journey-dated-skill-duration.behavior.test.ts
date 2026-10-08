@@ -14,7 +14,7 @@ describe('Candidate Journey duration requirements computed from dated experience
 
     await system.submitJobPostingAskingForThreeYearsOfReact()
 
-    system.expectOnlyTheReactDurationDerived({ value: 'React: 93 months of dated experience' })
+    system.expectDerivedDurations(['React: 93 months of dated experience', 'React Native: 24 months of dated experience'])
   })
 
   it('covers a duration requirement with the Candidate Facts behind the computed duration, never the Derived Fact', async () => {
@@ -42,7 +42,8 @@ const durationRequirementId = 'job-requirement-react-duration'
 
 /**
  * React is used in an ongoing role since March 2021 and in a 2019–2021 role that overlaps it, so the union runs from
- * January 2019 to September 2026. An undated experience and a retail role never count; TypeScript is used nowhere.
+ * January 2019 to September 2026. An undated experience never counts, a React Native role counts for React Native
+ * only, "c'est" and "R&D" name neither C nor R, and TypeScript is used nowhere.
  */
 const candidateFacts: readonly CandidateFact[] = [
   ['experiences.0.role.0', 'Frontend Engineer'],
@@ -53,14 +54,17 @@ const candidateFacts: readonly CandidateFact[] = [
   ['experiences.1.startDate.0', '2019'],
   ['experiences.1.endDate.0', '2021'],
   ['experiences.1.achievements.0', 'Maintained React dashboards for 12 clients'],
-  ['experiences.2.role.0', 'Store Clerk'],
+  ['experiences.2.role.0', 'Mobile Developer'],
   ['experiences.2.startDate.0', '2015'],
   ['experiences.2.endDate.0', '2016'],
-  ['experiences.2.achievements.0', 'Served customers at the checkout'],
+  ['experiences.2.achievements.0', 'Shipped a React Native app, c\'est-à-dire iOS et Android, for the R&D team'],
   ['experiences.3.role.0', 'Volunteer Developer'],
   ['experiences.3.achievements.0', 'Rebuilt a charity website in React'],
   ['skills.0.name.0', 'React'],
   ['skills.1.name.0', 'TypeScript'],
+  ['skills.2.name.0', 'React Native'],
+  ['skills.3.name.0', 'C'],
+  ['skills.4.name.0', 'R'],
 ].map(([path = '', value = '']) => ({ id: `source-fact-${path.replaceAll('.', '-')}` as const, path, status: 'attested' as const, value }))
 
 class DatedSkillDurationTestSystem {
@@ -97,10 +101,9 @@ class DatedSkillDurationTestSystem {
     this.#view = this.#journey.readView()
   }
 
-  expectOnlyTheReactDurationDerived({ value }: Readonly<{ value: string }>) {
+  expectDerivedDurations(values: readonly string[]) {
     const sourceFactIds = new Set<string>(candidateFacts.map(({ id }) => id))
-    const derived = this.#readMatchedFacts().filter(({ id }) => !sourceFactIds.has(id))
-    expect(derived).toEqual([expect.objectContaining({ value })])
+    expect(this.#readMatchedFacts().filter(({ id }) => !sourceFactIds.has(id)).map(({ value }) => value)).toEqual(values)
   }
 
   expectDurationRequirementCoveredBy(factIds: readonly string[]) {

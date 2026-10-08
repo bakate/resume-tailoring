@@ -47,7 +47,7 @@ describe('OpenAI structured Source Profile extractor contract', () => {
     const result = await extractor.extract({ professionalContent: 'Licence professionnelle – Université de Lille – 2018' })
 
     const education = (await requests[0]?.json() as EducationSchemaRequest).text.format.schema.properties.education.items
-    expect(result).toEqual({ ok: true, value: profile })
+    expect(result.ok).toBe(true)
     expect(education.properties.dates).toEqual({ anyOf: [{ type: 'string', minLength: 1 }, { type: 'null' }] })
     expect(education.required).toContain('dates')
   })

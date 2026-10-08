@@ -16,14 +16,20 @@ export function deriveSkillDurations({ candidateFacts, today }: Readonly<{
 }>): readonly SkillDuration[] {
   const attested = candidateFacts.filter(({ status, value }) => status === 'attested' && value.trim().length > 0)
   const experiences = readDatedExperiences({ facts: attested, today })
-  return readSkills({ facts: attested }).flatMap(({ name, factIds }, index): SkillDuration[] => {
+  const skills = readSkills({ facts: attested })
+  return skills.flatMap(({ name, factIds }, index): SkillDuration[] => {
     const term = normalizeTerm(name)
+    // "React Native" is not a mention of React when both are listed.
+    const longerTerms = skills.map((skill) => normalizeTerm(skill.name))
+      .filter((other) => other !== term && ` ${other} `.includes(` ${term} `))
+    const mentionsSkill = (value: string) => longerTerms
+      .reduce((text, other) => text.replaceAll(` ${other} `, ' | '), ` ${normalizeTerm(value)} `).includes(` ${term} `)
     const mentioning = experiences.flatMap((experience) => {
-      const mentions = experience.textFacts.filter(({ value }) => ` ${normalizeTerm(value)} `.includes(` ${term} `))
+      const mentions = experience.textFacts.filter(({ value }) => mentionsSkill(value))
       return mentions.length === 0 ? [] : [{ ...experience, mentions }]
     })
     if (term.length === 0 || mentioning.length === 0) return []
-    const months = countCoveredMonths(mentioning.map(({ span }) => span))
+    const months = countCoveredMonths({ spans: mentioning.map(({ span }) => span) })
     return [{
       fact: { id: `source-fact-derived-skill-duration-${String(index)}`, kind: 'experience',
         value: `${name}: ${String(months)} months of dated experience` },
@@ -65,8 +71,12 @@ function readDatedExperiences({ facts, today }: Readonly<{ facts: readonly Candi
   })
 }
 
-/** Lower case without accents, with words split on anything but letters, digits and the + # . of technology names. */
+/**
+ * Lower case without accents or French elisions ("c'est" is not C), with words split on anything but letters, digits
+ * and the + # . & of technology names, so "R&D" stays one word and never names R.
+ */
 function normalizeTerm(value: string) {
   return value.normalize('NFD').replaceAll(/\p{Diacritic}/gu, '').toLocaleLowerCase('en')
-    .replaceAll(/[^\p{L}\p{N}+#.]+/gu, ' ').replaceAll(/\.(?![\p{L}\p{N}])/gu, '').trim()
+    .replaceAll(/(?<![\p{L}\p{N}])\p{L}['’](?=\p{L})/gu, ' ')
+    .replaceAll(/[^\p{L}\p{N}+#.&]+/gu, ' ').replaceAll(/\.(?![\p{L}\p{N}])/gu, '').trim()
 }

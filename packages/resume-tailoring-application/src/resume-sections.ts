@@ -170,7 +170,7 @@ export function normalizeSectionContent({ content: written, purpose, section, re
  * Front-end". A contract type is removed when it is a whole parenthesis or a segment after a dash, comma or bar, and an
  * unambiguous one (CDI, CDD, freelance) also as the first or last word; a title made only of it is kept as written.
  */
-export function withoutContractType(field: TailoredResumeField): TailoredResumeField {
+function withoutContractType(field: TailoredResumeField): TailoredResumeField {
   const text = contractTypePatterns.reduce((title, pattern) => title.replace(pattern, ''), field.text).trim()
   return text.length === 0 || text === field.text ? field : { ...field, text }
 }
@@ -179,11 +179,12 @@ export function withoutContractType(field: TailoredResumeField): TailoredResumeF
 // role ("Responsable de stage", "Consultante indépendante"), so only a whole parenthesis or segment of them is removed.
 const contractTypes = String.raw`(?:cdi|cdd|freelance|free[- ]lance|ind[ée]pendante?|int[ée]rim|alternance|apprentissage|`
   + String.raw`contrat de professionnalisation|contrat pro|stage|internship|temps plein|temps partiel|full[- ]time|part[- ]time|`
-  + String.raw`fixed[- ]term(?: contract)?|permanent contract|v\.?i\.?e\.?)(?![\p{L}\p{N}])`
+  + String.raw`fixed[- ]term(?: contract)?|permanent contract|contractor|temporary|portage salarial|v\.?i\.?e\.?)(?![\p{L}\p{N}])`
 const bareContractTypes = String.raw`(?:cdi|cdd|freelance|free[- ]lance)(?![\p{L}\p{N}])`
 const contractTypePatterns = [
-  // A parenthesis opening on a contract type, alone or followed by its terms: "(CDI)", "(CDD – 6 mois)", "(stage de 6 mois)".
-  new RegExp(String.raw`\s*[(\[]\s*${contractTypes}(?:\s*[-–,/:]\s*[^()[\]]*|\s+(?:de\s+|of\s+)?\d[^()[\]]*)?\s*[)\]]`, 'giu'),
+  // A parenthesis opening on a contract type, alone or followed by its terms: "(CDI)", "(CDD – 6 mois)", "(stage de fin
+  // d'études)", but not "(Stage Lighting)".
+  new RegExp(String.raw`\s*[(\[]\s*${contractTypes}(?:\s*[-–,/:]\s*[^()[\]]*|\s+(?:(?:de|du|des|of|for)\s|d['’]\p{L})[^()[\]]*|\s+\d[^()[\]]*)?\s*[)\]]`, 'giu'),
   new RegExp(String.raw`\s*[-–|,/]\s*${contractTypes}\s*$`, 'iu'),
   new RegExp(String.raw`^\s*${contractTypes}\s*[-–|,/]\s*`, 'iu'),
   new RegExp(String.raw`(?<=\S)\s+${bareContractTypes}\s*$`, 'iu'),

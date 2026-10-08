@@ -18,7 +18,7 @@ import type {
   TargetRole,
 } from '@resume-tailoring/domain/job-match'
 import { explainFailure, explainModelFailure } from './failure-cause'
-import { deriveSkillDurations, replaceDerivedFactIds } from './skill-durations'
+import { deriveSkillDurations, replaceDerivedFactIds, type SkillDuration } from './skill-durations'
 import type { ExplainedFailure } from './failure-cause'
 import type { JobPostingDocumentReader, JobPostingExtractor, MatchEvidenceMatcher } from './ports'
 
@@ -217,7 +217,7 @@ async function analyzeCandidateFacts({
 
 /** A Derived Fact exists only for the matcher: the Match Analysis cites the Candidate Facts it was calculated from. */
 function citeCandidateFactsForDerivedFacts({ analysis, skillDurations }: Readonly<{
-  analysis: EngineMatchAnalysis; skillDurations: ReturnType<typeof deriveSkillDurations>
+  analysis: EngineMatchAnalysis; skillDurations: readonly SkillDuration[]
 }>): EngineMatchAnalysis {
   if (skillDurations.length === 0) return analysis
   const replace = (factIds: readonly string[]) => replaceDerivedFactIds({ factIds, durations: skillDurations })
