@@ -7,6 +7,9 @@ const turnstileOrigin = 'https://challenges.cloudflare.com'
  * Styles stay `'unsafe-inline'`: Mantine writes style attributes, and the Tailored Resume preview's `srcdoc` iframe
  * inherits this policy for its own inline stylesheet. A style alone cannot reach another host while `connect-src`,
  * `img-src` and `font-src` keep every request on our origin.
+ *
+ * Strict-Transport-Security has no `preload`: we do not own `workers.dev`. Browsers ignore it over plain HTTP, so the
+ * development server can send it too.
  */
 export function withPageSecurityHeaders({ nonce, response }: Readonly<{
   nonce: string
@@ -16,6 +19,7 @@ export function withPageSecurityHeaders({ nonce, response }: Readonly<{
   headers.set('content-security-policy', createContentSecurityPolicy({ nonce }))
   headers.set('permissions-policy', 'camera=(), microphone=(), geolocation=()')
   headers.set('referrer-policy', 'no-referrer')
+  headers.set('strict-transport-security', 'max-age=31536000; includeSubDomains')
   headers.set('x-content-type-options', 'nosniff')
   return new Response(response.body, { headers, status: response.status, statusText: response.statusText })
 }

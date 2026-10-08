@@ -31,6 +31,7 @@ describe('page security headers', () => {
     expect(response.headers.get('referrer-policy')).toBe('no-referrer')
     expect(response.headers.get('x-content-type-options')).toBe('nosniff')
     expect(response.headers.get('permissions-policy')).toBe('camera=(), microphone=(), geolocation=()')
+    expect(response.headers.get('strict-transport-security')).toBe('max-age=31536000; includeSubDomains')
   })
 
   it('keeps the status and body of the page it secures', async () => {
