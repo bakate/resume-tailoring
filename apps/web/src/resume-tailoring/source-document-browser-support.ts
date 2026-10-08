@@ -15,4 +15,5 @@ export const sourceDocumentBrowserSupportPolicy = {
     },
   },
   validatedPdfJsVersion: '6.3.289',
+  pdfWorkerPreBundledPackages: ['pdfjs-dist/legacy/build/pdf.worker.min.mjs'],
 } as const
