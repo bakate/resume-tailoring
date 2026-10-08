@@ -36,7 +36,8 @@ export function ResumeEditor({ initialTab, onUnsavedChange, ...props }: EditorPr
     return next
   }) }, [])
   const { localization } = props
-  return <Stack><EditorStatus {...props} /><Tabs defaultValue={initialTab === 'contacts' ? 'contacts' : 'content'} keepMounted={false}>
+  return <Stack><EditorStatus {...props} />{/* Every tab stays mounted, so switching tabs keeps the drafts typed in the content. */}
+    <Tabs defaultValue={initialTab === 'contacts' ? 'contacts' : 'content'}>
     <Tabs.List aria-label={localization.translate('resumeReview.edit')}>
       <Tabs.Tab value="contacts">{localization.translate('resumeReview.contacts')}</Tabs.Tab>
       <Tabs.Tab value="content">{localization.translate('resumeReview.content')}</Tabs.Tab>

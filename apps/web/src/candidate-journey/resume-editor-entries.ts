@@ -29,8 +29,9 @@ export function readEditorSections({ resume }: Readonly<{ resume: TailoredResume
 export function readEditorEntries({ resume }: Readonly<{ resume: TailoredResume }>): readonly EditorEntry[] {
   const references = readResumeFields({ resume })
   return readEditorSections({ resume }).flatMap((section) => {
-    if (section === 'experiences') return distinguish(resume.experiences.map((experience) => entry({ section,
-      id: `experience:${experience.id}`, name: [experience.role?.text, experience.organization?.text].filter(Boolean).join(' · '),
+    if (section === 'experiences') return distinguish(resume.experiences.map((experience, index) => entry({ section,
+      id: `experience:${experience.id}`,
+      name: [experience.role?.text, experience.organization?.text].filter(Boolean).join(' · ') || String(index + 1),
       references: references.filter(({ location }) => location.kind === 'experience' && location.experienceId === experience.id) })))
     if (section === 'skills') {
       const skills = resume.sections.find((content) => content.section === 'skills')

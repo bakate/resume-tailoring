@@ -29,6 +29,13 @@ describe('Resume editor entries', () => {
       { kind: 'category', position: null }, { kind: 'skill', position: 1 }, { kind: 'skill', position: 2 }])
   })
 
+  it('names an experience without role or employer after its position', () => {
+    const [first] = resume.experiences
+    if (first === undefined) throw new Error('The fixture has an experience')
+    const anonymous = { ...resume, experiences: [{ ...first, role: null, organization: null }] }
+    expect(readEditorEntries({ resume: anonymous }).find(({ section }) => section === 'experiences')?.name).toBe('1')
+  })
+
   it('gives every field a distinct label even when two experiences share a role and employer', () => {
     const [first] = resume.experiences
     if (first === undefined) throw new Error('The fixture has an experience')

@@ -102,8 +102,9 @@ export async function editResumeField({ access, fieldId, text }: Readonly<{
 export async function editResumeFields({ access, edits }: Readonly<{
   access: ResumeEditingAccess; edits: readonly ResumeFieldEdit[]
 }>) {
+  const fields = readSessionFields({ access })
   const sections = [...new Set(edits.flatMap(({ fieldId }) => {
-    const reference = readSessionFields({ access }).find(({ field }) => field.id === fieldId)
+    const reference = fields.find(({ field }) => field.id === fieldId)
     return reference === undefined ? [] : [sectionOfLocation(reference.location)]
   }))]
   for (const section of sections) {
