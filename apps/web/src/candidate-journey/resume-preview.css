@@ -3,3 +3,62 @@
 .resume-pdf-pages figcaption { margin-bottom: .4rem; }
 .resume-pdf-pages canvas { display: block; width: 100%; height: auto; max-width: 794px; border: 1px solid var(--mantine-color-gray-3); }
 .resume-page-accessible-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+/*
+ * Resume Review: the document column, then the action rail. Below 62em the rail dissolves into the column so its
+ * primary actions can stick to the bottom of the screen for as long as the review is on screen.
+ */
+.resume-review-layout { display: flex; flex-direction: column; gap: var(--mantine-spacing-md); }
+.resume-review-document { display: flex; flex-direction: column; gap: var(--mantine-spacing-md); min-width: 0; }
+.resume-review-rail { display: contents; }
+.resume-review-match-summary:empty { display: none; }
+.resume-review-primary {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-xs);
+  padding-block: var(--mantine-spacing-sm);
+  border-top: 1px solid var(--mantine-color-gray-3);
+  background: var(--mantine-color-white);
+}
+.resume-review-primary-actions { display: flex; gap: var(--mantine-spacing-xs); }
+.resume-review-primary-actions > * { flex: 1 1 0; }
+
+@media (max-width: 61.99em) {
+  .resume-pdf-pages[data-collapsed] figure:not(:first-child) { display: none; }
+}
+
+/* On a desktop the rail sits beside the preview and stays in view while the pages scroll past. */
+@media (min-width: 62em) {
+  .resume-review-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 20rem;
+    align-items: start;
+    gap: var(--mantine-spacing-xl);
+  }
+
+  .resume-review-rail {
+    position: sticky;
+    top: calc(var(--app-shell-header-height, 76px) + var(--mantine-spacing-md));
+    display: flex;
+    flex-direction: column;
+    gap: var(--mantine-spacing-md);
+    max-height: calc(100vh - var(--app-shell-header-height, 76px) - 2 * var(--mantine-spacing-md));
+    /* Room for focus outlines, which the rail's own scrolling would otherwise clip. */
+    padding: 6px;
+    overflow-y: auto;
+  }
+
+  .resume-review-primary {
+    position: static;
+    gap: var(--mantine-spacing-md);
+    padding-block: 0;
+    border-top: 0;
+  }
+
+  .resume-review-primary-actions { flex-direction: column; }
+  .resume-review-primary-actions > * { flex: none; }
+  .resume-review-layout .resume-pdf-pages-expand { display: none; }
+}

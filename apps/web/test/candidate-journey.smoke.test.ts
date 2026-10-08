@@ -103,6 +103,39 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectGroupedPreview()
   })
 
+  test('keeps Download and Edit in a rail beside the preview on a desktop screen', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenScreenSize({ width: 1440, height: 900 })
+    await system.givenStablePreview()
+    await system.givenRequiredContactsArePresent()
+    await system.givenFocusOnDownload()
+
+    await system.scrollToTheEndOfTheReview()
+
+    await system.expectReviewActionsInReach({ beside: true })
+    await system.expectDownloadStillFocused()
+  })
+
+  test('keeps Download and Edit in a bottom bar on a phone', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenScreenSize({ width: 375, height: 812 })
+    await system.givenCombinedIntake()
+
+    await system.generateResume()
+
+    await system.expectReviewActionsInReach({ beside: false })
+  })
+
+  test('reaches the review actions by keyboard in the order they are shown', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenStablePreview()
+    await system.givenRequiredContactsArePresent()
+
+    await system.tabFromDownload()
+
+    system.expectFocusFollowedTheRail()
+  })
+
   test('keeps semantic metadata when an employer is hidden and restored', async ({ page }) => {
     const system = createSystemUnderTest({ page })
     await system.givenStablePreview()
@@ -497,6 +530,7 @@ class CandidateJourneyTestSystem {
   #hasTriggeredExpiry = false
   #isAccessExpired = false
   #accessRenewals = 0
+  readonly #focusedAfterDownload: string[] = []
   #releaseHeldSkills: () => void = () => undefined
   readonly #heldSkills = new Promise<void>((resolve) => { this.#releaseHeldSkills = resolve })
 
@@ -1258,7 +1292,71 @@ class CandidateJourneyTestSystem {
   }
 
   async givenScreenWidth(width: number) {
-    await this.#page.setViewportSize({ width, height: 800 })
+    await this.givenScreenSize({ width, height: 800 })
+  }
+
+  async givenScreenSize(size: Readonly<{ width: number; height: number }>) {
+    await this.#page.setViewportSize(size)
+  }
+
+  /** A render in progress takes the pages off screen, so the review only has its full length once Download is ready. */
+  async givenFocusOnDownload() {
+    const download = this.#page.getByRole('button', { name: 'Download PDF', exact: true })
+    await expect(download).toBeEnabled({ timeout: 20_000 })
+    await download.focus()
+  }
+
+  async expectDownloadStillFocused() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeFocused()
+  }
+
+  async scrollToTheEndOfTheReview() {
+    await this.#page.evaluate(() => { window.scrollTo(0, document.documentElement.scrollHeight) })
+    await this.#page.waitForFunction(() => window.scrollY > 0)
+    this.#completedAction = 'scrolled-review'
+  }
+
+  /** Download and Edit are on screen without scrolling: beside the preview on a desktop, below it on a phone. */
+  async expectReviewActionsInReach({ beside }: Readonly<{ beside: boolean }>) {
+    this.#expectAction()
+    const download = this.#page.getByRole('button', { name: 'Download PDF', exact: true })
+    const edit = this.#page.getByRole('button', { name: 'Edit resume', exact: true })
+    await expect(this.#page.locator('.resume-pdf-pages canvas').first()).toBeVisible({ timeout: 20_000 })
+    // What explains a disabled Download is on screen with it.
+    const explainedBy = await download.getAttribute('aria-describedby')
+    if (explainedBy !== null) await expect(this.#page.locator(`[id="${explainedBy}"]`)).toBeInViewport()
+    for (const action of [download, edit]) {
+      await expect(action).toBeInViewport({ ratio: 1 })
+      // WCAG 2.5.8: a target at least 24px tall, which a squeezed rail would not leave.
+      expect((await action.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(24)
+    }
+    await expect(this.#page.locator('.resume-review-match-summary')).toHaveCount(1)
+    const action = await download.boundingBox()
+    const pages = await this.#page.locator('.resume-pdf-pages').boundingBox()
+    if (action === null || pages === null) throw new Error('The preview pages and Download must be laid out')
+    if (beside) expect(action.x).toBeGreaterThanOrEqual(pages.x + pages.width)
+    else expect(action.y).toBeGreaterThanOrEqual(pages.y)
+    expect(await this.#page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+      .toBeLessThanOrEqual(0)
+  }
+
+  async tabFromDownload() {
+    await this.givenFocusOnDownload()
+    await this.#page.keyboard.press('Tab')
+    this.#focusedAfterDownload.push(await this.#readFocusedName())
+    await this.#page.keyboard.press('Tab')
+    this.#focusedAfterDownload.push(await this.#readFocusedName())
+    this.#completedAction = 'tabbed-from-download'
+  }
+
+  expectFocusFollowedTheRail() {
+    this.#expectAction()
+    expect(this.#focusedAfterDownload).toEqual(['Edit resume', 'Change job posting'])
+  }
+
+  async #readFocusedName() {
+    return this.#page.evaluate(() => document.activeElement?.textContent.trim() ?? '')
   }
 
   async expectFileChoiceCopyFor({ touch }: Readonly<{ touch: boolean }>) {

@@ -1,5 +1,6 @@
 import { Avatar, Button, FileButton, Group, List, Stack, Text, TextInput } from '@mantine/core'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { isCopiedFromSource } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeExportBlocker, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
@@ -17,55 +18,103 @@ import type { ResumePreviewProps } from './use-resume-preview'
 import './resume-preview.css'
 
 type CandidateNameDraft = ReturnType<typeof useCandidateNameDraft>
-type RenderedResumeProps = Readonly<{
-  current: ResumeRenderResult; document: TailoredResume; localization: Localization; name: CandidateNameDraft
-  pageBudget?: ResumePreviewProps['pageBudget']; onDownload: () => void; onRetry: () => void; paused: boolean
-}>
 
 export function TailoredResumePreview(props: ResumePreviewProps) {
-  const { localization } = props
+  const { localization, photo } = props
   const [attempt, setAttempt] = useState(0)
-  const { photo } = props
   const { current } = useRenderedResume({ ...props, attempt, photo })
   const name = useCandidateNameDraft({ identity: props.document.identity, onCommit: props.onIdentityChange })
   const onRetry = () => { setAttempt((value) => value + 1) }
-  const pendingId = useId()
-  return <section aria-label={localization.translate('resumePreview.title')}>
-    {current === null ? <Stack><Text id={pendingId} role="status">{photo.failed ? localization.translate('resumePreview.photoInvalid') : localization.translate('resumePreview.pending')}</Text>
-      <Button disabled aria-describedby={pendingId}>{localization.translate('resumePreview.download')}</Button>
-      <CandidateNameField identity={props.document.identity} explain={false} localization={localization} name={name} /></Stack>
-      : current.assessment.layout.status === 'unavailable' ? <RenderFailure {...{ localization, onRetry }} failure={current.failure} />
-        : <RenderedResume key={current.assessment.layout.revision} {...{ ...props, current, name, onRetry }} />}
-    <PhotoPicker photo={photo} localization={localization} disabled={props.enabled === false} />
+  const { pages, status, download, missingName } = useResumeReviewParts({ ...props, current, onRetry })
+  // One layout for every preview state: a render never remounts the rail, so focus and the open disclosures stay put.
+  return <section aria-label={localization.translate('resumePreview.title')} className="resume-review-layout">
+    <div className="resume-review-document">{pages}{props.children}</div>
+    <div className="resume-review-rail">
+      {/* The status explains Download, so it travels with it, in the bottom bar on a phone. */}
+      <div className="resume-review-primary">
+        {status}
+        <ResumeDownload {...download} edit={props.actions.edit} localization={localization} onDownload={props.onDownload}
+          purpose={props.document.purpose} />
+      </div>
+      {/* Where the Match Analysis summary goes, under the primary actions. */}
+      <div className="resume-review-match-summary" />
+      {props.actions.secondary}
+      <CandidateNameField identity={props.document.identity} explain={missingName} errorId={download.explainedBy('name')}
+        localization={localization} name={name} />
+      <PhotoPicker photo={photo} localization={localization} disabled={props.enabled === false} />
+    </div>
   </section>
 }
 
-function RenderedResume({ pageBudget, current, document, localization, name, onDownload, onRetry, paused }: RenderedResumeProps) {
-  const [preview, setPreview] = useState<'pending' | 'ready' | 'failed'>('pending')
-  const ready = useCallback(() => { setPreview('ready') }, [])
-  const failed = useCallback(() => { setPreview('failed') }, [])
+/** What the current render shows: the pages, the rail's status line, Download's state and whether the name is missing. */
+type ResumeReviewParts = Readonly<{
+  pages: ReactNode; status: ReactNode; missingName: boolean
+  download: Readonly<{
+    bytes: Uint8Array | null; revision: string | null
+    /** Why the button is disabled: the element that says so, and the hint to show beside it when nothing else does. */
+    explanation: Readonly<{ id: string; hint: string | null }> | null
+    explainedBy: (source: DownloadExplanation['source']) => string | undefined
+  }>
+}>
+
+/**
+ * Derives each preview state from the current render. What the browser made of the pages is remembered per layout
+ * revision, so a new render starts over without remounting anything.
+ */
+/** State that belongs to one layout revision: a new render reads the initial value again, without remounting anything. */
+function useRevisionState<T>(revision: string | null, initial: T) {
+  const [state, setState] = useState<Readonly<{ revision: string | null; value: T }>>({ revision, value: initial })
+  const value = state.revision === revision ? state.value : initial
+  const update = useCallback((next: (value: T) => T) => {
+    setState((previous) => ({ revision, value: next(previous.revision === revision ? previous.value : initial) }))
+  }, [revision, initial])
+  return [value, update] as const
+}
+
+const pagesPending = { preview: 'pending', pageCount: 0, expanded: false } as const satisfies PagesShown
+type PagesShown = Readonly<{ preview: 'pending' | 'ready' | 'failed'; pageCount: number; expanded: boolean }>
+
+function useResumeReviewParts({ current, document, localization, onRetry, pageBudget, paused, photo }: Readonly<
+  Pick<ResumePreviewProps, 'document' | 'localization' | 'pageBudget' | 'paused' | 'photo'>
+  & { current: ResumeRenderResult | null; onRetry: () => void }>): ResumeReviewParts {
+  const revision = current?.assessment.layout.revision ?? null
+  const [{ preview, pageCount, expanded }, updatePages] = useRevisionState<PagesShown>(revision, pagesPending)
+  const ready = useCallback((count: number) => { updatePages(() => ({ preview: 'ready', pageCount: count, expanded: false })) }, [updatePages])
+  const failed = useCallback(() => { updatePages(() => ({ ...pagesPending, preview: 'failed' })) }, [updatePages])
+  const explanationId = useId()
+  // Without a PDF, the pending status or the render failure is what explains the disabled Download.
+  const withoutPdf = { bytes: null, revision, explanation: { id: explanationId, hint: null }, explainedBy: () => undefined }
+  if (current === null) return { pages: null, missingName: false, download: withoutPdf,
+    status: <Text id={explanationId} role="status">{localization.translate(photo.failed ? 'resumePreview.photoInvalid' : 'resumePreview.pending')}</Text> }
+  if (current.assessment.layout.status === 'unavailable') return { status: null, missingName: false, download: withoutPdf,
+    pages: <RenderFailure id={explanationId} {...{ localization, onRetry }} failure={current.failure} /> }
   const eligibility = current.assessment.exportEligibility
   const bytes = eligibility.status === 'eligible' && preview === 'ready' && !paused ? current.pdf : null
   const blocker = eligibility.status === 'blocked' ? readPrimaryBlocker({ reasons: eligibility.reasons }) : null
-  const explanationId = useId()
   const explanation = bytes !== null ? null : readDownloadExplanation({ blocker, localization, paused, preview })
   const explainedBy = (source: DownloadExplanation['source']) => explanation?.source === source ? explanationId : undefined
   const budgetStatus = pageBudget === undefined ? null
     : readPageBudgetStatus({ layout: current.assessment.layout, overflowReduction: pageBudget.overflowReduction })
-  return <Stack gap="sm" mt="md">
-    {current.pdf === null ? null : <ResumePdfPages bytes={current.pdf} onReady={ready} onFailure={failed} pageLabel={localization.translate('resumePreview.page')} />}
-    <CopiedExperiences {...{ document, localization }} />
-    {preview === 'failed' ? <RenderFailure id={explainedBy('render-failure')} {...{ localization, onRetry }} failure={undefined} /> : null}
-    <ResumeDownload {...{ bytes, localization, onDownload, purpose: document.purpose }}
-      explanation={explanation === null ? null : { id: explanationId, hint: explanation.hint }} />
-    {/* The reason a download is blocked, and the action that unblocks it, sit right under the button. */}
-    {blocker === 'overflow' || blocker === null || blocker === 'missing-identity'
+  // A phone shows the first page and collapses the others behind one action; a desktop shows them all.
+  const collapsed = !expanded && pageCount > 1
+  return {
+    pages: <>
+      {current.pdf === null ? null : <ResumePdfPages bytes={current.pdf} collapsed={collapsed} onReady={ready} onFailure={failed}
+        pageLabel={localization.translate('resumePreview.page')} />}
+      {collapsed ? <Button className="resume-pdf-pages-expand" variant="default" onClick={() => { updatePages((pages) => ({ ...pages, expanded: true })) }}>
+        {localization.translate('resumePreview.showAllPages').replace('{pageCount}', String(pageCount))}</Button> : null}
+      <CopiedExperiences {...{ document, localization }} />
+      {preview === 'failed' ? <RenderFailure id={explainedBy('render-failure')} {...{ localization, onRetry }} failure={undefined} /> : null}
+    </>,
+    // The Page Budget status, or the reason a download is blocked and the action that unblocks it, heads the rail.
+    status: blocker === 'overflow' || blocker === null || blocker === 'missing-identity'
       ? budgetStatus === null || pageBudget === undefined ? null
         : <PageBudget status={budgetStatus} id={explainedBy('blocker')} {...{ localization, pageBudget }} />
-      : <StatusMessage tone="error" id={explainedBy('blocker')}>{localization.translate(`resumePreview.${blocker}`)}</StatusMessage>}
-    <CandidateNameField identity={document.identity} explain={blocker === 'missing-identity'} errorId={explainedBy('name')}
-      localization={localization} name={name} />
-  </Stack>
+      : <StatusMessage tone="error" id={explainedBy('blocker')}>{localization.translate(`resumePreview.${blocker}`)}</StatusMessage>,
+    download: { bytes, revision, explainedBy,
+      explanation: explanation === null ? null : { id: explanationId, hint: explanation.hint } },
+    missingName: blocker === 'missing-identity',
+  }
 }
 
 /** The one Page Budget status of the current render; an overflow makes shortening the primary action. */
@@ -157,7 +206,7 @@ function PhotoPicker({ disabled, localization, photo }: Readonly<{
   disabled: boolean; localization: Localization; photo: ResumePreviewProps['photo']
 }>) {
   const chosen = photo.name !== null
-  return <div role="group" aria-labelledby="resume-photo-label"><Stack gap={6} mt="sm">
+  return <div role="group" aria-labelledby="resume-photo-label"><Stack gap={6}>
     <Text id="resume-photo-label" fw={600} size="sm">{localization.translate('resumePreview.photo')}</Text>
     <Group gap="md" wrap="nowrap">
       <Avatar src={photo.ready ? photo.dataUrl : undefined} alt="" radius="xl" size="lg" />
@@ -191,19 +240,20 @@ function RenderFailure({ failure, id, localization, onRetry }: Readonly<{
   </Stack>
 }
 
-function ResumeDownload({ bytes, explanation, localization, onDownload, purpose }: Readonly<{
-  bytes: Uint8Array | null; localization: Localization; onDownload: () => void
-  purpose: TailoredResume['purpose']
-  /** Why the button is disabled: the element that says so, and the hint to show beside it when nothing else does. */
-  explanation: Readonly<{ id: string; hint: string | null }> | null
+/**
+ * Download, with Edit beside it: the primary actions a phone keeps in a bottom bar. The outcome of a download belongs
+ * to the revision it downloaded.
+ */
+function ResumeDownload({ bytes, edit, explanation, localization, onDownload, purpose, revision }: ResumeReviewParts['download'] & Readonly<{
+  edit: ReactNode; localization: Localization; onDownload: () => void; purpose: TailoredResume['purpose']
 }>) {
-  const [download, setDownload] = useState<'idle' | 'failed' | 'handed-off'>('idle')
-  return <><Button disabled={bytes === null} aria-describedby={explanation?.id} onClick={() => {
+  const [download, setDownload] = useRevisionState<'idle' | 'failed' | 'handed-off'>(revision, 'idle')
+  return <><div className="resume-review-primary-actions"><Button disabled={bytes === null} aria-describedby={explanation?.id} onClick={() => {
     if (bytes === null) return
-    const outcome = handOffResumePdf({ bytes, purpose })
-    setDownload(outcome ? 'handed-off' : 'failed')
-    if (outcome) onDownload()
-  }}>{localization.translate('resumePreview.download')}</Button>
+    const handedOff = handOffResumePdf({ bytes, purpose })
+    setDownload(() => handedOff ? 'handed-off' : 'failed')
+    if (handedOff) onDownload()
+  }}>{localization.translate('resumePreview.download')}</Button>{edit}</div>
     {explanation === null || explanation.hint === null ? null : <Text id={explanation.id} size="sm" c="dimmed">{explanation.hint}</Text>}
     {download === 'idle' ? null : <Text role={download === 'failed' ? 'alert' : 'status'}>
       {download === 'failed' ? localization.translate('failure.preview.download') : localization.translate('resumePreview.downloaded')}</Text>}
