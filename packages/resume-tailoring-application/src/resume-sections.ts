@@ -257,7 +257,21 @@ export function copyExperienceFromFacts(input: ResumeSectionWritingInput): Resum
   return normalizeSectionContent({ purpose: input.purpose, section: input.section, relevantFactIds: input.relevantFactIds,
     content: { kind: 'experience', experience: { id: key, chronology: relevant ? 'relevant' : 'context',
       role: copy('role'), organization: copy('organization'), startDate: copy('startDate'), endDate: copy('endDate'),
-      location: copy('location'), context: copy('context'), achievements } } })
+      location: copy('location'), context: copy('context'), achievements, origin: 'copied-from-source' } } })
+}
+
+/** Whether a Resume Section is an experience copied from its Candidate Facts rather than written. */
+export function isCopiedFromSource(content: ResumeSectionContent) {
+  return content.kind === 'experience' && content.experience.origin === 'copied-from-source'
+}
+
+/**
+ * The content a rewrite starts from: the writer only ever returns written content, so a copied experience is handed
+ * over without its origin, which an undefined value leaves out of the request.
+ */
+export function readWritableContent(content: ResumeSectionContent): ResumeSectionContent {
+  return content.kind === 'experience' && content.experience.origin !== undefined
+    ? { kind: 'experience', experience: { ...content.experience, origin: undefined } } : content
 }
 
 /** The existing deterministic structure checks, restricted to one section and the facts it may cite. */

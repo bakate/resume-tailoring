@@ -20,6 +20,11 @@ export type TailoredResumeExperience = Readonly<{
   location?: TailoredResumeField | null
   context: TailoredResumeField | null
   achievements: readonly TailoredResumeField[]
+  /**
+   * `copied-from-source` marks an experience taken word for word from its Candidate Facts after its rewrite still
+   * failed, kept through editing and condensation; absent when the experience was written.
+   */
+  origin?: 'copied-from-source'
 }>
 
 export type TailoredResumeSkillGroup = Readonly<{
@@ -107,7 +112,7 @@ export type ResumeEditingState = Readonly<{
   restoredFieldIds?: readonly string[]
 }>
 
-type ExperienceValue = Exclude<keyof TailoredResumeExperience, 'id' | 'chronology'>
+type ExperienceValue = Exclude<keyof TailoredResumeExperience, 'id' | 'chronology' | 'origin'>
 export type ResumeFieldLocation = Readonly<
   | { kind: 'value-proposition'; fieldId: string }
   | { kind: 'experience'; experienceId: string; fieldName: ExperienceValue; fieldId: string }

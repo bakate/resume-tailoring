@@ -1,9 +1,11 @@
 import { Group, List, Paper, Skeleton, Stack, Text, Title } from '@mantine/core'
 import type { CandidateSession, ResumeSectionSnapshot } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeSectionContent, ResumeSectionKind } from '@resume-tailoring/application/candidate-journey'
+import { isCopiedFromSource } from '@resume-tailoring/application/candidate-journey'
 import { inferTailoredResumeLocale } from '@resume-tailoring/application/tailored-resume'
 import type { Localization } from '../localization/localization'
 import type { useCandidateJourney } from './use-candidate-journey'
+import { CopiedNotice } from './copied-notice'
 import { resumeReviewCopy } from './resume-review-copy'
 import { readResumeHeading } from './tailored-resume-document'
 import type { ResumeHeadingKey } from './tailored-resume-document'
@@ -68,7 +70,10 @@ function ResumeSectionGroupPreview({ group, localization, resumeLocale }: Readon
 }
 
 function ResumeSectionPreview({ localization, section }: Readonly<{ localization: Localization; section: ResumeSectionSnapshot }>) {
-  if (section.status === 'validated') return <ValidatedSectionContent content={section.content} />
+  if (section.status === 'validated') return <Stack gap={4}>
+    <ValidatedSectionContent content={section.content} />
+    {isCopiedFromSource(section.content) ? <CopiedNotice localization={localization} /> : null}
+  </Stack>
   const label = resumeReviewCopy[localization.locale][sectionLabelKeys[section.kind]]
   const message = localization.translate(section.status === 'failed' ? 'resumeSections.failed' : 'resumeSections.writing')
     .replace('{section}', label)

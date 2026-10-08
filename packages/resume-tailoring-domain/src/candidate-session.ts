@@ -67,7 +67,10 @@ export type ResumePreparation = Readonly<{
   sections?: readonly ResumeSectionSnapshot[]
 }>
 
-/** One Resume Section as the preparation machine last reported it; text exists only once validated. */
+/**
+ * One Resume Section as the preparation machine last reported it; text exists only once validated. A validated
+ * experience copied from its Candidate Facts keeps `origin: 'copied-from-source'` on its experience.
+ */
 export type ResumeSectionSnapshot = Readonly<{ key: string; kind: ResumeSectionKind; attempt: number }> & (
   | Readonly<{ status: 'planned' | 'writing' | 'validating' | 'failed' }>
   | Readonly<{ status: 'validated'; content: ResumeSectionContent }>)

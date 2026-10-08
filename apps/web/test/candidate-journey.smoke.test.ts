@@ -3,7 +3,7 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
-import type { ResumeCoherenceInput, ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
+import type { ResumeCoherenceInput, ResumeFieldValidationInput, ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
 import { routeResumeSectionModels, writeFixtureSection } from './resume-section-model-routes'
 
 test.describe('Candidate Journey preview-first preparation', () => {
@@ -240,6 +240,17 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectUnsafeOutputRejected()
   })
 
+  test('marks only the experience copied from the resume as taken as written, outside the exported PDF', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'copied-experience' })
+    await system.givenCombinedIntake()
+    await system.generateResume()
+    await system.givenRequiredContactsArePresent()
+
+    await system.downloadCurrentResume()
+
+    await system.expectOnlyFirstExperienceMarkedCopied()
+  })
+
   test('explains a resume that stays incoherent and keeps its checked sections', async ({ page }) => {
     const system = createSystemUnderTest({ page, scenario: 'incoherent' })
     await system.givenCombinedIntake()
@@ -437,7 +448,7 @@ function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: P
 
 type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-coverage' | 'adjacent-evidence' | 'no-correspondence'
   | 'unsafe-output' | 'interrupted' | 'unavailable' | 'pending-writing' | 'posting-extraction-unavailable' | 'held-skills'
-  | 'incoherent' | 'expired-access'
+  | 'incoherent' | 'expired-access' | 'copied-experience'
 
 class CandidateJourneyTestSystem {
   readonly #page: Page
@@ -486,6 +497,12 @@ class CandidateJourneyTestSystem {
         return route.fulfill({ status: 401, json: { ok: false, error: { type: 'demo-access-required' } } })
       }
       return route.fallback()
+    })
+    // The first experience is never supported, before or after its rewrite, so it is copied from its Candidate Facts.
+    await this.#page.route('**/api/resume-section-validation', (route) => {
+      const input = route.request().postDataJSON() as ResumeFieldValidationInput
+      if (this.#scenario !== 'copied-experience' || input.section.key !== 'experiences.0') return route.fallback()
+      return route.fulfill({ json: { ok: true, value: { fields: input.fields.map(({ id }) => ({ fieldId: id, supported: false })) } } })
     })
     // The demo access cookie stays expired until the Candidate passes a new security check.
     await this.#page.route('**/api/demo-access', (route) => {
@@ -721,21 +738,41 @@ class CandidateJourneyTestSystem {
   async expectCurrentResumePdfDownloaded() {
     expect(this.#downloadPath, 'downloadCurrentResume must run first').not.toBeNull()
     if (this.#downloadPath === null) return
-    const bytes = new Uint8Array(await readFile(this.#downloadPath))
-    const loading = getDocument({ data: bytes })
+    const { pageCount, text } = await this.#readDownloadedPdf()
+    expect(pageCount).toBe(1)
+    expect(text).toContain('Alex Morgan')
+    expect(text).toContain('Northwind')
+    expect(text).toContain('React')
+    await expect(this.#page.locator('.resume-pdf-pages canvas')).toHaveCount(pageCount)
+    await expect(this.#page.getByRole('status').filter({ hasText: 'PDF handed to your browser' })).toBeVisible()
+    await this.#page.getByText('Read the document text', { exact: true }).click()
+    await this.#page.setViewportSize({ width: 1280, height: 1800 })
+    await this.#page.getByRole('region', { name: 'Preview and export' }).screenshot({ path: 'test-results/bak-59-preview.png' })
+  }
+
+  async expectOnlyFirstExperienceMarkedCopied() {
+    this.#expectAction()
+    const copied = this.#page.getByRole('list', { name: 'Experiences taken as written', exact: true })
+    await expect(copied.getByRole('listitem')).toHaveCount(1)
+    await expect(copied).toContainText('Frontend Engineer – Northwind')
+    await expect(this.#page.getByText('Taken as written from your resume', { exact: true })).toHaveCount(1)
+    await this.#showDocumentText()
+    await expect(this.#page.frameLocator('iframe').getByText('Taken as written', { exact: false })).toHaveCount(0)
+    const { text } = await this.#readDownloadedPdf()
+    expect(text).toContain('Northwind')
+    expect(text).not.toContain('Taken as written')
+    expect(this.#errors).toEqual([])
+  }
+
+  async #readDownloadedPdf() {
+    if (this.#downloadPath === null) throw new Error('downloadCurrentResume must run first')
+    const loading = getDocument({ data: new Uint8Array(await readFile(this.#downloadPath)) })
     try {
       const pdf = await loading.promise
-      expect(pdf.numPages).toBe(1)
-      const pdfPage = await pdf.getPage(1)
-      const text = (await pdfPage.getTextContent()).items.flatMap((item) => 'str' in item ? item.str : []).join(' ')
-      expect(text).toContain('Alex Morgan')
-      expect(text).toContain('Northwind')
-      expect(text).toContain('React')
-      await expect(this.#page.locator('.resume-pdf-pages canvas')).toHaveCount(pdf.numPages)
-      await expect(this.#page.getByRole('status').filter({ hasText: 'PDF handed to your browser' })).toBeVisible()
-      await this.#page.getByText('Read the document text', { exact: true }).click()
-      await this.#page.setViewportSize({ width: 1280, height: 1800 })
-      await this.#page.getByRole('region', { name: 'Preview and export' }).screenshot({ path: 'test-results/bak-59-preview.png' })
+      const pages = await Promise.all(Array.from({ length: pdf.numPages }, (_page, index) => pdf.getPage(index + 1)))
+      const contents = await Promise.all(pages.map((pdfPage) => pdfPage.getTextContent()))
+      return { pageCount: pdf.numPages,
+        text: contents.flatMap(({ items }) => items.flatMap((item) => 'str' in item ? item.str : [])).join(' ') }
     } finally { await loading.destroy() }
   }
 

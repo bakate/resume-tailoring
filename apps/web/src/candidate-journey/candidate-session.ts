@@ -134,6 +134,8 @@ export const tailoredResumeSchema = z.strictObject({
     location: tailoredResumeFieldSchema.nullable().optional(),
     context: tailoredResumeFieldSchema.nullable(),
     achievements: z.array(tailoredResumeFieldSchema),
+    // Optional so a Tailored Resume prepared before copied experiences were marked still restores as written.
+    origin: z.literal('copied-from-source').optional(),
   })),
   identity: sourceIntakeSchema.shape.contactDetails.element.extend({ origin: z.literal('detected').optional() }).nullable(),
   locale: z.enum(['en', 'fr']),

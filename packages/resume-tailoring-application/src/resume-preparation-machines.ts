@@ -3,7 +3,7 @@ import type { ResumeSectionSnapshot } from '@resume-tailoring/domain/candidate-s
 import type { PrivacySafeTelemetryEvent, resumeSectionOutcomes } from './privacy-safe-telemetry'
 import type { ResumeOperationFailure, ResumePreparationOutcome } from './structured-resume-contract'
 import { assembleResumeDocumentWithOrigins, citedCandidateFacts, copyExperienceFromFacts, createSectionWritingInput,
-  hasSupportedSectionStructure,
+  hasSupportedSectionStructure, isCopiedFromSource, readWritableContent,
   isSectionFullyValidated, normalizeSectionContent, planResumeSections, readRejectedFields,
   readSectionContentFields, removeSectionFields } from './resume-sections'
 import type { ResumeCoherenceIssue, ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage,
@@ -340,7 +340,7 @@ function readCoherenceRewrite({ context, coherence }: Readonly<{
     coherenceAcceptedFields: readAcceptedFields({ context, rewrittenKeys: Object.keys(coherenceRejections),
       namedFieldIds: coherence.ok ? coherence.value.issues.map(({ fieldId }) => fieldId) : [] }),
     coherencePreviousContents: Object.fromEntries(results.flatMap((result) =>
-      rejected(result.section.key) && result.status !== 'failed' ? [[result.section.key, result.content]] : [])),
+      rejected(result.section.key) && result.status !== 'failed' ? [[result.section.key, readWritableContent(result.content)]] : [])),
     results: results.filter(({ section }) => !rejected(section.key)),
     startedKeys: context.startedKeys.filter((key) => !rejected(key)),
     sections: context.sections.map((section): ResumeSectionSnapshot => rejected(section.key)
@@ -459,13 +459,14 @@ function restoreValidatedSections({ context, plan }: Readonly<{
 function readRestoredSection({ section, saved }: Readonly<{
   section: ResumeSectionPlanEntry; saved: ResumeSectionSnapshot
 }>): Extract<ResumeSectionResult, { content: ResumeSectionContent }> | null {
-  return saved.status === 'validated' ? { section, status: 'validated', content: saved.content, attempt: saved.attempt,
-    durationMilliseconds: 0, usage: noUsage } : null
+  if (saved.status !== 'validated') return null
+  return { section, status: isCopiedFromSource(saved.content) ? 'copied-from-source' : 'validated', content: saved.content,
+    attempt: saved.attempt, durationMilliseconds: 0, usage: noUsage }
 }
 
 function readSectionSnapshot(result: ResumeSectionResult): ResumeSectionSnapshot {
   const { key, kind } = result.section
-  // A copied section is saved as validated: the saved snapshot does not yet tell copied content apart.
+  // A copied section is saved as validated: its experience keeps the copied origin, which restoration reads back.
   return result.status !== 'failed' ? { key, kind, attempt: result.attempt, status: 'validated', content: result.content }
     : { key, kind, attempt: result.attempt, status: 'failed' }
 }

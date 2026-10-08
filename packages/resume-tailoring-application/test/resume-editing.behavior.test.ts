@@ -148,6 +148,17 @@ describe('Candidate Journey resume editing', () => {
 
     system.expectOnlyProseCondensed()
   })
+  it('keeps a condensed experience copied from its Candidate Facts marked as copied', async () => {
+    const system = createSystemUnderTest()
+    system.givenFirstExperienceCopiedFromItsFacts()
+    await system.givenReviewableResume()
+    system.givenFaithfulCondensation()
+    await system.proposeCondensation()
+
+    system.acceptProposal()
+
+    system.expectCondensedFirstExperienceStillCopied()
+  })
   it('rejects a proposal decision after contact changes invalidate its revision', async () => {
     const system = createSystemUnderTest()
     await system.givenReviewableResume()
@@ -308,7 +319,10 @@ function createSystemUnderTest() {
 class StructuredResumeTestSystem {
   readonly #ports: TestPorts = {}
   readonly #condensationRequests: Parameters<ResumeDocumentPorts['condenseClaim']>[0][] = []
-  readonly #dependencies = createDependencies({ ports: this.#ports, condensationRequests: this.#condensationRequests })
+  // Section keys whose written fields validation never supports, so preparation copies them from their Candidate Facts.
+  readonly #unsupportedSectionKeys = new Set<string>()
+  readonly #dependencies = createDependencies({ ports: this.#ports, condensationRequests: this.#condensationRequests,
+    unsupportedSectionKeys: this.#unsupportedSectionKeys })
   #decision: ResumeProposalDecision = { proposalId: '', baseRevision: '' }
   #validationRequests: Parameters<ResumeDocumentPorts['validateClaim']>[0][] = []
   #completeProposal: (() => void) | null = null
@@ -437,6 +451,14 @@ class StructuredResumeTestSystem {
   }
 
   givenFaithfulCondensation() { this.givenSupportedValidation() }
+
+  givenFirstExperienceCopiedFromItsFacts() { this.#unsupportedSectionKeys.add('experiences.0') }
+
+  expectCondensedFirstExperienceStillCopied() {
+    const experience = this.#expectPreparedSession()?.tailoredResume?.experiences.find(({ id }) => id === 'experiences.0')
+    expect(experience?.achievements.map(({ text }) => text)).toContain(condensedSummary)
+    expect(experience?.origin).toBe('copied-from-source')
+  }
 
   givenMeaningLosingCondensation() {
     // The shorter wording is backed by the facts, but it does not carry the original meaning back.
@@ -821,14 +843,17 @@ function createMatchedSession(): CandidateSession {
   }
 }
 
-function createDependencies({ ports, condensationRequests }: Readonly<{
+function createDependencies({ ports, condensationRequests, unsupportedSectionKeys }: Readonly<{
   ports: TestPorts; condensationRequests: Parameters<ResumeDocumentPorts['condenseClaim']>[0][]
+  unsupportedSectionKeys: ReadonlySet<string>
 }>): CandidateJourneyDependencies {
   const session = createMatchedSession()
   return createFakeCandidateJourneyDependencies({
     now: () => session.startedAt,
     resumeSectionModels: createFakeResumeSectionModels({
       writeSection: (input) => Promise.resolve({ ok: true, value: writeResumeSectionFromFacts(input) }),
+      validateFields: ({ section, fields }) => Promise.resolve({ ok: true, value: { fields: fields.map(({ id }) => ({
+        fieldId: id, supported: !unsupportedSectionKeys.has(section.key) })) } }),
     }),
     // Scenarios replace individual ports on this object after the journey starts.
     resumeDocumentPorts: Object.assign(ports, createFakeResumeDocumentPorts({

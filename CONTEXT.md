@@ -168,6 +168,10 @@ _Avoid_: Free text, generated field
 One planned part of a Tailored Resume, such as the Value Proposition, one experience, or the skills, written and validated on its own before it appears in the preview.
 _Avoid_: Chunk, partial resume, streamed text
 
+**Copied Section**:
+An experience Resume Section taken word for word from its attested Candidate Facts after its rewrite still failed as unsupported. It keeps its copied origin through saving, editing, and condensation, and the interface tells the Candidate it reuses their own wording; the exported resume does not.
+_Avoid_: Fallback section, raw section, unwritten section
+
 **Resume Claim**:
 A concise professional statement within a Resume Field whose meaning, dates, scope, level, and outcomes remain supported by its linked Candidate Facts.
 _Avoid_: Generated statement, inferred claim

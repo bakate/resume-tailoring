@@ -195,6 +195,19 @@ describe('browser Candidate Session persistence', () => {
     expect(restored).toEqual({ ok: true, value: { notice: null, session } })
   })
 
+  it('restores an experience copied from its Candidate Facts as copied, and one saved before origins as written', () => {
+    const written = readGroupedResumeSection({ key: 'experiences.0', kind: 'experience' })
+    const copied = written.kind === 'experience'
+      ? { ...written, experience: { ...written.experience, origin: 'copied-from-source' as const } } : written
+    const session: CandidateSession = { ...preparingCandidateSession, preparation: { ...preparingCandidateSession.preparation,
+      sections: [{ key: 'experiences.0', kind: 'experience', attempt: 2, status: 'validated', content: copied },
+        { key: 'experiences.1', kind: 'experience', attempt: 1, status: 'validated', content: written }] } }
+
+    const restored = roundTrip({ session })
+
+    expect(restored).toEqual({ ok: true, value: { notice: null, session } })
+  })
+
   it.each([
     { type: 'rate-limited', retryAfterSeconds: 20 },
     { type: 'access-required' },

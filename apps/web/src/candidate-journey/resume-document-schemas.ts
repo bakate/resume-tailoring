@@ -10,8 +10,10 @@ const fieldsSchema = z.strictObject({ fields: z.array(tailoredResumeFieldSchema)
 /** One strict structured-output schema per Resume Section kind, each a slice of the professional document. */
 export const resumeSectionOutputSchemas = {
   'value-proposition': z.strictObject({ paragraphs: z.array(tailoredResumeFieldSchema) }),
-  // Strict structured output requires every key, so the writer always states a location, or null.
-  experience: tailoredResumeSchema.shape.experiences.element.extend({ location: tailoredResumeFieldSchema.nullable() }),
+  // Strict structured output requires every key, so the writer always states a location, or null. Only the application
+  // marks an experience as copied from its Candidate Facts, so the writer cannot state an origin.
+  experience: tailoredResumeSchema.shape.experiences.element.omit({ origin: true })
+    .extend({ location: tailoredResumeFieldSchema.nullable() }),
   skills: z.strictObject({ groups: z.array(z.strictObject({ id: z.string().min(1),
     category: tailoredResumeFieldSchema.nullable(), items: z.array(tailoredResumeFieldSchema) })) }),
   education: fieldsSchema, languages: fieldsSchema, projects: fieldsSchema, certifications: fieldsSchema,

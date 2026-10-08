@@ -1,11 +1,13 @@
-import { Avatar, Button, FileButton, Group, Stack, Text, TextInput } from '@mantine/core'
+import { Avatar, Button, FileButton, Group, List, Stack, Text, TextInput } from '@mantine/core'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { isCopiedFromSource } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeExportBlocker, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
 import type { Localization } from '../localization/localization'
 import { FailureExplanation, RecoveryAction } from './failure-recovery'
 import { renderTailoredResumeDocument } from './tailored-resume-document'
 import { ResumePdfPages } from './resume-pdf-pages'
+import { CopiedNotice } from './copied-notice'
 import { resumePreviewMessages } from './resume-preview-messages'
 import { useRenderedResume } from './use-resume-preview'
 import type { ResumePreviewProps } from './use-resume-preview'
@@ -46,12 +48,29 @@ function RenderedResume({ condensation, current, document, localization, message
   return <Stack gap="sm" mt="md">
     {blocker === null || blocker === 'missing-identity' ? null : <Text role="alert" c="danger.8">{messages[blocker]}</Text>}
     {current.pdf === null ? null : <ResumePdfPages bytes={current.pdf} onReady={ready} onFailure={failed} pageLabel={messages.page} />}
+    <CopiedExperiences {...{ document, localization, messages }} />
     {preview === 'failed' ? <RenderFailure {...{ localization, onRetry }} failure={undefined} /> : null}
     {eligibility.status === 'blocked' && eligibility.reasons.includes('overflow') && condensation !== undefined
       ? <Button disabled={condensation.disabled} onClick={condensation.propose}>{condensation.label}</Button> : null}
     <ResumeDownload {...{ bytes, localization, messages, onDownload, purpose: document.purpose }} />
     <CandidateNameField identity={document.identity} explain={blocker === 'missing-identity'} messages={messages} name={name} />
   </Stack>
+}
+
+/**
+ * The PDF pages are the exported document, so the notice for each experience copied from the Candidate's own wording
+ * is listed beside them and never printed.
+ */
+function CopiedExperiences({ document, localization, messages }: Readonly<{
+  document: TailoredResume; localization: Localization; messages: PreviewMessages
+}>) {
+  const copied = document.experiences.filter((experience) => isCopiedFromSource({ kind: 'experience', experience }))
+  if (copied.length === 0) return null
+  return <List aria-label={messages.copiedExperiences} listStyleType="none" spacing={4}>
+    {copied.map(({ id, role, organization }) => <List.Item key={id}>
+      <Text fw={600} size="sm">{[role?.text, organization?.text].filter(Boolean).join(' – ')}</Text>
+      <CopiedNotice localization={localization} /></List.Item>)}
+  </List>
 }
 
 /** Only one blocking message is shown: the one the Candidate should resolve first. */
