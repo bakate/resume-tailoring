@@ -287,6 +287,34 @@ test.describe('Candidate Journey integration qualification', () => {
 
     await system.expectAccessibleKeyboardJourney()
   })
+
+  test('explains why the download is unavailable to assistive technology', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGeneratedPreview()
+
+    await system.clearCandidateName()
+
+    await system.expectDownloadUnavailabilityExplained()
+  })
+
+  test('exposes whether the source profile details are shown', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenGeneratedResume()
+    await system.returnToDocuments()
+
+    await system.toggleSourceProfileByKeyboard()
+
+    await system.expectSourceProfileToggleExposed()
+  })
+
+  test('announces once that a rate-limit wait is over', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenConsentedIntake()
+
+    await system.generateWhileRateLimited()
+
+    await system.expectWaitEndAnnouncedOnce()
+  })
 })
 
 test.describe('Candidate Journey mobile integration', () => {
@@ -886,6 +914,69 @@ class CandidateJourneyIntegrationSystem {
     await expect(this.#page.getByRole('dialog')).toBeVisible()
     await this.#page.keyboard.press('Escape')
     await expect(this.#page.getByRole('button', { name: 'Edit resume', exact: true })).toBeFocused()
+    await this.#expectNamedEditorControls()
+  }
+
+  async #expectNamedEditorControls() {
+    await this.#openEditor()
+    await this.#page.getByRole('tab', { name: 'Experience', exact: true }).click()
+    await expect(this.#page.getByRole('button', { name: 'Move Experience: Northwind up', exact: true }).first()).toBeVisible()
+    await this.#page.getByRole('tab', { name: 'Section order', exact: true }).click()
+    await expect(this.#page.getByRole('button', { name: 'Move Summary up', exact: true })).toBeDisabled()
+    await expect(this.#page.getByRole('button', { name: 'Move Experience up', exact: true })).toBeEnabled()
+    await this.#closeEditor()
+  }
+
+  async clearCandidateName() {
+    const field = this.#page.getByRole('textbox', { name: 'Full name', exact: true })
+    await field.fill('')
+    await field.blur()
+    this.#completedAction = 'name-cleared'
+  }
+
+  async expectDownloadUnavailabilityExplained() {
+    this.#expectAction()
+    const download = this.#page.getByRole('button', { name: 'Download PDF', exact: true })
+    await expect(download).toBeDisabled({ timeout: 30_000 })
+    await expect(download).toHaveAccessibleDescription('Add your full name to download the PDF.', { timeout: 30_000 })
+  }
+
+  async toggleSourceProfileByKeyboard() {
+    await this.#page.getByText('See or add to what we took from your resume', { exact: true }).click()
+    await this.#page.getByRole('button', { name: 'See what we took from your resume', exact: true }).focus()
+    await this.#page.keyboard.press('Enter')
+    this.#completedAction = 'source-profile-toggled'
+  }
+
+  async expectSourceProfileToggleExposed() {
+    this.#expectAction()
+    const toggle = this.#page.getByRole('button', { name: 'Hide what we took from your resume', exact: true })
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const details = this.#page.getByRole('region', { name: 'What we took from your resume', exact: true })
+    await expect(details).toHaveAttribute('id', await toggle.getAttribute('aria-controls') ?? 'missing aria-controls')
+    await this.#page.keyboard.press('Enter')
+    await expect(this.#page.getByRole('button', { name: 'See what we took from your resume', exact: true }))
+      .toHaveAttribute('aria-expanded', 'false')
+    await expect(details).toHaveCount(0)
+  }
+
+  async generateWhileRateLimited() {
+    await this.#page.route('**/api/resume-section-writing', (route) => route.fulfill({ status: 429,
+      headers: { 'Retry-After': '2' }, json: { ok: false, error: { type: 'rate-limited', retryAfterSeconds: 2 } } }))
+    await this.#generate()
+    this.#completedAction = 'rate-limited'
+  }
+
+  async expectWaitEndAnnouncedOnce() {
+    this.#expectAction()
+    const alert = this.#page.getByRole('alert').filter({ hasText: 'Preparation could not finish.' })
+    const countdown = alert.getByRole('button', { name: /^Try again in \d s$/u })
+    await expect(countdown).toBeDisabled()
+    await expect(countdown).not.toHaveAttribute('aria-live')
+    const announcement = alert.getByRole('status').filter({ hasText: 'The wait is over. You can try again.' })
+    await expect(announcement).toHaveCount(0)
+    await expect(alert.getByRole('button', { name: 'Try again', exact: true })).toBeEnabled({ timeout: 5_000 })
+    await expect(announcement).toHaveCount(1)
   }
 
   async expectMobileJourneyExported() {
@@ -924,6 +1015,8 @@ class CandidateJourneyIntegrationSystem {
   async #expectOverflow() {
     await expect(this.#page.getByRole('alert').filter({ hasText: 'This document exceeds two pages.' })).toBeVisible({ timeout: 30_000 })
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeDisabled()
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true }))
+      .toHaveAccessibleDescription(/^This document exceeds two pages\./u)
   }
 
   async #expectNoNormalPathCheckpoint() {

@@ -26,9 +26,18 @@ export function RecoveryAction({ busy = false, cause, localization, onRetry, onS
   if (recovery === 'shorten-input' && onShortenInput === undefined) return null
   const run = recovery === 'reload' ? () => { window.location.reload() }
     : recovery === 'shorten-input' ? onShortenInput : onRetry
-  // The countdown changes every second: announcing it would interrupt the explanation the alert just read out.
-  return <Button aria-live="off" disabled={busy || remainingSeconds > 0} onClick={run} variant="default">
+  return <><Button disabled={busy || remainingSeconds > 0} onClick={run} variant="default">
     {readActionLabel({ cause, localization, remainingSeconds })}</Button>
+    {cause?.type === 'rate-limited' && cause.retryAfterSeconds > 0 ? <WaitOverAnnouncement {...{ localization, remainingSeconds }} /> : null}</>
+}
+
+/**
+ * The countdown itself is never announced, so it does not interrupt the explanation the alert reads out; the region
+ * is present from the start and speaks once, when the wait is over.
+ */
+function WaitOverAnnouncement({ localization, remainingSeconds }: Readonly<{ localization: Localization; remainingSeconds: number }>) {
+  return <span aria-atomic="true" aria-live="polite" className="sr-only" role="status">
+    {remainingSeconds === 0 ? localization.translate('failure.rate-limited.ready') : ''}</span>
 }
 
 function readActionLabel({ cause, localization, remainingSeconds }: Readonly<{

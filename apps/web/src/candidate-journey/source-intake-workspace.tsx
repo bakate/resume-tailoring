@@ -11,7 +11,7 @@ import {
   TextInput,
   Title,
 } from '@mantine/core'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 
 import type { SourceIntake } from '@resume-tailoring/application/source-intake'
 import type { Localization } from '../localization/localization'
@@ -166,16 +166,18 @@ function SourceIntakeResult({
   sourceIntake: SourceIntake
 }>) {
   const [showDetails, setShowDetails] = useState(false)
+  const detailsId = useId()
   return <Stack gap="md">
     {sourceIntake.criticalAmbiguities.length === 0
       ? <Text c="forest.8" fw={700} role="status">
           {localization.translate('sourceIntake.ready')}
         </Text>
       : <CriticalAmbiguityQuestions {...{ candidateJourney, localization, sourceIntake }} />}
-    <Button onClick={() => { setShowDetails((currentValue) => !currentValue) }} variant="default">
+    <Button aria-controls={detailsId} aria-expanded={showDetails}
+      onClick={() => { setShowDetails((currentValue) => !currentValue) }} variant="default">
       {localization.translate(showDetails ? 'sourceIntake.hideProfile' : 'sourceIntake.inspectProfile')}
     </Button>
-    {showDetails ? <DetailedSourceProfile {...{ localization, sourceIntake }} /> : null}
+    {showDetails ? <DetailedSourceProfile id={detailsId} {...{ localization, sourceIntake }} /> : null}
   </Stack>
 }
 
@@ -227,11 +229,12 @@ function CriticalAmbiguityQuestion({
 }
 
 function DetailedSourceProfile({
+  id,
   localization,
   sourceIntake,
-}: Readonly<{ localization: Localization; sourceIntake: SourceIntake }>) {
+}: Readonly<{ id: string; localization: Localization; sourceIntake: SourceIntake }>) {
   const profile = sourceIntake.sourceProfile
-  return <Stack aria-label={localization.translate('sourceIntake.detailedProfile')} role="region">
+  return <Stack aria-label={localization.translate('sourceIntake.detailedProfile')} id={id} role="region">
     <List>{sourceIntake.candidateFacts.map((fact) => <List.Item key={fact.id}>
       <Text>{fact.value}</Text><Text size="xs" c="dimmed">{fact.path}</Text>
     </List.Item>)}</List>

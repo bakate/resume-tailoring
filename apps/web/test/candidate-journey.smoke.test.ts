@@ -971,7 +971,7 @@ class CandidateJourneyTestSystem {
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
     await this.#page.getByRole('tab', { name: 'Section order', exact: true }).click()
     const experienceOrder = this.#page.getByRole('tabpanel').getByText('Experience', { exact: true }).locator('..')
-    await experienceOrder.getByRole('button', { name: 'Move up', exact: true }).click()
+    await experienceOrder.getByRole('button', { name: 'Move Experience up', exact: true }).click()
     await this.#page.keyboard.press('Escape')
   }
 

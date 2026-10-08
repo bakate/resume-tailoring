@@ -1,5 +1,5 @@
 import { Avatar, Button, FileButton, Group, List, Stack, Text, TextInput } from '@mantine/core'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { isCopiedFromSource } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeExportBlocker, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
@@ -28,9 +28,10 @@ export function TailoredResumePreview(props: ResumePreviewProps) {
   const { current } = useRenderedResume({ ...props, attempt, photo })
   const name = useCandidateNameDraft({ identity: props.document.identity, onCommit: props.onIdentityChange })
   const onRetry = () => { setAttempt((value) => value + 1) }
+  const pendingId = useId()
   return <section aria-label={messages.title}>
-    {current === null ? <Stack><Text role="status">{photo.failed ? messages.photoInvalid : messages.pending}</Text>
-      <Button disabled>{messages.download}</Button>
+    {current === null ? <Stack><Text id={pendingId} role="status">{photo.failed ? messages.photoInvalid : messages.pending}</Text>
+      <Button disabled aria-describedby={pendingId}>{messages.download}</Button>
       <CandidateNameField identity={props.document.identity} explain={false} messages={messages} name={name} /></Stack>
       : current.assessment.layout.status === 'unavailable' ? <RenderFailure {...{ localization, onRetry }} failure={current.failure} />
         : <RenderedResume key={current.assessment.layout.revision} {...{ ...props, current, messages, name, onRetry }} />}
@@ -45,15 +46,22 @@ function RenderedResume({ condensation, current, document, localization, message
   const eligibility = current.assessment.exportEligibility
   const bytes = eligibility.status === 'eligible' && preview === 'ready' && !paused ? current.pdf : null
   const blocker = eligibility.status === 'blocked' ? readPrimaryBlocker({ reasons: eligibility.reasons }) : null
+  const explanationId = useId()
+  const explanation = bytes !== null ? null : readDownloadExplanation({ blocker, preview })
+  const explainedBy = (source: DownloadExplanation) => explanation === source ? explanationId : undefined
   return <Stack gap="sm" mt="md">
-    {blocker === null || blocker === 'missing-identity' ? null : <Text role="alert" c="danger.8">{messages[blocker]}</Text>}
+    {blocker === null || blocker === 'missing-identity' ? null
+      : <Text id={explainedBy('blocker')} role="alert" c="danger.8">{messages[blocker]}</Text>}
     {current.pdf === null ? null : <ResumePdfPages bytes={current.pdf} onReady={ready} onFailure={failed} pageLabel={messages.page} />}
     <CopiedExperiences {...{ document, localization, messages }} />
-    {preview === 'failed' ? <RenderFailure {...{ localization, onRetry }} failure={undefined} /> : null}
+    {preview === 'failed' ? <RenderFailure id={explainedBy('render-failure')} {...{ localization, onRetry }} failure={undefined} /> : null}
     {eligibility.status === 'blocked' && eligibility.reasons.includes('overflow') && condensation !== undefined
       ? <Button disabled={condensation.disabled} onClick={condensation.propose}>{condensation.label}</Button> : null}
-    <ResumeDownload {...{ bytes, localization, messages, onDownload, purpose: document.purpose }} />
-    <CandidateNameField identity={document.identity} explain={blocker === 'missing-identity'} messages={messages} name={name} />
+    <ResumeDownload {...{ bytes, localization, messages, onDownload, purpose: document.purpose }}
+      explanation={explanation === null ? null : { id: explanationId,
+        hint: explanation !== 'hint' ? null : paused ? messages.paused : messages.pending }} />
+    <CandidateNameField identity={document.identity} explain={blocker === 'missing-identity'} errorId={explainedBy('name')}
+      messages={messages} name={name} />
   </Stack>
 }
 
@@ -81,6 +89,20 @@ function readPrimaryBlocker({ reasons }: Readonly<{ reasons: readonly ResumeExpo
 const blockerPriority = ['unsupported-content', 'overflow', 'missing-identity',
   'missing-contact', 'stale-layout'] as const satisfies readonly ResumeExportBlocker[]
 
+type DownloadExplanation = 'blocker' | 'name' | 'render-failure' | 'hint'
+
+/**
+ * What says why the Download button is disabled, which the button is described by. A blocker or a failed preview
+ * already explains itself on screen, a missing name beside its field; otherwise a hint beside the button does.
+ */
+function readDownloadExplanation({ blocker, preview }: Readonly<{
+  blocker: ReturnType<typeof readPrimaryBlocker>; preview: 'pending' | 'ready' | 'failed'
+}>): DownloadExplanation {
+  if (blocker === 'missing-identity') return 'name'
+  if (blocker !== null) return 'blocker'
+  return preview === 'failed' ? 'render-failure' : 'hint'
+}
+
 /**
  * The name being typed lives above the preview branches, so a render landing mid-typing keeps it. It commits on blur
  * or Enter, at most once per value, so typing never re-renders the PDF and the editor edits the same identity.
@@ -101,10 +123,10 @@ function useCandidateNameDraft({ identity, onCommit }: Readonly<{
   return { draft, setDraft, commit }
 }
 
-function CandidateNameField({ identity, explain, messages, name }: Readonly<{
-  identity: TailoredResume['identity']; explain: boolean; messages: PreviewMessages; name: CandidateNameDraft
+function CandidateNameField({ identity, errorId, explain, messages, name }: Readonly<{
+  identity: TailoredResume['identity']; errorId?: string; explain: boolean; messages: PreviewMessages; name: CandidateNameDraft
 }>) {
-  return <TextInput label={messages.fullName} value={name.draft} autoComplete="name"
+  return <TextInput label={messages.fullName} value={name.draft} autoComplete="name" errorProps={{ id: errorId }}
     description={identity?.origin === 'detected' ? messages.detectedName : undefined}
     error={explain && (identity?.value.trim() ?? '').length === 0 ? messages['missing-identity'] : undefined}
     onChange={(event) => { name.setDraft(event.currentTarget.value) }} onBlur={name.commit}
@@ -139,10 +161,10 @@ function PhotoPicker({ disabled, messages, photo }: Readonly<{
  * A render the renderer could not complete explains its Failure Cause and offers its Recovery. Pages the browser could
  * not display have no cause: retrying the preview renders them again.
  */
-function RenderFailure({ failure, localization, onRetry }: Readonly<{
-  failure: ResumeRenderResult['failure']; localization: Localization; onRetry: () => void
+function RenderFailure({ failure, id, localization, onRetry }: Readonly<{
+  failure: ResumeRenderResult['failure']; id?: string; localization: Localization; onRetry: () => void
 }>) {
-  return <Stack gap="sm" mt="md" role="alert">
+  return <Stack gap="sm" id={id} mt="md" role="alert">
     <Text c="danger.8">{localization.translate(failure === undefined ? 'failure.preview.pagesUnavailable' : 'failure.preview.layoutUnavailable')}</Text>
     {failure === undefined ? <Button onClick={onRetry}>{localization.translate('failure.preview.retry')}</Button> : <>
       <FailureExplanation cause={failure.cause} localization={localization} />
@@ -150,17 +172,20 @@ function RenderFailure({ failure, localization, onRetry }: Readonly<{
   </Stack>
 }
 
-function ResumeDownload({ bytes, localization, messages, onDownload, purpose }: Readonly<{
+function ResumeDownload({ bytes, explanation, localization, messages, onDownload, purpose }: Readonly<{
   bytes: Uint8Array | null; localization: Localization; messages: PreviewMessages; onDownload: () => void
   purpose: TailoredResume['purpose']
+  /** Why the button is disabled: the element that says so, and the hint to show beside it when nothing else does. */
+  explanation: Readonly<{ id: string; hint: string | null }> | null
 }>) {
   const [download, setDownload] = useState<'idle' | 'failed' | 'handed-off'>('idle')
-  return <><Button disabled={bytes === null} onClick={() => {
+  return <><Button disabled={bytes === null} aria-describedby={explanation?.id} onClick={() => {
     if (bytes === null) return
     const outcome = handOffResumePdf({ bytes, purpose })
     setDownload(outcome ? 'handed-off' : 'failed')
     if (outcome) onDownload()
   }}>{messages.download}</Button>
+    {explanation === null || explanation.hint === null ? null : <Text id={explanation.id} size="sm" c="dimmed">{explanation.hint}</Text>}
     {download === 'idle' ? null : <Text role={download === 'failed' ? 'alert' : 'status'}>
       {download === 'failed' ? localization.translate('failure.preview.download') : messages.downloaded}</Text>}
   </>
