@@ -23,6 +23,15 @@ Turnstile grants a signed, HTTP-only access cookie for 30 minutes. Protected API
 requests without that cookie. This reduces automated abuse but does not replace the enforced
 OpenAI spend limit.
 
+## Security headers
+
+The application sets its own `Content-Security-Policy`, `Referrer-Policy`, `X-Content-Type-Options` and
+`Permissions-Policy` on every response, from the request middleware in `apps/web/src/start.ts`; the Worker passes them
+through unchanged. Inline scripts run only with the per-request nonce, and `connect-src` keeps every request on our
+origin. A new third-party host, such as a CDN or an analytics script, must be added to
+`apps/web/src/security-headers/page-security-headers.ts` or the browser will block it. The end-to-end suite fails on
+any `securitypolicyviolation`.
+
 ## Prerequisites
 
 - Docker
