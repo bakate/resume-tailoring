@@ -24,6 +24,7 @@ import type { ResumeSectionChange } from './structured-resume-contract'
 import { assign, createActor, fromPromise, setup, waitFor } from 'xstate'
 import type { AnyActorRef, SnapshotFrom } from 'xstate'
 import { prepareResumeRendering, staleResumeRendering, validateResumeRendering } from './resume-rendering-state'
+import { reduceToPageBudget } from './overflow-reduction'
 import type { ResumeRenderingState } from './resume-rendering-state'
 
 import { unavailableResumeRender } from './resume-export'
@@ -443,6 +444,29 @@ function hasJobMatchConsent({ input, session }: Readonly<{
   })
 }
 
+/** Overflow Reduction of a just prepared Tailored Resume; null when it hides nothing or cannot measure the resume. */
+const fitPageBudget = fromPromise<CandidateSession | null, Readonly<{
+  dependencies: CandidateJourneyDependencies; session: CandidateSession | null
+}>>(async ({ input: { dependencies, session } }) => {
+  const renderer = dependencies.resumeDocumentRenderer
+  // The Page Budget belongs to a Tailored Resume: a Normalized Resume claims no relevance to rank its content by.
+  if (session?.tailoredResume?.purpose !== 'tailored' || renderer === undefined) return null
+  const reduction = { resume: session.tailoredResume, editing: readResumeEditing({ session }) }
+  const reduced = await reduceToPageBudget({ reduction, renderer, today: dependencies.now(),
+    relevantFactIds: session.jobMatch?.analysis.relevantFactIds ?? [], photoDataUrl: session.resumePhoto?.dataUrl })
+  return reduced === reduction ? null : { ...session, tailoredResume: reduced.resume, resumeEditing: reduced.editing }
+})
+
+/** Reduction completes the preparation: the prepared revision stays, and the resume is not manually edited. */
+function saveReducedResume({ context, reduced }: Readonly<{
+  context: CandidateJourneyContext; reduced: CandidateSession | null
+}>): Partial<CandidateJourneyContext> {
+  if (reduced === null || context.preparationOutcome?.status !== 'prepared') return {}
+  // The unreduced resume is already saved: when this save fails, the Candidate keeps it and the overflow outcome applies.
+  const saved = context.dependencies.persistence.save({ session: reduced })
+  return saved.ok ? { session: saved.value, preparationOutcome: { ...context.preparationOutcome, session: saved.value } } : {}
+}
+
 const renderResumeDocument = fromPromise<ResumeRenderResult | null, Readonly<{
   dependencies: CandidateJourneyDependencies; request: ResumeRenderRequest | null
 }>>(async ({ input }) => {
@@ -516,6 +540,7 @@ const candidateJourneyMachine = setup({
   actors: {
     generateApplicationResume,
     resumePreparationMachine,
+    fitPageBudget,
     renderResumeDocument,
     confirmProfileEnrichment,
     deleteCandidateSession,
@@ -700,7 +725,7 @@ const candidateJourneyMachine = setup({
           invoke: {
             src: 'resumePreparationMachine',
             input: ({ context }) => readResumePreparationInput(context),
-            onDone: { target: '#candidate-journey.candidateSessionAvailable', actions: assign(({ context, event }) => {
+            onDone: { target: 'fittingPageBudget', actions: assign(({ context, event }) => {
               const outcome = context.preparedInputs === null ? unavailable : publishResumePreparation({
                 inputs: context.preparedInputs, dependencies: context.dependencies, outcome: event.output })
               return { preparationPhase: null, preparationOutcome: outcome, preparedInputs: null,
@@ -708,6 +733,16 @@ const candidateJourneyMachine = setup({
             }) },
             onError: { target: '#candidate-journey.candidateSessionAvailable',
               actions: assign({ preparationPhase: null, preparationOutcome: unavailable, preparedInputs: null }) },
+          },
+        },
+        fittingPageBudget: {
+          invoke: {
+            src: 'fitPageBudget',
+            input: ({ context }) => ({ dependencies: context.dependencies,
+              session: context.preparationOutcome?.status === 'prepared' ? context.session : null }),
+            onDone: { target: '#candidate-journey.candidateSessionAvailable', actions: assign(({ context, event }) =>
+              saveReducedResume({ context, reduced: event.output })) },
+            onError: { target: '#candidate-journey.candidateSessionAvailable' },
           },
         },
       },
