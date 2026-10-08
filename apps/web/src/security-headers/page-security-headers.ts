@@ -32,8 +32,8 @@ function createContentSecurityPolicy({ nonce }: Readonly<{ nonce: string }>) {
     'script-src': ["'self'", `'nonce-${nonce}'`, turnstileOrigin],
     // `'self'` also covers the development server's same-origin hot reload socket.
     'connect-src': ["'self'"],
-    'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-    'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
+    'style-src': ["'self'", "'unsafe-inline'"],
+    'font-src': ["'self'", 'data:'],
     'img-src': ["'self'", 'data:', 'blob:'],
     'frame-src': ["'self'", turnstileOrigin, 'blob:'],
     'worker-src': ["'self'", 'blob:'],

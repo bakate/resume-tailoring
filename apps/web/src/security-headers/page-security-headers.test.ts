@@ -12,14 +12,14 @@ describe('page security headers', () => {
       'base-uri': ["'none'"],
       'connect-src': ["'self'"],
       'default-src': ["'self'"],
-      'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
+      'font-src': ["'self'", 'data:'],
       'form-action': ["'self'"],
       'frame-ancestors': ["'none'"],
       'frame-src': ["'self'", 'https://challenges.cloudflare.com', 'blob:'],
       'img-src': ["'self'", 'data:', 'blob:'],
       'object-src': ["'none'"],
       'script-src': ["'self'", `'nonce-${nonce}'`, 'https://challenges.cloudflare.com'],
-      'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      'style-src': ["'self'", "'unsafe-inline'"],
       'worker-src': ["'self'", 'blob:'],
     })
   })
