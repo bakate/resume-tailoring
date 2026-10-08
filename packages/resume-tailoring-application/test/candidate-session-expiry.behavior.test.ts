@@ -51,7 +51,7 @@ class CandidateSessionExpiryTestSystem {
     }) })
     this.#journey.start()
     await vi.advanceTimersByTimeAsync(0)
-    expect(this.#journey.readView().status).toBe('candidate-session-open')
+    if (this.#journey.readView().status !== 'candidate-session-open') expect.fail('Expected the stored Candidate Session to open')
   }
 
   /** Lets the open page's clock run, as a Candidate who leaves the tab open would. */

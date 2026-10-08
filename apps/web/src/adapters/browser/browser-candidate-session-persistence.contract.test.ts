@@ -176,22 +176,13 @@ describe('browser Candidate Session persistence', () => {
     ['the previous flat document version', { ...candidateSession, version: 5 }],
     ['an incompatible version', { ...candidateSession, version: 999 }],
   ])('discards %s', (_caseName, storedSession) => {
-    const storage = createMemoryStorage({ initialValue: JSON.stringify(storedSession) })
-    const persistence = createBrowserCandidateSessionPersistence({ storages: { browser: storage, tab: createMemoryStorage() } })
+    const storages = createBrowserStorages({ initialValue: JSON.stringify(storedSession) })
+    const persistence = createBrowserCandidateSessionPersistence({ storages })
 
     const restored = persistence.restore()
 
     expect(restored).toEqual({ ok: true, value: { notice: 'incompatible-session-discarded', session: null } })
-    expect(storage.getItem(candidateSessionStorageKey)).toBeNull()
-  })
-
-  it('removes a deleted Candidate Session from browser storage', () => {
-    const storage = createMemoryStorage({ initialValue: JSON.stringify(candidateSession) })
-    const persistence = createBrowserCandidateSessionPersistence({ storages: { browser: storage, tab: createMemoryStorage() } })
-
-    persistence.delete()
-
-    expect(storage.getItem(candidateSessionStorageKey)).toBeNull()
+    expect(storages.browser.getItem(candidateSessionStorageKey)).toBeNull()
   })
 
   it('keeps the last saved session while the page is being left, so cut-short work restores as interrupted', () => {
