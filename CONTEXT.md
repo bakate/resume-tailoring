@@ -73,7 +73,7 @@ A professional proposition taken from a Candidate-supplied Source Document or ex
 _Avoid_: Verified Fact, inferred skill, assumed qualification
 
 **Derived Fact**:
-A deterministic value calculated from Candidate Facts, such as a non-overlapping duration computed from complete dates; it never assigns a qualitative level or introduces new professional information.
+A deterministic value calculated from Candidate Facts, such as a non-overlapping duration computed from complete dates; it never assigns a qualitative level or introduces new professional information. A listed skill's duration across the dated experiences that mention it is one: Match Evidence for a duration requirement may rest on it, and then cites the Candidate Facts it was calculated from.
 _Avoid_: Inference, estimate, assumed seniority
 
 **Profile Enrichment Prompt**:
@@ -87,7 +87,7 @@ The Candidate-provided text describing one employment opportunity against which 
 _Avoid_: Job offer URL, advert, listing
 
 **Target Role**:
-The unambiguous role title copied from an exact Job Posting excerpt and used as the Tailored Resume heading; when absent, the interface uses an explicit localized fallback.
+The unambiguous role title copied from an exact Job Posting excerpt. It orients the Headline and the emphasis of a Tailored Resume but is never shown as a title the Candidate held; when absent, the interface uses an explicit localized fallback.
 _Avoid_: Inferred title, desired role, generated headline
 
 **Job Requirement**:
@@ -176,8 +176,12 @@ _Avoid_: Fallback section, raw section, unwritten section
 A concise professional statement within a Resume Field whose meaning, dates, scope, level, and outcomes remain supported by its linked Candidate Facts.
 _Avoid_: Generated statement, inferred claim
 
+**Headline**:
+The one-line title under the Candidate's name on a Tailored Resume: a role the Candidate held, in the grammatical gender and resume language of their own titles, optionally followed by supported specialities the Target Role asks for. It is a validated Resume Field, falls back to the role of the most recent relevant experience, and never carries a contract type.
+_Avoid_: Target Role heading, job title claim, tagline
+
 **Value Proposition**:
-The two-to-four-line opening summary that explains within the first reading moments why the Candidate's strongest supported evidence is relevant to the Target Role.
+The two-to-four-line opening summary that explains within the first reading moments why the Candidate's strongest supported evidence is relevant to the Target Role, written without personal pronouns as a resume is.
 _Avoid_: Personal objective, generic profile summary
 
 **Relevant Experience**:

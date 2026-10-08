@@ -53,6 +53,11 @@ export type TailoredResume = Readonly<{
   locale: TailoredResumeLocale
   sections: readonly TailoredResumeSection[]
   targetRole: TargetRole | null
+  /**
+   * The title under the Candidate's name, written from roles the Candidate held and evidence they hold, oriented to the
+   * Target Role but never claiming it; absent from resumes prepared before it existed, which are headed by the Target Role.
+   */
+  headline?: TailoredResumeField | null
   valueProposition: Readonly<{
     kind: 'evidence-excerpts' | 'prose'
     paragraphs: readonly TailoredResumeField[]
@@ -92,7 +97,8 @@ export type ResumeSectionKind = typeof resumeSectionKinds[number]
 type FieldSectionKind = Exclude<ResumeSectionKind, 'value-proposition' | 'experience' | 'skills'>
 
 export type ResumeSectionContent =
-  | Readonly<{ kind: 'value-proposition'; paragraphs: readonly TailoredResumeField[] }>
+  // `headline` is absent from sections written before the Value Proposition writer also wrote it.
+  | Readonly<{ kind: 'value-proposition'; paragraphs: readonly TailoredResumeField[]; headline?: TailoredResumeField | null }>
   | Readonly<{ kind: 'experience'; experience: TailoredResumeExperience }>
   | Readonly<{ kind: 'skills'; groups: readonly TailoredResumeSkillGroup[] }>
   | Readonly<{ kind: FieldSectionKind; fields: readonly TailoredResumeField[] }>

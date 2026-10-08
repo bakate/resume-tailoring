@@ -24,8 +24,10 @@ export function renderTailoredResumeDocument({ tailoredResume, photoDataUrl }: R
   photoDataUrl?: string
 }>) {
   const title = tailoredResume.identity?.value ?? 'Tailored resume'
+  // A resume prepared before headlines existed is still headed by its Target Role.
   const heading = tailoredResume.purpose === 'normalized'
-    ? readResumeHeading({ key: 'normalized', locale: tailoredResume.locale }) : tailoredResume.targetRole?.value ?? ''
+    ? readResumeHeading({ key: 'normalized', locale: tailoredResume.locale })
+    : tailoredResume.headline?.text ?? tailoredResume.targetRole?.value ?? ''
   // Each detail stays on one line, so an address never splits across lines.
   const contactDetails = tailoredResume.contactDetails
     .map(({ value }) => `<span class="contact-detail">${renderText(value)}</span>`).join(' · ')
@@ -60,6 +62,7 @@ function hasRequiredContactDetails({ tailoredResume }: Readonly<{ tailoredResume
 
 function readProfessionalFields({ tailoredResume }: Readonly<{ tailoredResume: TailoredResume }>) {
   return [
+    ...(tailoredResume.headline === undefined || tailoredResume.headline === null ? [] : [tailoredResume.headline]),
     ...tailoredResume.valueProposition.paragraphs,
     ...tailoredResume.experiences.flatMap((experience) => readExperienceFields({ experience })),
     ...tailoredResume.sections.flatMap((section) => readSectionFields({ section })),

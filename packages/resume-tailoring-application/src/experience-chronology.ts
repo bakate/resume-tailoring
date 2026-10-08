@@ -57,6 +57,14 @@ function budgetByDuration(months: number | null) {
  * covers that whole year, never beyond today. Null without a usable start and end, so the duration is never guessed.
  */
 export function readExperienceMonths({ experience, today }: Readonly<{ experience: ExperienceDates; today: number }>) {
+  const span = readExperienceMonthSpan({ experience, today })
+  return span === null ? null : span.last - span.first + 1
+}
+
+/** The first and last calendar months of an experience, both included, under the same rules as its duration. */
+export function readExperienceMonthSpan({ experience, today }: Readonly<{
+  experience: ExperienceDates; today: number
+}>): Readonly<{ first: number; last: number }> | null {
   const start = readMonth({ date: experience.startDate })
   const ongoing = readExperienceDates({ experience }).end === 'ongoing'
   const end = ongoing ? null : readMonth({ date: experience.endDate })
@@ -64,7 +72,20 @@ export function readExperienceMonths({ experience, today }: Readonly<{ experienc
   const todayMonth = new Date(today).getUTCFullYear() * 12 + new Date(today).getUTCMonth()
   const first = toCalendarMonth({ month: start, edge: 'first' })
   const last = end === null ? todayMonth : Math.min(toCalendarMonth({ month: end, edge: 'last' }), todayMonth)
-  return last < first ? null : last - first + 1
+  return last < first ? null : { first, last }
+}
+
+/** How many calendar months the spans cover together, each month counted once however many spans overlap it. */
+export function countCoveredMonths(spans: readonly Readonly<{ first: number; last: number }>[]) {
+  const ordered = spans.toSorted((left, right) => left.first - right.first)
+  let total = 0
+  let coveredUntil = -Infinity
+  for (const { first, last } of ordered) {
+    if (last <= coveredUntil) continue
+    total += last - Math.max(first, coveredUntil + 1) + 1
+    coveredUntil = last
+  }
+  return total
 }
 
 /** A month counted from year zero; a date known only by its year starts in January and ends in December. */

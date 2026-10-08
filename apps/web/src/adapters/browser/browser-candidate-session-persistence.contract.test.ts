@@ -1,4 +1,4 @@
-import { groupedResumeDocument, readGroupedResumeSection } from '@resume-tailoring/application/structured-resume-fixtures'
+import { groupedResumeDocument, readGroupedResumeSection, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -92,6 +92,17 @@ describe('browser Candidate Session persistence', () => {
 
   it('round-trips semantic values, stable identities, prose, and grouped provenance', () => {
     const session = { ...candidateSession, tailoredResume: groupedResumeDocument }
+
+    const restored = roundTrip({ session })
+
+    expect(restored).toEqual({ ok: true, value: { notice: null, session } })
+  })
+
+  it('round-trips the headline of a Tailored Resume and the dates of an education entry', () => {
+    const headline = { id: 'headline', text: 'Frontend Engineer', factIds: ['source-fact-experiences-0-role-0' as const] }
+    const sourceIntake = { ...structuredResumeSource, sourceProfile: { ...structuredResumeSource.sourceProfile,
+      education: [{ qualification: 'Computer Science degree', institution: null, dates: '2018' }] } }
+    const session = { ...candidateSession, sourceIntake, tailoredResume: { ...groupedResumeDocument, headline } }
 
     const restored = roundTrip({ session })
 

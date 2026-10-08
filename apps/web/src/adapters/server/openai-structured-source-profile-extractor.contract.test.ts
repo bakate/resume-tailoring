@@ -30,6 +30,28 @@ describe('OpenAI structured Source Profile extractor contract', () => {
     })
   })
 
+  it('asks for the dates of every education entry, so a degree keeps the year the source gives', async () => {
+    const requests: Request[] = []
+    const profile = { ...structuredSourceProfile, education: [{ institution: 'Université de Lille',
+      qualification: 'Licence professionnelle Développement Web', dates: '2018' }] }
+    const extractor = createOpenAiStructuredSourceProfileExtractor({
+      apiKey: 'test-api-key',
+      model: 'structured-model',
+      reasoningEffort: 'low',
+      request: (input, init) => {
+        requests.push(new Request(input, init))
+        return Promise.resolve(Response.json(createOpenAiResponse({ profile })))
+      },
+    })
+
+    const result = await extractor.extract({ professionalContent: 'Licence professionnelle – Université de Lille – 2018' })
+
+    const education = (await requests[0]?.json() as EducationSchemaRequest).text.format.schema.properties.education.items
+    expect(result).toEqual({ ok: true, value: profile })
+    expect(education.properties.dates).toEqual({ anyOf: [{ type: 'string', minLength: 1 }, { type: 'null' }] })
+    expect(education.required).toContain('dates')
+  })
+
   it('rejects malformed structured evidence', async () => {
     const extractor = createOpenAiStructuredSourceProfileExtractor({
       apiKey: 'test-api-key',
@@ -45,6 +67,9 @@ describe('OpenAI structured Source Profile extractor contract', () => {
     expect(result).toEqual({ ok: false, error: 'source-profile-extraction-unavailable' })
   })
 })
+
+type EducationSchemaRequest = Readonly<{ text: { format: { schema: { properties: { education: { items: {
+  properties: Readonly<Record<string, unknown>>; required: readonly string[] } } } } } } }>
 
 function createOpenAiResponse({
   profile = structuredSourceProfile,

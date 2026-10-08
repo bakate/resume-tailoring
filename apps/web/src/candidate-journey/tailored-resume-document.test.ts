@@ -111,6 +111,28 @@ describe('Tailored Resume export document', () => {
     expect(hasValidTailoredResumeProvenance({ ...source, tailoredResume })).toBe(true)
   })
 
+  it('heads a Tailored Resume with its headline, never the Target Role, and checks the headline provenance', () => {
+    const tailoredResume = { ...source.tailoredResume,
+      targetRole: { value: 'Développeur Front-end React', sourceExcerpt: 'Développeur Front-end React (H/F)' },
+      headline: { id: 'headline', factIds: ['source-fact-1'], text: 'Développeuse Front-end' } } as const
+
+    const html = renderTailoredResumeDocument({ tailoredResume })
+
+    expect(html).toContain('<p>Développeuse Front-end</p>')
+    expect(html).not.toContain('Développeur Front-end React')
+    expect(hasValidTailoredResumeProvenance({ ...source, tailoredResume: { ...tailoredResume,
+      headline: { ...tailoredResume.headline, factIds: ['source-fact-unknown'] } } })).toBe(false)
+  })
+
+  it('heads a Tailored Resume prepared before headlines existed with its Target Role', () => {
+    const tailoredResume = { ...source.tailoredResume,
+      targetRole: { value: 'Frontend Engineer', sourceExcerpt: 'Frontend Engineer' } } as const
+
+    const html = renderTailoredResumeDocument({ tailoredResume })
+
+    expect(html).toContain('<p>Frontend Engineer</p>')
+  })
+
   it('labels a Normalized Resume explicitly without claiming a Target Role', () => {
     const tailoredResume = { ...source.tailoredResume, purpose: 'normalized',
       targetRole: { value: 'Frontend Engineer', sourceExcerpt: 'Frontend Engineer' } } as const

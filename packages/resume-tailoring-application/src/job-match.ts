@@ -18,6 +18,7 @@ import type {
   TargetRole,
 } from '@resume-tailoring/domain/job-match'
 import { explainFailure, explainModelFailure } from './failure-cause'
+import { deriveSkillDurations, replaceDerivedFactIds } from './skill-durations'
 import type { ExplainedFailure } from './failure-cause'
 import type { JobPostingDocumentReader, JobPostingExtractor, MatchEvidenceMatcher } from './ports'
 
@@ -83,6 +84,8 @@ type CreateJobMatchRequest = Readonly<{
   jobPostingDocumentReader: JobPostingDocumentReader
   jobPostingExtractor: JobPostingExtractor
   matchEvidenceMatcher: MatchEvidenceMatcher
+  /** When the analysis runs: an ongoing experience lasts until then, which sets the durations derived from it. */
+  now: () => number
 }>
 
 type CreateJobMatchResult = Promise<Readonly<{ ok: true; value: JobMatch }> | (Readonly<{
@@ -96,6 +99,7 @@ export async function createJobMatch({
   jobPostingDocumentReader,
   jobPostingExtractor,
   matchEvidenceMatcher,
+  now,
 }: CreateJobMatchRequest): CreateJobMatchResult {
   if (document.bytes.byteLength > maximumJobPostingBytes) return oversizedResult
   const contentResult = await jobPostingDocumentReader.read(document)
@@ -104,7 +108,7 @@ export async function createJobMatch({
   if (content.length === 0) return emptyResult
   if (content.length > maximumJobPostingCharacters) return oversizedResult
   return extractAndAnalyzeJobMatch({
-    candidateFacts, content, document, jobPostingExtractor, matchEvidenceMatcher,
+    candidateFacts, content, document, jobPostingExtractor, matchEvidenceMatcher, now,
   })
 }
 
@@ -112,15 +116,18 @@ export async function refreshJobMatch({
   candidateFacts,
   jobMatch,
   matchEvidenceMatcher,
+  now,
 }: Readonly<{
   candidateFacts: readonly CandidateFact[]
   jobMatch: JobMatch
   matchEvidenceMatcher: MatchEvidenceMatcher
+  now: () => number
 }>): CreateJobMatchResult {
   const analysisResult = await analyzeCandidateFacts({
     candidateFacts,
     matchEvidenceMatcher,
     requirements: jobMatch.requirements,
+    today: now(),
   })
   if (!analysisResult.ok) return analysisResult
   return { ok: true, value: {
@@ -132,20 +139,21 @@ export async function refreshJobMatch({
 }
 
 async function extractAndAnalyzeJobMatch({
-  candidateFacts, content, document, jobPostingExtractor, matchEvidenceMatcher,
+  candidateFacts, content, document, jobPostingExtractor, matchEvidenceMatcher, now,
 }: Readonly<{
   candidateFacts: readonly CandidateFact[]
   content: string
   document: JobPostingDocument
   jobPostingExtractor: JobPostingExtractor
   matchEvidenceMatcher: MatchEvidenceMatcher
+  now: () => number
 }>) {
   const extractionResult = await jobPostingExtractor.extract({ jobPostingContent: content })
   if (!extractionResult.ok) return explainModelFailure(extractionResult)
   const extraction = readSourceBackedExtraction({ content, extraction: extractionResult.value })
   if (extraction === null) return extractionUnavailableResult
   return analyzeExtractedJobPosting({
-    candidateFacts, content, document, extraction, matchEvidenceMatcher,
+    candidateFacts, content, document, extraction, matchEvidenceMatcher, today: now(),
   })
 }
 
@@ -155,15 +163,17 @@ type AnalyzeExtractedJobPostingRequest = Readonly<{
   document: JobPostingDocument
   extraction: ExtractedJobPosting
   matchEvidenceMatcher: MatchEvidenceMatcher
+  today: number
 }>
 
 async function analyzeExtractedJobPosting({
-  candidateFacts, content, document, extraction, matchEvidenceMatcher,
+  candidateFacts, content, document, extraction, matchEvidenceMatcher, today,
 }: AnalyzeExtractedJobPostingRequest) {
   const analysisResult = await analyzeCandidateFacts({
     candidateFacts,
     matchEvidenceMatcher,
     requirements: extraction.requirements,
+    today,
   })
   if (!analysisResult.ok) return analysisResult
   return { ok: true, value: buildJobMatch({
@@ -178,12 +188,16 @@ async function analyzeCandidateFacts({
   candidateFacts,
   matchEvidenceMatcher,
   requirements,
+  today,
 }: Readonly<{
   candidateFacts: readonly CandidateFact[]
   matchEvidenceMatcher: MatchEvidenceMatcher
   requirements: readonly JobRequirement[]
+  today: number
 }>) {
-  const engineFacts = mapCandidateFacts({ candidateFacts })
+  // Durations a requirement may ask for are calculated here, from dated experiences, and cited as Derived Facts.
+  const skillDurations = deriveSkillDurations({ candidateFacts, today })
+  const engineFacts = [...mapCandidateFacts({ candidateFacts }), ...skillDurations.map(({ fact }) => fact)]
   // One judgment misses evidence another finds, so the engine verifies the proposals of both and keeps the strongest.
   const judgments = await Promise.all(Array.from({ length: matchEvidenceJudgmentCount },
     () => matchEvidenceMatcher.match({ candidateFacts: engineFacts, requirements })))
@@ -198,7 +212,18 @@ async function analyzeCandidateFacts({
     requirements,
   })
   if (!analysisResult.ok) return matchEvidenceUnavailableResult
-  return analysisResult
+  return { ok: true, value: citeCandidateFactsForDerivedFacts({ analysis: analysisResult.value, skillDurations }) } as const
+}
+
+/** A Derived Fact exists only for the matcher: the Match Analysis cites the Candidate Facts it was calculated from. */
+function citeCandidateFactsForDerivedFacts({ analysis, skillDurations }: Readonly<{
+  analysis: EngineMatchAnalysis; skillDurations: ReturnType<typeof deriveSkillDurations>
+}>): EngineMatchAnalysis {
+  if (skillDurations.length === 0) return analysis
+  const replace = (factIds: readonly string[]) => replaceDerivedFactIds({ factIds, durations: skillDurations })
+  return { ...analysis, relevantFactIds: replace(analysis.relevantFactIds),
+    evidence: analysis.evidence.map((item) => ({ ...item, factIds: replace(item.factIds) })),
+    adjacentEvidence: analysis.adjacentEvidence.map((item) => ({ ...item, factIds: replace(item.factIds) })) }
 }
 
 type BuildJobMatchRequest = Readonly<{

@@ -2,7 +2,8 @@ import type { JobMatch } from '@resume-tailoring/domain/job-match'
 import type { CandidateFact, CandidateFactId } from '@resume-tailoring/domain/source-intake'
 import { classifyExperiences, orderExperiencesReverseChronologically } from './experience-chronology'
 import { readExperienceFields, readSectionFields, replaceEmDashes } from './tailored-resume'
-import type { TailoredResumeExperience, TailoredResumeField, TailoredResumeLocale, TailoredResumeSection } from './tailored-resume'
+import type { TailoredResumeExperience, TailoredResumeField, TailoredResumeLocale, TailoredResumeSection,
+  TailoredResumeSkillGroup } from './tailored-resume'
 import type { ProfessionalResumeDocument } from './structured-resume-contract'
 import type { ReadApiFailure } from './api-failure'
 import type { ResumeSectionContent, ResumeSectionKind } from '@resume-tailoring/domain/tailored-resume'
@@ -139,8 +140,14 @@ export function normalizeSectionContent({ content: written, purpose, section, re
 }>): ResumeSectionContent {
   const content = mapSectionFields({ content: written,
     map: (field) => ({ ...field, text: replaceEmDashes(field.text) }) })
+  if (content.kind === 'value-proposition') {
+    if (content.headline === undefined) return content
+    // A Normalized Resume claims no orientation, so it is never headed by a written headline.
+    return { ...content, headline: purpose === 'normalized' || content.headline === null ? null : withoutContractType(content.headline) }
+  }
   if (content.kind === 'experience') {
-    const { experience } = content
+    const experience = { ...content.experience,
+      role: content.experience.role === null ? null : withoutContractType(content.experience.role) }
     const achievements = orderByRelevance({ fields: deduplicateFields(experience.achievements), relevantFactIds })
     const shape = section.experienceShape
     if (shape === undefined) {
@@ -153,9 +160,47 @@ export function normalizeSectionContent({ content: written, purpose, section, re
       : { ...shaped, achievements: achievements.slice(0, shape.achievementBudget) } }
   }
   if (content.kind === 'skills') {
-    return { kind: 'skills', groups: content.groups.map((group) => ({ ...group, items: deduplicateFields(group.items) })) }
+    return { kind: 'skills', groups: content.groups.map((group) => withoutRepeatedLabel({ ...group, items: deduplicateFields(group.items) })) }
   }
   return content
+}
+
+/**
+ * A job title names the role, never how it was contracted: "Développeuse Front-end (CDI)" becomes "Développeuse
+ * Front-end". A contract type is removed when it is a whole parenthesis or a segment after a dash, comma or bar, and an
+ * unambiguous one (CDI, CDD, freelance) also as the first or last word; a title made only of it is kept as written.
+ */
+export function withoutContractType(field: TailoredResumeField): TailoredResumeField {
+  const text = contractTypePatterns.reduce((title, pattern) => title.replace(pattern, ''), field.text).trim()
+  return text.length === 0 || text === field.text ? field : { ...field, text }
+}
+
+// The contract types a title may carry, in both supported languages. "Stage" or "indépendant" alone may belong to the
+// role ("Responsable de stage", "Consultante indépendante"), so only a whole parenthesis or segment of them is removed.
+const contractTypes = String.raw`(?:cdi|cdd|freelance|free[- ]lance|ind[ée]pendante?|int[ée]rim|alternance|apprentissage|`
+  + String.raw`contrat de professionnalisation|contrat pro|stage|internship|temps plein|temps partiel|full[- ]time|part[- ]time|`
+  + String.raw`fixed[- ]term(?: contract)?|permanent contract|v\.?i\.?e\.?)(?![\p{L}\p{N}])`
+const bareContractTypes = String.raw`(?:cdi|cdd|freelance|free[- ]lance)(?![\p{L}\p{N}])`
+const contractTypePatterns = [
+  // A parenthesis opening on a contract type, alone or followed by its terms: "(CDI)", "(CDD – 6 mois)", "(stage de 6 mois)".
+  new RegExp(String.raw`\s*[(\[]\s*${contractTypes}(?:\s*[-–,/:]\s*[^()[\]]*|\s+(?:de\s+|of\s+)?\d[^()[\]]*)?\s*[)\]]`, 'giu'),
+  new RegExp(String.raw`\s*[-–|,/]\s*${contractTypes}\s*$`, 'iu'),
+  new RegExp(String.raw`^\s*${contractTypes}\s*[-–|,/]\s*`, 'iu'),
+  new RegExp(String.raw`(?<=\S)\s+${bareContractTypes}\s*$`, 'iu'),
+  new RegExp(String.raw`^\s*${bareContractTypes}\s+(?=\S)`, 'iu'),
+] as const
+
+/** A group whose only item repeats its label, as "Accessibilité: Accessibilité RGAA", keeps the item and loses the label. */
+function withoutRepeatedLabel(group: TailoredResumeSkillGroup): TailoredResumeSkillGroup {
+  const [only, ...others] = group.items
+  if (group.category === null || only === undefined || others.length > 0) return group
+  const label = foldWords(group.category.text)
+  return label.length > 0 && ` ${foldWords(only.text)} `.includes(` ${label} `) ? { ...group, category: null } : group
+}
+
+function foldWords(value: string) {
+  return value.normalize('NFD').replaceAll(/\p{Diacritic}/gu, '').toLocaleLowerCase()
+    .replaceAll(/[^\p{L}\p{N}+#]+/gu, ' ').trim()
 }
 
 /**
@@ -183,7 +228,10 @@ function mapSectionFields({ content, map }: Readonly<{
   content: ResumeSectionContent; map: (field: TailoredResumeField) => TailoredResumeField
 }>): ResumeSectionContent {
   const mapOrNull = (field: TailoredResumeField | null) => field === null ? null : map(field)
-  if (content.kind === 'value-proposition') return { ...content, paragraphs: content.paragraphs.map(map) }
+  if (content.kind === 'value-proposition') {
+    return { ...content, paragraphs: content.paragraphs.map(map),
+      ...(content.headline === undefined ? {} : { headline: mapOrNull(content.headline) }) }
+  }
   if (content.kind === 'experience') {
     const { experience } = content
     return { ...content, experience: { ...experience, role: mapOrNull(experience.role),
@@ -211,7 +259,9 @@ function deduplicateFields(fields: readonly TailoredResumeField[]) {
 }
 
 export function readSectionContentFields(content: ResumeSectionContent): readonly TailoredResumeField[] {
-  if (content.kind === 'value-proposition') return content.paragraphs
+  if (content.kind === 'value-proposition') {
+    return content.headline === undefined || content.headline === null ? content.paragraphs : [content.headline, ...content.paragraphs]
+  }
   if (content.kind === 'experience') return readExperienceFields({ experience: content.experience })
   if (content.kind === 'skills') return readSectionFields({ section: { section: 'skills', groups: content.groups } })
   return content.fields
@@ -389,6 +439,8 @@ export function assembleResumeDocumentWithOrigins({ contents, request }: Readonl
     field === null ? null : unique(field, key, copiedFromSource)
   const paragraphs = contents.flatMap((content) => content.kind === 'value-proposition'
     ? content.paragraphs.map((field) => unique(field, 'value-proposition')) : [])
+  const headline = request.purpose === 'normalized' ? null
+    : uniqueOrNull(readHeadline({ contents, relevantFactIds: request.jobMatch.analysis.relevantFactIds }), 'value-proposition')
   const experiences = contents.flatMap((content) => content.kind !== 'experience' ? [] : [{ ...content.experience,
     role: uniqueOrNull(content.experience.role, content.experience.id),
     organization: uniqueOrNull(content.experience.organization, content.experience.id),
@@ -406,12 +458,30 @@ export function assembleResumeDocumentWithOrigins({ contents, request }: Readonl
     return [{ section: content.kind, fields: content.fields.map((field) => unique(field, content.kind)) }]
   })
   return { origins, document: { purpose: request.purpose, locale: request.locale,
-    targetRole: request.purpose === 'normalized' ? null : request.jobMatch.targetRole,
+    targetRole: request.purpose === 'normalized' ? null : request.jobMatch.targetRole, headline,
     valueProposition: { kind: 'prose', paragraphs }, experiences, sections } }
 }
 
+/**
+ * The headline the Value Proposition writer cited, or else the role the Candidate held in their most recent relevant
+ * experience (in any experience when none is relevant), so the resume is never headed by a role the Candidate did not hold.
+ */
+function readHeadline({ contents, relevantFactIds }: Readonly<{
+  contents: readonly ResumeSectionContent[]; relevantFactIds: readonly string[]
+}>): TailoredResumeField | null {
+  const written = contents.find((content) => content.kind === 'value-proposition')
+  if (written?.kind === 'value-proposition' && written.headline !== undefined && written.headline !== null) return written.headline
+  const relevant = new Set(relevantFactIds)
+  const roles = contents.flatMap((content) => content.kind === 'experience' && content.experience.role !== null
+    ? [{ role: content.experience.role, relevant: readExperienceFields({ experience: content.experience })
+      .some(({ factIds }) => factIds.some((factId) => relevant.has(factId))) }] : [])
+  const role = (roles.find((candidate) => candidate.relevant) ?? roles[0])?.role
+  return role === undefined ? null : { id: 'headline', text: role.text, factIds: role.factIds }
+}
+
 export function readProfessionalResumeFields(document: ProfessionalResumeDocument) {
-  return [...document.valueProposition.paragraphs,
+  return [...(document.headline === undefined || document.headline === null ? [] : [document.headline]),
+    ...document.valueProposition.paragraphs,
     ...document.experiences.flatMap((experience) => readExperienceFields({ experience })),
     ...document.sections.flatMap((section) => readSectionFields({ section }))]
 }

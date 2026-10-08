@@ -367,6 +367,7 @@ const submitJobPosting = fromPromise<JobMatchActorResult, JobMatchActorInput>(as
     jobPostingDocumentReader: input.dependencies.jobPostingDocumentReader,
     jobPostingExtractor: input.dependencies.jobPostingExtractor,
     matchEvidenceMatcher: input.dependencies.matchEvidenceMatcher,
+    now: input.dependencies.now,
   })
   if (!jobMatchResult.ok) return jobMatchResult
   return input.dependencies.persistence.save({
@@ -423,7 +424,7 @@ async function persistProfileEnrichment({ fact, input, jobMatch, session, source
   const candidateFacts = [...sourceIntake.candidateFacts, fact]
   const jobMatchResult = await refreshJobMatch({
     candidateFacts, jobMatch,
-    matchEvidenceMatcher: input.dependencies.matchEvidenceMatcher,
+    matchEvidenceMatcher: input.dependencies.matchEvidenceMatcher, now: input.dependencies.now,
   })
   if (!jobMatchResult.ok) return {
     ok: false, error: 'match-evidence-unavailable',
