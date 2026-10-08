@@ -96,6 +96,38 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectFirstExperienceCopiedFromItsFactsAndResumePrepared()
   })
 
+  it('saves and restores an experience copied after its rewrite still fails as copied, not written', async () => {
+    const system = createSystemUnderTest({ writtenExperience: 'role-citing-achievement',
+      skillsWritingFailure: 'provider-unavailable' })
+    await system.givenFailedPreparation()
+    await system.givenReload()
+
+    await system.retryPreparation()
+
+    system.expectRetryWrote(['skills'])
+    system.expectOnlyFirstExperienceCopied()
+  })
+
+  it('keeps a copied experience marked as copied after the Candidate edits it, hides it and restores it', async () => {
+    const system = createSystemUnderTest({ writtenExperience: 'role-citing-achievement' })
+    await system.givenPreparedTailoredResume()
+    await system.givenFirstExperienceEditedAndHidden()
+
+    system.restoreFirstExperience()
+
+    system.expectOnlyFirstExperienceCopiedInTheTailoredResume({ achievement: 'Built accessible billing screens for 3 teams' })
+  })
+
+  it('rewrites a copied experience the coherence check rejects from its copy, as written content', async () => {
+    const system = createSystemUnderTest({ writtenExperience: 'role-citing-achievement', coherence: 'mixed-first-experience-once' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectFirstExperienceRewrittenFromItsCopyWithoutItsOrigin()
+    system.expectOnlyFirstExperienceCopiedInTheTailoredResume()
+  })
+
   it('rewrites a section once after a writing timeout', async () => {
     const system = createSystemUnderTest({ skillsWritingFailure: 'timeout' })
     await system.givenMatchedCandidateSession()
@@ -504,6 +536,10 @@ describe('Candidate Journey section-by-section resume preparation', () => {
   })
 })
 
+function isCopied(experience: Readonly<{ origin?: string }>) {
+  return experience.origin === 'copied-from-source'
+}
+
 function createSystemUnderTest(options: TestOptions = {}) {
   return new SectionPreparationTestSystem(options)
 }
@@ -534,7 +570,7 @@ type TestOptions = Readonly<{
     | 'unnamed-language-mismatch' | 'language-issue-while-language-matches'
     | 'coherence-issue-while-coherent' | 'mixed-projects-then-unchanged-education'
     | 'duplicated-skill-always' | 'every-copy-duplicated-once' | 'mixed-skills-once' | 'mixed-skills-then-unchanged-category'
-    | 'mixed-projects-then-redundant-language'
+    | 'mixed-projects-then-redundant-language' | 'mixed-first-experience-once'
     | 'redundant-achievement-always' | 'redundant-value-proposition-always' | 'language-issues-while-language-matches-after-rewrite' | 'timeout'
 }>
 
@@ -642,6 +678,23 @@ class SectionPreparationTestSystem {
       : { ...section, content: { kind: 'education' as const, fields: [{ id: 'education-0', text: 'Computer Science degree',
         factIds: ['source-fact-education-1-qualification-0' as const] }] } })
     this.#persistence.save({ session: { ...session, preparation: { ...preparation, sections } } })
+    await this.#reload()
+  }
+
+  async givenFirstExperienceEditedAndHidden() {
+    const achievement = this.#readOpenView().session.tailoredResume?.experiences
+      .find(({ id }) => id === 'experiences.0')?.achievements[0]
+    if (achievement === undefined) expect.fail('Expected an achievement in the copied experience')
+    await this.#journey.editResumeField({ fieldId: achievement.id, text: 'Built accessible billing screens for 3 teams' })
+    this.#journey.hideResumeEntry({ experienceId: 'experiences.0' })
+  }
+
+  restoreFirstExperience() {
+    this.#journey.restoreResumeEntry({ experienceId: 'experiences.0' })
+    this.#outcome = this.#journey.readView()
+  }
+
+  async givenReload() {
     await this.#reload()
   }
 
@@ -954,6 +1007,33 @@ class SectionPreparationTestSystem {
     })
   }
 
+  expectOnlyFirstExperienceCopied() {
+    const session = this.#expectOutcome()?.session
+    expect(session?.preparation?.sections?.flatMap((section) => section.status === 'validated'
+      && section.content.kind === 'experience' && isCopied(section.content.experience) ? [section.key] : []))
+      .toEqual(['experiences.0'])
+    this.expectOnlyFirstExperienceCopiedInTheTailoredResume()
+  }
+
+  expectOnlyFirstExperienceCopiedInTheTailoredResume({ achievement }: Readonly<{ achievement?: string }> = {}) {
+    const resume = this.#expectOutcome()?.session.tailoredResume
+    expect(resume?.experiences.filter(isCopied).map(({ id }) => id)).toEqual(['experiences.0'])
+    if (achievement !== undefined) {
+      expect(resume?.experiences.find(isCopied)?.achievements.map(({ text }) => text)).toContain(achievement)
+    }
+    expect(this.#readStoredSession().tailoredResume).toEqual(resume)
+  }
+
+  expectFirstExperienceRewrittenFromItsCopyWithoutItsOrigin() {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    const rewrites = this.#writingInputs.filter(({ section, previousContent }) =>
+      section.key === 'experiences.0' && previousContent?.kind === 'experience')
+    expect(rewrites.length).toBeGreaterThan(0)
+    for (const { previousContent } of rewrites) {
+      expect(previousContent?.kind === 'experience' ? previousContent.experience.origin : 'missing').toBeUndefined()
+    }
+  }
+
   expectSavedSections(expected: Readonly<{ validated: readonly string[]; failed: readonly string[] }>) {
     const sections = this.#expectOutcome()?.session.preparation?.sections ?? []
     expect(sections.filter(({ status }) => status === 'validated').map(({ key }) => key)).toEqual(expected.validated)
@@ -1173,6 +1253,11 @@ function readCoherence({ coherence, check, document, onRejectedField }: Readonly
     const education = document.sections.flatMap((section) => section.section === 'education' ? section.fields : [])[0]
     return education === undefined ? coherent
       : { ...coherent, coherent: false, issues: [{ fieldId: education.id, kind: 'language' }] }
+  }
+  if (coherence === 'mixed-first-experience-once') {
+    const role = document.experiences.find(({ id }) => id === 'experiences.0')?.role
+    return check > 1 || role === null || role === undefined ? coherent
+      : { ...coherent, coherent: false, issues: [{ fieldId: role.id, kind: 'mixed-association' }] }
   }
   if (coherence === 'chronology-on-source-dates') {
     // Two experiences overlap in time, as concurrent roles at one employer do; their dates come from the source.

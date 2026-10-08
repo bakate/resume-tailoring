@@ -13,6 +13,7 @@ export const resumePreviewMessages = {
     'missing-contact': 'Add an email address or phone number in contact details.',
     overflow: 'This document exceeds two pages. Condense or choose content to remove; your draft has been preserved.',
     'stale-layout': 'The document changed. Wait for the current preview before downloading.',
+    copiedExperiences: 'Experiences taken as written',
   },
   fr: {
     normalizedTitle: 'CV général – non adapté à une offre',
@@ -28,5 +29,6 @@ export const resumePreviewMessages = {
     'missing-contact': 'Ajoute une adresse e-mail ou un numéro de téléphone dans les coordonnées.',
     overflow: 'Ce document dépasse deux pages. Condense-le ou choisis du contenu à retirer ; ton brouillon est conservé.',
     'stale-layout': 'Le document a changé. Attends l’aperçu actuel avant de télécharger.',
+    copiedExperiences: 'Expériences reprises telles quelles',
   },
 } as const

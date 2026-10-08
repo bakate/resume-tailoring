@@ -24,6 +24,25 @@ but carries an explicit non-tailored purpose and does not claim relevance to the
 Job Posting. No relevant evidence is a preparation outcome, not permission to
 fabricate a Tailored Resume.
 
+### Copied sections
+
+An experience whose rewrite still fails as unsupported is a copied section: it
+is taken word for word from its attested Candidate Facts rather than written.
+Its experience carries `origin: 'copied-from-source'`, which only the
+application sets; the writer's output schema has no origin. The origin travels
+with the saved Resume Section snapshot, so a restored preparation keeps the
+section as copied without writing it again, and with the Tailored Resume
+experience, so editing, hiding, restoring, or condensing it never relabels it as
+written. An experience without an origin, including one saved before origins
+existed, is written. When the coherence check sends a copied experience back to
+writing, the rewrite starts from the copy without its origin.
+
+The interface labels each copied section with a localized notice, EN "Taken as
+written from your resume" / FR "Repris tel quel de ton CV": under the section in
+the preparation preview, and beside the PDF pages of the result, naming each
+copied experience. The notice is never part of the document, so neither the
+exported PDF nor the document text carries it.
+
 ## Operation ownership
 
 The Candidate Journey owns one current validated draft and its revision. The

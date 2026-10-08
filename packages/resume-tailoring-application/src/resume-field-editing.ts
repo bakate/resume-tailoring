@@ -1,7 +1,7 @@
 import type { CandidateFact } from './source-intake'
 import type { TailoredResume, TailoredResumeExperience, TailoredResumeField, TailoredResumeSection } from './tailored-resume'
 
-type ExperienceValue = Exclude<keyof TailoredResumeExperience, 'id' | 'chronology'>
+type ExperienceValue = Exclude<keyof TailoredResumeExperience, 'id' | 'chronology' | 'origin'>
 import type { ResumeFieldLocation } from '@resume-tailoring/domain/tailored-resume'
 export type { ResumeFieldLocation } from '@resume-tailoring/domain/tailored-resume'
 export type ResumeFieldReference = Readonly<{
