@@ -18,13 +18,52 @@ and AWS Lambda Web Adapter for the Nitro HTTP server.
 - Configure a Cloudflare Turnstile widget for the `workers.dev` hostname.
 - Keep `DEMO_ORIGIN_SECRET` identical in the Worker secret and Lambda environment. Protected API
   routes reject requests made directly to the Lambda Function URL.
-- Keep the regional Lambda account quota low. New accounts commonly start at ten concurrent
-  executions, which already caps this single-function demo.
+- Set a monthly budget alert on the production OpenAI project, below its hard limit, so a spending
+  drift is noticed before the limit stops the demo.
+- Keep the account Lambda concurrency quota at ten: it is the function's concurrency ceiling. The
+  template sets no `ReservedConcurrentExecutions`, because Lambda keeps at least ten unreserved
+  executions per account and any reservation would fail the deployment at this quota. If the quota
+  is ever raised above twenty, reserve ten for the function instead.
 - Do not attach the function to a VPC, NAT Gateway, load balancer, or database.
 
 Turnstile grants a signed, HTTP-only access cookie for 30 minutes. Protected API routes reject
 requests without that cookie. This reduces automated abuse but does not replace the enforced
-OpenAI spend limit.
+OpenAI spend limit, nor the daily limits below: a renewed cookie would reset any limit keyed on it.
+
+### Daily spending limits
+
+The Worker counts requests in one Durable Object (`DailySpendingLimits`,
+`infrastructure/cloudflare-worker/src/daily-spending-limits.js`), keyed by an HMAC of the client
+network: the IPv4 address, or the IPv6 /64 one subscriber usually holds. The HMAC key is
+`ORIGIN_SECRET`, so rotating it resets every count. Every window resets at 00:00 Europe/Paris,
+when the object deletes everything it holds.
+
+| Limit | Per day | Keyed by | Counted on |
+| -- | -- | -- | -- |
+| Daily Quota | 4 | client network | `POST /api/explainable-job-posting-extraction` |
+| Global ceiling | 30 | all clients | the same request |
+| Technical ceiling | 400 | client network | every model-backed API route |
+| PDF renders | 200 | client network | `POST /api/resume-document` |
+
+Over a limit, the Worker answers `429` with the `rate-limited` API Failure and `retryAfterSeconds`
+until the reset, without reaching the Lambda. A request the application refuses before any model
+call (`400`, `401`, `403` or `413`), such as a demo access renewal, gives back what it counted. A
+provider failure keeps it counted, so a loop of failing model calls still reaches the technical
+ceiling. Responses to a Job Posting extraction carry `x-resume-quota-remaining` (Tailored Resumes
+this client can still start today, bounded by the global ceiling; `0` whenever a limit refuses it)
+and `x-resume-quota-reset` (the ISO 8601 reset instant).
+
+### Alarms
+
+`template.yaml` defines three CloudWatch alarms on the function: more than 1,000 invocations in an
+hour, five or more errors in 15 minutes, and any throttle at the account concurrency ceiling. They notify
+the `honest-resume-demo-abuse-alarms` SNS topic. Pass `AlarmEmail=you@example.com` once in
+`--parameter-overrides` to subscribe an address, then confirm the email AWS sends; later deployments
+keep the value.
+
+The GitHub deploy role needs CloudWatch and SNS permissions for these
+resources. Update the `infrastructure/github-actions.yaml` stack before deploying a template that
+adds them.
 
 ## Security headers
 

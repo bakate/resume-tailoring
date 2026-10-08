@@ -1,0 +1,14 @@
+{
+  "name": "@resume-tailoring/cloudflare-worker",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/worker.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
+  }
+}
