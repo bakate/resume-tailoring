@@ -6,7 +6,7 @@ import { LocalizationFailure, useLocalization } from '../localization/localizati
 import type { Localization } from '../localization/localization'
 import { CandidateJourneyProgress, isResultOperation } from './candidate-journey-shell'
 import { PreparationFeedback } from './combined-intake-workspace'
-import { ResumeSectionsPreview } from './resume-sections-preview'
+import { FailedSectionsSummary, ResumeSectionsPreview } from './resume-sections-preview'
 import { TailoredResumeWorkspace } from './tailored-resume-workspace'
 import { useCandidateJourney } from './use-candidate-journey'
 import type { CandidateJourneyController } from './use-candidate-journey'
@@ -31,10 +31,12 @@ function ResumeResult({ localization }: Readonly<{ localization: Localization }>
       <span aria-hidden="true">← </span>{localization.translate('resumeResult.backToDocuments')}
     </Anchor>
     {isResultOperation(candidateJourney) ? <CandidateJourneyProgress {...{ candidateJourney, localization }} /> : null}
-    <ResumeSectionsPreview {...{ candidateJourney, localization }} />
+    {/* A failure opens the page, naming what it left undone above the sections it kept. */}
     <PreparationFeedback {...{ candidateJourney, localization }} onBack={toDocuments}
+      failureDetails={<FailedSectionsSummary {...{ candidateJourney, localization }} />}
       onRetry={() => { candidateJourney.startTailoredResumePreparation({ purpose }) }}
       onNormalized={() => { candidateJourney.startTailoredResumePreparation({ purpose: 'normalized' }) }} />
+    <ResumeSectionsPreview {...{ candidateJourney, localization }} />
     <TailoredResumeWorkspace {...{ candidateJourney, localization }} onChangeJobPosting={() => {
       candidateJourney.changeJobPosting(); toDocuments() }} />
   </>
