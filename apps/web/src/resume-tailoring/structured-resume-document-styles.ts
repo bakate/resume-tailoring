@@ -1,6 +1,11 @@
 import interFontUrl from '@fontsource/inter/files/inter-latin-400-normal.woff2?inline'
 import loraFontUrl from '@fontsource/lora/files/lora-latin-400-normal.woff2?inline'
 
+/**
+ * The Tailored Resume is a standalone document, printed to PDF on the server and previewed in a sandboxed iframe.
+ * Neither loads the Mantine stylesheet, so its colours stay literal values rather than var(--mantine-*) tokens, and
+ * its print sizes use pt and mm.
+ */
 export const tailoredResumeDocumentStyles = `
 @font-face{font-family:ResumeInter;src:url('${interFontUrl}') format('woff2');font-weight:400}
 @font-face{font-family:ResumeLora;src:url('${loraFontUrl}') format('woff2');font-weight:400}

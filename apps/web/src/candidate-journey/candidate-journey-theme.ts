@@ -45,11 +45,24 @@ export const candidateJourneyTheme = createTheme({
 })
 
 /**
+ * The demo access gate and the standalone pages are plain markup styled by styles.css, which reads their brand green,
+ * paper tones and body text through these variables. The brand green is darker than forest.8, which Mantine
+ * components use, and its hover shade is forest.9.
+ */
+const brandSurfaceVariables = {
+  '--mantine-color-brand': '#164f3d',
+  '--mantine-color-brand-focus': '#94cdb8',
+  '--mantine-color-brand-text': '#555b68',
+  '--mantine-color-paper': '#f4f1e9',
+  '--mantine-color-paper-border': '#d9d5ca',
+}
+
+/**
  * Secondary text and placeholders meet the WCAG AA 4.5:1 text contrast on the white and tinted surfaces; Mantine's
  * gray defaults reach only 3.3:1 and 2.1:1.
  */
 export const candidateJourneyCssVariablesResolver: CSSVariablesResolver = () => ({
-  variables: {},
+  variables: brandSurfaceVariables,
   light: { '--mantine-color-dimmed': '#646b75', '--mantine-color-placeholder': '#6b7280' },
   dark: {},
 })

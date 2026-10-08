@@ -3,9 +3,11 @@ import { extname, join } from 'node:path'
 
 const candidateJourneyDirectory = 'apps/web/src/candidate-journey'
 const themeFile = 'candidate-journey-theme.ts'
+const globalStylesheet = 'apps/web/src/styles.css'
 const inspectedExtensions = new Set(['.css', '.ts', '.tsx'])
+const rawColorLiteral = /#[\da-f]{3,8}\b|\b(?:rgb|hsl)a?\s*\(/iu
 const forbiddenPatterns = [
-  { label: 'raw color literal', pattern: /#[\da-f]{3,8}\b|\b(?:rgb|hsl)a?\s*\(/iu },
+  { label: 'raw color literal', pattern: rawColorLiteral },
   { label: 'inline style object', pattern: /\bstyle\s*=\s*\{/u },
   {
     label: 'raw interactive visual value',
@@ -22,7 +24,10 @@ const forbiddenPatterns = [
 ]
 
 const files = await findCandidateJourneyVisualFiles(candidateJourneyDirectory)
-const violations = (await Promise.all(files.map(inspectFile))).flat()
+const violations = [
+  ...(await Promise.all(files.map(inspectFile))).flat(),
+  ...(await inspectStylesheet(globalStylesheet)),
+]
 
 if (violations.length > 0) {
   process.stderr.write(`${violations.join('\n')}\n`)
@@ -45,4 +50,13 @@ async function inspectFile(filePath) {
   return forbiddenPatterns.flatMap(({ label, pattern }) => pattern.test(source)
     ? [`${filePath}: ${label}; use a Mantine theme token`]
     : [])
+}
+
+/** Only declarations are read: selectors may name ids that look like hex colours, and comments may quote a value. */
+async function inspectStylesheet(filePath) {
+  const source = (await readFile(filePath, 'utf8')).replace(/\/\*[\s\S]*?\*\//gu, '')
+  const declarationBlocks = [...source.matchAll(/\{([^{}]*)\}/gu)].map(([, block]) => block)
+  return declarationBlocks.some((block) => rawColorLiteral.test(block))
+    ? [`${filePath}: raw color literal; use a Mantine theme token`]
+    : []
 }
