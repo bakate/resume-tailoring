@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './content-security-policy'
 import type { Locator, Page } from '@playwright/test'
 import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import type { ResumeCoherenceInput, ResumeFieldValidationInput, ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
@@ -543,6 +543,14 @@ test.describe('Candidate Journey preview-first preparation', () => {
 
     await system.expectPrivacyStatedOnceAboveTheFold()
   })
+
+  test('serves every page under a Content-Security-Policy bound to a fresh nonce', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    await system.requestEveryPageTwice()
+
+    system.expectEveryPageServedUnderItsOwnNonce()
+  })
 })
 
 function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: Page; scenario?: Scenario }>) {
@@ -564,6 +572,7 @@ class CandidateJourneyTestSystem {
   #accessRenewals = 0
   #isDemoAccessCheckSlow = false
   readonly #focusedAfterDownload: string[] = []
+  readonly #servedPages: Array<Readonly<{ body: string; policy: string | null }>> = []
   #releaseHeldSkills: () => void = () => undefined
   readonly #heldSkills = new Promise<void>((resolve) => { this.#releaseHeldSkills = resolve })
 
@@ -1595,6 +1604,30 @@ class CandidateJourneyTestSystem {
     await frame.waitFor({ state: 'attached' })
     if (await frame.isVisible()) return
     await this.#page.locator('summary').filter({ hasText: /Read the document text|Lire le texte du document/ }).click()
+  }
+
+  async requestEveryPageTwice() {
+    const paths = ['/', '/resume', '/a-page-that-does-not-exist']
+    for (const path of [...paths, ...paths]) {
+      const response = await this.#page.request.get(path)
+      this.#servedPages.push({ body: await response.text(), policy: response.headers()['content-security-policy'] ?? null })
+    }
+    this.#completedAction = 'pages-requested'
+  }
+
+  expectEveryPageServedUnderItsOwnNonce() {
+    this.#expectAction()
+    const nonces = this.#servedPages.map(({ body, policy }) => {
+      expect(policy, 'Every page must be served with a Content-Security-Policy').not.toBeNull()
+      const scriptSources = /(?:^|;)\s*script-src ([^;]+)/u.exec(policy ?? '')?.[1] ?? ''
+      expect(scriptSources).not.toMatch(/'unsafe-inline'|'unsafe-eval'/u)
+      expect(policy).toMatch(/(?:^|;)\s*connect-src 'self'(?:;|$)/u)
+      const nonce = /'nonce-([^']+)'/u.exec(scriptSources)?.[1] ?? ''
+      expect(nonce, 'The script policy must name the request nonce').not.toBe('')
+      expect(body).toContain(`<script nonce="${nonce}"`)
+      return nonce
+    })
+    expect(new Set(nonces).size).toBe(nonces.length)
   }
 
   #expectAction() { expect(this.#completedAction, 'Perform a Candidate Journey action before reading the outcome').not.toBeNull() }

@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './content-security-policy'
 import type { Page, Request } from '@playwright/test'
 import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import { routeResumeSectionModels, writeFixtureSection } from './resume-section-model-routes'

@@ -11,6 +11,15 @@ export default defineConfig(({ mode }) => {
 
   return {
     build: {
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            // Zod probes `new Function` when a schema is built unless it is already jitless, which the page
+            // Content-Security-Policy reports as a violation. Bundling the setting with Zod applies it before any schema.
+            groups: [{ name: 'zod', test: /[\\/]node_modules[\\/]zod[\\/]|[\\/]zod-without-eval\.ts$/ }],
+          },
+        },
+      },
       target: [...sourceDocumentBrowserSupportPolicy.buildTargets],
     },
     envDir: '../..',
