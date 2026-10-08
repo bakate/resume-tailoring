@@ -59,7 +59,7 @@ async function evaluateJobPosting({ jobPostingContent }: Readonly<{
       ok: true, value: { text: new TextDecoder().decode(document.bytes) },
     }) },
     jobPostingExtractor: createOpenAiJobPostingExtractor({
-      apiKey: readEnvironmentValue({ name: 'OPENAI_API_KEY' }),
+      apiKey: { source: 'operator', value: readEnvironmentValue({ name: 'OPENAI_API_KEY' }) },
       model: readEnvironmentValue({ name: 'OPENAI_STRUCTURED_MODEL' }),
       reasoningEffort: 'low',
       request: createMeasuredRequest({ metrics }),

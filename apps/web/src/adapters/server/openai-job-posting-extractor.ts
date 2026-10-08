@@ -6,6 +6,7 @@ import type {
 import type { OpenAiReasoningEffort } from '../../openai-model-configuration'
 import {
   createOpenAiRequester,
+  type ModelApiKey,
   type OpenAiRequestFailure,
 } from './openai-request'
 import {
@@ -17,7 +18,7 @@ import type { JobPostingExtractor } from '@resume-tailoring/application/ports'
 export function createOpenAiJobPostingExtractor({
   apiKey, model, reasoningEffort, request = fetch,
 }: Readonly<{
-  apiKey: string
+  apiKey: ModelApiKey
   model: string
   reasoningEffort: OpenAiReasoningEffort
   request?: typeof fetch
@@ -37,7 +38,7 @@ export type OpenAiJobPostingExtractionFailure = Readonly<{
 export async function requestOpenAiJobPostingExtraction({
   apiKey, jobPostingContent, model, reasoningEffort, request = fetch,
 }: Readonly<{
-  apiKey: string
+  apiKey: ModelApiKey
   jobPostingContent: string
   model: string
   reasoningEffort: OpenAiReasoningEffort

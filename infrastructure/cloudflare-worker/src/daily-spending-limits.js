@@ -12,8 +12,10 @@ export const dailyLimits = {
   preparationsOverall: 30,
   /** Model-backed requests per client network: four journeys with edits stay under 250, so it only stops loops. */
   modelRequestsPerClient: 400,
-  /** PDF renders per client network: one per saved edit. */
+  /** PDF renders per client network: one per saved edit. Rendering spends the operator's compute whatever the key. */
   rendersPerClient: 200,
+  /** Candidate API Key validations per client network: enough to fix a typo, too few to test stolen keys. */
+  keyValidationsPerClient: 20,
 }
 
 /** The Job Posting extraction starts a Tailored Resume, so it uses one unit of the Daily Quota. */
@@ -29,13 +31,19 @@ const modelBackedPaths = new Set([
   '/api/resume-document-coherence',
 ])
 const renderPath = '/api/resume-document'
+const keyValidationPath = '/api/candidate-api-key'
 
-/** The counters a request consumes, or none when its route is not limited. */
-export function readLimitedCounters({ method, pathname }) {
+/**
+ * The counters a request consumes, or none when its route is not limited. A model-backed request that carries a
+ * Candidate API Key spends the Candidate's provider account, not the operator's, so no model limit applies to it.
+ */
+export function readLimitedCounters({ method, pathname, carriesCandidateApiKey = false }) {
   if (method !== 'POST') return []
+  if (pathname === keyValidationPath) return ['key-validations']
+  if (pathname === renderPath) return ['renders']
+  if (carriesCandidateApiKey) return []
   if (pathname === preparationPath) return ['model-requests', 'preparations']
   if (modelBackedPaths.has(pathname)) return ['model-requests']
-  if (pathname === renderPath) return ['renders']
   return []
 }
 
@@ -43,6 +51,7 @@ const clientLimits = {
   preparations: dailyLimits.dailyQuota,
   'model-requests': dailyLimits.modelRequestsPerClient,
   renders: dailyLimits.rendersPerClient,
+  'key-validations': dailyLimits.keyValidationsPerClient,
 }
 const dayKey = 'day'
 
@@ -61,6 +70,7 @@ export class DailySpendingLimits {
     const { operation, reservation } = await request.json()
     if (operation === 'reserve') return Response.json(await this.#reserve(reservation))
     if (operation === 'release') return Response.json(await this.#release(reservation))
+    if (operation === 'peek') return Response.json(await this.#peek(reservation))
     return new Response('Unknown operation', { status: 400 })
   }
 
@@ -74,9 +84,13 @@ export class DailySpendingLimits {
     await this.#startDay(window)
     const keys = readCounterKeys({ clientKey, counters })
     const counts = await this.#readCounts(keys)
-    const allowed = keys.every(({ limit }, position) => counts[position] < limit)
+    const exhausted = keys.find(({ limit }, position) => counts[position] >= limit)
+    const allowed = exhausted === undefined
     if (!allowed) {
-      return { allowed, resetAt: window.resetAt, remainingDailyQuota: hasDailyQuota(keys) ? 0 : undefined }
+      return {
+        allowed, exhaustedLimit: exhausted.scope, resetAt: window.resetAt,
+        remainingDailyQuota: hasDailyQuota(keys) ? 0 : undefined,
+      }
     }
     const consumed = counts.map((count) => count + 1)
     await Promise.all(keys.map(({ key }, position) => this.#storage.put(key, consumed[position])))
@@ -98,6 +112,14 @@ export class DailySpendingLimits {
     return { remainingDailyQuota: readRemainingDailyQuota({ keys, counts: await this.#readCounts(keys) }) }
   }
 
+  /** Today's remaining Daily Quota of a client, read without consuming anything. */
+  async #peek({ clientKey }) {
+    const window = readDailyWindow({ now: Date.now() })
+    await this.#startDay(window)
+    const keys = readCounterKeys({ clientKey, counters: ['preparations'] })
+    return { resetAt: window.resetAt, remainingDailyQuota: readRemainingDailyQuota({ keys, counts: await this.#readCounts(keys) }) }
+  }
+
   #readCounts(keys) {
     return Promise.all(keys.map(async ({ key }) => (await this.#storage.get(key)) ?? 0))
   }
@@ -110,14 +132,17 @@ export class DailySpendingLimits {
   }
 }
 
-/** The stored counters behind a request's counters; a preparation also counts towards the global ceiling. */
+/**
+ * The stored counters behind a request's counters; a preparation also counts towards the global ceiling. Each names
+ * the limit it enforces, so a refusal tells which one was reached.
+ */
 function readCounterKeys({ clientKey, counters }) {
   return counters.flatMap((counter) => counter === 'preparations'
     ? [
-      { key: `${clientKey}:preparations`, limit: dailyLimits.dailyQuota, boundsDailyQuota: true },
-      { key: 'overall:preparations', limit: dailyLimits.preparationsOverall, boundsDailyQuota: true },
+      { key: `${clientKey}:preparations`, limit: dailyLimits.dailyQuota, boundsDailyQuota: true, scope: 'daily-quota' },
+      { key: 'overall:preparations', limit: dailyLimits.preparationsOverall, boundsDailyQuota: true, scope: 'overall' },
     ]
-    : [{ key: `${clientKey}:${counter}`, limit: clientLimits[counter], boundsDailyQuota: false }])
+    : [{ key: `${clientKey}:${counter}`, limit: clientLimits[counter], boundsDailyQuota: false, scope: counter }])
 }
 
 function hasDailyQuota(keys) {

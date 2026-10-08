@@ -7,8 +7,8 @@ import { processResumeModel } from './-resume-document-model'
 export const Route = createFileRoute('/api/resume-section-validation')({ server: {
   middleware: [createCsrfMiddleware()], handlers: { POST: ({ request }) => processResumeModel({
     request, schema: resumeFieldValidationInputSchema,
-    processInput: (input, environment) => createOpenAiResumeFieldValidator({
-      apiKey: environment.openAiApiKey, model: environment.openAiStructuredModel,
+    processInput: (input, environment, apiKey) => createOpenAiResumeFieldValidator({
+      apiKey, model: environment.openAiStructuredModel,
       reasoningEffort: environment.openAiStructuredReasoningEffort,
     }).validate(input),
   }) },

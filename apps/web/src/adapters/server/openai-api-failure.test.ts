@@ -13,6 +13,9 @@ describe('OpenAI failures as API failures', () => {
     [{ type: 'upstream-invalid-request', status: 401 }, { type: 'service-misconfigured' }],
     [{ type: 'upstream-failure', status: 503 }, { type: 'provider-unavailable' }],
     [{ type: 'transport' }, { type: 'provider-unavailable' }],
+    [{ type: 'candidate-api-key-invalid', status: 401 }, { type: 'candidate-api-key-invalid' }],
+    [{ type: 'candidate-api-key-model-unavailable', status: 404 }, { type: 'candidate-api-key-model-unavailable' }],
+    [{ type: 'provider-credit-exhausted', status: 429 }, { type: 'provider-credit-exhausted' }],
   ] as const)('reads %o as %o without naming the operation', (failure, apiFailure) => {
     expect(readOpenAiApiFailure(failure)).toEqual(apiFailure)
   })

@@ -14,10 +14,14 @@ export const apiFailureStatuses = {
   'invalid-input': 400,
   'input-too-large': 413,
   'rate-limited': 429,
+  'daily-quota-reached': 429,
   timeout: 504,
   'provider-unavailable': 502,
   'invalid-provider-response': 502,
   'service-misconfigured': 503,
+  'candidate-api-key-invalid': 401,
+  'candidate-api-key-model-unavailable': 403,
+  'provider-credit-exhausted': 402,
 } as const satisfies Record<ApiFailureType, number>
 
 export type { ApiFailureType }

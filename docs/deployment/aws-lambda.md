@@ -44,14 +44,25 @@ when the object deletes everything it holds.
 | Global ceiling | 30 | all clients | the same request |
 | Technical ceiling | 400 | client network | every model-backed API route |
 | PDF renders | 200 | client network | `POST /api/resume-document` |
+| Candidate API Key validations | 20 | client network | `POST /api/candidate-api-key` |
 
-Over a limit, the Worker answers `429` with the `rate-limited` API Failure and `retryAfterSeconds`
-until the reset, without reaching the Lambda. A request the application refuses before any model
+Over the Daily Quota, the global ceiling or the technical ceiling, the Worker answers `429` with the
+`daily-quota-reached` API Failure, `retryAfterSeconds` until the reset, and `x-resume-quota-scope`
+(`daily-quota`, `overall` or `model-requests`), so the interface can offer the Candidate API Key.
+Over the PDF render or key validation limit, which no key lifts, it answers the `rate-limited` API
+Failure instead. Neither reaches the Lambda. A request the application refuses before any model
 call (`400`, `401`, `403` or `413`), such as a demo access renewal, gives back what it counted. A
 provider failure keeps it counted, so a loop of failing model calls still reaches the technical
 ceiling. Responses to a Job Posting extraction carry `x-resume-quota-remaining` (Tailored Resumes
 this client can still start today, bounded by the global ceiling; `0` whenever a limit refuses it)
-and `x-resume-quota-reset` (the ISO 8601 reset instant).
+and `x-resume-quota-reset` (the ISO 8601 reset instant). `GET /api/daily-quota`, answered by the
+Worker itself, returns the same two values without counting anything, so the interface shows them
+before the Candidate starts a preparation.
+
+A model-backed request that carries the `x-candidate-api-key` header counts against none of the model
+limits: it spends the Candidate's provider account. The application signs it with that key or refuses
+it and never falls back to `OPENAI_API_KEY`, which is what keeps this bypass from spending the operator
+key. PDF renders, key validations and Turnstile still apply.
 
 ### Alarms
 

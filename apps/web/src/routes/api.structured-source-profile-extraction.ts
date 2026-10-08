@@ -7,6 +7,7 @@ import { failureResponse } from '../api-failure'
 import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
+import { readModelApiKey } from './-model-api-key'
 
 export const Route = createFileRoute('/api/structured-source-profile-extraction')({
   server: {
@@ -24,15 +25,19 @@ async function extractStructuredSourceProfile({ request }: Readonly<{ request: R
   if (!contentResult.ok) return failureResponse({ type: contentResult.type })
   const environmentResult = validateServerEnvironment({ environment: process.env })
   if (!environmentResult.ok) return failureResponse({ type: 'service-misconfigured' })
+  const apiKey = readModelApiKey({ environment: environmentResult.value, request })
+  if (!apiKey.ok) return failureResponse({ type: apiKey.type })
   const extractor = createOpenAiStructuredSourceProfileExtractor({
-    apiKey: environmentResult.value.openAiApiKey,
+    apiKey: apiKey.value,
     model: environmentResult.value.openAiStructuredModel,
     reasoningEffort: environmentResult.value.openAiStructuredReasoningEffort,
   })
   const result = await extractor.extract({ professionalContent: contentResult.value })
-  return result.ok
-    ? Response.json(result, { headers: privateHeaders })
-    : failureResponse({ type: 'provider-unavailable' })
+  if (result.ok) return Response.json(result, { headers: privateHeaders })
+  // Only a browser adapter reads a network failure or an unexpected response.
+  const apiFailure = result.apiFailure
+  return failureResponse(apiFailure === undefined || apiFailure.type === 'network' || apiFailure.type === 'unexpected-response'
+    ? { type: 'provider-unavailable' } : { ...apiFailure, type: apiFailure.type })
 }
 
 async function readProfessionalContent({ request }: Readonly<{ request: Request }>) {

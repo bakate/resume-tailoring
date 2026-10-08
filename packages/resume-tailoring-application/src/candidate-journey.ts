@@ -6,7 +6,7 @@ export type { ResumeCoherenceInput, ResumeCoherenceIssue, ResumeCoherenceIssueKi
   ResumeFieldRejection, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage, ResumeRejectedField,
   ResumeSectionContent, ResumeSectionKind, ResumeSectionModelError, ResumeSectionModelFailure, ResumeSectionModelResult,
   ResumeSectionPlanEntry, ResumeSectionWritingInput } from './resume-sections'
-export { failureCauseTypes, readRecovery } from './failure-cause'
+export { delayedFailureCauseTypes, failureCauseTypes, readRecovery } from './failure-cause'
 export type { ExplainedFailure, FailureCause, Recovery } from './failure-cause'
 import { resumePreparationMachine } from './resume-preparation-machines'
 import { prepareCombinedIntake, publishResumePreparation, unavailable } from './combined-intake'

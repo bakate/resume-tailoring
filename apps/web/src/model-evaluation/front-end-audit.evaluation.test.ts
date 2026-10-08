@@ -78,7 +78,7 @@ type AuditRun = Readonly<{
 }>
 
 async function replayAuditRun({ environment }: Readonly<{ environment: ServerEnvironment }>): Promise<AuditRun> {
-  const structured = { apiKey: environment.openAiApiKey, model: environment.openAiStructuredModel,
+  const structured = { apiKey: { source: 'operator', value: environment.openAiApiKey } as const, model: environment.openAiStructuredModel,
     reasoningEffort: environment.openAiStructuredReasoningEffort }
   const sourceIntake = await readSourceIntake({ structured })
   const jobMatchResult = await createJobMatch({
@@ -137,7 +137,7 @@ Promise<SourceIntake> {
 function createSectionModels({ environment, structured }: Readonly<{
   environment: ServerEnvironment; structured: Parameters<typeof createOpenAiResumeSectionWriter>[0]
 }>) {
-  const writer = createOpenAiResumeSectionWriter({ apiKey: environment.openAiApiKey, model: environment.openAiWritingModel,
+  const writer = createOpenAiResumeSectionWriter({ apiKey: { source: 'operator', value: environment.openAiApiKey } as const, model: environment.openAiWritingModel,
     reasoningEffort: environment.openAiWritingReasoningEffort })
   const validator = createOpenAiResumeFieldValidator(structured)
   return { writeSection: writer.write, validateFields: validator.validate,

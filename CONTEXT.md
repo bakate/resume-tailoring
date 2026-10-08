@@ -55,11 +55,11 @@ The type, from one closed catalogue, with which a server route answers a failed 
 _Avoid_: Error code, operation-prefixed failure
 
 **Failure Cause**:
-The provider-neutral reason a model-backed operation failed, read from its API Failure: access required, rate limited (with the delay to wait), timeout, input too large, service unavailable, network, or unexpected. It is kept with a failed preparation so it survives a reload.
+The provider-neutral reason a model-backed operation failed, read from its API Failure: access required, rate limited (with the delay to wait), Daily Quota reached, timeout, input too large, service unavailable, network, unexpected, or, for a Candidate API Key, key invalid, model not available to the key, or provider credit exhausted. Exhausted credit is never read as rate limited: waiting does not restore it. It is kept with a failed preparation so it survives a reload.
 _Avoid_: Error type, transient or permanent failure
 
 **Recovery**:
-The one action the application derives from a Failure Cause to let the Candidate continue: renew access, retry after a delay, shorten the input, retry, or reload. The interface offers it; it never decides it.
+The one action the application derives from a Failure Cause to let the Candidate continue: renew access, retry after a delay, use a Candidate API Key, change the Candidate API Key, shorten the input, retry, or reload. The interface offers it; it never decides it.
 _Avoid_: Error handling, fallback, retry policy
 
 ## Candidate evidence

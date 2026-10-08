@@ -31,7 +31,7 @@ describe('OpenAI Job Match evidence live evaluation', () => {
 async function evaluateCase({ evaluationCase }: Readonly<{ evaluationCase: EvaluationCase }>) {
   const metrics: EvaluationMetric[] = []
   const matcher = createOpenAiJobMatchEvidenceMatcher({
-    apiKey: readEnvironmentValue({ name: 'OPENAI_API_KEY' }),
+    apiKey: { source: 'operator', value: readEnvironmentValue({ name: 'OPENAI_API_KEY' }) },
     model: readEnvironmentValue({ name: 'OPENAI_STRUCTURED_MODEL' }),
     reasoningEffort: 'low',
     request: createMeasuredRequest({ metrics }),

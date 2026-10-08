@@ -337,6 +337,24 @@ test.describe('Candidate Journey integration qualification', () => {
     await system.expectSourceProfileToggleExposed()
   })
 
+  test('resumes a preparation refused past the Daily Quota once the Candidate enters their own key', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenConsentedIntakeWithoutFreeResumeLeft()
+
+    await system.generateWithOwnKeyPastTheWall()
+
+    await system.expectPreparationResumedWithOwnKey()
+  })
+
+  test('shows the free resumes left today and returns to them when the Candidate removes their key', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenCandidateApiKeyEntered()
+
+    await system.removeCandidateApiKey()
+
+    await system.expectFreeResumesShown()
+  })
+
   test('announces once that a rate-limit wait is over', async ({ page }) => {
     const system = createSystemUnderTest({ page })
     await system.givenConsentedIntake()
@@ -381,6 +399,7 @@ class CandidateJourneyIntegrationSystem {
   readonly #analytics: AnalyticsEvent[] = []
   readonly #modelRequests: string[] = []
   readonly #modelRequestBodies: string[] = []
+  readonly #candidateApiKeyHeaders: Readonly<{ path: string; candidateApiKey: string | null }>[] = []
   #posting = firstPosting
   #pdfText: string | null = null
   #pdfPageCount = 0
@@ -1042,6 +1061,79 @@ class CandidateJourneyIntegrationSystem {
     await expect(details).toHaveCount(0)
   }
 
+  async givenConsentedIntakeWithoutFreeResumeLeft() {
+    await this.#openConsentedIntake()
+    await this.#routeCandidateApiKeyValidation()
+    let refused = false
+    await this.#page.route('**/api/explainable-job-posting-extraction', (route) => {
+      if (refused) return route.fallback()
+      refused = true
+      return route.fulfill({ status: 429, headers: { 'Retry-After': '3600', 'x-resume-quota-scope': 'daily-quota',
+        'x-resume-quota-remaining': '0', 'x-resume-quota-reset': '2026-10-08T22:00:00.000Z' },
+        json: { ok: false, error: { type: 'daily-quota-reached', retryAfterSeconds: 3600 } } })
+    })
+  }
+
+  async generateWithOwnKeyPastTheWall() {
+    await this.#generate()
+    const wall = this.#page.getByRole('dialog', { name: 'You have used your 4 resumes for today' })
+    await expect(wall.getByRole('button', { name: /^Come back tomorrow at \d{2}:\d{2}/u })).toBeVisible()
+    await wall.getByRole('button', { name: 'Use my key', exact: true }).click()
+    await this.#enterCandidateApiKey()
+    this.#completedAction = 'generated-with-own-key'
+  }
+
+  async expectPreparationResumedWithOwnKey() {
+    this.#expectAction()
+    await this.#expectGeneratedResume()
+    const extractions = this.#candidateApiKeyHeaders.filter(({ path }) => path === '/api/explainable-job-posting-extraction')
+    expect(extractions.map(({ candidateApiKey }) => candidateApiKey)).toEqual([null, candidateApiKey])
+    expect(this.#candidateApiKeyHeaders.filter(({ path }) => path === '/api/resume-section-writing')
+      .every((request) => request.candidateApiKey === candidateApiKey)).toBe(true)
+    expect(this.#candidateApiKeyHeaders.filter(({ path }) => path === '/api/resume-document')
+      .every((request) => request.candidateApiKey === null)).toBe(true)
+    const stored = await this.#page.evaluate(() => ({ tab: JSON.stringify(sessionStorage), browser: JSON.stringify(localStorage) }))
+    expect(stored.tab).toContain(candidateApiKey)
+    expect(stored.browser).not.toContain(candidateApiKey)
+  }
+
+  async givenCandidateApiKeyEntered() {
+    await this.#routeCandidateApiKeyValidation()
+    await this.#page.route('**/api/daily-quota', (route) => route.fulfill({ json: { ok: true,
+      value: { remaining: 3, resetAt: '2026-10-08T22:00:00.000Z' } } }))
+    await this.#openConsentedIntake()
+    await expect(this.#page.getByText('Free resumes left today: 3', { exact: true })).toBeVisible()
+    await this.#page.getByRole('button', { name: 'Use my key', exact: true }).click()
+    await this.#enterCandidateApiKey()
+    await expect(this.#page.getByText('Personal key active', { exact: true })).toBeVisible()
+  }
+
+  async removeCandidateApiKey() {
+    await this.#page.getByRole('button', { name: 'Remove my key', exact: true }).click()
+    this.#completedAction = 'candidate-api-key-removed'
+  }
+
+  async expectFreeResumesShown() {
+    this.#expectAction()
+    await expect(this.#page.getByText('Free resumes left today: 3', { exact: true })).toBeVisible()
+    await expect(this.#page.getByText('Personal key active', { exact: true })).toHaveCount(0)
+    expect(await this.#page.evaluate(() => JSON.stringify(sessionStorage))).not.toContain(candidateApiKey)
+  }
+
+  async #enterCandidateApiKey() {
+    const entry = this.#page.getByRole('dialog', { name: /^(Use my OpenAI API key|You have used your 4 resumes for today)$/u })
+    await entry.getByLabel('Your OpenAI API key', { exact: true }).fill(candidateApiKey)
+    await entry.getByRole('checkbox', { name: 'I agree that my content is processed on my OpenAI account, with my key.' }).check()
+    await entry.getByRole('button', { name: 'Check and use my key', exact: true }).click()
+    await expect(entry).toHaveCount(0)
+  }
+
+  async #routeCandidateApiKeyValidation() {
+    await this.#page.route('**/api/candidate-api-key', (route) => route.fulfill(
+      route.request().headers()['x-candidate-api-key'] === candidateApiKey
+        ? { json: { ok: true } } : { status: 401, json: { ok: false, error: { type: 'candidate-api-key-invalid' } } }))
+  }
+
   async generateWhileRateLimited() {
     await this.#page.route('**/api/resume-section-writing', (route) => route.fulfill({ status: 429,
       headers: { 'Retry-After': '2' }, json: { ok: false, error: { type: 'rate-limited', retryAfterSeconds: 2 } } }))
@@ -1171,6 +1263,7 @@ class CandidateJourneyIntegrationSystem {
   #recordModelRequest(request: Request) {
     const path = new URL(request.url()).pathname
     if (path.startsWith('/api/')) this.#modelRequests.push(path)
+    if (path.startsWith('/api/')) this.#candidateApiKeyHeaders.push({ path, candidateApiKey: request.headers()['x-candidate-api-key'] ?? null })
     if (path.startsWith('/api/') && path !== '/api/resume-document' && path !== '/api/analytics') {
       this.#modelRequestBodies.push(request.postData() ?? '')
     }
@@ -1216,6 +1309,7 @@ const onePixelPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mN
 const secondPosting = 'Accessibility Lead. React is required. Inclusive product delivery matters.'
 const correctedSummary = 'Built accessible billing screens with React.'
 const candidateContent = ['Northwind', 'Contoso', 'billing', 'Alex', 'Morgan', 'example.com', 'Frontend', 'Accessibility'] as const
+const candidateApiKey = 'sk-proj-CandidateSecret0123456789abcdef'
 const reactMatch = { factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' } as const
 
 const overflowStatus = /^Your resume runs to \d+ pages, two at most\.$/u

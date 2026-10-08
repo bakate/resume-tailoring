@@ -8,6 +8,7 @@ import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
 import { readOpenAiApiFailure } from '../adapters/server/openai-api-failure'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
+import { readModelApiKey } from './-model-api-key'
 
 export const Route = createFileRoute('/api/explainable-match-evidence')({
   server: { middleware: [createCsrfMiddleware()], handlers: {
@@ -22,8 +23,10 @@ async function matchEvidence({ request }: Readonly<{ request: Request }>) {
   if (!bodyResult.ok) return failureResponse({ type: bodyResult.type })
   const environmentResult = validateServerEnvironment({ environment: process.env })
   if (!environmentResult.ok) return failureResponse({ type: 'service-misconfigured' })
+  const apiKey = readModelApiKey({ environment: environmentResult.value, request })
+  if (!apiKey.ok) return failureResponse({ type: apiKey.type })
   const result = await requestOpenAiJobMatchEvidence({
-    apiKey: environmentResult.value.openAiApiKey,
+    apiKey: apiKey.value,
     matchRequest: bodyResult.value,
     model: environmentResult.value.openAiStructuredModel,
     reasoningEffort: environmentResult.value.openAiStructuredReasoningEffort,

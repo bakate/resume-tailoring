@@ -21,6 +21,7 @@ import { createResumeDocumentModelAdapters } from './adapters/browser/resume-doc
 import { createBrowserSourceIntakeDocumentReader } from './adapters/browser/source-intake-document-reader'
 import { listenForUncaughtErrors, reportUncaughtError } from './adapters/browser/uncaught-error-reporting'
 import { createAccessRecoveringRequest, demoAccessRecovery } from './demo-access/demo-access-recovery'
+import { candidateApiKeyRecovery, candidateApiKeys, createCandidateApiKeyRequest, dailyQuota } from './candidate-api-key/candidate-api-key-recovery'
 
 export type { CandidateSessionRetention }
 
@@ -33,7 +34,10 @@ export type BrowserCandidateJourneySystem = Readonly<{
 
 export function createBrowserCandidateJourneySystem(): BrowserCandidateJourneySystem {
   let candidateJourney: CandidateJourney | null = null
-  const request = createAccessRecoveringRequest({ recovery: demoAccessRecovery, request: fetch })
+  // A request replayed after renewing demo access signs itself again with the Candidate API Key of this tab, if any.
+  const request = createAccessRecoveringRequest({ recovery: demoAccessRecovery, request: createCandidateApiKeyRequest({
+    dailyQuota, keys: candidateApiKeys, recovery: candidateApiKeyRecovery, request: fetch,
+  }) })
   const languageModelGateway = createOpenAiLanguageModelGateway({
     readProcessingConsent: () => readProcessingConsent({ candidateJourney }),
     request,

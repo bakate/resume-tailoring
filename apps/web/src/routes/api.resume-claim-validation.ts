@@ -5,6 +5,7 @@ import { failureResponse } from '../api-failure'
 import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
+import { readModelApiKey } from './-model-api-key'
 import { createOpenAiResumeClaimSemanticValidator } from '../adapters/server/openai-resume-claim-service'
 import { resumeClaimValidationRequestSchema } from '../resume-tailoring/resume-claim-schemas'
 
@@ -22,8 +23,10 @@ async function validateResumeClaim({ request }: Readonly<{ request: Request }>) 
   if (!validationRequest.ok) return failureResponse({ type: validationRequest.type })
   const environment = validateServerEnvironment({ environment: process.env })
   if (!environment.ok) return failureResponse({ type: 'service-misconfigured' })
+  const apiKey = readModelApiKey({ environment: environment.value, request })
+  if (!apiKey.ok) return failureResponse({ type: apiKey.type })
   const validator = createOpenAiResumeClaimSemanticValidator({
-    apiKey: environment.value.openAiApiKey,
+    apiKey: apiKey.value,
     model: environment.value.openAiStructuredModel,
     reasoningEffort: environment.value.openAiStructuredReasoningEffort,
   })

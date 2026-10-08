@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { FailureCause, Recovery, ResumeOperationFailure } from '@resume-tailoring/application/candidate-journey'
 import type { Localization } from '../localization/localization'
+import { candidateApiKeyRecovery, candidateApiKeys } from '../candidate-api-key/candidate-api-key-recovery'
+import { useDailyQuota } from '../candidate-api-key/candidate-api-key-wall'
+import { formatNextDailyQuotaReset } from '../candidate-api-key/daily-quota'
 
 type FailureRecoveryProps = Readonly<{
   /** Absent when the failure was not a model call; the Recovery then has no explanation of its own. */
@@ -16,13 +19,47 @@ type FailureRecoveryProps = Readonly<{
   onShortenInput?: () => void
 }>
 
-/** Why an operation failed, in the Candidate's words. */
+/** Why an operation failed, in the Candidate's words; past the Daily Quota, when the free resumes come back. */
 export function FailureExplanation({ cause, localization }: Readonly<{ cause: FailureCause; localization: Localization }>) {
-  return <Text size="sm">{localization.translate(`failure.${cause.type}.explanation`)}</Text>
+  return <Text size="sm">{localization.translate(`failure.${cause.type}.explanation`)
+    .replace('{time}', formatNextDailyQuotaReset({ locale: localization.locale }))}</Text>
 }
 
 /** The Recovery the application derived, offered as the one button that lets the Candidate continue. */
-export function RecoveryAction({ busy = false, cause, localization, onRetry, onShortenInput, recovery }: FailureRecoveryProps) {
+export function RecoveryAction(props: FailureRecoveryProps) {
+  const { recovery } = props
+  return recovery === 'use-own-key' || recovery === 'change-key'
+    ? <CandidateApiKeyRecoveryAction {...props} recovery={recovery} />
+    : <WaitingRecoveryAction {...props} />
+}
+
+/**
+ * Past the Daily Quota, or when a Candidate API Key fails, the Candidate enters a key and the failed operation runs
+ * again with it. When the key ran out of credit, removing it goes back to the free resumes left today, offered only
+ * while the edge has not announced that none remains.
+ */
+function CandidateApiKeyRecoveryAction({ busy = false, cause, localization, onRetry, recovery }: FailureRecoveryProps
+  & Readonly<{ recovery: 'use-own-key' | 'change-key' }>) {
+  const quota = useDailyQuota()
+  const enterKey = () => {
+    void candidateApiKeyRecovery.request({ reason: recovery === 'use-own-key' ? 'enter-key' : 'change-key' })
+      .then((entered) => { if (entered) onRetry() })
+  }
+  const useFreeQuota = () => {
+    candidateApiKeys.remove()
+    onRetry()
+  }
+  return <>
+    <Button disabled={busy} onClick={enterKey} variant="default">{localization.translate(cause === undefined
+      ? 'candidateApiKey.use' : `failure.${cause.type}.action`)}</Button>
+    {cause?.type === 'provider-credit-exhausted' && quota?.remaining !== 0
+      ? <Button disabled={busy} onClick={useFreeQuota} variant="subtle">
+          {localization.translate('failure.provider-credit-exhausted.freeQuota')}</Button>
+      : null}
+  </>
+}
+
+function WaitingRecoveryAction({ busy = false, cause, localization, onRetry, onShortenInput, recovery }: FailureRecoveryProps) {
   const remainingSeconds = useRemainingSeconds(cause)
   if (recovery === 'shorten-input' && onShortenInput === undefined) return null
   const run = recovery === 'reload' ? () => { window.location.reload() }

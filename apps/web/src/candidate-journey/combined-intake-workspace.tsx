@@ -13,6 +13,7 @@ import type { useCandidateJourney } from './use-candidate-journey'
 import { CriticalAmbiguityQuestions, sourceIntakeFailureKeys } from './source-intake-workspace'
 import { jobMatchFailureKeys } from './job-match-workspace'
 import { ProcessingPolicyNotice, processingPolicyNoticeId } from './processing-policy-notice'
+import { DailyQuotaStatus } from '../candidate-api-key/candidate-api-key-wall'
 import { FailureExplanation, RecoveryAction } from './failure-recovery'
 
 type IntakeProps = Readonly<{ candidateJourney: ReturnType<typeof useCandidateJourney>; localization: Localization }>
@@ -52,6 +53,7 @@ function CombinedIntakeForm(props: OpenIntakeProps) {
         onClick={() => { controls.requestGeneration({ purpose: 'tailored' }) }} size="lg">
         {localization.translate(session.tailoredResume === null ? 'combinedIntake.generate' : 'combinedIntake.regenerate')}</Button>}
     <ProcessingPolicyNotice {...{ candidateJourney, localization }} />
+    <DailyQuotaStatus localization={localization} />
     <PreparationFeedback {...{ candidateJourney, localization }}
       onRetry={() => { controls.requestGeneration({ purpose: session.preparation?.purpose ?? 'tailored' }) }}
       onNormalized={() => { controls.requestGeneration({ purpose: 'normalized' }) }} />
@@ -338,7 +340,9 @@ function PreparationFailureAlert({ busy, cause, failure, failureDetails, hasStab
   busy: boolean; failureDetails: ReactNode; hasStableResume: boolean; localization: Localization
   onBack: (() => void) | undefined; onRetry: () => void
 }>) {
-  const step = interrupted || failure === null || (cause !== undefined && failure === 'unavailable') ? null
+  // Past the Daily Quota nothing failed to analyze: the step that was refused says nothing the cause does not.
+  const step = interrupted || failure === null || (cause !== undefined && failure === 'unavailable')
+    || cause?.type === 'daily-quota-reached' ? null
     : localization.translate(failure in retryableFailureCauses
       ? retryableFailureCauses[failure as keyof typeof retryableFailureCauses] : preparationFailureKeys[failure])
   return <Alert color={interrupted ? 'caution' : 'danger'} role="alert"

@@ -11,6 +11,8 @@ export function readOpenAiApiFailure(failure: OpenAiRouteFailure): ApiFailure {
   if (failure.type === 'request-too-large') return { type: 'input-too-large' }
   if (failure.type === 'timeout') return { type: 'timeout' }
   if (failure.type === 'rate-limited') return readRateLimit(failure)
+  if (failure.type === 'candidate-api-key-invalid' || failure.type === 'candidate-api-key-model-unavailable'
+    || failure.type === 'provider-credit-exhausted') return { type: failure.type }
   if (failure.type === 'invalid-model-output' || failure.type === 'invalid-response') {
     return { type: 'invalid-provider-response' }
   }

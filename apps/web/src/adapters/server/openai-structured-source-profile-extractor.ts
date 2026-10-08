@@ -2,6 +2,8 @@ import { z } from 'zod'
 
 import type { OpenAiReasoningEffort } from '../../openai-model-configuration'
 import { createOpenAiRequester } from './openai-request'
+import type { ModelApiKey } from './openai-request'
+import { readOpenAiApiFailure } from './openai-api-failure'
 import {
   structuredSourceProfileExtractionSchema,
   structuredSourceProfileResponseFormat,
@@ -14,7 +16,7 @@ export function createOpenAiStructuredSourceProfileExtractor({
   reasoningEffort,
   request = fetch,
 }: Readonly<{
-  apiKey: string
+  apiKey: ModelApiKey
   model: string
   reasoningEffort: OpenAiReasoningEffort
   request?: typeof fetch
@@ -37,7 +39,7 @@ async function requestExtraction({
   reasoningEffort,
   request,
 }: Readonly<{
-  apiKey: string
+  apiKey: ModelApiKey
   model: string
   professionalContent: string
   reasoningEffort: OpenAiReasoningEffort
@@ -58,7 +60,8 @@ async function requestExtraction({
     },
     operation: 'structured-source-profile-extraction',
   })
-  return response.ok ? parseOpenAiResponse({ value: response.value }) : unavailableResult
+  return response.ok ? parseOpenAiResponse({ value: response.value })
+    : { ...unavailableResult, apiFailure: readOpenAiApiFailure(response.error) }
 }
 
 function parseOpenAiResponse({ value }: Readonly<{ value: unknown }>) {
