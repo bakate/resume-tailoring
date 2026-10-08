@@ -1,4 +1,4 @@
-import { failureCauseTypes, resumePreparationFailures, resumeSectionKinds } from '@resume-tailoring/application/candidate-journey'
+import { failureCauseTypes, hiddenContentOrigins, resumePreparationFailures, resumeSectionKinds } from '@resume-tailoring/application/candidate-journey'
 import { z } from 'zod'
 
 import {
@@ -195,7 +195,8 @@ export const candidateSessionSchema = z.strictObject({
     unsupportedFieldIds: z.array(z.string()),
     hiddenExperiences: tailoredResumeSchema.shape.experiences.optional(), hiddenFields: z.array(z.strictObject({
       field: tailoredResumeFieldSchema, location: resumeFieldLocationSchema,
-    })) }).optional(),
+      origin: z.enum(hiddenContentOrigins).default('candidate'),
+    })), restoredFieldIds: z.array(z.string()).optional() }).optional(),
   expiresAt: z.number().int().positive(),
   jobMatch: jobMatchSchema.nullable(),
   phase: z.enum(candidateJourneyPhases),

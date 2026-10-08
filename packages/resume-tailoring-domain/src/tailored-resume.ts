@@ -92,12 +92,19 @@ export type ResumeSectionContent =
   | Readonly<{ kind: 'skills'; groups: readonly TailoredResumeSkillGroup[] }>
   | Readonly<{ kind: FieldSectionKind; fields: readonly TailoredResumeField[] }>
 
+/** Who hid a piece of Hidden Content: the Candidate in the editor, or Overflow Reduction fitting the Page Budget. */
+export const hiddenContentOrigins = ['candidate', 'overflow-reduction'] as const
+export type HiddenContentOrigin = typeof hiddenContentOrigins[number]
+
 export type ResumeEditingState = Readonly<{
   revision: string
   unsupportedFieldIds: readonly string[]
   manuallyEdited: boolean
+  /** Only the Candidate hides a whole experience: Overflow Reduction never removes one. */
   hiddenExperiences?: readonly TailoredResumeExperience[]
-  hiddenFields: readonly Readonly<{ field: TailoredResumeField; location: ResumeFieldLocation }>[]
+  hiddenFields: readonly Readonly<{ field: TailoredResumeField; location: ResumeFieldLocation; origin: HiddenContentOrigin }>[]
+  /** Fields the Candidate restored, which a later Overflow Reduction never hides again. */
+  restoredFieldIds?: readonly string[]
 }>
 
 type ExperienceValue = Exclude<keyof TailoredResumeExperience, 'id' | 'chronology'>

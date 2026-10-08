@@ -12,13 +12,14 @@ type EditorProps = Readonly<{
   candidateJourney: ResumeReviewController; localization: Localization; resume: TailoredResume; copy: ResumeReviewCopy
   operations: RetryableOperations
 }>
+export type EditorTab = 'contacts' | 'recovery'
 type EditorContext = EditorProps & Readonly<{ announce: (message: string) => void }>
 
-export function ResumeEditor(props: EditorProps) {
+export function ResumeEditor({ initialTab, ...props }: EditorProps & Readonly<{ initialTab: EditorTab }>) {
   const [announcement, announce] = useState('')
   const { copy, resume } = props
   const sections = readSections({ resume })
-  return <Stack><EditorStatus {...props} /><Tabs defaultValue="contacts" keepMounted={false}>
+  return <Stack><EditorStatus {...props} /><Tabs defaultValue={initialTab} keepMounted={false}>
     <Tabs.List aria-label={copy.edit}>
       <Tabs.Tab value="contacts">{copy.contacts}</Tabs.Tab>
       {sections.map((section) => <Tabs.Tab key={section} value={section}>{copy[section]}</Tabs.Tab>)}
@@ -164,7 +165,8 @@ function HiddenExperienceRecovery({ announce, candidateJourney, copy, recovery }
 }
 
 function HiddenFieldRecovery({ announce, candidateJourney, copy, localization, recovery }: RecoveryProps) {
-  return <>{recovery.hiddenFields.map(({ field }) => <Group key={field.id} justify="space-between"><Text>{field.text}</Text>
+  return <>{recovery.hiddenFields.map(({ field, origin }) => <Group key={field.id} justify="space-between"><Stack gap={0}>
+    <Text>{field.text}</Text>{origin === 'overflow-reduction' ? <Text size="sm" c="dimmed">{copy.hiddenByReduction}</Text> : null}</Stack>
     <Button variant="subtle" onClick={() => { candidateJourney.restoreResumeField({ fieldId: field.id }); announce(copy.restored) }}>
       {localization.translate('tailoredResume.restoreField')}</Button></Group>)}</>
 }

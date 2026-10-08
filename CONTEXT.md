@@ -188,6 +188,18 @@ _Avoid_: Filler experience, irrelevant role
 An older role retained as title, organization, and dates when detail is unnecessary but omission would make the chronology misleading.
 _Avoid_: Hidden experience, discarded career history
 
+**Page Budget**:
+The page count a Tailored Resume aims for: one page by default, two when the Relevant Experiences alone cannot fit on one.
+_Avoid_: Page limit, length setting
+
+**Overflow Reduction**:
+The fixed, deterministic sequence of steps that turns content into Hidden Content until the Tailored Resume fits its Page Budget, without calling a language model.
+_Avoid_: Auto-shortening, condensation, trimming
+
+**Hidden Content**:
+Resume content kept out of the Tailored Resume but never deleted, tagged with its origin (hidden by the Candidate, or by Overflow Reduction) and restorable from the editor in one click. Content the Candidate restored is never hidden again by Overflow Reduction.
+_Avoid_: Deleted content, removed claims
+
 ## Outcomes
 
 **Outcome Feedback**:
