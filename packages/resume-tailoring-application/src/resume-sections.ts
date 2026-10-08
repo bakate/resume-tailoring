@@ -32,8 +32,8 @@ export type ResumeSectionWritingInput = Readonly<{
   previousContent: ResumeSectionContent | null
 }>
 
-/** Why a field was sent back to its writer: unsupported by its facts, or one of the coherence issue kinds. */
-export type ResumeFieldRejection = 'unsupported' | ResumeCoherenceIssueKind
+/** Why a field was sent back to its writer: unsupported by its facts, or one of the coherence or structure kinds. */
+export type ResumeFieldRejection = 'unsupported' | ResumeCoherenceIssueKind | ResumeStructureRejectionKind
 /** `unsupportedProposition` names what validation found unsupported, so the rewrite does not repeat it. */
 export type ResumeRejectedField = Readonly<{ fieldId: string; text: string; reason: ResumeFieldRejection; unsupportedProposition?: string }>
 
@@ -52,6 +52,14 @@ export type ResumeCoherenceInput = Readonly<{ document: ProfessionalResumeDocume
 export const resumeCoherenceIssueKinds = ['chronology', 'mixed-association', 'redundant', 'skill-category',
   'duplicated-skill', 'language'] as const
 export type ResumeCoherenceIssueKind = typeof resumeCoherenceIssueKinds[number]
+/**
+ * Why the deterministic structure checks rejected a written field before any validation: the section is of another
+ * kind or empty, a field reuses an id, has no text, cites no fact or one it may not cite, cites a fact of another
+ * experience field (a role citing an achievement), or an experience leaves out a role, employer or date its facts hold.
+ */
+export const resumeStructureRejectionKinds = ['wrong-section', 'empty-section', 'duplicate-id', 'empty-text', 'uncited',
+  'unknown-fact', 'misplaced-fact', 'missing-field'] as const
+export type ResumeStructureRejectionKind = typeof resumeStructureRejectionKinds[number]
 /** A field of the assembled document that the coherence check objects to: removed when redundant, else rewritten. */
 export type ResumeCoherenceIssue = Readonly<{ fieldId: string; kind: ResumeCoherenceIssueKind }>
 export type ResumeDocumentCoherence = Readonly<{
@@ -278,29 +286,57 @@ export function readWritableContent(content: ResumeSectionContent): ResumeSectio
 export function hasSupportedSectionStructure({ content, input }: Readonly<{
   content: ResumeSectionContent; input: ResumeSectionWritingInput
 }>) {
-  if (content.kind !== input.section.kind) return false
-  const fields = readSectionContentFields(content)
-  const factIds = new Set(input.candidateFacts.filter(({ status }) => status === 'attested').map(({ id }) => id))
-  return fields.length > 0 && new Set(fields.map(({ id }) => id)).size === fields.length
-    && fields.every((field) => field.text.trim().length > 0 && field.factIds.length > 0
-      && field.factIds.every((factId) => factIds.has(factId)))
-    && (content.kind !== 'skills' || new Set(content.groups.map(({ id }) => id)).size === content.groups.length)
-    && (content.kind !== 'experience' || experienceRetainsAssociations({ candidateFacts: input.candidateFacts,
-      experience: content.experience }))
+  return readStructureRejections({ content, input }).length === 0
 }
 
-function experienceRetainsAssociations({ candidateFacts, experience }: Readonly<{
+/**
+ * Each field the structure checks reject, with why, so its rewrite does not repeat it. A whole section of the wrong
+ * kind or without fields is named by its key, and an experience field left out by its conventional id, without text.
+ */
+export function readStructureRejections({ content, input }: Readonly<{
+  content: ResumeSectionContent; input: ResumeSectionWritingInput
+}>): readonly ResumeRejectedField[] {
+  const { key, kind } = input.section
+  if (content.kind !== kind) return [{ fieldId: key, text: '', reason: 'wrong-section' }]
+  const fields = readSectionContentFields(content)
+  if (fields.length === 0) return [{ fieldId: key, text: '', reason: 'empty-section' }]
+  const factIds = new Set(input.candidateFacts.filter(({ status }) => status === 'attested').map(({ id }) => id))
+  const seen = new Set<string>()
+  const fieldRejections = fields.flatMap(({ id, text, factIds: cited }): ResumeRejectedField[] => {
+    const reason = seen.has(id) ? 'duplicate-id' : text.trim().length === 0 ? 'empty-text' : cited.length === 0 ? 'uncited'
+      : cited.some((factId) => !factIds.has(factId)) ? 'unknown-fact' : null
+    seen.add(id)
+    return reason === null ? [] : [{ fieldId: id, text, reason }]
+  })
+  const groupIds = new Set<string>()
+  const groupRejections = content.kind !== 'skills' ? [] : content.groups.flatMap(({ id, category }): ResumeRejectedField[] => {
+    const duplicate = groupIds.has(id)
+    groupIds.add(id)
+    return duplicate ? [{ fieldId: id, text: category?.text ?? '', reason: 'duplicate-id' }] : []
+  })
+  const associations = content.kind !== 'experience' ? []
+    : readExperienceAssociationRejections({ candidateFacts: input.candidateFacts, experience: content.experience })
+  // A field rejected for its own citations is named once, for that first reason.
+  return [...fieldRejections, ...groupRejections,
+    ...associations.filter(({ fieldId }) => !fieldRejections.some((rejection) => rejection.fieldId === fieldId))]
+}
+
+function readExperienceAssociationRejections({ candidateFacts, experience }: Readonly<{
   candidateFacts: readonly CandidateFact[]; experience: TailoredResumeExperience
-}>) {
-  return (['role', 'organization', 'startDate', 'endDate', 'location', 'context'] as const).every((name) => {
+}>): readonly ResumeRejectedField[] {
+  return (['role', 'organization', 'startDate', 'endDate', 'location', 'context'] as const).flatMap((name): ResumeRejectedField[] => {
     const expectedFacts = candidateFacts.filter(({ path }) => path.startsWith(`${experience.id}.${name}.`))
     const field = experience[name] ?? null
     // Context and location may be left out; a role, an employer or a date the facts hold must be kept.
-    if (field === null) return name === 'context' || name === 'location' || expectedFacts.length === 0
+    if (field === null) {
+      return name === 'context' || name === 'location' || expectedFacts.length === 0 ? []
+        : [{ fieldId: `${experience.id}.${name}`, text: '', reason: 'missing-field' }]
+    }
     // The context sums up the experience, so it may cite any of its facts; no other experience's fact ever reaches it.
-    if (name === 'context') return field.factIds.every((factId) => candidateFacts.some(({ id, path }) =>
-      id === factId && path.startsWith(`${experience.id}.`)))
-    return expectedFacts.length > 0 && field.factIds.every((factId) => expectedFacts.some(({ id }) => id === factId))
+    const associated = name === 'context'
+      ? field.factIds.every((factId) => candidateFacts.some(({ id, path }) => id === factId && path.startsWith(`${experience.id}.`)))
+      : expectedFacts.length > 0 && field.factIds.every((factId) => expectedFacts.some(({ id }) => id === factId))
+    return associated ? [] : [{ fieldId: field.id, text: field.text, reason: 'misplaced-fact' }]
   })
 }
 

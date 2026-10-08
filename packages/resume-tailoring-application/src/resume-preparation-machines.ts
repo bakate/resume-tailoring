@@ -3,7 +3,7 @@ import type { ResumeSectionSnapshot } from '@resume-tailoring/domain/candidate-s
 import type { PrivacySafeTelemetryEvent, resumeSectionOutcomes } from './privacy-safe-telemetry'
 import type { ResumeOperationFailure, ResumePreparationOutcome } from './structured-resume-contract'
 import { assembleResumeDocumentWithOrigins, citedCandidateFacts, copyExperienceFromFacts, createSectionWritingInput,
-  hasSupportedSectionStructure, isCopiedFromSource, readWritableContent,
+  hasSupportedSectionStructure, isCopiedFromSource, readStructureRejections, readWritableContent,
   isSectionFullyValidated, normalizeSectionContent, planResumeSections, readRejectedFields,
   readSectionContentFields, removeSectionFields } from './resume-sections'
 import type { ResumeCoherenceIssue, ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage,
@@ -81,13 +81,14 @@ function readWriting({ context, result }: Readonly<{
   context: ResumeSectionMachineContext; result: ResumeSectionModelResult<ResumeSectionContent>
 }>): SectionStep {
   const usage = addUsage(context.usage, result.usage)
-  // A failed or unstructured write rejected no field, so its retry keeps the feedback the attempt was given.
+  // A failed write rejected no field, so its retry keeps the feedback the attempt was given.
   if (!result.ok) return { content: null, failure: result.error, rejectedFields: context.rejectedFields, usage }
   const { section, purpose, relevantFactIds } = context.writingInput
   const content = normalizeSectionContent({ content: result.value, purpose, section, relevantFactIds })
-  return hasSupportedSectionStructure({ content, input: context.writingInput })
-    ? { content, failure: null, rejectedFields: [], usage }
-    : { content: null, failure: unsupported, rejectedFields: context.rejectedFields, usage }
+  const rejections = readStructureRejections({ content, input: context.writingInput })
+  return rejections.length === 0 ? { content, failure: null, rejectedFields: [], usage }
+    // The coherence feedback a rewritten section started from still applies, next to what its structure broke.
+    : { content: null, failure: unsupported, usage, rejectedFields: [...context.writingInput.rejectedFields, ...rejections] }
 }
 
 function readValidation({ context, result }: Readonly<{
