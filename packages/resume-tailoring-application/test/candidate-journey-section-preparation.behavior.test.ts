@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { candidateSessionDurationMilliseconds, candidateSessionStorageVersion, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourney, CandidateJourneyView, CandidateSession,
   ResumeCoherenceInput, ResumeDocumentCoherence, ResumeRejectedField, ResumeSectionContent, ResumeSectionModelFailure,
-  ResumeSectionWritingInput,
+  ResumeSectionSnapshot, ResumeSectionWritingInput,
 } from '@resume-tailoring/application/candidate-journey'
 import { readGroupedResumeSection, structuredResumeJobMatch,
   structuredResumeSource, writeResumeSectionFromFacts } from '@resume-tailoring/application/structured-resume-fixtures'
@@ -601,14 +601,26 @@ class SectionPreparationTestSystem {
   readonly #rejectedFields: ResumeRejectedField[] = []
   readonly #telemetry = createRecordingTelemetry()
   #outcome: CandidateJourneyView | null = null
+  // The Resume Sections the preview last revealed while they were written; the published resume no longer keeps them.
+  #revealedSections: readonly ResumeSectionSnapshot[] = []
 
   constructor(options: TestOptions) {
     this.#options = options
     this.#persistence = createInMemoryCandidateSessionPersistence({ session: createMatchedSession(options) })
-    this.#journey = this.#createJourney({ heldSection: options.heldSection })
+    this.#journey = this.#createJourneyRevealingSections({ heldSection: options.heldSection })
   }
 
-  #createJourney({ heldSection }: Readonly<{ heldSection: TestOptions['heldSection'] }>) {
+  #createJourneyRevealingSections({ heldSection }: Readonly<{ heldSection: TestOptions['heldSection'] }>) {
+    const journey = this.#createJourneyWithFakes({ heldSection })
+    journey.subscribe(() => {
+      const view = journey.readView()
+      const preparation = view.status === 'candidate-session-open' ? view.session.preparation : undefined
+      if (preparation?.status === 'pending' && preparation.sections !== undefined) this.#revealedSections = preparation.sections
+    })
+    return journey
+  }
+
+  #createJourneyWithFakes({ heldSection }: Readonly<{ heldSection: TestOptions['heldSection'] }>) {
     return createCandidateJourney({ dependencies: createDependencies({ options: this.#options, persistence: this.#persistence, telemetry: this.#telemetry, models: {
       onWrite: async (input) => {
         this.#writingInputs.push(input)
@@ -716,7 +728,7 @@ class SectionPreparationTestSystem {
   }
 
   async #reload() {
-    this.#journey = this.#createJourney({ heldSection: undefined })
+    this.#journey = this.#createJourneyRevealingSections({ heldSection: undefined })
     this.#journey.start()
     await expect.poll(() => this.#journey.readView().status).toBe('candidate-session-open')
   }
@@ -786,7 +798,6 @@ class SectionPreparationTestSystem {
     expect(view?.preparationOutcome).toMatchObject({ status: 'prepared' })
     expect(view?.session.tailoredResume?.sections.map(({ section }) => section))
       .toEqual(['skills', 'education', 'languages', 'projects', 'certifications'])
-    expect(view?.session.preparation?.sections?.every(({ status }) => status === 'validated')).toBe(true)
   }
 
   expectEveryValidatedSectionKeptVisible() {
@@ -988,7 +999,7 @@ class SectionPreparationTestSystem {
     expect(view?.preparationOutcome).toMatchObject({ status: 'prepared' })
     expect(view?.session.tailoredResume?.experiences.map(({ id }) => id)).toEqual(experienceIds)
     // The preview reveals the sections in this order while they are written.
-    expect(view?.session.preparation?.sections?.filter(({ kind }) => kind === 'experience').map(({ key }) => key))
+    expect(this.#revealedSections.filter(({ kind }) => kind === 'experience').map(({ key }) => key))
       .toEqual(experienceIds)
   }
 
@@ -1041,8 +1052,7 @@ class SectionPreparationTestSystem {
   }
 
   expectOnlyFirstExperienceCopied() {
-    const session = this.#expectOutcome()?.session
-    expect(session?.preparation?.sections?.flatMap((section) => section.status === 'validated'
+    expect(this.#revealedSections.flatMap((section) => section.status === 'validated'
       && section.content.kind === 'experience' && isCopied(section.content.experience) ? [section.key] : []))
       .toEqual(['experiences.0'])
     this.expectOnlyFirstExperienceCopiedInTheTailoredResume()

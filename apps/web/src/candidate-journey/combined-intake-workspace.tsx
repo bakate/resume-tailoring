@@ -64,7 +64,7 @@ function useIntakeForm(props: OpenIntakeProps) {
   const [state, setState] = useState<IntakeState>(() => ({ sourceChoice: initialSource(props.candidateJourney),
     postingChoice: initialPosting(props.candidateJourney), locale: props.session.preparation?.locale ?? 'automatic',
     missingDocuments: [], confirmation: false, purpose: 'tailored' }))
-  const extractedSource = props.session.preparation === undefined ? props.session.sourceIntake : props.session.preparation.sourceIntake
+  const extractedSource = props.session.preparation?.sourceIntake ?? props.session.sourceIntake
   useEffect(() => {
     if (extractedSource !== null) setState((current) => ({ ...current, sourceChoice: { method: 'paste', text: '', file: null } }))
   }, [extractedSource])
@@ -280,9 +280,9 @@ export function PreparationFeedback({ candidateJourney, failureDetails, localiza
         {localization.translate('combinedIntake.normalized')}</Button>
         <BackToDocuments {...{ localization, onBack }} /></Group>
     </Alert> : null}
-    {preparation?.status === 'prepared' && preparation.sourceIntake !== null && preparation.sourceIntake.criticalAmbiguities.length > 0
+    {preparation?.status === 'prepared' && (view.session.sourceIntake?.criticalAmbiguities.length ?? 0) > 0
       ? <Alert color="informative">{localization.translate('combinedIntake.omittedAmbiguities')}</Alert> : null}
-    {preparation?.jobMatch?.analysis.matchBand === 'ambitious' && preparation.status === 'prepared'
+    {view.session.jobMatch?.analysis.matchBand === 'ambitious' && preparation?.status === 'prepared'
       ? <Alert color="caution">{localization.translate('jobMatch.generation.lowScoreWarning')}</Alert> : null}
   </>
 }

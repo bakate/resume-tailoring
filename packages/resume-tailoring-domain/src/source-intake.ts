@@ -81,7 +81,6 @@ export type SourceIntake = Readonly<{
   candidateFacts: readonly CandidateFact[]
   contactDetails: readonly LocalContactDetail[]
   criticalAmbiguities: readonly CriticalAmbiguity[]
-  originalContent: string
   sourceDocument: Readonly<{
     kind: 'docx' | 'pasted-text' | 'pdf'
     name: string

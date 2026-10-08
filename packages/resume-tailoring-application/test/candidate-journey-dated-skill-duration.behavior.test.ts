@@ -148,7 +148,7 @@ function createSession(): CandidateSession {
     expiresAt: currentTime + candidateSessionDurationMilliseconds, startedAt: currentTime,
     version: candidateSessionStorageVersion, sessionId: 'candidate-session-00000000-0000-4000-8000-000000000139',
     jobMatch: null, phase: 'job-match', processingConsent: { grantedAt: currentTime, policy: testProcessingPolicy },
-    sourceIntake: { candidateFacts, contactDetails: [], criticalAmbiguities: [], originalContent: 'Professional source content',
+    sourceIntake: { candidateFacts, contactDetails: [], criticalAmbiguities: [],
       sourceDocument: { kind: 'pasted-text', name: 'source.txt' },
       sourceProfile: { certifications: [], education: [], experiences: [], languages: [], projects: [], skills: [] } },
     tailoredResume: null,

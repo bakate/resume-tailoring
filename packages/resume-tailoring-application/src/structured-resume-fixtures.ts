@@ -37,7 +37,6 @@ export const structuredResumeSource: SourceIntake = {
     { kind: 'email', value: 'alex@example.com' },
   ],
   criticalAmbiguities: [],
-  originalContent: 'Frontend Engineer at Northwind, 2021–2024. Software Developer at Contoso, 2018–2021.',
   sourceDocument: { kind: 'pasted-text', name: 'anonymized-resume.txt' },
   sourceProfile: {
     certifications: [{ name: 'Cloud practitioner', issuer: null, issuedAt: null }],

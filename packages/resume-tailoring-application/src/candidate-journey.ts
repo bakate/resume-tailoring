@@ -41,6 +41,7 @@ import {
   candidateSessionStorageVersion,
   hasValidCandidateSessionLifetime,
   isCandidateSessionExpired,
+  settlePublishedPreparation,
 } from '@resume-tailoring/domain/candidate-session'
 import type {
   CandidateSession,
@@ -227,8 +228,11 @@ const restoreCandidateSession = fromPromise<
   CandidateJourneyDependencies
 >(({ input }) => Promise.resolve(restoreRecoverableSession(input)))
 
+/** A published preparation stored with its copies, as sessions once were, is restored without them; the next save stores none. */
 function restoreRecoverableSession(dependencies: CandidateJourneyDependencies): CandidateSessionStorageResult<RestoredCandidateSession> {
-  const result = restoreLiveSession(dependencies)
+  const restored = restoreLiveSession(dependencies)
+  const result = !restored.ok || restored.value.session === null ? restored
+    : { ok: true, value: { ...restored.value, session: settlePublishedPreparation({ session: restored.value.session }) } } as const
   if (!result.ok || result.value.session?.preparation?.status !== 'pending') return result
   const session = result.value.session
   const preparation = session.preparation
