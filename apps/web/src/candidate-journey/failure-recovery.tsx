@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom'
 import type { FailureCause, Recovery, ResumeOperationFailure } from '@resume-tailoring/application/candidate-journey'
 import type { Localization } from '../localization/localization'
 import { candidateApiKeyRecovery, candidateApiKeys } from '../candidate-api-key/candidate-api-key-recovery'
-import { formatNextDailyQuotaReset } from '../candidate-api-key/candidate-api-key-wall'
+import { useDailyQuota } from '../candidate-api-key/candidate-api-key-wall'
+import { formatNextDailyQuotaReset } from '../candidate-api-key/daily-quota'
 
 type FailureRecoveryProps = Readonly<{
   /** Absent when the failure was not a model call; the Recovery then has no explanation of its own. */
@@ -34,10 +35,12 @@ export function RecoveryAction(props: FailureRecoveryProps) {
 
 /**
  * Past the Daily Quota, or when a Candidate API Key fails, the Candidate enters a key and the failed operation runs
- * again with it. When the key ran out of credit, removing it goes back to the free resumes left today, if any.
+ * again with it. When the key ran out of credit, removing it goes back to the free resumes left today, offered only
+ * while the edge has not announced that none remains.
  */
 function CandidateApiKeyRecoveryAction({ busy = false, cause, localization, onRetry, recovery }: FailureRecoveryProps
   & Readonly<{ recovery: 'use-own-key' | 'change-key' }>) {
+  const quota = useDailyQuota()
   const enterKey = () => {
     void candidateApiKeyRecovery.request({ reason: recovery === 'use-own-key' ? 'enter-key' : 'change-key' })
       .then((entered) => { if (entered) onRetry() })
@@ -49,7 +52,7 @@ function CandidateApiKeyRecoveryAction({ busy = false, cause, localization, onRe
   return <>
     <Button disabled={busy} onClick={enterKey} variant="default">{localization.translate(cause === undefined
       ? 'candidateApiKey.use' : `failure.${cause.type}.action`)}</Button>
-    {cause?.type === 'provider-credit-exhausted'
+    {cause?.type === 'provider-credit-exhausted' && quota?.remaining !== 0
       ? <Button disabled={busy} onClick={useFreeQuota} variant="subtle">
           {localization.translate('failure.provider-credit-exhausted.freeQuota')}</Button>
       : null}

@@ -9,7 +9,7 @@ import type { Localization } from '../localization/localization'
 import { candidateApiKeyHeaderName } from './candidate-api-key-header'
 import { candidateApiKeyRecovery, candidateApiKeys, dailyQuota } from './candidate-api-key-recovery'
 import type { CandidateApiKeyPrompt, CandidateApiKeyRequest } from './candidate-api-key-recovery'
-import { formatDailyQuotaReset, readNextDailyQuotaReset } from './daily-quota'
+import { formatDailyQuotaReset } from './daily-quota'
 
 /** The Candidate API Key of this tab, re-read whenever it is entered or removed. */
 export function useCandidateApiKey() {
@@ -158,11 +158,6 @@ export function DailyQuotaStatus({ localization }: Readonly<{ localization: Loca
     <Button onClick={() => { void candidateApiKeyRecovery.request({ reason: 'enter-key' }) }} size="compact-sm"
       variant="subtle">{translate('candidateApiKey.use')}</Button>
   </Group>
-}
-
-/** The local time at which the Daily Quota of a refused preparation comes back, whenever the failure is shown. */
-export function formatNextDailyQuotaReset({ locale }: Readonly<{ locale: string }>) {
-  return formatDailyQuotaReset({ locale, resetAt: readNextDailyQuotaReset(Date.now()) })
 }
 
 async function validateCandidateApiKey(apiKey: string): Promise<

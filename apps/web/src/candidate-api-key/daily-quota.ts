@@ -61,6 +61,11 @@ export function formatDailyQuotaReset({ locale, resetAt }: Readonly<{ locale: st
   return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(resetAt)
 }
 
+/** The local time at which the Daily Quota of a refused preparation comes back, whenever the failure is shown. */
+export function formatNextDailyQuotaReset({ locale }: Readonly<{ locale: string }>) {
+  return formatDailyQuotaReset({ locale, resetAt: readNextDailyQuotaReset(Date.now()) })
+}
+
 const parisDateFormat = new Intl.DateTimeFormat('en-US', {
   timeZone: 'Europe/Paris', year: 'numeric', month: 'numeric', day: 'numeric',
   hour: 'numeric', minute: 'numeric', second: 'numeric', hourCycle: 'h23',
