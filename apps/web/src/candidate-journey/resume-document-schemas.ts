@@ -26,7 +26,10 @@ export const resumeSectionContentSchema = z.union([
 ])
 
 const sectionSchema = z.strictObject({ key: z.string().regex(/^(?:value-proposition|experiences\.\d+|skills|education|languages|projects|certifications)$/u),
-  kind: z.enum(resumeSectionKinds) })
+  kind: z.enum(resumeSectionKinds),
+  // Absent from clients loaded before code classified experiences, and from every other section kind.
+  experienceShape: z.strictObject({ chronology: z.enum(['context', 'earlier', 'relevant']),
+    achievementBudget: z.number().int().min(0).max(6) }).optional() })
 const candidateFactsSchema = sourceIntakeSchema.shape.candidateFacts.max(500)
 const localeSchema = z.enum(['en', 'fr'])
 const purposeSchema = z.enum(['tailored', 'normalized'])

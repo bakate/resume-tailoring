@@ -1,17 +1,21 @@
 import type { JobMatch } from '@resume-tailoring/domain/job-match'
 import type { CandidateFact, CandidateFactId } from '@resume-tailoring/domain/source-intake'
-import { orderExperiencesReverseChronologically } from './experience-chronology'
+import { classifyExperiences, orderExperiencesReverseChronologically } from './experience-chronology'
 import { readExperienceFields, readSectionFields, replaceEmDashes } from './tailored-resume'
 import type { TailoredResumeExperience, TailoredResumeField, TailoredResumeLocale, TailoredResumeSection } from './tailored-resume'
 import type { ProfessionalResumeDocument } from './structured-resume-contract'
 import type { ReadApiFailure } from './api-failure'
 import type { ResumeSectionContent, ResumeSectionKind } from '@resume-tailoring/domain/tailored-resume'
+import type { ExperienceShape } from './experience-chronology'
 
 export { resumeSectionKinds } from '@resume-tailoring/domain/tailored-resume'
 export type { ResumeSectionContent, ResumeSectionKind } from '@resume-tailoring/domain/tailored-resume'
 
-/** One Resume Section of the deterministic section plan; experiences are keyed `experiences.N`, N their source index. */
-export type ResumeSectionPlanEntry = Readonly<{ key: string; kind: ResumeSectionKind }>
+/**
+ * One Resume Section of the deterministic section plan; experiences are keyed `experiences.N`, N their source index,
+ * and carry the shape code decided for them, which their writer receives as a constraint and normalization enforces.
+ */
+export type ResumeSectionPlanEntry = Readonly<{ key: string; kind: ResumeSectionKind; experienceShape?: ExperienceShape }>
 
 /** Only what the section may cite (every fact for the Value Proposition): never the Job Posting text or Match Analysis details. */
 export type ResumeSectionWritingInput = Readonly<{
@@ -71,15 +75,23 @@ export type ResumeSectionsRequest = Readonly<{
 
 const fieldSectionKinds = ['skills', 'education', 'languages', 'projects', 'certifications'] as const
 
-export function planResumeSections({ candidateFacts }: Pick<ResumeSectionsRequest, 'candidateFacts'>): readonly ResumeSectionPlanEntry[] {
+/** `today` is when the plan is made: an ongoing role lasts until then, which sets its achievement budget. */
+export function planResumeSections({ request: { candidateFacts, jobMatch, purpose }, today }: Readonly<{
+  request: ResumeSectionsRequest; today: number
+}>): readonly ResumeSectionPlanEntry[] {
   const experienceIndexes = [...new Set(candidateFacts.map(({ path }) => /^experiences\.(\d+)\./u.exec(path)?.[1])
     .filter((index) => index !== undefined).map(Number))]
   const readDate = (sourceIndex: number, name: 'startDate' | 'endDate') =>
     candidateFacts.find(({ path }) => path.startsWith(`experiences.${String(sourceIndex)}.${name}.`))?.value ?? null
+  const relevantFactIds = new Set<string>(purpose === 'tailored' ? jobMatch.analysis.relevantFactIds : [])
   const experiences = orderExperiencesReverseChronologically({ experiences: experienceIndexes.map((sourceIndex) => ({
-    sourceIndex, startDate: readDate(sourceIndex, 'startDate'), endDate: readDate(sourceIndex, 'endDate') })) })
+    sourceIndex, startDate: readDate(sourceIndex, 'startDate'), endDate: readDate(sourceIndex, 'endDate'),
+    relevant: candidateFacts.some(({ id, path }) => path.startsWith(`experiences.${String(sourceIndex)}.`) && relevantFactIds.has(id)),
+  })) })
+  const shapes = classifyExperiences({ experiences, purpose, today })
   return [{ key: 'value-proposition', kind: 'value-proposition' },
-    ...experiences.map(({ sourceIndex }) => ({ key: `experiences.${String(sourceIndex)}`, kind: 'experience' as const })),
+    ...experiences.map(({ sourceIndex }, index) => ({ key: `experiences.${String(sourceIndex)}`, kind: 'experience' as const,
+      ...(shapes[index] === undefined ? {} : { experienceShape: shapes[index] }) })),
     ...fieldSectionKinds.filter((kind) => candidateFacts.some(({ path, value }) => path.startsWith(`${kind}.`)
       && value.trim().length > 0)).map((kind) => ({ key: kind, kind }))]
 }
@@ -121,14 +133,33 @@ export function normalizeSectionContent({ content: written, purpose, section, re
     map: (field) => ({ ...field, text: replaceEmDashes(field.text) }) })
   if (content.kind === 'experience') {
     const { experience } = content
-    return { kind: 'experience', experience: { ...experience, id: section.key,
-      chronology: purpose === 'normalized' && experience.chronology === 'relevant' ? 'context' : experience.chronology,
-      achievements: orderByRelevance({ fields: deduplicateFields(experience.achievements), relevantFactIds }) } }
+    const achievements = orderByRelevance({ fields: deduplicateFields(experience.achievements), relevantFactIds })
+    const shape = section.experienceShape
+    if (shape === undefined) {
+      return { kind: 'experience', experience: { ...experience, id: section.key, achievements,
+        chronology: purpose === 'normalized' && experience.chronology === 'relevant' ? 'context' : experience.chronology } }
+    }
+    // Achievements beyond the budget are dropped least relevant first; an Earlier Experience keeps its one line.
+    const shaped = { ...experience, id: section.key, chronology: shape.chronology }
+    return { kind: 'experience', experience: shape.chronology === 'earlier' ? readEarlierLine({ experience: shaped, achievements })
+      : { ...shaped, achievements: achievements.slice(0, shape.achievementBudget) } }
   }
   if (content.kind === 'skills') {
     return { kind: 'skills', groups: content.groups.map((group) => ({ ...group, items: deduplicateFields(group.items) })) }
   }
   return content
+}
+
+/**
+ * Role, organization and dates only. An experience with none of them keeps its context, or else its most relevant
+ * achievement, so its one line still says what it was rather than leaving an empty entry.
+ */
+function readEarlierLine({ experience, achievements }: Readonly<{
+  experience: TailoredResumeExperience; achievements: readonly TailoredResumeField[]
+}>): TailoredResumeExperience {
+  const named = [experience.role, experience.organization, experience.startDate, experience.endDate].some((field) => field !== null)
+  if (named) return { ...experience, location: null, context: null, achievements: [] }
+  return { ...experience, location: null, achievements: experience.context === null ? achievements.slice(0, 1) : [] }
 }
 
 /** Puts the fields citing a fact the Match Analysis found relevant first, each group keeping its written order. */

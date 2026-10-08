@@ -73,16 +73,30 @@ function renderExperiences({ tailoredResume }: Readonly<{ tailoredResume: Tailor
 }
 
 function renderExperience({ experience }: Readonly<{ experience: TailoredResumeExperience }>) {
+  const dates = [experience.startDate, experience.endDate].filter((field) => field !== null)
+    .map(({ text }) => renderText(text)).join(' – ')
+  if (experience.chronology === 'earlier') return renderEarlierExperience({ experience, dates })
   const role = experience.role === null ? '' : `<h3>${renderText(experience.role.text)}</h3>`
   const organization = experience.organization === null ? ''
     : `<p class="experience-organization">${renderText(experience.organization.text)}</p>`
-  const dates = [experience.startDate, experience.endDate].filter((field) => field !== null)
-    .map(({ text }) => renderText(text)).join(' – ')
   const context = experience.context === null ? '' : `<p>${renderText(experience.context.text)}</p>`
   const achievements = experience.achievements.map(({ text }) => `<li>${renderText(text)}</li>`).join('')
   // The heading stays whole and with what follows it, so a page never ends on a role without its dates.
   const heading = `<div class="experience-heading">${role}${organization}${renderPeriod({ dates, location: experience.location ?? null })}</div>`
   return `<article class="resume-experience">${heading}${context}${achievements.length === 0 ? '' : `<ul>${achievements}</ul>`}</article>`
+}
+
+/**
+ * An Earlier Experience is one line: role and organization, then its dates at the far end. Without role and
+ * organization, its context or else its first achievement names it instead; nothing else is shown.
+ */
+function renderEarlierExperience({ experience, dates }: Readonly<{ experience: TailoredResumeExperience; dates: string }>) {
+  const name = experience.role ?? (experience.organization === null ? experience.context ?? experience.achievements[0] ?? null : null)
+  const title = [name === null ? '' : `<span class="experience-role">${renderText(name.text)}</span>`,
+    experience.organization === null ? '' : `<span class="experience-organization">${renderText(experience.organization.text)}</span>`]
+    .filter((part) => part.length > 0).join(' · ')
+  const period = dates.length === 0 ? '' : `<span class="experience-dates">${dates}</span>`
+  return `<article class="resume-experience earlier-experience"><p class="experience-line">${title}${period}</p></article>`
 }
 
 /** The dates line, with the location at its far end when the experience has one. */

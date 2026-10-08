@@ -41,6 +41,22 @@ describe('Resume section model adapters', () => {
     expect(readModelInput(body)).toMatchObject({ previousContent })
   })
 
+  it('accepts an experience with the class and achievement budget code set and passes them to the writer', async () => {
+    let body: RequestBody | null = null
+    const content = readResumeSection({ document: groupedResumeDocument, section: sectionFor('experience') })
+    const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
+      body = readBody(options)
+      return Promise.resolve(Response.json(modelResponse(sectionOutput(content))))
+    } })
+    const experienceShape = { chronology: 'relevant', achievementBudget: 6 } as const
+    const input = resumeSectionWritingInputSchema.parse({ ...writingInput('experience'),
+      section: { ...sectionFor('experience'), experienceShape } })
+
+    await writer.write(input)
+
+    expect(readModelInput(body)).toMatchObject({ section: { key: 'experiences.0', experienceShape } })
+  })
+
   it('validates only the fields of one section against the facts they cite', async () => {
     const validation = { fields: [{ fieldId: 'degree', supported: false, unsupportedProposition: 'The cited facts name no degree' },
       { fieldId: 'institution', supported: true, unsupportedProposition: null }] }

@@ -18,6 +18,7 @@ header p,address{margin:2mm 0 0;font-style:normal}
 section{margin-top:4mm}article,.skill-group{margin-top:3mm}
 article p,.skill-group p{margin:1mm 0 0}
 .experience-organization{font-weight:600}.experience-dates{color:#505760;font-size:10pt;display:flex;justify-content:space-between;gap:12pt}.experience-location{text-align:right}
+.experience-line{display:flex;align-items:baseline;gap:4pt}.experience-role{font-weight:600}.experience-line .experience-organization{font-weight:400}.experience-line .experience-dates{margin-left:auto;padding-left:8pt;white-space:nowrap}
 ul{margin:2mm 0 0;padding-left:5mm}li{margin-top:1.5mm;line-height:1.35;break-inside:avoid}
 p{orphans:2;widows:2}
 .resume-photo{width:24mm;height:24mm;object-fit:cover;border-radius:50%}
