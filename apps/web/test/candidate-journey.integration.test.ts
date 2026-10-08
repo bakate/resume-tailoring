@@ -970,13 +970,15 @@ class CandidateJourneyIntegrationSystem {
   async expectWaitEndAnnouncedOnce() {
     this.#expectAction()
     const alert = this.#page.getByRole('alert').filter({ hasText: 'Preparation could not finish.' })
-    const countdown = alert.getByRole('button', { name: /^Try again in \d s$/u })
-    await expect(countdown).toBeDisabled()
-    await expect(countdown).not.toHaveAttribute('aria-live')
-    const announcement = alert.getByRole('status').filter({ hasText: 'The wait is over. You can try again.' })
+    const retry = alert.getByRole('button', { name: 'Try again', exact: true })
+    await expect(retry).toBeDisabled()
+    await expect(retry).toHaveText(/^Try again in \d s/u)
+    await expect(retry).not.toHaveAttribute('aria-live')
+    const announcement = this.#page.getByRole('status').filter({ hasText: 'The wait is over. You can try again.' })
     await expect(announcement).toHaveCount(0)
-    await expect(alert.getByRole('button', { name: 'Try again', exact: true })).toBeEnabled({ timeout: 5_000 })
+    await expect(retry).toBeEnabled({ timeout: 5_000 })
     await expect(announcement).toHaveCount(1)
+    await expect(alert.getByText('The wait is over. You can try again.')).toHaveCount(0)
   }
 
   async expectMobileJourneyExported() {

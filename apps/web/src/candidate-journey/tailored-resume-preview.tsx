@@ -47,8 +47,8 @@ function RenderedResume({ condensation, current, document, localization, message
   const bytes = eligibility.status === 'eligible' && preview === 'ready' && !paused ? current.pdf : null
   const blocker = eligibility.status === 'blocked' ? readPrimaryBlocker({ reasons: eligibility.reasons }) : null
   const explanationId = useId()
-  const explanation = bytes !== null ? null : readDownloadExplanation({ blocker, preview })
-  const explainedBy = (source: DownloadExplanation) => explanation === source ? explanationId : undefined
+  const explanation = bytes !== null ? null : readDownloadExplanation({ blocker, messages, paused, preview })
+  const explainedBy = (source: DownloadExplanation['source']) => explanation?.source === source ? explanationId : undefined
   return <Stack gap="sm" mt="md">
     {blocker === null || blocker === 'missing-identity' ? null
       : <Text id={explainedBy('blocker')} role="alert" c="danger.8">{messages[blocker]}</Text>}
@@ -58,8 +58,7 @@ function RenderedResume({ condensation, current, document, localization, message
     {eligibility.status === 'blocked' && eligibility.reasons.includes('overflow') && condensation !== undefined
       ? <Button disabled={condensation.disabled} onClick={condensation.propose}>{condensation.label}</Button> : null}
     <ResumeDownload {...{ bytes, localization, messages, onDownload, purpose: document.purpose }}
-      explanation={explanation === null ? null : { id: explanationId,
-        hint: explanation !== 'hint' ? null : paused ? messages.paused : messages.pending }} />
+      explanation={explanation === null ? null : { id: explanationId, hint: explanation.hint }} />
     <CandidateNameField identity={document.identity} explain={blocker === 'missing-identity'} errorId={explainedBy('name')}
       messages={messages} name={name} />
   </Stack>
@@ -89,18 +88,19 @@ function readPrimaryBlocker({ reasons }: Readonly<{ reasons: readonly ResumeExpo
 const blockerPriority = ['unsupported-content', 'overflow', 'missing-identity',
   'missing-contact', 'stale-layout'] as const satisfies readonly ResumeExportBlocker[]
 
-type DownloadExplanation = 'blocker' | 'name' | 'render-failure' | 'hint'
+type DownloadExplanation = Readonly<{ source: 'blocker' | 'name' | 'render-failure'; hint: null } | { source: 'hint'; hint: string }>
 
 /**
  * What says why the Download button is disabled, which the button is described by. A blocker or a failed preview
  * already explains itself on screen, a missing name beside its field; otherwise a hint beside the button does.
  */
-function readDownloadExplanation({ blocker, preview }: Readonly<{
-  blocker: ReturnType<typeof readPrimaryBlocker>; preview: 'pending' | 'ready' | 'failed'
+function readDownloadExplanation({ blocker, messages, paused, preview }: Readonly<{
+  blocker: ReturnType<typeof readPrimaryBlocker>; messages: PreviewMessages; paused: boolean; preview: 'pending' | 'ready' | 'failed'
 }>): DownloadExplanation {
-  if (blocker === 'missing-identity') return 'name'
-  if (blocker !== null) return 'blocker'
-  return preview === 'failed' ? 'render-failure' : 'hint'
+  if (blocker === 'missing-identity') return { source: 'name', hint: null }
+  if (blocker !== null) return { source: 'blocker', hint: null }
+  if (preview === 'failed') return { source: 'render-failure', hint: null }
+  return { source: 'hint', hint: paused ? messages.paused : messages.pending }
 }
 
 /**

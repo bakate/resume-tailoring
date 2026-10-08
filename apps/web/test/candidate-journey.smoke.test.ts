@@ -823,7 +823,8 @@ class CandidateJourneyTestSystem {
     await this.generateResume()
     const alert = this.#page.getByRole('alert').filter({ hasText: 'Preparation could not finish.' })
     await expect(alert).toContainText('Too many requests were sent in a short time.')
-    await expect(alert.getByRole('button', { name: /^Try again in \d s$/u })).toBeDisabled()
+    await expect(alert.getByRole('button', { name: 'Try again', exact: true })).toBeDisabled()
+    await expect(alert.getByRole('button', { name: 'Try again', exact: true })).toHaveText(/^Try again in \d s/u)
   }
 
   async retryOnceTheWaitIsOver() {

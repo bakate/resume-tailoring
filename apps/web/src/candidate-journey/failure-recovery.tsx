@@ -1,5 +1,6 @@
 import { Button, Group, Stack, Text } from '@mantine/core'
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { FailureCause, Recovery, ResumeOperationFailure } from '@resume-tailoring/application/candidate-journey'
 import type { Localization } from '../localization/localization'
 
@@ -26,18 +27,29 @@ export function RecoveryAction({ busy = false, cause, localization, onRetry, onS
   if (recovery === 'shorten-input' && onShortenInput === undefined) return null
   const run = recovery === 'reload' ? () => { window.location.reload() }
     : recovery === 'shorten-input' ? onShortenInput : onRetry
+  const waited = cause?.type === 'rate-limited' && cause.retryAfterSeconds > 0
   return <><Button disabled={busy || remainingSeconds > 0} onClick={run} variant="default">
-    {readActionLabel({ cause, localization, remainingSeconds })}</Button>
-    {cause?.type === 'rate-limited' && cause.retryAfterSeconds > 0 ? <WaitOverAnnouncement {...{ localization, remainingSeconds }} /> : null}</>
+    {remainingSeconds > 0 ? <Countdown label={readActionLabel({ cause, localization, remainingSeconds })}
+      name={localization.translate('failure.retry')} /> : readActionLabel({ cause, localization, remainingSeconds })}</Button>
+    {waited ? <WaitOverAnnouncement {...{ localization, remainingSeconds }} /> : null}</>
 }
 
 /**
- * The countdown itself is never announced, so it does not interrupt the explanation the alert reads out; the region
- * is present from the start and speaks once, when the wait is over.
+ * The button sits in an alert, which re-reads any text that changes inside it: the ticking label is hidden from
+ * assistive technology behind a stable name, so the countdown never interrupts the explanation.
+ */
+function Countdown({ label, name }: Readonly<{ label: string; name: string }>) {
+  return <><span aria-hidden="true">{label}</span><span className="sr-only">{name}</span></>
+}
+
+/**
+ * Speaks once, when the wait is over. The region is present from the start, and rendered outside the alert so the
+ * alert does not read the message out a second time.
  */
 function WaitOverAnnouncement({ localization, remainingSeconds }: Readonly<{ localization: Localization; remainingSeconds: number }>) {
-  return <span aria-atomic="true" aria-live="polite" className="sr-only" role="status">
-    {remainingSeconds === 0 ? localization.translate('failure.rate-limited.ready') : ''}</span>
+  if (typeof document === 'undefined') return null
+  return createPortal(<span aria-atomic="true" aria-live="polite" className="sr-only" role="status">
+    {remainingSeconds === 0 ? localization.translate('failure.rate-limited.ready') : ''}</span>, document.body)
 }
 
 function readActionLabel({ cause, localization, remainingSeconds }: Readonly<{

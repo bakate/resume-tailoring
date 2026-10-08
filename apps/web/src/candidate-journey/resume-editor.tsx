@@ -135,7 +135,8 @@ function FieldOrdering({ announce, candidateJourney, copy, localization, referen
     || (reference.location.kind === 'experience' && reference.location.fieldName === 'achievements')
     || (reference.location.kind === 'skill-group' && reference.location.fieldName === 'items')
   if (!isMovable) return null
-  const name = `${copy[sectionOf(reference)]}: ${readEntryName({ reference, resume })}`
+  const name = localization.translate('tailoredResume.entryName').replace('{section}', copy[sectionOf(reference)])
+    .replace('{entry}', readEntryName({ reference, resume }))
   return <>{(['up', 'down'] as const).map((direction) => <Button key={direction} size="compact-sm" variant="subtle"
     onClick={() => { candidateJourney.moveResumeField({ fieldId: reference.key, direction }); announce(copy.ordered) }}>
     {readMoveLabel({ direction, localization, name })}</Button>)}</>
