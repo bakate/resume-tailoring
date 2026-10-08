@@ -1,7 +1,7 @@
 import { readResumeRecovery } from './resume-recovery-view'
 import type { PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
 import type { CandidateSession } from '@resume-tailoring/domain/candidate-session'
-import type { ResumeEditingState, TailoredResume, TailoredResumeField } from '@resume-tailoring/domain/tailored-resume'
+import type { ResumeEditingState, ResumeFieldLocation, TailoredResume, TailoredResumeField } from '@resume-tailoring/domain/tailored-resume'
 import type { ProfessionalResumeDocument, ResumeDocumentReview,
   ResumeOperationFailure, ResumeSectionChange } from './structured-resume-contract'
 import { assessResumeExport } from './resume-export'
@@ -89,20 +89,45 @@ export function applySectionChange({ document, change }: Readonly<{
   return { ...document, sections }
 }
 
+export type ResumeFieldEdit = Readonly<{ fieldId: string; text: string }>
+
 export async function editResumeField({ access, fieldId, text }: Readonly<{
   access: ResumeEditingAccess; fieldId: string; text: string
+}>) { await editResumeFields({ access, edits: [{ fieldId, text }] }) }
+
+/**
+ * Saves several edited fields at once, such as every field of one experience: the edits of each Resume Section become
+ * one validated change, so the draft gets one new revision per section rather than one per field.
+ */
+export async function editResumeFields({ access, edits }: Readonly<{
+  access: ResumeEditingAccess; edits: readonly ResumeFieldEdit[]
 }>) {
-  const session = access.readSession()
-  if (session?.tailoredResume === null || session === null) return
-  const reference = readResumeFields({ resume: session.tailoredResume }).find(({ field }) => field.id === fieldId)
-  if (reference === undefined) return
-  const document = updateResumeField({ resume: session.tailoredResume, location: reference.location,
-    field: { ...reference.field, text } })
-  const section = reference.location.kind === 'experience' ? 'experiences'
-    : reference.location.kind === 'skill-group' ? 'skills'
-      : reference.location.kind === 'section' ? reference.location.section : 'value-proposition'
-  await applyValidatedSectionChange({ access, change: sectionChange({ document, section,
-    baseRevision: readResumeEditing({ session }).revision }) })
+  const sections = [...new Set(edits.flatMap(({ fieldId }) => {
+    const reference = readSessionFields({ access }).find(({ field }) => field.id === fieldId)
+    return reference === undefined ? [] : [sectionOfLocation(reference.location)]
+  }))]
+  for (const section of sections) {
+    const session = access.readSession()
+    if (session?.tailoredResume === null || session === null) return
+    const document = readResumeFields({ resume: session.tailoredResume }).reduce((current, reference) => {
+      const edit = edits.find(({ fieldId }) => fieldId === reference.field.id)
+      return edit === undefined || sectionOfLocation(reference.location) !== section ? current
+        : updateResumeField({ resume: current, location: reference.location, field: { ...reference.field, text: edit.text } })
+    }, session.tailoredResume)
+    await applyValidatedSectionChange({ access, change: sectionChange({ document, section,
+      baseRevision: readResumeEditing({ session }).revision }) })
+  }
+}
+
+function readSessionFields({ access }: Readonly<{ access: ResumeEditingAccess }>) {
+  const resume = access.readSession()?.tailoredResume
+  return resume === null || resume === undefined ? [] : readResumeFields({ resume })
+}
+
+function sectionOfLocation(location: ResumeFieldLocation): ResumeSectionChange['section'] {
+  return location.kind === 'experience' ? 'experiences'
+    : location.kind === 'skill-group' ? 'skills'
+      : location.kind === 'section' ? location.section : 'value-proposition'
 }
 
 export async function applyValidatedSectionChange({ access, change }: Readonly<{

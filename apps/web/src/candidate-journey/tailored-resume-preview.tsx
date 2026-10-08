@@ -27,7 +27,8 @@ export function TailoredResumePreview(props: ResumePreviewProps) {
   const onRetry = () => { setAttempt((value) => value + 1) }
   const { pages, status, download, missingName } = useResumeReviewParts({ ...props, current, onRetry })
   // One layout for every preview state: a render never remounts the rail, so focus and the open disclosures stay put.
-  return <section aria-label={localization.translate('resumePreview.title')} className="resume-review-layout">
+  const editing = props.editor !== undefined && props.editor !== null
+  return <section aria-label={localization.translate('resumePreview.title')} className="resume-review-layout" data-editing={editing || undefined}>
     <div className="resume-review-document">{pages}{props.children}</div>
     <div className="resume-review-rail">
       {/* The status explains Download, so it travels with it, in the bottom bar on a phone. */}
@@ -36,12 +37,14 @@ export function TailoredResumePreview(props: ResumePreviewProps) {
         <ResumeDownload {...download} edit={props.actions.edit} localization={localization} onDownload={props.onDownload}
           purpose={props.document.purpose} />
       </div>
-      {/* Where the Match Analysis summary goes, under the primary actions. */}
-      <div className="resume-review-match-summary" />
-      {props.actions.secondary}
-      <CandidateNameField identity={props.document.identity} explain={missingName} errorId={download.explainedBy('name')}
-        localization={localization} name={name} />
-      <PhotoPicker photo={photo} localization={localization} disabled={props.enabled === false} />
+      {editing ? props.editor : <>
+        {/* Where the Match Analysis summary goes, under the primary actions. */}
+        <div className="resume-review-match-summary" />
+        {props.actions.secondary}
+        <CandidateNameField identity={props.document.identity} explain={missingName} errorId={download.explainedBy('name')}
+          localization={localization} name={name} />
+        <PhotoPicker photo={photo} localization={localization} disabled={props.enabled === false} />
+      </>}
     </div>
   </section>
 }
@@ -74,8 +77,8 @@ function useRevisionState<T>(revision: string | null, initial: T) {
 const pagesPending = { preview: 'pending', pageCount: 0, expanded: false } as const satisfies PagesShown
 type PagesShown = Readonly<{ preview: 'pending' | 'ready' | 'failed'; pageCount: number; expanded: boolean }>
 
-function useResumeReviewParts({ current, document, localization, onRetry, pageBudget, paused, photo }: Readonly<
-  Pick<ResumePreviewProps, 'document' | 'localization' | 'pageBudget' | 'paused' | 'photo'>
+function useResumeReviewParts({ current, document, localization, onRetry, pageBudget, unsavedEdits, photo }: Readonly<
+  Pick<ResumePreviewProps, 'document' | 'localization' | 'pageBudget' | 'unsavedEdits' | 'photo'>
   & { current: ResumeRenderResult | null; onRetry: () => void }>): ResumeReviewParts {
   const revision = current?.assessment.layout.revision ?? null
   const [{ preview, pageCount, expanded }, updatePages] = useRevisionState<PagesShown>(revision, pagesPending)
@@ -89,9 +92,9 @@ function useResumeReviewParts({ current, document, localization, onRetry, pageBu
   if (current.assessment.layout.status === 'unavailable') return { status: null, missingName: false, download: withoutPdf,
     pages: <RenderFailure id={explanationId} {...{ localization, onRetry }} failure={current.failure} /> }
   const eligibility = current.assessment.exportEligibility
-  const bytes = eligibility.status === 'eligible' && preview === 'ready' && !paused ? current.pdf : null
+  const bytes = eligibility.status === 'eligible' && preview === 'ready' && !unsavedEdits ? current.pdf : null
   const blocker = eligibility.status === 'blocked' ? readPrimaryBlocker({ reasons: eligibility.reasons }) : null
-  const explanation = bytes !== null ? null : readDownloadExplanation({ blocker, localization, paused, preview })
+  const explanation = bytes !== null ? null : readDownloadExplanation({ blocker, localization, unsavedEdits, preview })
   const explainedBy = (source: DownloadExplanation['source']) => explanation?.source === source ? explanationId : undefined
   const budgetStatus = pageBudget === undefined ? null
     : readPageBudgetStatus({ layout: current.assessment.layout, overflowReduction: pageBudget.overflowReduction })
@@ -162,13 +165,13 @@ type DownloadExplanation = Readonly<{ source: 'blocker' | 'name' | 'render-failu
  * What says why the Download button is disabled, which the button is described by. A blocker or a failed preview
  * already explains itself on screen, a missing name beside its field; otherwise a hint beside the button does.
  */
-function readDownloadExplanation({ blocker, localization, paused, preview }: Readonly<{
-  blocker: ReturnType<typeof readPrimaryBlocker>; localization: Localization; paused: boolean; preview: 'pending' | 'ready' | 'failed'
+function readDownloadExplanation({ blocker, localization, unsavedEdits, preview }: Readonly<{
+  blocker: ReturnType<typeof readPrimaryBlocker>; localization: Localization; unsavedEdits: boolean; preview: 'pending' | 'ready' | 'failed'
 }>): DownloadExplanation {
   if (blocker === 'missing-identity') return { source: 'name', hint: null }
   if (blocker !== null) return { source: 'blocker', hint: null }
   if (preview === 'failed') return { source: 'render-failure', hint: null }
-  return { source: 'hint', hint: paused ? localization.translate('resumePreview.paused') : localization.translate('resumePreview.pending') }
+  return { source: 'hint', hint: unsavedEdits ? localization.translate('resumePreview.unsaved') : localization.translate('resumePreview.pending') }
 }
 
 /**

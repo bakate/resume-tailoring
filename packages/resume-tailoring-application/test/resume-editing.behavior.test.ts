@@ -26,6 +26,17 @@ describe('Candidate Journey resume editing', () => {
     system.expectOnlyUnsupportedExperienceFieldUnresolved()
   })
 
+  it('saves the edited fields of one experience as one change and validates each of them', async () => {
+    const system = createSystemUnderTest()
+    await system.givenReviewableResume()
+    system.givenPartiallySupportedExperienceValidation()
+
+    await system.editTwoExperienceFieldsTogether()
+
+    system.expectOnlyUnsupportedExperienceFieldUnresolved()
+    system.expectOneDraftRevisionSinceReview()
+  })
+
   it('restores a corrected employer field while its experience is hidden without losing the correction', async () => {
     const system = createSystemUnderTest()
     await system.givenReviewableResume()
@@ -324,6 +335,7 @@ class StructuredResumeTestSystem {
   readonly #dependencies = createDependencies({ ports: this.#ports, condensationRequests: this.#condensationRequests,
     unsupportedSectionKeys: this.#unsupportedSectionKeys })
   #decision: ResumeProposalDecision = { proposalId: '', baseRevision: '' }
+  #revisions: string[] = []
   #validationRequests: Parameters<ResumeDocumentPorts['validateClaim']>[0][] = []
   #completeProposal: (() => void) | null = null
   #pendingProposal: Promise<void> | null = null
@@ -804,6 +816,25 @@ class StructuredResumeTestSystem {
     await this.#journey.applyValidatedSectionChange({ section: 'experiences', replacement,
       baseRevision: view.resumeReview.draft.revision })
     this.#outcome = this.#journey.readView()
+  }
+
+  async editTwoExperienceFieldsTogether() {
+    this.#revisions = []
+    const unsubscribe = this.#journey.subscribe(() => {
+      const view = this.#journey.readView()
+      const revision = view.status === 'candidate-session-open' ? view.resumeReview?.draft.revision : undefined
+      if (revision !== undefined && !this.#revisions.includes(revision)) this.#revisions.push(revision)
+    })
+    await this.#journey.editResumeFields({ edits: [
+      { fieldId: 'source-fact-experiences-0-role-0', text: 'Chief Technology Officer' },
+      { fieldId: 'source-fact-experiences-0-organization-0', text: 'Northwind Ltd' },
+    ] })
+    unsubscribe()
+    this.#outcome = this.#journey.readView()
+  }
+
+  expectOneDraftRevisionSinceReview() {
+    expect(this.#revisions).toHaveLength(1)
   }
 
   expectOnlyUnsupportedExperienceFieldUnresolved() {

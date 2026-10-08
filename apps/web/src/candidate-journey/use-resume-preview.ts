@@ -10,7 +10,8 @@ export type ResumePreviewProps = Readonly<{
   /** The interface language; the document keeps its own resume language. */
   localization: Localization
   enabled?: boolean
-  paused: boolean
+  /** Edits typed in the editor but not saved yet: the PDF does not show them, so it cannot be downloaded. */
+  unsavedEdits: boolean
   photo: ReturnType<typeof useResumePhoto>
   renderDocument: (request: ResumeRenderInput) => Promise<ResumeRenderResult>
   unsupportedFieldIds: readonly string[]
@@ -30,20 +31,22 @@ export type ResumePreviewProps = Readonly<{
    * actions follow the Match Analysis summary. `children` follow the pages in the document column.
    */
   actions: Readonly<{ edit: ReactNode; secondary: ReactNode }>
+  /** The editor, opened beside the preview in place of the secondary actions; null while it is closed. */
+  editor?: ReactNode
   children?: ReactNode
 }>
 
-type PreviewInput = Omit<ResumePreviewProps, 'pageBudget' | 'localization' | 'onDownload' | 'onIdentityChange' | 'actions' | 'children'> & Readonly<{
+type PreviewInput = Omit<ResumePreviewProps, 'pageBudget' | 'localization' | 'onDownload' | 'onIdentityChange' | 'actions' | 'children' | 'editor' | 'unsavedEdits'> & Readonly<{
   attempt: number
 }>
 
-export function useRenderedResume({ document, renderDocument, unsupportedFieldIds, attempt, photo, enabled: requested = true, paused }: PreviewInput) {
+export function useRenderedResume({ document, renderDocument, unsupportedFieldIds, attempt, photo, enabled: requested = true }: PreviewInput) {
   const photoDataUrl = photo.ready ? photo.dataUrl : undefined
   const renderKey = JSON.stringify({ document, unsupportedFieldIds, photoDataUrl, attempt })
   const request = useMemo<ResumeRenderInput>(() => ({ document, unsupportedFieldIds, photoDataUrl }), [renderKey])
   const [rendered, setRendered] = useState<Readonly<{ renderKey: string; result: ResumeRenderResult }> | null>(null)
   const enabled = requested && photo.ready && !photo.failed
-  const renderDue = enabled && !paused && rendered?.renderKey !== renderKey
+  const renderDue = enabled && rendered?.renderKey !== renderKey
   useEffect(() => {
     if (!renderDue) return
     let active = true
@@ -52,7 +55,7 @@ export function useRenderedResume({ document, renderDocument, unsupportedFieldId
     }) }, 300)
     return () => { active = false; window.clearTimeout(timer) }
   }, [request, renderKey, renderDocument, renderDue])
-  const current = paused || (enabled && rendered?.renderKey === renderKey) ? rendered?.result ?? null : null
+  const current = enabled && rendered?.renderKey === renderKey ? rendered.result : null
   return { request, current }
 }
 
