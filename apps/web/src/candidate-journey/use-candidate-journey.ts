@@ -42,6 +42,7 @@ export function useCandidateJourneyController() {
     updateResumePhoto: candidateJourney.updateResumePhoto,
     changeJobPosting: candidateJourney.changeJobPosting,
     proposeResumeCondensation: candidateJourney.proposeResumeCondensation,
+    shortenResume: candidateJourney.shortenResume,
     acceptResumeCondensation: candidateJourney.acceptResumeCondensation,
     rejectResumeCondensation: candidateJourney.rejectResumeCondensation,
     confirmProfileEnrichment: candidateJourney.confirmProfileEnrichment,

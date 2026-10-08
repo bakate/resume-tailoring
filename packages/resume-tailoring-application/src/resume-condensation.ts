@@ -9,6 +9,8 @@ import { changedResumeSession, consentRequired, professionalDocument, readModelF
   reportFailure, staleResumeResult, unavailableResumeResult, unsupportedResumeResult } from './resume-editing'
 import { assessResumeExport } from './resume-export'
 import { readResumeFields } from './resume-field-editing'
+import { shortenToPageBudget } from './overflow-reduction'
+import { readResumeEditing } from './resume-editing'
 
 export async function assessResumeLayout({ access, photoDataUrl }: Readonly<{ access: ResumeEditingAccess; photoDataUrl?: string }>) {
   const review = access.readReview()
@@ -45,6 +47,31 @@ export async function proposeResumeCondensation({ access, photoDataUrl }: Readon
     if (result.status !== 'proposed') { reportFailure({ access, baseRevision, failure: result }); return; }
     await publishProposal({ access, review, proposal: result.proposal, photoDataUrl })
   } catch { reportFailure({ access, baseRevision, failure: unavailableResumeResult }) }
+}
+
+/**
+ * The one-click way back within the Page Budget: Overflow Reduction of the current draft, saved as the Candidate's own
+ * removal. When no reduction reaches two pages, it proposes shorter wording instead.
+ */
+export async function shortenResume({ access, today, photoDataUrl }: Readonly<{
+  access: ResumeEditingAccess; today: number; photoDataUrl?: string
+}>) {
+  const review = access.readReview()
+  const session = access.readSession()
+  const assessLayout = access.ports.assessLayout
+  if (review === null || session?.tailoredResume == null || review.operation !== null || assessLayout === undefined) return
+  const baseRevision = review.draft.revision
+  access.report({ baseRevision, review: { ...review, proposal: null, failure: null, operation: 'shortening' } })
+  const shortened = await shortenToPageBudget({ assessLayout, today, photoDataUrl,
+    reduction: { resume: session.tailoredResume, editing: readResumeEditing({ session }) },
+    relevantFactIds: session.jobMatch?.analysis.relevantFactIds ?? [] })
+  const current = access.readReview()
+  if (current?.draft.revision !== baseRevision) return
+  access.report({ baseRevision, review: { ...current, operation: null } })
+  if (shortened === null) { await proposeResumeCondensation({ access, photoDataUrl }); return }
+  access.save({ baseRevision, correctionKind: 'resume-claim-removal', session: changedResumeSession({ session,
+    document: shortened.resume, editing: shortened.editing, revision: access.createIdentifier() }) })
+  await assessResumeLayout({ access, photoDataUrl })
 }
 
 /** Shortens each condensable field on its own; one field that cannot be faithfully shortened rejects the proposal. */

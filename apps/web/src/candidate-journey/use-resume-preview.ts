@@ -12,13 +12,22 @@ export type ResumePreviewProps = Readonly<{
   photo: ReturnType<typeof useResumePhoto>
   renderDocument: (request: ResumeRenderInput) => Promise<ResumeRenderResult>
   unsupportedFieldIds: readonly string[]
-  /** Offered as the primary action only while the current assessment reports an overflow. */
-  condensation?: Readonly<{ label: string; disabled: boolean; propose: () => void }>
+  /**
+   * The Page Budget status under the Download button: what Overflow Reduction hid, the way to review it, and while
+   * the current assessment reports an overflow, shortening as the primary action with shorter wording beside it.
+   */
+  pageBudget?: Readonly<{
+    overflowReduction: Readonly<{ achievements: number; other: number }>
+    busy: boolean
+    reviewHidden: () => void
+    shorten: () => void
+    propose: () => void
+  }>
   onDownload: () => void
   onIdentityChange: (identity: TailoredResume['identity']) => void
 }>
 
-type PreviewInput = Omit<ResumePreviewProps, 'condensation' | 'localization' | 'onDownload' | 'onIdentityChange'> & Readonly<{
+type PreviewInput = Omit<ResumePreviewProps, 'pageBudget' | 'localization' | 'onDownload' | 'onIdentityChange'> & Readonly<{
   attempt: number
 }>
 

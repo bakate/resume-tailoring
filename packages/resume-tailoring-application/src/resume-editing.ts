@@ -12,7 +12,7 @@ import { verifyResumeField } from './resume-claim-verification'
 
 export type ResumeReview = ResumeDocumentReview & Readonly<{
   recovery: ReturnType<typeof readResumeRecovery>
-  operation: 'validating-section' | 'condensing' | 'assessing-layout' | null
+  operation: 'validating-section' | 'condensing' | 'shortening' | 'assessing-layout' | null
   unsupportedFieldIds: readonly string[]
   manuallyEdited: boolean
 }>

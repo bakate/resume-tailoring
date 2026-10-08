@@ -98,6 +98,15 @@ test.describe('Candidate Journey integration qualification', () => {
     await system.expectOverflowingDraftPreserved()
   })
 
+  test('shortens a resume that restored content pushed over two pages in one click', async ({ page }) => {
+    const system = createSystemUnderTest({ page, source: 'dense' })
+    await system.givenOverflowingDraft()
+
+    await system.shortenResume()
+
+    await system.expectShortenedDraftExportable()
+  })
+
   test('replaces the draft only when a condensation proposal is accepted', async ({ page }) => {
     const system = createSystemUnderTest({ page, source: 'dense' })
     await system.givenCondensationProposal()
@@ -636,14 +645,14 @@ class CandidateJourneyIntegrationSystem {
     await this.givenOverflowingDraft()
     await this.requestCondensationProposal()
     await expect(this.#page.getByRole('heading', { name: 'Shorter version proposal' })).toBeVisible({ timeout: 30_000 })
-    await expect(this.#page.getByText('The current version fits within two pages. Nothing is deleted: hidden content can be restored from the editor.', { exact: true }).last()).toBeVisible({ timeout: 30_000 })
+    await expect(this.#proposal().getByText(/^Fits on (one page|two pages)\.$/u)).toBeVisible({ timeout: 30_000 })
   }
 
   async givenInsufficientCondensationProposal() {
     await this.givenOverflowingDraft()
     await this.requestCondensationProposal()
     await expect(this.#page.getByRole('heading', { name: 'Shorter version proposal' })).toBeVisible({ timeout: 30_000 })
-    await expect(this.#proposal().getByText('This version exceeds two pages.', { exact: false })).toBeVisible({ timeout: 30_000 })
+    await expect(this.#proposal().getByText('Over two pages.', { exact: true })).toBeVisible({ timeout: 30_000 })
   }
 
   async givenReplacedJobPosting() {
@@ -685,6 +694,11 @@ class CandidateJourneyIntegrationSystem {
     }
     await this.#closeEditor()
     this.#completedAction = 'restored'
+  }
+
+  async shortenResume() {
+    await this.#page.getByRole('button', { name: 'Shorten the resume', exact: true }).click()
+    this.#completedAction = 'shortened'
   }
 
   async requestCondensationProposal() {
@@ -813,6 +827,13 @@ class CandidateJourneyIntegrationSystem {
     await this.#expectOverflow()
     await expect(this.#page.getByRole('heading', { name: 'Shorter version proposal' })).toHaveCount(0)
     await this.#expectDocumentTextContains(denseAchievements.at(-1) ?? '')
+  }
+
+  async expectShortenedDraftExportable() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled({ timeout: 30_000 })
+    await expect(this.#page.getByRole('status').filter({ hasText: / hidden to fit (one page|two pages)\.$/u })).toBeVisible()
+    await expect(this.#page.getByRole('alert').filter({ hasText: overflowStatus })).toHaveCount(0)
   }
 
   async expectCondensedDraftExportable() {
@@ -1015,10 +1036,10 @@ class CandidateJourneyIntegrationSystem {
   }
 
   async #expectOverflow() {
-    await expect(this.#page.getByRole('alert').filter({ hasText: 'This document exceeds two pages.' })).toBeVisible({ timeout: 30_000 })
+    await expect(this.#page.getByRole('alert').filter({ hasText: overflowStatus })).toBeVisible({ timeout: 30_000 })
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeDisabled()
-    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true }))
-      .toHaveAccessibleDescription(/^This document exceeds two pages\./u)
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toHaveAccessibleDescription(overflowStatus)
+    await expect(this.#page.getByRole('button', { name: 'Shorten the resume', exact: true })).toBeEnabled()
   }
 
   async #expectNoNormalPathCheckpoint() {
@@ -1130,6 +1151,8 @@ const secondPosting = 'Accessibility Lead. React is required. Inclusive product 
 const correctedSummary = 'Built accessible billing screens with React.'
 const candidateContent = ['Northwind', 'Contoso', 'billing', 'Alex', 'Morgan', 'example.com', 'Frontend', 'Accessibility'] as const
 const reactMatch = { factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' } as const
+
+const overflowStatus = 'Over two pages: shorten it to download it.'
 
 /** Enough to overflow two pages in full (from 16), few enough that the condensed experience still fits whole (up to 28). */
 const denseTopics = ['checkout', 'invoicing', 'refunds', 'onboarding', 'reporting', 'search', 'navigation', 'settings',

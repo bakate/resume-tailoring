@@ -14,7 +14,8 @@ import type { CombinedIntakeOutcome, CombinedIntakeRequest, PreparationPhase, Pr
 
 import type { MatchScoreBand, PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
 import type { ResumeCorrectionKind } from './resume-editing'
-import { assessResumeLayout, proposeResumeCondensation, acceptResumeCondensation, rejectResumeCondensation } from './resume-condensation'
+import { assessResumeLayout, proposeResumeCondensation, acceptResumeCondensation, rejectResumeCondensation,
+  shortenResume } from './resume-condensation'
 import type { ResumeProposalDecision } from './structured-resume-contract'
 import { hideResumeEntry, restoreResumeEntry, attestResumeField, hideResumeContent, restoreResumeContent, moveResumeContent, reorderResumeSections, restoreSourceFact } from './resume-content-recovery'
 import type { ResumeSectionName } from './tailored-resume'
@@ -173,6 +174,8 @@ export type CandidateJourney = Readonly<{
   restoreResumeEntry: (request: Readonly<{ experienceId: string }>) => void
   assessResumeLayout: (request?: Readonly<{ photoDataUrl?: string }>) => Promise<void>
   proposeResumeCondensation: (request?: Readonly<{ photoDataUrl?: string }>) => Promise<void>
+  /** Brings an overflowing resume back within its Page Budget in one click, proposing shorter wording as a last resort. */
+  shortenResume: (request?: Readonly<{ photoDataUrl?: string }>) => Promise<void>
   acceptResumeCondensation: (decision: ResumeProposalDecision) => void
   rejectResumeCondensation: (decision: ResumeProposalDecision) => void
   attestResumeField: (request: Readonly<{ fieldId: string }>) => void
@@ -453,7 +456,8 @@ const fitPageBudget = fromPromise<CandidateSession | null, Readonly<{
   // The Page Budget belongs to a Tailored Resume: a Normalized Resume claims no relevance to rank its content by.
   if (session?.tailoredResume?.purpose !== 'tailored' || renderer === undefined) return null
   const reduction = { resume: session.tailoredResume, editing: readResumeEditing({ session }) }
-  const reduced = await reduceToPageBudget({ reduction, renderer, today: dependencies.now(),
+  const reduced = await reduceToPageBudget({ reduction, today: dependencies.now(),
+    assessLayout: async (request) => validateResumeRendering({ request, result: await renderer.render(request) }).assessment,
     relevantFactIds: session.jobMatch?.analysis.relevantFactIds ?? [], photoDataUrl: session.resumePhoto?.dataUrl })
   return reduced === reduction ? null : { ...session, tailoredResume: reduced.resume, resumeEditing: reduced.editing }
 })
@@ -1003,6 +1007,7 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     restoreResumeEntry: (request) => { restoreResumeEntry({ access: editingAccess, ...request }) },
     assessResumeLayout: (request = {}) => assessResumeLayout({ access: editingAccess, ...request }),
     proposeResumeCondensation: (request = {}) => proposeResumeCondensation({ access: editingAccess, ...request }),
+    shortenResume: (request = {}) => shortenResume({ access: editingAccess, today: dependencies.now(), ...request }),
     acceptResumeCondensation: (decision) => { acceptResumeCondensation({ access: editingAccess, decision }) },
     rejectResumeCondensation: (decision) => { rejectResumeCondensation({ access: editingAccess, decision }) },
     attestResumeField: (request) => { attestResumeField({ access: editingAccess, ...request }) },

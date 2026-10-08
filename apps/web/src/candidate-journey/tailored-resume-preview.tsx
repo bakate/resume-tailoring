@@ -8,6 +8,10 @@ import { FailureExplanation, RecoveryAction } from './failure-recovery'
 import { renderTailoredResumeDocument } from './tailored-resume-document'
 import { ResumePdfPages } from './resume-pdf-pages'
 import { CopiedNotice } from './copied-notice'
+import { readPageBudgetStatus } from './page-budget-status'
+import type { PageBudgetStatus } from './page-budget-status'
+import { StatusMessage } from './status-message'
+import { describeOverflowReduction } from '../localization/overflow-reduction-summary'
 import { useRenderedResume } from './use-resume-preview'
 import type { ResumePreviewProps } from './use-resume-preview'
 import './resume-preview.css'
@@ -15,7 +19,7 @@ import './resume-preview.css'
 type CandidateNameDraft = ReturnType<typeof useCandidateNameDraft>
 type RenderedResumeProps = Readonly<{
   current: ResumeRenderResult; document: TailoredResume; localization: Localization; name: CandidateNameDraft
-  condensation?: ResumePreviewProps['condensation']; onDownload: () => void; onRetry: () => void; paused: boolean
+  pageBudget?: ResumePreviewProps['pageBudget']; onDownload: () => void; onRetry: () => void; paused: boolean
 }>
 
 export function TailoredResumePreview(props: ResumePreviewProps) {
@@ -36,7 +40,7 @@ export function TailoredResumePreview(props: ResumePreviewProps) {
   </section>
 }
 
-function RenderedResume({ condensation, current, document, localization, name, onDownload, onRetry, paused }: RenderedResumeProps) {
+function RenderedResume({ pageBudget, current, document, localization, name, onDownload, onRetry, paused }: RenderedResumeProps) {
   const [preview, setPreview] = useState<'pending' | 'ready' | 'failed'>('pending')
   const ready = useCallback(() => { setPreview('ready') }, [])
   const failed = useCallback(() => { setPreview('failed') }, [])
@@ -46,19 +50,44 @@ function RenderedResume({ condensation, current, document, localization, name, o
   const explanationId = useId()
   const explanation = bytes !== null ? null : readDownloadExplanation({ blocker, localization, paused, preview })
   const explainedBy = (source: DownloadExplanation['source']) => explanation?.source === source ? explanationId : undefined
+  const budgetStatus = pageBudget === undefined ? null
+    : readPageBudgetStatus({ layout: current.assessment.layout, overflowReduction: pageBudget.overflowReduction })
   return <Stack gap="sm" mt="md">
-    {blocker === null || blocker === 'missing-identity' ? null
-      : <Text id={explainedBy('blocker')} role="alert" c="danger.8">{localization.translate(`resumePreview.${blocker}`)}</Text>}
     {current.pdf === null ? null : <ResumePdfPages bytes={current.pdf} onReady={ready} onFailure={failed} pageLabel={localization.translate('resumePreview.page')} />}
     <CopiedExperiences {...{ document, localization }} />
     {preview === 'failed' ? <RenderFailure id={explainedBy('render-failure')} {...{ localization, onRetry }} failure={undefined} /> : null}
-    {eligibility.status === 'blocked' && eligibility.reasons.includes('overflow') && condensation !== undefined
-      ? <Button disabled={condensation.disabled} onClick={condensation.propose}>{condensation.label}</Button> : null}
     <ResumeDownload {...{ bytes, localization, onDownload, purpose: document.purpose }}
       explanation={explanation === null ? null : { id: explanationId, hint: explanation.hint }} />
+    {/* The reason a download is blocked, and the action that unblocks it, sit right under the button. */}
+    {blocker === 'overflow' || blocker === null || blocker === 'missing-identity'
+      ? <PageBudget status={budgetStatus} id={explainedBy('blocker')} {...{ localization, pageBudget }} />
+      : <StatusMessage tone="error" id={explainedBy('blocker')}>{localization.translate(`resumePreview.${blocker}`)}</StatusMessage>}
     <CandidateNameField identity={document.identity} explain={blocker === 'missing-identity'} errorId={explainedBy('name')}
       localization={localization} name={name} />
   </Stack>
+}
+
+/**
+ * The one Page Budget status of the current render. An overflow makes shortening the primary action, with shorter
+ * wording, which keeps every item, offered beside it.
+ */
+function PageBudget({ id, localization, pageBudget, status }: Readonly<{
+  id?: string; localization: Localization; pageBudget: ResumePreviewProps['pageBudget']; status: PageBudgetStatus | null
+}>) {
+  if (status === null || pageBudget === undefined) return null
+  const { message } = status
+  const text = message.kind === 'overflow' ? localization.translate('pageBudget.overflow')
+    : message.kind === 'reduced' ? describeOverflowReduction({ locale: localization.locale, ...message }) ?? ''
+      : localization.translate(message.pageCount === 1 ? 'pageBudget.fitsOne' : 'pageBudget.fitsTwo')
+  if (status.action === 'shorten') return <Stack gap="xs">
+    <StatusMessage tone={status.tone} id={id} action={<Button disabled={pageBudget.busy} onClick={pageBudget.shorten}>
+      {localization.translate('pageBudget.shorten')}</Button>}>{text}</StatusMessage>
+    <Button variant="subtle" w="fit-content" disabled={pageBudget.busy} onClick={pageBudget.propose}>
+      {localization.translate('resumeReview.condense')}</Button>
+  </Stack>
+  return <StatusMessage tone={status.tone} id={id} action={status.action === 'review-hidden'
+    ? <Button variant="subtle" size="compact-sm" disabled={pageBudget.busy} onClick={pageBudget.reviewHidden}>
+      {localization.translate('resumeReview.reviewHidden')}</Button> : undefined}>{text}</StatusMessage>
 }
 
 /**

@@ -201,7 +201,7 @@ The fixed, deterministic sequence of steps that turns content into Hidden Conten
 _Avoid_: Auto-shortening, condensation, trimming
 
 **Hidden Content**:
-Resume content kept out of the Tailored Resume but never deleted, tagged with its origin (hidden by the Candidate, or by Overflow Reduction) and restorable from the editor in one click. Content the Candidate restored is never hidden again by Overflow Reduction.
+Resume content kept out of the Tailored Resume but never deleted, tagged with its origin (hidden by the Candidate, or by Overflow Reduction) and restorable from the editor in one click. Content the Candidate restored is never hidden again by Overflow Reduction, unless the Candidate asks to shorten a resume that nothing else can bring back within its Page Budget.
 _Avoid_: Deleted content, removed claims
 
 ## Outcomes

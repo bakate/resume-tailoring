@@ -2,11 +2,22 @@ import type { ResumeEditingState, TailoredResume, TailoredResumeExperience, Tail
 import { readExperienceMonths } from './experience-chronology'
 import { readResumeFields, removeResumeField } from './resume-field-editing'
 import type { ResumeFieldReference } from './resume-field-editing'
-import type { ResumeDocumentRenderer } from './ports'
-import { validateResumeRendering } from './resume-rendering-state'
+import type { ResumeRenderRequest } from './resume-export'
+import type { ResumeLayoutOutcome } from './structured-resume-contract'
 
 /** A Tailored Resume with the editing state that holds its Hidden Content. */
 type ReducibleResume = Readonly<{ resume: TailoredResume; editing: ResumeEditingState }>
+
+/** Lays a resume out as the export would; a failure to lay it out may throw or answer unavailable. */
+export type ResumeLayoutMeasure = (request: ResumeRenderRequest) => Promise<Readonly<{ layout: ResumeLayoutOutcome }>>
+
+type ReductionRequest = Readonly<{
+  reduction: ReducibleResume
+  relevantFactIds: readonly string[]
+  today: number
+  assessLayout: ResumeLayoutMeasure
+  photoDataUrl?: string
+}>
 
 /** What a step may read besides the resume: which facts the Match Analysis found relevant, and today for ongoing roles. */
 type ReductionContext = Readonly<{ relevantFactIds: ReadonlySet<string>; today: number }>
@@ -20,38 +31,62 @@ type ReductionStep = Readonly<{
 const relevantExperienceAchievementFloor = 2
 
 /**
- * Overflow ReducibleResume: hides content one step at a time, re-rendering after each, and keeps the first result that fits
+ * Overflow Reduction: hides content one step at a time, re-rendering after each, and keeps the first result that fits
  * on one page. Without one, it keeps the two-page result with the least Hidden Content; beyond two pages after every
  * step, or when the resume cannot be rendered, it leaves the resume unchanged for the existing overflow outcome. It
  * never calls a language model, never removes an experience, and never hides content the Candidate restored.
  */
-export async function reduceToPageBudget({ reduction, relevantFactIds, today, renderer, photoDataUrl }: Readonly<{
-  reduction: ReducibleResume
-  relevantFactIds: readonly string[]
-  today: number
-  renderer: ResumeDocumentRenderer
-  photoDataUrl?: string
-}>): Promise<ReducibleResume> {
-  const measure = (current: ReducibleResume) => measurePages({ renderer, photoDataUrl, reduction: current })
+export async function reduceToPageBudget(request: ReductionRequest): Promise<ReducibleResume> {
+  return (await reduce(request)).reduction
+}
+
+/**
+ * The Candidate's request to bring a resume back within its Page Budget: Overflow Reduction first, keeping what the
+ * Candidate restored; when only restored content is left to hide, the request itself lets reduction hide it again.
+ * Null when even that cannot reach two pages.
+ */
+export async function shortenToPageBudget(request: ReductionRequest): Promise<ReducibleResume | null> {
+  const kept = await reduce(request)
+  if (withinPageBudget(kept.pages)) return kept.reduction
+  const restoredFieldIds = request.reduction.editing.restoredFieldIds ?? []
+  if (restoredFieldIds.length === 0) return null
+  const released = await reduce({ ...request, reduction: { ...request.reduction,
+    editing: { ...request.reduction.editing, restoredFieldIds: [] } } })
+  if (!withinPageBudget(released.pages)) return null
+  const hiddenIds = new Set(released.reduction.editing.hiddenFields.map(({ field }) => field.id))
+  return { ...released.reduction, editing: { ...released.reduction.editing,
+    restoredFieldIds: restoredFieldIds.filter((id) => !hiddenIds.has(id)) } }
+}
+
+function withinPageBudget(pages: number | null) {
+  return pages === 1 || pages === 2
+}
+
+/** The reduced resume with its measured page count, or null pages when it could not be rendered. */
+async function reduce({ reduction, relevantFactIds, today, assessLayout, photoDataUrl }: ReductionRequest): Promise<Readonly<{
+  reduction: ReducibleResume; pages: number | null
+}>> {
+  const measure = (current: ReducibleResume) => measurePages({ assessLayout, photoDataUrl, reduction: current })
   const context = { relevantFactIds: new Set(relevantFactIds), today }
   const initialPages = await measure(reduction)
-  if (initialPages === null || initialPages === 1) return reduction
+  if (initialPages === null || initialPages === 1) return { reduction, pages: initialPages }
   // Each step only adds Hidden Content, so the first two-page result is the one with the least.
   let twoPageResult = initialPages === 2 ? reduction : null
   let current = reduction
+  const settled = () => twoPageResult === null ? { reduction, pages: initialPages } : { reduction: twoPageResult, pages: 2 }
   for (const step of reductionSteps) {
     for (;;) {
       const hidden = step.select({ reduction: current, context })
       if (hidden.length === 0) break
       current = hideFields({ reduction: current, references: hidden })
       const pages = await measure(current)
-      if (pages === null) return twoPageResult ?? reduction
-      if (pages === 1) return current
+      if (pages === null) return settled()
+      if (pages === 1) return { reduction: current, pages }
       if (pages === 2) twoPageResult ??= current
       if (!step.repeats) break
     }
   }
-  return twoPageResult ?? reduction
+  return settled()
 }
 
 const reductionSteps: readonly ReductionStep[] = [
@@ -148,13 +183,13 @@ function hideFields({ reduction, references }: Readonly<{ reduction: ReducibleRe
 }
 
 /** The page count of the real render, or null when the resume cannot be rendered. */
-async function measurePages({ renderer, photoDataUrl, reduction }: Readonly<{
-  renderer: ResumeDocumentRenderer; photoDataUrl?: string; reduction: ReducibleResume
+async function measurePages({ assessLayout, photoDataUrl, reduction }: Readonly<{
+  assessLayout: ResumeLayoutMeasure; photoDataUrl?: string; reduction: ReducibleResume
 }>) {
   const request = { draft: { document: reduction.resume, revision: reduction.editing.revision }, unsupportedFieldIds: [],
     ...(photoDataUrl === undefined ? {} : { photoDataUrl }) }
   try {
-    const { layout } = validateResumeRendering({ request, result: await renderer.render(request) }).assessment
+    const { layout } = await assessLayout(request)
     return layout.status === 'unavailable' ? null : layout.pageCount
   } catch {
     return null
