@@ -376,6 +376,25 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectRejectedSourceFile()
   })
 
+  test('offers to choose a file rather than drop one on a touch screen', async ({ page, hasTouch }) => {
+    const system = createSystemUnderTest({ page })
+
+    await system.openUnconsentedIntake()
+
+    await system.expectFileActionFor({ touch: hasTouch })
+  })
+
+  for (const width of [320, 375]) {
+    test(`fits the intake and its header to a ${String(width)}px screen`, async ({ page }) => {
+      const system = createSystemUnderTest({ page })
+      await system.givenScreenWidth(width)
+
+      await system.openUnconsentedIntake()
+
+      await system.expectIntakeFitsTheScreen()
+    })
+  }
+
   test('explains a failed posting analysis in a single alert', async ({ page }) => {
     const system = createSystemUnderTest({ page, scenario: 'posting-extraction-unavailable' })
     await system.givenCombinedIntake()
@@ -1144,13 +1163,59 @@ class CandidateJourneyTestSystem {
     await expect(notice).toBeVisible()
     expect(await readContrast(notice)).toBeGreaterThanOrEqual(4.5)
     expect(parseFloat(await notice.evaluate((element) => getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(14)
-    expect(await readContrast(this.#page.getByText('Drop your file here or click to choose it').first().locator('xpath=following-sibling::*[1]')))
+    expect(await readContrast(this.#page.getByText('PDF or DOCX, up to 5 pages and 5 MB', { exact: true })))
       .toBeGreaterThanOrEqual(4.5)
     const source = this.#page.getByRole('textbox', { name: 'Professional text', exact: true })
     await source.focus()
     await this.#page.keyboard.press('Shift+Tab')
     await this.#page.keyboard.press('Tab')
     expect(await readContrast(source, 'outlineColor')).toBeGreaterThanOrEqual(3)
+  }
+
+  async givenScreenWidth(width: number) {
+    await this.#page.setViewportSize({ width, height: 800 })
+  }
+
+  async expectFileActionFor({ touch }: Readonly<{ touch: boolean }>) {
+    this.#expectAction()
+    const intake = this.#page.getByRole('region', { name: 'Your resume and the job posting', exact: true })
+    const [shown, hidden] = touch
+      ? ['Choose a file', 'Drop your file here or click to choose it']
+      : ['Drop your file here or click to choose it', 'Choose a file']
+    await expect(intake.getByText(shown, { exact: true })).toHaveCount(2)
+    await expect(intake.getByText(hidden, { exact: true })).toHaveCount(0)
+  }
+
+  async expectIntakeFitsTheScreen() {
+    this.#expectAction()
+    const intake = this.#page.getByRole('region', { name: 'Your resume and the job posting', exact: true })
+    await expect(intake).toBeVisible()
+    expect(await this.#page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+      .toBeLessThanOrEqual(0)
+    // The intake, then a dropzone or a text area: never a card inside a card inside a card.
+    expect(await intake.evaluate((section) => Math.max(...[...section.querySelectorAll('*')].map((element) => {
+      let depth = 0
+      for (let node: Element | null = element; node !== null && section.contains(node); node = node.parentElement) {
+        const style = getComputedStyle(node)
+        if (style.borderTopStyle !== 'none' && parseFloat(style.borderTopWidth) > 0) depth += 1
+      }
+      return depth
+    })))).toBeLessThanOrEqual(2)
+    const source = intake.getByRole('textbox', { name: 'Professional text', exact: true })
+    // On a phone the text area spans the intake, with no card padding around it.
+    const sourceWidth = (await source.boundingBox())?.width ?? 0
+    expect(sourceWidth).toBeGreaterThanOrEqual(await readContentWidth(intake) - 2)
+    // On one line or two, the header holds the brand, its badge and the language switch, the last two side by side.
+    const banner = this.#page.getByRole('banner')
+    const [header, brand, badge, locale] = await Promise.all([banner, banner.getByRole('link', { name: 'Resume Studio', exact: true }),
+      banner.getByText('Private by design', { exact: true }), banner.getByRole('radiogroup', { name: 'Language', exact: true }),
+    ].map((locator) => locator.boundingBox()))
+    if (header == null || brand == null || badge == null || locale == null) throw new Error('The header, its brand, badge and language switch must be visible')
+    for (const box of [brand, badge, locale]) {
+      expect(box.y).toBeGreaterThanOrEqual(header.y)
+      expect(box.y + box.height).toBeLessThanOrEqual(header.y + header.height)
+    }
+    expect(Math.abs((badge.y + badge.height / 2) - (locale.y + locale.height / 2))).toBeLessThanOrEqual(1)
   }
 
   async expectOneRetryActionOnTheDocuments() {
@@ -1226,6 +1291,14 @@ function matchFor(scenario: Scenario) {
     factMatches: [{ factId: 'source-fact-skills-1-name-0', factExcerpt: 'TypeScript' }] }] : [],
   evidence: [{ requirementId: 'job-requirement-react', coverage: 'covered', factMatches: [factMatch] }],
   relevance: [{ requirementId: 'job-requirement-react', factMatch }] }
+}
+
+/** The width inside an element's padding, where its content lays out. */
+function readContentWidth(locator: Locator) {
+  return locator.evaluate((element) => {
+    const style = getComputedStyle(element)
+    return element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+  })
 }
 
 /** The WCAG contrast ratio of an element's color, or another color property, against the white page. */
