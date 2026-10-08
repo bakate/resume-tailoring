@@ -260,6 +260,15 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectIncoherentSectionsExplained()
   })
 
+  test('summarizes a failed experience above the kept sections and leads to it', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'failed-experience' })
+    await system.givenCombinedIntake()
+
+    await system.generateResume()
+
+    await system.expectFailedExperienceSummarized()
+  })
+
   test('recovers interrupted preparation after reload', async ({ page }) => {
     const system = createSystemUnderTest({ page, scenario: 'interrupted' })
     await system.givenInterruptedPreparation()
@@ -387,6 +396,27 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectRejectedSourceFile()
   })
 
+  test('offers to choose a file rather than drop one on a touch screen', async ({ page, hasTouch }) => {
+    const system = createSystemUnderTest({ page })
+
+    await system.openUnconsentedIntake()
+
+    await system.expectFileChoiceCopyFor({ touch: hasTouch })
+  })
+
+  for (const width of [320, 375]) {
+    test(`fits the intake and its header to a ${String(width)}px screen`, async ({ page }) => {
+      const system = createSystemUnderTest({ page })
+      await system.givenScreenWidth(width)
+
+      await system.openUnconsentedIntake()
+
+      await system.expectNoHorizontalScroll()
+      await system.expectNoNestedDocumentCards()
+      await system.expectHeaderWithinItsBar()
+    })
+  }
+
   test('explains a failed posting analysis in a single alert', async ({ page }) => {
     const system = createSystemUnderTest({ page, scenario: 'posting-extraction-unavailable' })
     await system.givenCombinedIntake()
@@ -448,7 +478,7 @@ function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: P
 
 type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-coverage' | 'adjacent-evidence' | 'no-correspondence'
   | 'unsafe-output' | 'interrupted' | 'unavailable' | 'pending-writing' | 'posting-extraction-unavailable' | 'held-skills'
-  | 'incoherent' | 'expired-access' | 'copied-experience'
+  | 'incoherent' | 'expired-access' | 'copied-experience' | 'failed-experience'
 
 class CandidateJourneyTestSystem {
   readonly #page: Page
@@ -489,6 +519,10 @@ class CandidateJourneyTestSystem {
         return this.#heldSkills.then(() => route.fallback())
       }
       if (this.#scenario === 'unavailable') return route.fulfill({ status: 502, json: { ok: false, error: { type: 'invalid-provider-response' } } })
+      // Only the second experience cannot be written, so the preparation fails with every other section kept.
+      if (this.#scenario === 'failed-experience' && (route.request().postDataJSON() as ResumeSectionWritingInput).section.key === 'experiences.1') {
+        return route.fulfill({ status: 502, json: { ok: false, error: { type: 'provider-unavailable' } } })
+      }
       if (this.#scenario === 'expired-access' && !this.#hasTriggeredExpiry) {
         this.#hasTriggeredExpiry = true
         this.#isAccessExpired = true
@@ -823,7 +857,8 @@ class CandidateJourneyTestSystem {
     await this.generateResume()
     const alert = this.#page.getByRole('alert').filter({ hasText: 'Preparation could not finish.' })
     await expect(alert).toContainText('Too many requests were sent in a short time.')
-    await expect(alert.getByRole('button', { name: /^Try again in \d s$/u })).toBeDisabled()
+    await expect(alert.getByRole('button', { name: 'Try again', exact: true })).toBeDisabled()
+    await expect(alert.getByRole('button', { name: 'Try again', exact: true })).toHaveText(/^Try again in \d s/u)
   }
 
   async retryOnceTheWaitIsOver() {
@@ -971,7 +1006,7 @@ class CandidateJourneyTestSystem {
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
     await this.#page.getByRole('tab', { name: 'Section order', exact: true }).click()
     const experienceOrder = this.#page.getByRole('tabpanel').getByText('Experience', { exact: true }).locator('..')
-    await experienceOrder.getByRole('button', { name: 'Move up', exact: true }).click()
+    await experienceOrder.getByRole('button', { name: 'Move Experience up', exact: true }).click()
     await this.#page.keyboard.press('Escape')
   }
 
@@ -1061,10 +1096,26 @@ class CandidateJourneyTestSystem {
     this.#expectAction()
     await expect(this.#page.getByText('Some sections repeated or contradicted one another', { exact: false })).toBeVisible()
     const keptSections = this.#page.getByRole('region', { name: 'Checked sections kept' })
-    await expect(keptSections.getByText('could not be prepared', { exact: false })).toBeVisible()
+    await expect(keptSections.getByText('Not prepared: Summary.', { exact: true })).toBeVisible()
     await expect(keptSections.getByRole('heading', { name: 'Experience' })).toBeVisible()
     await expect(this.#page.getByRole('heading', { name: 'Your resume is taking shape' })).toHaveCount(0)
     await expect(this.#page.getByRole('button', { name: 'Try again' })).toBeEnabled()
+  }
+
+  async expectFailedExperienceSummarized() {
+    this.#expectAction()
+    const summary = this.#page.getByRole('alert').filter({ hasText: 'Preparation could not finish.' })
+    const keptSections = this.#page.getByRole('region', { name: 'Checked sections kept' })
+    const failedExperience = 'Experience: Software Developer – Contoso'
+    await expect(keptSections.getByRole('heading', { name: 'Experience' })).toBeVisible()
+    const [summaryBox, keptBox] = await Promise.all([summary.boundingBox(), keptSections.boundingBox()])
+    expect(summaryBox?.y).toBeLessThan(keptBox?.y ?? 0)
+    await expect(this.#page.getByRole('button', { name: 'Try again' })).toHaveCount(1)
+
+    await summary.getByRole('link', { name: failedExperience }).click()
+
+    await expect(keptSections.getByRole('group', { name: failedExperience })).toBeFocused()
+    await expect(keptSections.getByText(`Not prepared: ${failedExperience}.`, { exact: true })).toBeVisible()
   }
 
   async expectUnsafeOutputRejected() {
@@ -1181,13 +1232,68 @@ class CandidateJourneyTestSystem {
     await expect(notice).toBeVisible()
     expect(await readContrast(notice)).toBeGreaterThanOrEqual(4.5)
     expect(parseFloat(await notice.evaluate((element) => getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(14)
-    expect(await readContrast(this.#page.getByText('Drop your file here or click to choose it').first().locator('xpath=following-sibling::*[1]')))
+    expect(await readContrast(this.#page.getByText('PDF or DOCX, up to 5 pages and 5 MB', { exact: true })))
       .toBeGreaterThanOrEqual(4.5)
     const source = this.#page.getByRole('textbox', { name: 'Professional text', exact: true })
     await source.focus()
     await this.#page.keyboard.press('Shift+Tab')
     await this.#page.keyboard.press('Tab')
     expect(await readContrast(source, 'outlineColor')).toBeGreaterThanOrEqual(3)
+  }
+
+  async givenScreenWidth(width: number) {
+    await this.#page.setViewportSize({ width, height: 800 })
+  }
+
+  async expectFileChoiceCopyFor({ touch }: Readonly<{ touch: boolean }>) {
+    this.#expectAction()
+    const [shown, hidden] = touch ? [chooseFileCopy, dropFileCopy] : [dropFileCopy, chooseFileCopy]
+    await expect(this.#intake.getByText(shown, { exact: true })).toHaveCount(2)
+    await expect(this.#intake.getByText(hidden, { exact: true })).toHaveCount(0)
+  }
+
+  async expectNoHorizontalScroll() {
+    this.#expectAction()
+    await expect(this.#intake).toBeVisible()
+    expect(await this.#page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+      .toBeLessThanOrEqual(0)
+  }
+
+  /** The intake, then a dropzone or a text area: never a card inside a card inside a card, and text areas span the intake. */
+  async expectNoNestedDocumentCards() {
+    this.#expectAction()
+    expect(await this.#intake.evaluate((section) => Math.max(...[...section.querySelectorAll('*')].map((element) => {
+      let depth = 0
+      for (let node: Element | null = element; node !== null && section.contains(node); node = node.parentElement) {
+        const style = getComputedStyle(node)
+        if (style.borderTopStyle !== 'none' && parseFloat(style.borderTopWidth) > 0) depth += 1
+      }
+      return depth
+    })))).toBeLessThanOrEqual(2)
+    const intakeWidth = await readContentWidth(this.#intake)
+    for (const name of ['Professional text', 'Job posting text']) {
+      const textArea = await this.#intake.getByRole('textbox', { name, exact: true }).boundingBox()
+      expect(textArea?.width ?? 0).toBeGreaterThanOrEqual(intakeWidth - 2)
+    }
+  }
+
+  /** On one line or two, the header holds the brand, its badge and the language switch, the last two side by side. */
+  async expectHeaderWithinItsBar() {
+    this.#expectAction()
+    const banner = this.#page.getByRole('banner')
+    const [header, brand, badge, locale] = await Promise.all([banner, banner.getByRole('link', { name: 'Resume Studio', exact: true }),
+      banner.getByText('Private by design', { exact: true }), banner.getByRole('radiogroup', { name: 'Language', exact: true }),
+    ].map((locator) => locator.boundingBox()))
+    if (header == null || brand == null || badge == null || locale == null) throw new Error('The header, its brand, badge and language switch must be visible')
+    for (const box of [brand, badge, locale]) {
+      expect(box.y).toBeGreaterThanOrEqual(header.y)
+      expect(box.y + box.height).toBeLessThanOrEqual(header.y + header.height)
+    }
+    expect(Math.abs((badge.y + badge.height / 2) - (locale.y + locale.height / 2))).toBeLessThanOrEqual(1)
+  }
+
+  get #intake() {
+    return this.#page.getByRole('region', { name: 'Your resume and the job posting', exact: true })
   }
 
   async expectOneRetryActionOnTheDocuments() {
@@ -1263,6 +1369,17 @@ function matchFor(scenario: Scenario) {
     factMatches: [{ factId: 'source-fact-skills-1-name-0', factExcerpt: 'TypeScript' }] }] : [],
   evidence: [{ requirementId: 'job-requirement-react', coverage: 'covered', factMatches: [factMatch] }],
   relevance: [{ requirementId: 'job-requirement-react', factMatch }] }
+}
+
+const dropFileCopy = 'Drop your file here or click to choose it'
+const chooseFileCopy = 'Choose a file'
+
+/** The width inside an element's padding, where its content lays out. */
+function readContentWidth(locator: Locator) {
+  return locator.evaluate((element) => {
+    const style = getComputedStyle(element)
+    return element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+  })
 }
 
 /** The WCAG contrast ratio of an element's color, or another color property, against the white page. */
