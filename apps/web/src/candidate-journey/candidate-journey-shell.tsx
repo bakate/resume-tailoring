@@ -1,7 +1,6 @@
 import {
   Alert,
   AppShell,
-  Badge,
   Box,
   Button,
   Container,
@@ -31,6 +30,7 @@ import type { CandidateJourneyPhase } from './candidate-journey-phases'
 import { useCandidateJourney } from './use-candidate-journey'
 import { CombinedIntakeWorkspace } from './combined-intake-workspace'
 import { PhaseProgressList } from './phase-progress-list'
+import { PrivacyStatement } from './processing-policy-notice'
 import { SourceIntakeWorkspace } from './source-intake-workspace'
 import type { CandidateJourneyController } from './use-candidate-journey'
 
@@ -126,12 +126,7 @@ function CandidateJourneyHeader({ localization }: LocalizationProps) {
   return (
     <AppShell.Header><Container h="100%" size="xl"><Group className="candidate-journey-header" h="100%" justify="space-between" wrap="wrap">
       <Text className="candidate-journey-brand" component={Link} to="/" fw={700} size="lg">{localization.translate('brand.name')}</Text>
-      <Group gap="sm" wrap="wrap">
-        <Badge color="forest" variant="light">
-          {localization.translate('candidateJourney.privateByDesign')}
-        </Badge>
-        <LocaleControl localization={localization} />
-      </Group>
+      <LocaleControl localization={localization} />
     </Group></Container></AppShell.Header>
   )
 }
@@ -167,6 +162,8 @@ function CandidateJourneyIntroduction({ candidateJourney, localization }: Locali
       <Text c="dimmed" mt="lg" size="xl">
         {localization.translate('candidateJourney.description')}
       </Text>
+      <PrivacyStatement localization={localization}
+        processingPolicy={candidateJourney.languageModelGateway.processingPolicy} />
       <CandidateSessionControls {...{ candidateJourney, localization }} />
       <CandidateSessionNotice localization={localization} view={candidateJourney.view} />
     </Box>
@@ -189,9 +186,6 @@ LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) 
   const openDeleteConfirmation = () => { setDeleteConfirmationOpen(true) }
   return <>
     <Group mt="xl">
-      <Badge color="forest" size="lg" variant="light">
-        {localization.translate('candidateJourney.sessionActive')}
-      </Badge>
       <Button color="danger" onClick={openDeleteConfirmation} variant="subtle">
         {localization.translate('candidateJourney.deleteSession')}
       </Button>

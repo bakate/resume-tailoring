@@ -470,6 +470,14 @@ test.describe('Candidate Journey preview-first preparation', () => {
 
     await system.expectPolicyDisclosedAtGeneration()
   })
+
+  test('states privacy once above the fold, with the Processing Policy one click away', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+
+    await system.openUnconsentedIntake()
+
+    await system.expectPrivacyStatedOnceAboveTheFold()
+  })
 })
 
 function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: Page; scenario?: Scenario }>) {
@@ -730,7 +738,7 @@ class CandidateJourneyTestSystem {
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
     await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
     await this.#page.getByLabel('Resume field', { exact: true }).first().fill('Led 100 engineers')
-    await this.#page.getByRole('button', { name: 'Save wording', exact: true }).first().click()
+    await this.#page.getByRole('button', { name: 'Save', exact: true }).first().click()
     await this.#page.reload()
     this.#completedAction = 'wording-edited-and-reloaded'
   }
@@ -823,7 +831,7 @@ class CandidateJourneyTestSystem {
   }
 
   async saveUnsupportedProfessionalTextAgain() {
-    await this.#page.getByRole('button', { name: 'Save wording', exact: true }).first().click()
+    await this.#page.getByRole('button', { name: 'Save', exact: true }).first().click()
   }
 
   async expectUnsavedDownloadBlocked() {
@@ -986,7 +994,7 @@ class CandidateJourneyTestSystem {
     const fieldCard = employerField.locator('xpath=ancestor::*[contains(@class,"mantine-Paper-root")][1]')
     await fieldCard.getByRole('button', { name: 'Hide field', exact: true }).click()
     await expect(this.#page.frameLocator('iframe').getByText('Northwind', { exact: true })).toHaveCount(0)
-    await this.#page.getByRole('tab', { name: 'Restore content', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Hidden items', exact: true }).click()
     await this.#page.getByRole('button', { name: 'Restore field', exact: true }).click()
     await this.#page.keyboard.press('Escape')
     this.#completedAction = 'grouped-resume-prepared'
@@ -997,7 +1005,7 @@ class CandidateJourneyTestSystem {
     await this.#page.getByRole('tab', { name: 'Experience', exact: true }).click()
     await this.#page.getByRole('button', { name: 'Hide experience', exact: true }).first().click()
     await expect(this.#page.frameLocator('iframe').getByText('Northwind', { exact: true })).toHaveCount(0)
-    await this.#page.getByRole('tab', { name: 'Restore content', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Hidden items', exact: true }).click()
     await this.#page.getByRole('button', { name: 'Restore experience', exact: true }).click()
     await this.#page.keyboard.press('Escape')
   }
@@ -1020,7 +1028,7 @@ class CandidateJourneyTestSystem {
     await this.#page.reload()
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeVisible()
     await this.#returnToDocuments()
-    await expect(this.#page.getByText(/^Processed by .+, with nothing stored on our servers.$/)).toBeVisible()
+    await expect(this.#page.getByText(/^Your professional content is processed by .+\.$/)).toBeVisible()
     await this.#page.getByRole('button', { name: 'Delete my data', exact: true }).click()
     await this.#page.getByRole('button', { name: 'Delete my data now', exact: true }).click()
     this.#completedAction = 'deleted'
@@ -1124,7 +1132,7 @@ class CandidateJourneyTestSystem {
 
   async expectUnsafeOutputRejected() {
     this.#expectAction()
-    await expect(this.#page.getByText("The generated wording isn't backed by your resume", { exact: false })).toBeVisible()
+    await expect(this.#page.getByText("The generated text isn't backed by your resume", { exact: false })).toBeVisible()
     await expect(this.#page.getByTitle('Tailored resume preview')).toHaveCount(0)
   }
 
@@ -1285,19 +1293,19 @@ class CandidateJourneyTestSystem {
     }
   }
 
-  /** On one line or two, the header holds the brand, its badge and the language switch, the last two side by side. */
+  /** The header holds the brand and the language switch on one line. */
   async expectHeaderWithinItsBar() {
     this.#expectAction()
     const banner = this.#page.getByRole('banner')
-    const [header, brand, badge, locale] = await Promise.all([banner, banner.getByRole('link', { name: 'Resume Studio', exact: true }),
-      banner.getByText('Private by design', { exact: true }), banner.getByRole('radiogroup', { name: 'Language', exact: true }),
+    const [header, brand, locale] = await Promise.all([banner, banner.getByRole('link', { name: 'Resume Studio', exact: true }),
+      banner.getByRole('radiogroup', { name: 'Language', exact: true }),
     ].map((locator) => locator.boundingBox()))
-    if (header == null || brand == null || badge == null || locale == null) throw new Error('The header, its brand, badge and language switch must be visible')
-    for (const box of [brand, badge, locale]) {
+    if (header == null || brand == null || locale == null) throw new Error('The header, its brand and language switch must be visible')
+    for (const box of [brand, locale]) {
       expect(box.y).toBeGreaterThanOrEqual(header.y)
       expect(box.y + box.height).toBeLessThanOrEqual(header.y + header.height)
     }
-    expect(Math.abs((badge.y + badge.height / 2) - (locale.y + locale.height / 2))).toBeLessThanOrEqual(1)
+    expect(Math.abs((brand.y + brand.height / 2) - (locale.y + locale.height / 2))).toBeLessThanOrEqual(1)
   }
 
   get #intake() {
@@ -1333,6 +1341,19 @@ class CandidateJourneyTestSystem {
     await expect(generate).toBeEnabled()
     await expect(this.#page.getByRole('textbox', { name: 'Professional text' })).toBeVisible()
     await expect(this.#page.getByRole('textbox', { name: 'Job posting text' })).toBeVisible()
+  }
+
+  async expectPrivacyStatedOnceAboveTheFold() {
+    this.#expectAction()
+    const aroundStatement = (await this.#page.locator('body').innerText()).split(privacyStatement)
+    expect(aroundStatement).toHaveLength(2)
+    expect(aroundStatement.join('\n')).not.toMatch(/private by design|our servers|in this browser/i)
+    const statement = this.#page.getByText(privacyStatement, { exact: true })
+    const box = await statement.boundingBox()
+    expect((box?.y ?? Infinity) + (box?.height ?? 0)).toBeLessThanOrEqual(this.#page.viewportSize()?.height ?? 0)
+    await expect(this.#page.locator('svg.tabler-icon-lock')).toHaveCount(1)
+    await this.#page.getByText('Learn more', { exact: true }).click()
+    await expect(this.#page.getByText(/^Policy version /)).toBeVisible()
   }
 
   async #showDocumentText() {
@@ -1381,6 +1402,7 @@ function matchFor(scenario: Scenario) {
 
 const dropFileCopy = 'Drop your file here or click to choose it'
 const chooseFileCopy = 'Choose a file'
+const privacyStatement = 'Nothing is stored on our servers: your documents stay in this browser for 24 hours.'
 
 /** The width inside an element's padding, where its content lays out. */
 function readContentWidth(locator: Locator) {

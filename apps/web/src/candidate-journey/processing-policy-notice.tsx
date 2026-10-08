@@ -1,4 +1,5 @@
-import { Box, List, Stack, Text } from '@mantine/core'
+import { Box, Group, List, Stack, Text } from '@mantine/core'
+import { IconLock } from '@tabler/icons-react'
 
 import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
 import type { Localization } from '../localization/localization'
@@ -8,6 +9,21 @@ type LocalizationProps = Readonly<{ localization: Localization }>
 
 export const processingPolicyNoticeId = 'processing-policy-notice'
 
+/** The only place the intake speaks of privacy: a lock, one sentence, and the Processing Policy behind "Learn more". */
+export function PrivacyStatement({ localization, processingPolicy }: LocalizationProps & Readonly<{
+  processingPolicy: ProcessingPolicy
+}>) {
+  return <Box className="privacy-statement" mt="lg">
+    <Group gap="xs" wrap="nowrap" align="flex-start">
+      <IconLock aria-hidden="true" className="privacy-statement-icon" size={20} stroke={2} />
+      <Text>{localization.translate('candidateJourney.privacyStatement')}</Text>
+    </Group>
+    <details><summary>{localization.translate('candidateJourney.privacyLearnMore')}</summary>
+      <Stack gap="xs" mt="xs"><ProcessingPolicyDetails {...{ localization, processingPolicy }} /></Stack></details>
+  </Box>
+}
+
+/** What generating agrees to, read as the description of the generation action. */
 export function ProcessingPolicyNotice({ candidateJourney, localization }: LocalizationProps & Readonly<{
   candidateJourney: ReturnType<typeof useCandidateJourney>
 }>) {
@@ -17,11 +33,7 @@ export function ProcessingPolicyNotice({ candidateJourney, localization }: Local
   const summary = localization.translate(view.processingConsentStatus === 'granted'
     ? 'processingPolicy.grantedSummary' : 'processingPolicy.consentByGeneration')
     .replace('{provider}', processingPolicy.provider)
-  return <Box className="processing-policy-notice">
-    <Text c="dimmed" id={processingPolicyNoticeId} size="sm">{summary}</Text>
-    <details><summary>{localization.translate('combinedIntake.policyDetails')}</summary>
-      <Stack gap="xs" mt="xs"><ProcessingPolicyDetails {...{ localization, processingPolicy }} /></Stack></details>
-  </Box>
+  return <Text c="dimmed" id={processingPolicyNoticeId} size="sm">{summary}</Text>
 }
 
 function ProcessingPolicyDetails({ localization, processingPolicy }: LocalizationProps & Readonly<{

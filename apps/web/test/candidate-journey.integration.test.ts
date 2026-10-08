@@ -566,7 +566,7 @@ class CandidateJourneyIntegrationSystem {
     expect(box?.width, 'The section editor fills the small screen').toBeGreaterThanOrEqual(400)
     await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
     await this.#page.getByRole('textbox', { name: 'Resume field', exact: true }).first().fill(correctedSummary)
-    await this.#page.getByRole('button', { name: 'Save wording', exact: true }).first().click()
+    await this.#page.getByRole('button', { name: 'Save', exact: true }).first().click()
     await expect(dialog.getByRole('status').filter({ hasText: 'Resume updated.' })).toBeVisible()
     await this.#page.getByRole('button', { name: 'Close editor', exact: true }).click()
     await expect(this.#page.getByRole('dialog')).toHaveCount(0)
@@ -614,7 +614,7 @@ class CandidateJourneyIntegrationSystem {
   async #saveCorrectedSummary() {
     await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
     await this.#page.getByRole('textbox', { name: 'Resume field', exact: true }).first().fill(correctedSummary)
-    await this.#page.getByRole('button', { name: 'Save wording', exact: true }).first().click()
+    await this.#page.getByRole('button', { name: 'Save', exact: true }).first().click()
     await expect(this.#page.getByRole('dialog').getByRole('status').filter({ hasText: 'Resume updated.' })).toBeVisible()
   }
 
@@ -629,9 +629,9 @@ class CandidateJourneyIntegrationSystem {
 
   async givenOneOmittedAchievementRestored() {
     await this.#openEditor()
-    await this.#page.getByRole('tab', { name: 'Restore content', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Hidden items', exact: true }).click()
     await this.#page.getByRole('dialog').getByText(denseAchievements[2] ?? '', { exact: true }).locator('..')
-      .getByRole('button', { name: 'Restore source content', exact: true }).click()
+      .getByRole('button', { name: 'Add to the resume', exact: true }).click()
     await this.#closeEditor()
   }
 
@@ -685,8 +685,8 @@ class CandidateJourneyIntegrationSystem {
 
   async restoreAllOmittedAchievements() {
     await this.#openEditor()
-    await this.#page.getByRole('tab', { name: 'Restore content', exact: true }).click()
-    const restore = this.#page.getByRole('dialog').getByRole('button', { name: 'Restore source content', exact: true })
+    await this.#page.getByRole('tab', { name: 'Hidden items', exact: true }).click()
+    const restore = this.#page.getByRole('dialog').getByRole('button', { name: 'Add to the resume', exact: true })
     while (await restore.count() > 0) {
       const remaining = await restore.count()
       await restore.first().click()
@@ -772,7 +772,7 @@ class CandidateJourneyIntegrationSystem {
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled({ timeout: 30_000 })
     const field = this.#page.getByRole('textbox', { name: 'Full name', exact: true })
     await expect(field).toHaveValue('Alex Morgan')
-    await expect(field).toHaveAccessibleDescription(/Detected in your resume, check it/u)
+    await expect(field).toHaveAccessibleDescription(/Taken from your resume, check the spelling/u)
     await expect(this.#page.getByRole('alert')).toHaveCount(0)
     this.#expectNameKeptFromModels()
   }
@@ -867,7 +867,7 @@ class CandidateJourneyIntegrationSystem {
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled({ timeout: 30_000 })
     await this.#expectDocumentTextLacks(denseAchievements.at(-1) ?? '')
     await this.#openEditor()
-    await this.#page.getByRole('tab', { name: 'Restore content', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Hidden items', exact: true }).click()
     await expect(this.#page.getByRole('button', { name: 'Restore experience', exact: true })).toBeVisible()
   }
 
@@ -878,7 +878,7 @@ class CandidateJourneyIntegrationSystem {
 
   async expectPreviousResultOutdated() {
     this.#expectAction()
-    await expect(this.#page.getByRole('status').filter({ hasText: 'export is paused' })).toBeVisible()
+    await expect(this.#page.getByRole('status').filter({ hasText: 'Your documents changed' })).toBeVisible()
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeDisabled()
     await expect(this.#page.locator('.resume-pdf-pages canvas')).toHaveCount(0)
   }
