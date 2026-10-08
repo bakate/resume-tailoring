@@ -1,5 +1,6 @@
 import { Alert, Button, CloseButton, Divider, Fieldset, Group, Modal, Paper, Select, SimpleGrid, Stack, Text, Textarea, Title } from '@mantine/core'
 import { Dropzone } from '@mantine/dropzone'
+import { useMediaQuery } from '@mantine/hooks'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
@@ -42,7 +43,7 @@ function CombinedIntakeForm(props: OpenIntakeProps) {
   return <Paper component="section" aria-labelledby="combined-intake-title" p={{ base: 'md', sm: 'xl' }} withBorder><Stack>
     <Title id="combined-intake-title" order={2}>{localization.translate('combinedIntake.title')}</Title>
     <Text c="dimmed">{localization.translate('combinedIntake.description')}</Text>
-    <Fieldset disabled={view.operation !== null} p={0} variant="unstyled">
+    <Fieldset disabled={view.operation !== null} m={0} p={0} variant="unstyled">
       <Stack><IntakeFields {...props} busy={view.operation !== null} controls={controls} /></Stack>
     </Fieldset>
     {/* A failed preparation offers its own Recovery below, so the form shows one action at a time. */}
@@ -144,7 +145,7 @@ function SourceDocumentCard({ hasSource, ...props }: Omit<DocumentCardProps, 'ki
   if (!hasSource || replacing) return <DocumentCard {...props} kind="source" footer={hasSource
     ? <Button onClick={() => { setReplacing(false); props.onChange(emptyChoice) }} size="compact-sm" variant="subtle">
         {localization.translate('combinedIntake.keepSourceAction')}</Button> : null} />
-  return <Paper className="intake-document" p="lg" radius="md" withBorder>
+  return <Paper className="intake-document" radius="md" withBorder>
     <Stack gap="sm">
       <Text className="intake-document-title" fw={700} size="lg">{localization.translate('combinedIntake.sourceTitle')}</Text>
       <Text c="forest.8" fw={600} role="status">{localization.translate('combinedIntake.sourceReady')}</Text>
@@ -167,9 +168,12 @@ function DocumentCard({ busy, choice, footer = null, kind, localization, missing
   footer?: ReactNode; kind: DocumentKind
 }>) {
   const [rejected, setRejected] = useState(false)
+  // A finger cannot drag a file onto the page, so a touch screen only offers to choose one. The intake renders only in the
+  // browser, once the Candidate Session is read, so the first paint can already use the right copy.
+  const touch = useMediaQuery('(pointer: coarse)', undefined, { getInitialValueInEffect: false })
   const source = kind === 'source'
   const title = localization.translate(source ? 'combinedIntake.sourceTitle' : 'combinedIntake.postingTitle')
-  return <Paper className="intake-document" component="fieldset" p="lg" radius="md" withBorder>
+  return <Paper className="intake-document" component="fieldset" radius="md" withBorder>
     <Stack gap="sm">
       <Text className="intake-document-title" component="legend" fw={700} size="lg">{title}</Text>
       {choice.method === 'upload' && choice.file !== null
@@ -180,7 +184,7 @@ function DocumentCard({ busy, choice, footer = null, kind, localization, missing
             onDrop={([file]) => { setRejected(false); if (file !== undefined) onChange({ method: 'upload', text: '', file }) }}
             onReject={() => { setRejected(true) }}>
             <Stack align="center" gap={4} py="md">
-              <Text fw={600} ta="center">{localization.translate('combinedIntake.dropFile')}</Text>
+              <Text fw={600} ta="center">{localization.translate(touch ? 'combinedIntake.chooseFile' : 'combinedIntake.dropFile')}</Text>
               <Text c="dimmed" size="sm">{localization.translate(source ? 'combinedIntake.sourceHint' : 'combinedIntake.postingHint')}</Text>
             </Stack>
           </Dropzone>

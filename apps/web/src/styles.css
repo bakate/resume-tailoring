@@ -71,13 +71,37 @@ body {
   transform: translateY(0);
 }
 
+/* On a phone the header stays on one line: a smaller brand, badge and language switch. */
 @media (max-width: 40rem) {
   .candidate-journey-app .candidate-journey-header {
-    align-content: center;
+    flex-wrap: nowrap;
+    gap: var(--mantine-spacing-xs);
   }
 
-  .candidate-journey-app .candidate-journey-header > :first-child {
-    flex: 1 1 100%;
+  .candidate-journey-app .mantine-AppShell-header > .mantine-Container-root {
+    padding-inline: var(--mantine-spacing-sm);
+  }
+
+  .candidate-journey-app .candidate-journey-header > .mantine-Group-root {
+    flex-wrap: nowrap;
+    gap: var(--mantine-spacing-xs);
+  }
+
+  .candidate-journey-app .candidate-journey-brand {
+    font-size: var(--mantine-font-size-md);
+    white-space: nowrap;
+  }
+
+  .candidate-journey-app .candidate-journey-header .mantine-Badge-root {
+    --badge-fz: 0.6875rem;
+    --badge-padding-x: 0.375rem;
+    flex-shrink: 0;
+    letter-spacing: 0;
+  }
+
+  .candidate-journey-app .candidate-journey-header .mantine-SegmentedControl-label {
+    font-size: var(--mantine-font-size-xs);
+    padding-inline: 0.5rem;
   }
 
   .candidate-journey-app .mantine-SegmentedControl-root {
@@ -95,6 +119,22 @@ body {
   .candidate-journey-app .mantine-Button-root {
     max-width: 100%;
     white-space: normal;
+  }
+}
+
+/* Below 360px the brand takes its own line, with the badge and language switch side by side beneath it. */
+@media (max-width: 22.49em) {
+  .candidate-journey-app {
+    --app-shell-header-height: 104px;
+  }
+
+  .candidate-journey-app .candidate-journey-header {
+    flex-wrap: wrap;
+    align-content: center;
+  }
+
+  .candidate-journey-app .candidate-journey-header > :first-child {
+    flex: 1 1 100%;
   }
 }
 
@@ -1912,6 +1952,15 @@ h1 {
 .intake-document {
   margin: 0;
   min-width: 0;
+  padding: var(--mantine-spacing-lg);
+}
+
+/* On a phone the intake card is the only card: its documents and their text areas take the full width. */
+@media (max-width: 47.99em) {
+  .intake-document {
+    border: 0;
+    padding: 0;
+  }
 }
 
 .intake-document-title {
