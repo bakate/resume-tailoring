@@ -56,7 +56,8 @@ export const structuredSourceProfileRequestSchema = z.strictObject({
 
 export const structuredSourceProfileSuccessSchema = z.strictObject({
   ok: z.literal(true),
-  value: structuredSourceProfileExtractionSchema,
+  // A server deployed before education dates were extracted answers without them.
+  value: structuredSourceProfileExtractionSchema.extend({ education: structuredSourceProfileSchema.shape.education }),
 })
 
 export const structuredSourceProfileResponseFormat = {
