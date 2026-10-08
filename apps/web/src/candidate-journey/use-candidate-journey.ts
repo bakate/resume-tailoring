@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react'
 import { createBrowserCandidateJourneySystem } from '../composition-root'
+import type { CandidateSessionRetention } from '../composition-root'
 
 export type CandidateJourneyController = ReturnType<typeof useCandidateJourneyController>
 
@@ -53,7 +54,11 @@ export function useCandidateJourneyController() {
     grantProcessingConsent: candidateJourney.grantProcessingConsent,
     languageModelGateway: candidateJourneySystem.languageModelGateway,
     resolveCriticalAmbiguity: candidateJourney.resolveCriticalAmbiguity,
-    startCandidateSession: candidateJourney.startCandidateSession,
+    /** Starts the Candidate Session, kept in this browser or, on a shared computer, only until the tab closes. */
+    startCandidateSession: ({ retention }: Readonly<{ retention: CandidateSessionRetention }>) => {
+      candidateJourneySystem.chooseCandidateSessionRetention(retention)
+      candidateJourney.startCandidateSession()
+    },
     startTailoredResumePreparation: candidateJourney.startTailoredResumePreparation,
     submitJobPosting: candidateJourney.submitJobPosting,
     submitSourceDocument: candidateJourney.submitSourceDocument,

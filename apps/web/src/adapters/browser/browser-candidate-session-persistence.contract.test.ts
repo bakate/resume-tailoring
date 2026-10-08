@@ -37,13 +37,66 @@ const consentedCandidateSession = {
   },
 } as const satisfies CandidateSession
 
-describeCandidateSessionPersistenceContract({
-  name: 'Browser Candidate Session persistence',
-  createPersistence: ({ storedSession, storageAvailable }) => createBrowserCandidateSessionPersistence({
-    storage: storageAvailable
-      ? createMemoryStorage({ initialValue: storedSession === null ? null : JSON.stringify(storedSession) })
-      : unavailableStorage,
-  }),
+/** The contract holds whether the Candidate Session stays in local storage or only until its tab closes. */
+for (const [storageName, retention] of [['local storage', 'browser'], ['tab storage', 'tab']] as const) {
+  describeCandidateSessionPersistenceContract({
+    name: `Browser Candidate Session persistence in ${storageName}`,
+    createPersistence: ({ storedSession, storageAvailable }) => {
+      const storages = storageAvailable ? { browser: createMemoryStorage(), tab: createMemoryStorage() }
+        : { browser: unavailableStorage, tab: unavailableStorage }
+      if (storageAvailable && storedSession !== null) storages[retention].setItem(candidateSessionStorageKey, JSON.stringify(storedSession))
+      const persistence = createBrowserCandidateSessionPersistence({ storages })
+      persistence.chooseRetention(retention)
+      return persistence
+    },
+  })
+}
+
+describe('browser Candidate Session persistence on a shared computer', () => {
+  it('keeps nothing in local storage once the Candidate chooses to keep nothing after the tab closes', () => {
+    const storages = { browser: createMemoryStorage(), tab: createMemoryStorage() }
+    const persistence = createBrowserCandidateSessionPersistence({ storages })
+    persistence.chooseRetention('tab')
+
+    persistence.save({ session: candidateSession })
+
+    expect(storages.browser.getItem(candidateSessionStorageKey)).toBeNull()
+    expect(storages.tab.getItem(candidateSessionStorageKey)).toBe(JSON.stringify(candidateSession))
+  })
+
+  it('keeps saving a Candidate Session restored from tab storage in tab storage', () => {
+    const storages = { browser: createMemoryStorage(), tab: createMemoryStorage({ initialValue: JSON.stringify(candidateSession) }) }
+    const persistence = createBrowserCandidateSessionPersistence({ storages })
+    persistence.restore()
+
+    persistence.save({ session: consentedCandidateSession })
+
+    expect(storages.browser.getItem(candidateSessionStorageKey)).toBeNull()
+    expect(storages.tab.getItem(candidateSessionStorageKey)).toBe(JSON.stringify(consentedCandidateSession))
+  })
+
+  it('restores no Candidate Session in a new tab when the last one was kept until its tab closed', () => {
+    const closedTab = createMemoryStorage()
+    const storages = { browser: createMemoryStorage(), tab: closedTab }
+    const closedTabPersistence = createBrowserCandidateSessionPersistence({ storages })
+    closedTabPersistence.chooseRetention('tab')
+    closedTabPersistence.save({ session: candidateSession })
+
+    const restored = createBrowserCandidateSessionPersistence({ storages: { ...storages, tab: createMemoryStorage() } }).restore()
+
+    expect(restored).toEqual({ ok: true, value: { notice: null, session: null } })
+  })
+
+  it('deletes a Candidate Session from both storages', () => {
+    const storages = { browser: createMemoryStorage({ initialValue: JSON.stringify(candidateSession) }),
+      tab: createMemoryStorage({ initialValue: JSON.stringify(candidateSession) }) }
+    const persistence = createBrowserCandidateSessionPersistence({ storages })
+
+    persistence.delete()
+
+    expect(storages.browser.getItem(candidateSessionStorageKey)).toBeNull()
+    expect(storages.tab.getItem(candidateSessionStorageKey)).toBeNull()
+  })
 })
 
 describe('browser Candidate Session persistence', () => {
@@ -84,7 +137,7 @@ describe('browser Candidate Session persistence', () => {
         hiddenFields: [{ field, location, origin: 'candidate' }] } }
     const storedSession = { ...session, resumeEditing: { ...session.resumeEditing, hiddenFields: [{ field, location }] } }
 
-    const restored = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage({
+    const restored = createBrowserCandidateSessionPersistence({ storages: createBrowserStorages({
       initialValue: JSON.stringify(storedSession) }) }).restore()
 
     expect(restored).toEqual({ ok: true, value: { notice: null, session } })
@@ -124,7 +177,7 @@ describe('browser Candidate Session persistence', () => {
     ['an incompatible version', { ...candidateSession, version: 999 }],
   ])('discards %s', (_caseName, storedSession) => {
     const storage = createMemoryStorage({ initialValue: JSON.stringify(storedSession) })
-    const persistence = createBrowserCandidateSessionPersistence({ storage })
+    const persistence = createBrowserCandidateSessionPersistence({ storages: { browser: storage, tab: createMemoryStorage() } })
 
     const restored = persistence.restore()
 
@@ -134,7 +187,7 @@ describe('browser Candidate Session persistence', () => {
 
   it('removes a deleted Candidate Session from browser storage', () => {
     const storage = createMemoryStorage({ initialValue: JSON.stringify(candidateSession) })
-    const persistence = createBrowserCandidateSessionPersistence({ storage })
+    const persistence = createBrowserCandidateSessionPersistence({ storages: { browser: storage, tab: createMemoryStorage() } })
 
     persistence.delete()
 
@@ -143,7 +196,7 @@ describe('browser Candidate Session persistence', () => {
 
   it('keeps the last saved session while the page is being left, so cut-short work restores as interrupted', () => {
     const page = new EventTarget()
-    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage(), page })
+    const persistence = createBrowserCandidateSessionPersistence({ storages: createBrowserStorages(), page })
     persistence.save({ session: candidateSession })
     page.dispatchEvent(new Event('beforeunload'))
 
@@ -157,7 +210,7 @@ describe('browser Candidate Session persistence', () => {
     ['a page left for the back-forward cache is shown again', 'pagehide', 'pageshow'],
   ])('saves again once %s', (_caseName, leavingEvent, stayingEvent) => {
     const page = new EventTarget()
-    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage(), page })
+    const persistence = createBrowserCandidateSessionPersistence({ storages: createBrowserStorages(), page })
     page.dispatchEvent(new Event(leavingEvent))
     page.dispatchEvent(new Event(stayingEvent))
 
@@ -179,7 +232,7 @@ describe('browser Candidate Session persistence', () => {
   it('restores a Match Analysis stored before Adjacent Evidence existed', () => {
     const storedAnalysis: Record<string, unknown> = { ...jobMatchCandidateSession.jobMatch.analysis }
     delete storedAnalysis.adjacentEvidence
-    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage({
+    const persistence = createBrowserCandidateSessionPersistence({ storages: createBrowserStorages({
       initialValue: JSON.stringify({ ...jobMatchCandidateSession,
         jobMatch: { ...jobMatchCandidateSession.jobMatch, analysis: storedAnalysis } }),
     }) })
@@ -232,7 +285,7 @@ describe('browser Candidate Session persistence', () => {
   })
 
   it('restores a preparation stored before section-by-section preparation', () => {
-    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage({
+    const persistence = createBrowserCandidateSessionPersistence({ storages: createBrowserStorages({
       initialValue: JSON.stringify(preparingCandidateSession) }) })
 
     const restored = persistence.restore()
@@ -243,7 +296,7 @@ describe('browser Candidate Session persistence', () => {
 
 /** Saves a Candidate Session into fresh browser storage and restores it, as the next page load would. */
 function roundTrip({ session }: Readonly<{ session: CandidateSession }>) {
-  const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage() })
+  const persistence = createBrowserCandidateSessionPersistence({ storages: createBrowserStorages() })
   persistence.save({ session })
   return persistence.restore()
 }
@@ -337,6 +390,11 @@ function createMemoryStorage({ initialValue = null }: Readonly<{
     removeItem: (key: string) => { storedValues.delete(key) },
     setItem: (key: string, value: string) => { storedValues.set(key, value) },
   }
+}
+
+/** A browser's local and tab storages, with an optional stored Candidate Session in local storage. */
+function createBrowserStorages({ initialValue = null }: Readonly<{ initialValue?: string | null }> = {}) {
+  return { browser: createMemoryStorage({ initialValue }), tab: createMemoryStorage() }
 }
 
 const unavailableStorage = { getItem: refuseStorage, removeItem: refuseStorage, setItem: refuseStorage }
