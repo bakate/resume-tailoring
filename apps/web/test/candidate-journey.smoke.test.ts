@@ -569,6 +569,15 @@ test.describe('Candidate Journey preview-first preparation', () => {
 
     system.expectEveryPageServedUnderItsOwnNonce()
   })
+
+  test('serves its typography from its own origin so no visitor request reaches a third party', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenCombinedIntake()
+
+    await system.generateResume()
+
+    await system.expectEveryRequestServedByOwnOrigin()
+  })
 })
 
 function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: Page; scenario?: Scenario }>) {
@@ -582,6 +591,7 @@ type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-co
 class CandidateJourneyTestSystem {
   #page: Page
   readonly #errors: string[] = []
+  readonly #requestedUrls: string[] = []
   #downloadPath: string | null = null
   #scenario: Scenario
   #completedAction: string | null = null
@@ -597,10 +607,15 @@ class CandidateJourneyTestSystem {
   constructor(page: Page, scenario: Scenario) {
     this.#page = page; this.#scenario = scenario
     this.#recordPageErrors()
+    this.#recordRequests()
   }
 
   #recordPageErrors() {
     this.#page.on('pageerror', (error) => { if (!isCancelledByLeavingPage(error.message)) this.#errors.push(error.message) })
+  }
+
+  #recordRequests() {
+    this.#page.on('request', (request) => { this.#requestedUrls.push(request.url()) })
   }
 
   async #installModelAdapters() {
@@ -1306,6 +1321,7 @@ class CandidateJourneyTestSystem {
     await this.#page.close()
     this.#page = await context.newPage()
     this.#recordPageErrors()
+    this.#recordRequests()
     await this.#installModelAdapters()
     await this.#page.goto('/')
     this.#completedAction = 'tab-closed'
@@ -1669,6 +1685,16 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByText(/^Policy version /)).toBeVisible()
   }
 
+  async expectEveryRequestServedByOwnOrigin() {
+    this.#expectAction()
+    // Loading each face the interface uses proves it exists and pulls its file before the requests are read.
+    const loadedFaces = await this.#page.evaluate((faces) => Promise.all(faces.map(async (face) =>
+      (await document.fonts.load(face)).length > 0)), interfaceFontFaces)
+    expect(loadedFaces).toEqual(interfaceFontFaces.map(() => true))
+    const ownOrigin = new URL(this.#page.url()).origin
+    expect(this.#requestedUrls.filter((url) => !isAllowedRequest({ url, ownOrigin }))).toEqual([])
+  }
+
   async #showDocumentText() {
     const frame = this.#page.locator('iframe')
     await frame.waitFor({ state: 'attached' })
@@ -1711,6 +1737,14 @@ function isCancelledByLeavingPage(message: string) {
   return message.endsWith('due to access control checks.')
 }
 
+/** Only the Turnstile security check may come from elsewhere; data: and blob: URLs never leave the browser. */
+function isAllowedRequest({ url, ownOrigin }: Readonly<{ url: string; ownOrigin: string }>) {
+  const { origin, protocol } = new URL(url)
+  return origin === ownOrigin || origin === turnstileOrigin || protocol === 'data:' || protocol === 'blob:'
+}
+
+const turnstileOrigin = 'https://challenges.cloudflare.com'
+const interfaceFontFaces = ['400 16px "DM Sans"', '500 16px "DM Sans"', '600 16px "DM Sans"', '400 16px "DM Serif Display"']
 const postingText = 'Frontend Engineer. React is required. Rust is required. Java is required.'
 // Slow enough that a security check waiting for this response would be painted before the journey.
 const slowDemoAccessCheckMilliseconds = 3_000
