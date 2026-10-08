@@ -20,8 +20,10 @@ and AWS Lambda Web Adapter for the Nitro HTTP server.
   routes reject requests made directly to the Lambda Function URL.
 - Set a monthly budget alert on the production OpenAI project, below its hard limit, so a spending
   drift is noticed before the limit stops the demo.
-- `template.yaml` reserves ten concurrent executions for the function. Lambda keeps at least ten
-  unreserved executions per account, so the account concurrency quota must be above twenty.
+- Keep the account Lambda concurrency quota at ten: it is the function's concurrency ceiling. The
+  template sets no `ReservedConcurrentExecutions`, because Lambda keeps at least ten unreserved
+  executions per account and any reservation would fail the deployment at this quota. If the quota
+  is ever raised above twenty, reserve ten for the function instead.
 - Do not attach the function to a VPC, NAT Gateway, load balancer, or database.
 
 Turnstile grants a signed, HTTP-only access cookie for 30 minutes. Protected API routes reject
@@ -50,12 +52,12 @@ ceiling) and `x-resume-quota-reset` (the ISO 8601 reset instant).
 ### Alarms
 
 `template.yaml` defines three CloudWatch alarms on the function: more than 1,000 invocations in an
-hour, five or more errors in 15 minutes, and any throttle at the concurrency ceiling. They notify
+hour, five or more errors in 15 minutes, and any throttle at the account concurrency ceiling. They notify
 the `honest-resume-demo-abuse-alarms` SNS topic. Pass `AlarmEmail=you@example.com` once in
 `--parameter-overrides` to subscribe an address, then confirm the email AWS sends; later deployments
 keep the value.
 
-The GitHub deploy role needs CloudWatch, SNS and function concurrency permissions for these
+The GitHub deploy role needs CloudWatch and SNS permissions for these
 resources. Update the `infrastructure/github-actions.yaml` stack before deploying a template that
 adds them.
 

@@ -7,9 +7,16 @@
 export const dailyLimits = {
   /** Tailored Resume preparations one client IP may start per day: the free daily quota the Candidate sees. */
   preparationsPerClient: 4,
-  /** Tailored Resume preparations all Candidates together may start per day. Provisional: ≈ $0.10 each. */
+  /**
+   * Tailored Resume preparations all Candidates together may start per day. Measured on 32 real preparations
+   * (2026-10): about 24 model-backed requests each on average, ≈ $0.10, so 30 a day stay near $90 a month.
+   */
   preparationsOverall: 30,
-  /** Model-backed requests one client IP may send per day: a safety net that stops edit loops. */
+  /**
+   * Model-backed requests one client IP may send per day: a safety net that stops edit loops. A measured preparation
+   * sends 21 section requests on average, 30 at p90 and 46 at most, plus three for intake and matching; four
+   * journeys with edits stay under 250.
+   */
   modelRequestsPerClient: 400,
   /** PDF renders one client IP may request per day. */
   rendersPerClient: 200,

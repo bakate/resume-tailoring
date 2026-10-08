@@ -90,9 +90,6 @@ Resources:
                   - lambda:ListTags
                   - lambda:TagResource
                   - lambda:UntagResource
-                  - lambda:PutFunctionConcurrency
-                  - lambda:DeleteFunctionConcurrency
-                  - lambda:GetFunctionConcurrency
                 Resource: !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ApplicationName}
               - Effect: Allow
                 Action:

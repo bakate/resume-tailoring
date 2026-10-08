@@ -54,9 +54,8 @@ Resources:
         - arm64
       MemorySize: 2048
       Timeout: 120
-      # One preparation writes at most four Resume Sections at once; ten executions serve two or three Candidates
-      # preparing together and cap what a burst can spend.
-      ReservedConcurrentExecutions: 10
+      # No ReservedConcurrentExecutions: the account quota is 10 concurrent executions and Lambda keeps 10 unreserved,
+      # so any reservation fails the deployment. The account quota is the concurrency ceiling; keep it at 10.
       EphemeralStorage:
         Size: 1024
       Environment:
@@ -139,7 +138,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub ${ApplicationName}-concurrency-ceiling
-      AlarmDescription: Requests were throttled at the reserved concurrency ceiling
+      AlarmDescription: Requests were throttled at the account concurrency ceiling
       Namespace: AWS/Lambda
       MetricName: Throttles
       Dimensions:
