@@ -107,6 +107,27 @@ test.describe('Candidate Journey integration qualification', () => {
     await system.expectShortenedDraftExportable()
   })
 
+  test('shows the first page of a longer resume on a phone and the others on request', async ({ page }) => {
+    const system = createSystemUnderTest({ page, source: 'dense' })
+    await system.givenScreenSize({ width: 375, height: 812 })
+    await system.givenOverflowingDraft()
+    await system.givenPagesAfterTheFirstCollapsed()
+
+    await system.showAllPreviewPages()
+
+    await system.expectEveryPreviewPageShown()
+  })
+
+  test('keeps Download beside a longer resume on a desktop screen', async ({ page }) => {
+    const system = createSystemUnderTest({ page, source: 'dense' })
+    await system.givenScreenSize({ width: 1440, height: 900 })
+    await system.givenOverflowingDraft()
+
+    await system.scrollToTheLastPreviewPage()
+
+    await system.expectDownloadBesideThePages()
+  })
+
   test('replaces the draft only when a condensation proposal is accepted', async ({ page }) => {
     const system = createSystemUnderTest({ page, source: 'dense' })
     await system.givenCondensationProposal()
@@ -639,6 +660,41 @@ class CandidateJourneyIntegrationSystem {
     await this.givenGeneratedPreview()
     await this.restoreAllOmittedAchievements()
     await this.#expectOverflow()
+  }
+
+  async givenScreenSize(size: Readonly<{ width: number; height: number }>) {
+    await this.#page.setViewportSize(size)
+  }
+
+  async givenPagesAfterTheFirstCollapsed() {
+    await expect(this.#page.locator('.resume-pdf-pages figure').nth(1)).toBeHidden()
+  }
+
+  async scrollToTheLastPreviewPage() {
+    await this.#page.locator('.resume-pdf-pages figure').last().scrollIntoViewIfNeeded()
+    await this.#page.waitForFunction(() => window.scrollY > 0)
+    this.#completedAction = 'scrolled-to-last-page'
+  }
+
+  async expectDownloadBesideThePages() {
+    this.#expectAction()
+    expect(await this.#page.locator('.resume-pdf-pages figure').count()).toBeGreaterThan(1)
+    const download = this.#page.getByRole('button', { name: 'Download PDF', exact: true })
+    await expect(download).toBeInViewport({ ratio: 1 })
+    await expect(this.#page.getByRole('alert').filter({ hasText: overflowStatus })).toBeInViewport()
+  }
+
+  async showAllPreviewPages() {
+    await this.#page.getByRole('button', { name: /^See all \d+ pages$/u }).click()
+    this.#completedAction = 'pages-expanded'
+  }
+
+  async expectEveryPreviewPageShown() {
+    this.#expectAction()
+    const pages = this.#page.locator('.resume-pdf-pages figure')
+    expect(await pages.count()).toBeGreaterThan(1)
+    for (const figure of await pages.all()) await expect(figure).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: /^See all \d+ pages$/u })).toHaveCount(0)
   }
 
   async givenCondensationProposal() {

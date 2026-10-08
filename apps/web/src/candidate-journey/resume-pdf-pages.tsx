@@ -2,10 +2,23 @@ import { useEffect, useRef } from 'react'
 import type { PDFDocumentLoadingTask, PDFPageProxy } from 'pdfjs-dist'
 import { installPromiseWithResolvers } from '../resume-tailoring/promise-with-resolvers'
 
-export function ResumePdfPages({ bytes, onReady, onFailure, pageLabel }: Readonly<{
-  bytes: Uint8Array; onReady: () => void; onFailure: () => void; pageLabel: string
+/**
+ * Draws each page of the PDF, then reports how many there are. Collapsed, a narrow screen shows the first page only;
+ * expanding moves focus to the second page, as the action that revealed it disappears.
+ */
+export function ResumePdfPages({ bytes, collapsed, onReady, onFailure, pageLabel }: Readonly<{
+  bytes: Uint8Array; collapsed: boolean; onReady: (pageCount: number) => void; onFailure: () => void; pageLabel: string
 }>) {
   const container = useRef<HTMLDivElement>(null)
+  const wasCollapsed = useRef(collapsed)
+  useEffect(() => {
+    const expanded = wasCollapsed.current && !collapsed
+    wasCollapsed.current = collapsed
+    const second = container.current?.children.item(1)
+    if (!expanded || !(second instanceof HTMLElement)) return
+    second.tabIndex = -1
+    second.focus()
+  }, [collapsed])
   useEffect(() => {
     const host = container.current
     if (host === null) return
@@ -25,12 +38,12 @@ export function ResumePdfPages({ bytes, onReady, onFailure, pageLabel }: Readonl
         const page = await pdf.getPage(pageNumber)
         await renderPreviewPage({ host, page, label: `${pageLabel} ${String(pageNumber)} / ${String(pdf.numPages)}` })
       }
-      if (!isAborted()) onReady()
+      if (!isAborted()) onReady(pdf.numPages)
     }
     void render().catch(() => { if (!isAborted()) onFailure() })
     return () => { controller.abort(); void loading?.destroy().catch(() => undefined); host.replaceChildren() }
   }, [bytes, onReady, onFailure, pageLabel])
-  return <div ref={container} className="resume-pdf-pages" />
+  return <div ref={container} className="resume-pdf-pages" data-collapsed={collapsed || undefined} />
 }
 
 async function renderPreviewPage({ host, page, label }: Readonly<{

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { ResumePhoto, ResumeRenderInput, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
 import type { Localization } from '../localization/localization'
@@ -24,9 +25,15 @@ export type ResumePreviewProps = Readonly<{
   }>
   onDownload: () => void
   onIdentityChange: (identity: TailoredResume['identity']) => void
+  /**
+   * The action rail beside the preview: Edit sits next to Download, which a phone keeps in a bottom bar; the secondary
+   * actions follow the Match Analysis summary. `children` follow the pages in the document column.
+   */
+  actions: Readonly<{ edit: ReactNode; secondary: ReactNode }>
+  children?: ReactNode
 }>
 
-type PreviewInput = Omit<ResumePreviewProps, 'pageBudget' | 'localization' | 'onDownload' | 'onIdentityChange'> & Readonly<{
+type PreviewInput = Omit<ResumePreviewProps, 'pageBudget' | 'localization' | 'onDownload' | 'onIdentityChange' | 'actions' | 'children'> & Readonly<{
   attempt: number
 }>
 

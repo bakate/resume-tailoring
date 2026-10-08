@@ -29,7 +29,7 @@ export function TailoredResumeWorkspace({ candidateJourney, localization, onChan
 
 type ResumeDocumentProps = ResumeReviewProps & Readonly<{ resume: TailoredResume }>
 
-/** Preview and Download first, then the name, then the secondary actions. */
+/** The preview beside a rail of actions: the Page Budget status and Download first, then Edit and the secondary actions. */
 function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting: () => void }>) {
   const { view } = props.candidateJourney
   const photo = useResumePhoto({ photo: view.status === 'candidate-session-open' ? view.session.resumePhoto ?? null : null,
@@ -55,20 +55,25 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
         pageBudget={{ overflowReduction: view.status === 'candidate-session-open' && view.resumeReview !== null
           ? view.resumeReview.recovery.overflowReduction : { achievements: 0, other: 0 },
         reviewHidden: { disabled: blocksResumeEditing(view), open: () => { setEditorTab('recovery') } },
-        shortening: { disabled: !shorteningAvailable, shorten: () => { withPhoto(props.candidateJourney.shortenResume) } } }} />
-      {downloadedRevision !== null && downloadedRevision === revision
-        ? <UsabilityFeedback key={downloadedRevision} candidateJourney={props.candidateJourney} localization={props.localization} /> : null}
-      <ReviewStatus {...props} onRetry={operations.retry} />
-      <CondensationProposal {...props} photoDataUrl={photo.dataUrl}
-        proposalLayoutCurrent={photo.ready && !photo.failed && proposalPhoto === photo.dataUrl} />
-      <Group><Button variant="default" disabled={blocksResumeEditing(view)}
-        onClick={() => { setEditorTab('contacts') }}>{localization.translate('resumeReview.edit')}</Button>
-        {/* Shorter wording keeps every item: the alternative to shortening, offered while the resume overflows. */}
-        {overflows(view) ? <Button variant="default" disabled={!shorteningAvailable}
-          onClick={() => { withPhoto(props.candidateJourney.proposeResumeCondensation) }}>{localization.translate('resumeReview.condense')}</Button> : null}
-        <Button variant="default" onClick={props.onChangeJobPosting}>{localization.translate('resumeReview.changeJobPosting')}</Button></Group>
-      <MatchAnalysisDisclosure {...props} />
-      <DocumentText document={props.resume} localization={props.localization} />
+        shortening: { disabled: !shorteningAvailable, shorten: () => { withPhoto(props.candidateJourney.shortenResume) } } }}
+        actions={{
+          edit: <Button variant="default" disabled={blocksResumeEditing(view)}
+            onClick={() => { setEditorTab('contacts') }}>{localization.translate('resumeReview.edit')}</Button>,
+          secondary: <>
+            {downloadedRevision !== null && downloadedRevision === revision
+              ? <UsabilityFeedback key={downloadedRevision} candidateJourney={props.candidateJourney} localization={props.localization} /> : null}
+            <ReviewStatus {...props} onRetry={operations.retry} />
+            {/* Shorter wording keeps every item: the alternative to shortening, offered while the resume overflows. */}
+            {overflows(view) ? <Button variant="default" disabled={!shorteningAvailable}
+              onClick={() => { withPhoto(props.candidateJourney.proposeResumeCondensation) }}>{localization.translate('resumeReview.condense')}</Button> : null}
+            <Button variant="default" onClick={props.onChangeJobPosting}>{localization.translate('resumeReview.changeJobPosting')}</Button>
+          </>,
+        }}>
+        <CondensationProposal {...props} photoDataUrl={photo.dataUrl}
+          proposalLayoutCurrent={photo.ready && !photo.failed && proposalPhoto === photo.dataUrl} />
+        <MatchAnalysisDisclosure {...props} />
+        <DocumentText document={props.resume} localization={props.localization} />
+      </CurrentResumePreview>
     </Stack>
     <ResumeEditorDialog {...props} {...{ editorTab, operations }} closeEditor={() => { setEditorTab(null) }} />
   </Paper>
@@ -179,7 +184,7 @@ function ResumePreview({ resume, title, photoDataUrl }: Readonly<{ resume: Tailo
     srcDoc={renderTailoredResumeDocument({ tailoredResume: resume, photoDataUrl })} />
 }
 
-function CurrentResumePreview({ candidateJourney, pageBudget, localization, resume, editorOpened, photo, onDownload }: ResumeDocumentProps & Readonly<{
+function CurrentResumePreview({ actions, candidateJourney, children, pageBudget, localization, resume, editorOpened, photo, onDownload }: ResumeDocumentProps & Pick<ResumePreviewProps, 'actions' | 'children'> & Readonly<{
   pageBudget: ResumePreviewProps['pageBudget']; editorOpened: boolean; photo: ReturnType<typeof useResumePhoto>; onDownload: () => void
 }>) {
   const { view } = candidateJourney
@@ -188,8 +193,8 @@ function CurrentResumePreview({ candidateJourney, pageBudget, localization, resu
     && view.resumeReview.operation === null && (view.operation === null || view.operation === 'rendering-resume-document')
   return <TailoredResumePreview document={resume} localization={localization} enabled={enabled} paused={editorOpened} photo={photo} pageBudget={pageBudget}
     unsupportedFieldIds={view.resumeReview.unsupportedFieldIds} renderDocument={candidateJourney.renderResumeDocument}
-    onDownload={onDownload} onIdentityChange={(identity) => {
-      candidateJourney.updateResumeContacts({ identity, contactDetails: resume.contactDetails }) }} />
+    onDownload={onDownload} actions={actions} onIdentityChange={(identity) => {
+      candidateJourney.updateResumeContacts({ identity, contactDetails: resume.contactDetails }) }}>{children}</TailoredResumePreview>
 }
 
 function UsabilityFeedback({ candidateJourney, localization }: ResumeReviewProps) {
