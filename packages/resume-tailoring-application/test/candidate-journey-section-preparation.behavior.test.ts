@@ -5,7 +5,7 @@ import type { CandidateJourney, CandidateJourneyView, CandidateSession,
   ResumeSectionWritingInput,
 } from '@resume-tailoring/application/candidate-journey'
 import { readGroupedResumeSection, structuredResumeJobMatch,
-  structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+  structuredResumeSource, writeResumeSectionFromFacts } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createFakeCandidateJourneyDependencies, createFakeResumeSectionModels, createInMemoryCandidateSessionPersistence,
   testProcessingPolicy } from '@resume-tailoring/application/testing'
 import type { TailoredResumeField } from '@resume-tailoring/application/tailored-resume'
@@ -385,6 +385,46 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectRetryWrote(['skills', 'education'])
   })
 
+  it('lists an ongoing role first, then roles by end date and start date', async () => {
+    const system = createSystemUnderTest({ experienceDates: [['2015', '2017'], ['2019', 'Present'], ['2017', '2019'],
+      ['2018', '2019']] })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectExperienceOrder(['experiences.1', 'experiences.3', 'experiences.2', 'experiences.0'])
+  })
+
+  it('orders roles of the same year by month, whatever the language of the dates', async () => {
+    const system = createSystemUnderTest({ experienceDates: [['Jan 2020', 'June 2021'], ['09/2020', 'nov. 2021'],
+      ['2021-03', "Aujourd'hui"], ['févr. 2020', '2021-06']] })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectExperienceOrder(['experiences.2', 'experiences.1', 'experiences.3', 'experiences.0'])
+  })
+
+  it('lists a role the source gives as ongoing from its start before a role ended later, and a year after its December', async () => {
+    const system = createSystemUnderTest({ experienceDates: [['2019', 'Dec 2020'], ['2018', '2021'], ['2023', '2024'],
+      ['Depuis mars 2021', null]] })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectExperienceOrder(['experiences.3', 'experiences.2', 'experiences.1', 'experiences.0'])
+  })
+
+  it('keeps source order between roles with the same dates and lists undated experiences last', async () => {
+    const system = createSystemUnderTest({ experienceDates: [[null, null], ['2020', '2022'], ['Summer', 'Autumn'],
+      ['2020', '2022'], [null, '2016']] })
+    await system.givenPreparedTailoredResume()
+
+    await system.prepareTailoredResume()
+
+    system.expectExperienceOrder(['experiences.1', 'experiences.3', 'experiences.4', 'experiences.0', 'experiences.2'])
+  })
+
   it('writes the Normalized Resume through the same sections without the Job Posting', async () => {
     const system = createSystemUnderTest()
     await system.givenMatchedCandidateSession()
@@ -399,7 +439,11 @@ function createSystemUnderTest(options: TestOptions = {}) {
   return new SectionPreparationTestSystem(options)
 }
 
+/** The start and end date of each experience of the source, in source order; null when the source gives none. */
+type ExperienceDates = readonly [string | null, string | null]
+
 type TestOptions = Readonly<{
+  experienceDates?: readonly ExperienceDates[]
   writing?: 'slow'
   heldSection?: 'skills'
   skillsValidation?: 'unsupported-once' | 'unsupported-twice' | 'unsupported-on-rewrite'
@@ -426,7 +470,7 @@ type TestOptions = Readonly<{
 class SectionPreparationTestSystem {
   readonly #options: TestOptions
   // The in-memory persistence a reloaded Candidate Journey restores from.
-  readonly #persistence = createInMemoryCandidateSessionPersistence({ session: createMatchedSession() })
+  readonly #persistence: ReturnType<typeof createInMemoryCandidateSessionPersistence>
   #journey: CandidateJourney
   readonly #writingInputs: ResumeSectionWritingInput[] = []
   readonly #pendingWrites: (() => void)[] = []
@@ -442,6 +486,7 @@ class SectionPreparationTestSystem {
 
   constructor(options: TestOptions) {
     this.#options = options
+    this.#persistence = createInMemoryCandidateSessionPersistence({ session: createMatchedSession(options) })
     this.#journey = this.#createJourney({ heldSection: options.heldSection })
   }
 
@@ -465,6 +510,11 @@ class SectionPreparationTestSystem {
   async givenMatchedCandidateSession() {
     this.#journey.start()
     await expect.poll(() => this.#journey.readView().status).toBe('candidate-session-open')
+  }
+
+  async givenPreparedTailoredResume() {
+    await this.givenMatchedCandidateSession()
+    await this.prepareTailoredResume()
   }
 
   async prepareTailoredResume() {
@@ -741,6 +791,15 @@ class SectionPreparationTestSystem {
     expect(experience?.achievements.map(({ id }) => id)).toEqual(achievementIds)
   }
 
+  expectExperienceOrder(experienceIds: readonly string[]) {
+    const view = this.#expectOutcome()
+    expect(view?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    expect(view?.session.tailoredResume?.experiences.map(({ id }) => id)).toEqual(experienceIds)
+    // The preview reveals the sections in this order while they are written.
+    expect(view?.session.preparation?.sections?.filter(({ kind }) => kind === 'experience').map(({ key }) => key))
+      .toEqual(experienceIds)
+  }
+
   expectPreparedWithoutRewriting() {
     expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
     expect(this.#writingInputs).toHaveLength(8)
@@ -806,14 +865,26 @@ class SectionPreparationTestSystem {
   }
 }
 
-function createMatchedSession(): CandidateSession {
+function createMatchedSession({ experienceDates }: TestOptions): CandidateSession {
   const startedAt = Date.now()
   return {
     expiresAt: startedAt + candidateSessionDurationMilliseconds, startedAt,
     version: candidateSessionStorageVersion, sessionId: 'candidate-session-00000000-0000-4000-8000-000000000068',
     jobMatch: structuredResumeJobMatch, phase: 'job-match', processingConsent: { grantedAt: startedAt, policy: testProcessingPolicy },
-    sourceIntake: structuredResumeSource, tailoredResume: null,
+    sourceIntake: experienceDates === undefined ? structuredResumeSource : createDatedSource(experienceDates), tailoredResume: null,
   }
+}
+
+/** The fixture source with its experiences replaced by one per entry, each dated as given. */
+function createDatedSource(experienceDates: readonly ExperienceDates[]): CandidateSession['sourceIntake'] {
+  const experienceFacts = experienceDates.flatMap(([startDate, endDate], index) => [
+    ['role', `Role ${String(index)}`], ['organization', `Organization ${String(index)}`], ['startDate', startDate],
+    ['endDate', endDate], ['achievements', `Delivered outcome ${String(index)}`],
+  ].flatMap(([name, value]) => value === null || value === undefined ? [] : [{
+    id: `source-fact-experiences-${String(index)}-${name ?? ''}-0` as const, path: `experiences.${String(index)}.${name ?? ''}.0`,
+    status: 'attested' as const, value }]))
+  return { ...structuredResumeSource, candidateFacts: [...experienceFacts,
+    ...structuredResumeSource.candidateFacts.filter(({ path }) => !path.startsWith('experiences.'))] }
 }
 
 function createDependencies({ options, persistence, models }: Readonly<{
@@ -833,7 +904,8 @@ function createDependencies({ options, persistence, models }: Readonly<{
         if (input.section.kind === 'skills' && failure !== undefined && models.onSkillsWrite() === failingWrite) {
           return { ok: false, error: { type: failure } }
         }
-        const written = readGroupedResumeSection(input.section)
+        const written = options.experienceDates !== undefined && input.section.kind === 'experience'
+          ? writeResumeSectionFromFacts(input) : readGroupedResumeSection(input.section)
         const content = options.writtenSkills === 'duplicated' ? withDuplicatedSkill(written)
           : options.writtenSkills === 'versioned' ? withSkillsVersion({ content: written, version: input.rejectedFields.length + 1 })
             // The first rewrite cites a fact the section was not given, which fails the structure check.

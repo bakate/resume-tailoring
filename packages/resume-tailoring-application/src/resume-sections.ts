@@ -1,5 +1,6 @@
 import type { JobMatch } from '@resume-tailoring/domain/job-match'
 import type { CandidateFact, CandidateFactId } from '@resume-tailoring/domain/source-intake'
+import { orderExperiencesReverseChronologically } from './experience-chronology'
 import { readExperienceFields, readSectionFields, replaceEmDashes } from './tailored-resume'
 import type { TailoredResumeExperience, TailoredResumeField, TailoredResumeLocale, TailoredResumeSection } from './tailored-resume'
 import type { ProfessionalResumeDocument } from './structured-resume-contract'
@@ -9,7 +10,7 @@ import type { ResumeSectionContent, ResumeSectionKind } from '@resume-tailoring/
 export { resumeSectionKinds } from '@resume-tailoring/domain/tailored-resume'
 export type { ResumeSectionContent, ResumeSectionKind } from '@resume-tailoring/domain/tailored-resume'
 
-/** One Resume Section of the deterministic section plan; experiences are keyed `experiences.N`. */
+/** One Resume Section of the deterministic section plan; experiences are keyed `experiences.N`, N their source index. */
 export type ResumeSectionPlanEntry = Readonly<{ key: string; kind: ResumeSectionKind }>
 
 /** Only what the section may cite (every fact for the Value Proposition): never the Job Posting text or Match Analysis details. */
@@ -72,9 +73,13 @@ const fieldSectionKinds = ['skills', 'education', 'languages', 'projects', 'cert
 
 export function planResumeSections({ candidateFacts }: Pick<ResumeSectionsRequest, 'candidateFacts'>): readonly ResumeSectionPlanEntry[] {
   const experienceIndexes = [...new Set(candidateFacts.map(({ path }) => /^experiences\.(\d+)\./u.exec(path)?.[1])
-    .filter((index) => index !== undefined).map(Number))].sort((left, right) => left - right)
+    .filter((index) => index !== undefined).map(Number))]
+  const readDate = (sourceIndex: number, name: 'startDate' | 'endDate') =>
+    candidateFacts.find(({ path }) => path.startsWith(`experiences.${String(sourceIndex)}.${name}.`))?.value ?? null
+  const experiences = orderExperiencesReverseChronologically({ experiences: experienceIndexes.map((sourceIndex) => ({
+    sourceIndex, startDate: readDate(sourceIndex, 'startDate'), endDate: readDate(sourceIndex, 'endDate') })) })
   return [{ key: 'value-proposition', kind: 'value-proposition' },
-    ...experienceIndexes.map((index) => ({ key: `experiences.${String(index)}`, kind: 'experience' as const })),
+    ...experiences.map(({ sourceIndex }) => ({ key: `experiences.${String(sourceIndex)}`, kind: 'experience' as const })),
     ...fieldSectionKinds.filter((kind) => candidateFacts.some(({ path, value }) => path.startsWith(`${kind}.`)
       && value.trim().length > 0)).map((kind) => ({ key: kind, kind }))]
 }
