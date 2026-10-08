@@ -111,7 +111,7 @@ function FieldEditor(props: FieldEditorProps) {
   </Stack></Paper>
 }
 
-function FieldActions({ announce, candidateJourney, copy, localization, operations, reference, text, unsupported, busy }:
+function FieldActions({ announce, candidateJourney, copy, localization, operations, reference, resume, text, unsupported, busy }:
 FieldEditorProps & Readonly<{ text: string; unsupported: boolean; busy: boolean }>) {
   const save = async () => {
     await candidateJourney.editResumeField({ fieldId: reference.key, text })
@@ -126,18 +126,49 @@ FieldEditorProps & Readonly<{ text: string; unsupported: boolean; busy: boolean 
     <Button size="compact-sm" variant="subtle" onClick={() => {
       candidateJourney.hideResumeField({ fieldId: reference.key }); announce(copy.hiddenNotice)
     }}>{localization.translate('tailoredResume.hideField')}</Button>
-    <FieldOrdering {...{ announce, candidateJourney, copy, localization, reference }} />
+    <FieldOrdering {...{ announce, candidateJourney, copy, localization, reference, resume }} />
   </Group>
 }
 
-function FieldOrdering({ announce, candidateJourney, copy, localization, reference }: Omit<EditorContext, 'resume' | 'operations'> & Readonly<{ reference: ResumeFieldReference }>) {
+function FieldOrdering({ announce, candidateJourney, copy, localization, reference, resume }: Omit<EditorContext, 'operations'> & Readonly<{ reference: ResumeFieldReference }>) {
   const isMovable = reference.location.kind === 'value-proposition' || reference.location.kind === 'section'
     || (reference.location.kind === 'experience' && reference.location.fieldName === 'achievements')
     || (reference.location.kind === 'skill-group' && reference.location.fieldName === 'items')
   if (!isMovable) return null
+  const name = localization.translate('tailoredResume.entryName').replace('{section}', copy[sectionOf(reference)])
+    .replace('{entry}', readEntryName({ reference, resume }))
   return <>{(['up', 'down'] as const).map((direction) => <Button key={direction} size="compact-sm" variant="subtle"
     onClick={() => { candidateJourney.moveResumeField({ fieldId: reference.key, direction }); announce(copy.ordered) }}>
-    {localization.translate(direction === 'up' ? 'tailoredResume.moveUp' : 'tailoredResume.moveDown')}</Button>)}</>
+    {readMoveLabel({ direction, localization, name })}</Button>)}</>
+}
+
+/** Names what a field belongs to, so its Move buttons say what they move: its experience, skill group or own wording. */
+function readEntryName({ reference, resume }: Readonly<{ reference: ResumeFieldReference; resume: TailoredResume }>) {
+  const { location } = reference
+  if (location.kind === 'experience') {
+    const experience = resume.experiences.find(({ id }) => id === location.experienceId)
+    const entry = experience?.organization?.text ?? experience?.role?.text
+    if (entry !== undefined) return entry
+  }
+  if (location.kind === 'skill-group') {
+    const skills = resume.sections.find((section) => section.section === 'skills')
+    const category = skills?.section === 'skills' ? skills.groups.find(({ id }) => id === location.groupId)?.category?.text : undefined
+    if (category !== undefined) return category
+  }
+  return excerpt(reference.field.text)
+}
+
+function excerpt(text: string) {
+  const words = text.trim().split(/\s+/u)
+  return words.length <= entryNameWords ? words.join(' ') : `${words.slice(0, entryNameWords).join(' ')}…`
+}
+
+const entryNameWords = 6
+
+function readMoveLabel({ direction, localization, name }: Readonly<{
+  direction: 'up' | 'down'; localization: Localization; name: string
+}>) {
+  return localization.translate(direction === 'up' ? 'tailoredResume.moveUp' : 'tailoredResume.moveDown').replace('{name}', name)
 }
 
 type Recovery = NonNullable<Extract<ResumeReviewController['view'], { status: 'candidate-session-open' }>['resumeReview']>['recovery']
@@ -192,6 +223,6 @@ function SectionOrder({ announce, candidateJourney, copy, localization, resume }
     <Text>{copy[section]}</Text><Group>{(['up', 'down'] as const).map((direction) =>
       <Button key={direction} variant="subtle" disabled={direction === 'up' ? index === 0 : index === sections.length - 1}
         onClick={() => { move({ index, direction }) }}>
-        {localization.translate(direction === 'up' ? 'tailoredResume.moveUp' : 'tailoredResume.moveDown')}</Button>)}</Group>
+        {readMoveLabel({ direction, localization, name: copy[section] })}</Button>)}</Group>
   </Group>)}</Stack>
 }
