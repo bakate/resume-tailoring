@@ -608,7 +608,7 @@ class CandidateJourneyIntegrationSystem {
     await this.givenOverflowingDraft()
     await this.requestCondensationProposal()
     await expect(this.#page.getByRole('heading', { name: 'Shorter version proposal' })).toBeVisible({ timeout: 30_000 })
-    await expect(this.#page.getByText('The current version fits within two pages.', { exact: true }).last()).toBeVisible({ timeout: 30_000 })
+    await expect(this.#page.getByText('The current version fits within two pages. Nothing is deleted: hidden content can be restored from the editor.', { exact: true }).last()).toBeVisible({ timeout: 30_000 })
   }
 
   async givenInsufficientCondensationProposal() {
