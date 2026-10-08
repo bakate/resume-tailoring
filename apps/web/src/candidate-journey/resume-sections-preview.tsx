@@ -3,10 +3,10 @@ import type { CandidateSession, ResumeSectionSnapshot } from '@resume-tailoring/
 import type { ResumeSectionContent, ResumeSectionKind } from '@resume-tailoring/application/candidate-journey'
 import { isCopiedFromSource } from '@resume-tailoring/application/candidate-journey'
 import { inferTailoredResumeLocale } from '@resume-tailoring/application/tailored-resume'
+import type { ResumeSectionName } from '@resume-tailoring/application/tailored-resume'
 import type { Localization } from '../localization/localization'
 import type { useCandidateJourney } from './use-candidate-journey'
 import { CopiedNotice } from './copied-notice'
-import { resumeReviewCopy } from './resume-review-copy'
 import { readResumeHeading } from './tailored-resume-document'
 import type { ResumeHeadingKey } from './tailored-resume-document'
 
@@ -64,7 +64,7 @@ function readSectionAnchor({ key }: ResumeSectionSnapshot) {
 function readSectionName({ localization, preparation, section }: Readonly<{
   localization: Localization; preparation: ResumePreparation; section: ResumeSectionSnapshot
 }>) {
-  const label = resumeReviewCopy[localization.locale][sectionLabelKeys[section.kind]]
+  const label = localization.translate(`resumeReview.section.${sectionLabelKeys[section.kind]}`)
   const index = /^experiences\.(\d+)$/u.exec(section.key)?.[1]
   const experience = index === undefined ? undefined : preparation.sourceIntake?.sourceProfile.experiences[Number(index)]
   const name = [experience?.role, experience?.organization].filter(Boolean).join(' – ')
@@ -120,7 +120,7 @@ function ResumeSectionPreview({ localization, preparation, section }: Readonly<{
       <Text c="caution.8" fw={600}>{localization.translate('resumeSections.failed').replace('{section}', name)}</Text>
     </Stack>
   }
-  const label = resumeReviewCopy[localization.locale][sectionLabelKeys[section.kind]]
+  const label = localization.translate(`resumeReview.section.${sectionLabelKeys[section.kind]}`)
   return <Stack gap="xs">
     <Text c="dimmed" role="status">{localization.translate('resumeSections.writing').replace('{section}', label)}</Text>
     <Skeleton aria-hidden="true" height={10} radius="xl" width="88%" />
@@ -152,4 +152,4 @@ const sectionHeadingKeys = {
 const sectionLabelKeys = {
   'value-proposition': 'value-proposition', experience: 'experiences', skills: 'skills', education: 'education',
   languages: 'languages', projects: 'projects', certifications: 'certifications',
-} as const satisfies Record<ResumeSectionKind, keyof typeof resumeReviewCopy['en']>
+} as const satisfies Record<ResumeSectionKind, ResumeSectionName>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { describeOverflowReduction } from './resume-review-copy'
+import { describeOverflowReduction } from './overflow-reduction-summary'
 
 describe('Overflow Reduction summary', () => {
   it.each([
