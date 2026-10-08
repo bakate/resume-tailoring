@@ -6,7 +6,7 @@ import {
   createCandidateJourney,
 } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourney, CandidateSession } from '@resume-tailoring/application/candidate-journey'
-import { structuredResumeJobMatch } from '@resume-tailoring/application/structured-resume-fixtures'
+import { groupedResumeDocument, readGroupedResumeSection, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import {
   createFakeCandidateJourneyDependencies,
   createFakeResumeSectionModels,
@@ -45,6 +45,16 @@ describe('Candidate Journey keeps only what it needs in the Candidate Session', 
 
     system.expectPreparedAgainFromTheStoredSourceProfile()
   })
+
+  it('drops the preparation copies of a session prepared before they stopped being kept, at its next save', async () => {
+    const system = createSystemUnderTest()
+    system.givenSessionStoredWithPreparationCopies()
+    await system.givenOpenCandidateSession()
+
+    system.addResumePhoto()
+
+    system.expectOnlyThePublishedResultStored()
+  })
 })
 
 function createSystemUnderTest() {
@@ -52,12 +62,16 @@ function createSystemUnderTest() {
 }
 
 class CandidateSessionMinimizationTestSystem {
-  readonly #persistence = createInMemoryCandidateSessionPersistence({ session: createConsentedSession() })
-  readonly #journey: CandidateJourney
+  #persistence = createInMemoryCandidateSessionPersistence({ session: createConsentedSession() })
+  #journey: CandidateJourney
   #extractions = 0
 
   constructor() {
-    this.#journey = createCandidateJourney({ dependencies: createFakeCandidateJourneyDependencies({
+    this.#journey = this.#createJourney()
+  }
+
+  #createJourney() {
+    return createCandidateJourney({ dependencies: createFakeCandidateJourneyDependencies({
       now: () => startedAt,
       persistence: this.#persistence,
       resumeSectionModels: createFakeResumeSectionModels(),
@@ -66,6 +80,22 @@ class CandidateSessionMinimizationTestSystem {
         return Promise.resolve({ ok: true, value: { pageCount: null, text: new TextDecoder().decode(bytes) } })
       } },
     }) })
+  }
+
+  givenSessionStoredWithPreparationCopies() {
+    const revision = 'candidate-session-00000000-0000-4000-8000-000000000148:prepared'
+    this.#persistence = createInMemoryCandidateSessionPersistence({ session: { ...createConsentedSession(),
+      phase: 'tailored-resume-preparation', sourceIntake: structuredResumeSource, jobMatch: structuredResumeJobMatch,
+      tailoredResume: groupedResumeDocument, preparedResumeStatus: 'current', preparedResumeRevision: revision,
+      preparation: { revision, status: 'prepared', sourceDocument: null, jobPosting: null, locale: 'en', purpose: 'tailored',
+        sourceIntake: structuredResumeSource, jobMatch: structuredResumeJobMatch, failure: null,
+        sections: [{ key: 'skills', kind: 'skills', attempt: 1, status: 'validated',
+          content: readGroupedResumeSection({ key: 'skills', kind: 'skills' }) }] } } })
+    this.#journey = this.#createJourney()
+  }
+
+  addResumePhoto() {
+    this.#journey.updateResumePhoto({ dataUrl: 'data:image/png;base64,iVBORw0KGgo=', name: 'portrait.png' })
   }
 
   async givenOpenCandidateSession() {
@@ -117,7 +147,7 @@ class CandidateSessionMinimizationTestSystem {
 
   #readStoredSession(): CandidateSession {
     const stored = this.#persistence.readStoredSession()
-    if (stored === null) throw new Error('Open a Candidate Session before reading what it stores')
+    if (stored?.preparation?.status !== 'prepared') throw new Error('Prepare a Tailored Resume before reading what the session stores')
     return stored
   }
 }

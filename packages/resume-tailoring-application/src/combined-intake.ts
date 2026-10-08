@@ -1,3 +1,4 @@
+import { settlePublishedPreparation } from '@resume-tailoring/domain/candidate-session'
 import type { CandidateSession, ResumePreparation, StoredIntakeDocument, ResumePreparationFailure } from '@resume-tailoring/domain/candidate-session'
 import { hasProcessingConsentForPolicy } from '@resume-tailoring/domain/processing-policy'
 import { createJobMatch, maximumJobPostingBytes } from './job-match'
@@ -162,21 +163,16 @@ function publishDocument({ context, outcome }: Readonly<{
   if (outcome.revision !== context.preparation.revision) return failPreparation({ context, detail: 'stale-result' })
   const sourceIntake = context.preparation.sourceIntake
   if (sourceIntake === null) return failPreparation({ context, detail: 'unavailable' })
-  const session: CandidateSession = { ...context.session, sourceIntake, jobMatch: context.preparation.jobMatch,
+  const session = settlePublishedPreparation({ session: { ...context.session, sourceIntake, jobMatch: context.preparation.jobMatch,
     phase: 'tailored-resume-preparation', preparedResumeStatus: 'current', preparedResumeRevision: outcome.revision,
-    preparation: settlePreparation(context.preparation),
+    preparation: { ...context.preparation, status: 'prepared' },
     resumeEditing: { revision: outcome.revision, hiddenFields: [], unsupportedFieldIds: [], manuallyEdited: false },
     resumeFactLocations: context.session.resumeFactLocations?.filter(({ factId }) => sourceIntake.candidateFacts.some(({ id }) => id === factId)),
-    tailoredResume: { ...outcome.document, ...localResumeContacts({ sourceIntake, session: context.session }) } }
+    tailoredResume: { ...outcome.document, ...localResumeContacts({ sourceIntake, session: context.session }) } } })
   if (!canPublish(context)) return unavailable
   const saved = context.dependencies.persistence.save({ session })
   return saved.ok ? { status: 'prepared', revision: outcome.revision, session }
     : failPreparation({ context, detail: 'candidate-session-storage-unavailable' })
-}
-
-/** A prepared preparation keeps no copy of what the session publishes, nor the Resume Section drafts it superseded. */
-function settlePreparation({ revision, sourceDocument, jobPosting, locale, purpose }: ResumePreparation): ResumePreparation {
-  return { revision, status: 'prepared', sourceDocument, jobPosting, locale, purpose, sourceIntake: null, jobMatch: null, failure: null }
 }
 
 function localResumeContacts({ sourceIntake, session }: Readonly<{ sourceIntake: SourceIntake; session: CandidateSession }>) {

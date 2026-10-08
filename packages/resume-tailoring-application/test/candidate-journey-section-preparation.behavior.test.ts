@@ -607,11 +607,11 @@ class SectionPreparationTestSystem {
   constructor(options: TestOptions) {
     this.#options = options
     this.#persistence = createInMemoryCandidateSessionPersistence({ session: createMatchedSession(options) })
-    this.#journey = this.#createJourney({ heldSection: options.heldSection })
+    this.#journey = this.#createJourneyRevealingSections({ heldSection: options.heldSection })
   }
 
-  #createJourney({ heldSection }: Readonly<{ heldSection: TestOptions['heldSection'] }>) {
-    const journey = this.#createObservedJourney({ heldSection })
+  #createJourneyRevealingSections({ heldSection }: Readonly<{ heldSection: TestOptions['heldSection'] }>) {
+    const journey = this.#createJourneyWithFakes({ heldSection })
     journey.subscribe(() => {
       const view = journey.readView()
       const preparation = view.status === 'candidate-session-open' ? view.session.preparation : undefined
@@ -620,7 +620,7 @@ class SectionPreparationTestSystem {
     return journey
   }
 
-  #createObservedJourney({ heldSection }: Readonly<{ heldSection: TestOptions['heldSection'] }>) {
+  #createJourneyWithFakes({ heldSection }: Readonly<{ heldSection: TestOptions['heldSection'] }>) {
     return createCandidateJourney({ dependencies: createDependencies({ options: this.#options, persistence: this.#persistence, telemetry: this.#telemetry, models: {
       onWrite: async (input) => {
         this.#writingInputs.push(input)
@@ -728,7 +728,7 @@ class SectionPreparationTestSystem {
   }
 
   async #reload() {
-    this.#journey = this.#createJourney({ heldSection: undefined })
+    this.#journey = this.#createJourneyRevealingSections({ heldSection: undefined })
     this.#journey.start()
     await expect.poll(() => this.#journey.readView().status).toBe('candidate-session-open')
   }

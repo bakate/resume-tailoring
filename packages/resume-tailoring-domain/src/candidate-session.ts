@@ -50,6 +50,18 @@ export function isCandidateSessionExpired({ session, now }: Readonly<{
   return session.expiresAt <= now
 }
 
+/**
+ * The preparation that produced the published Tailored Resume keeps no copy of the Source Intake and Job Match the
+ * session publishes, nor the Resume Section drafts the published resume superseded.
+ */
+export function settlePublishedPreparation({ session }: Readonly<{ session: CandidateSession }>): CandidateSession {
+  const preparation = session.preparation
+  if (preparation === undefined || preparation.revision !== session.preparedResumeRevision) return session
+  const { revision, status, sourceDocument, jobPosting, locale, purpose } = preparation
+  return { ...session, preparation: { revision, status, sourceDocument, jobPosting, locale, purpose,
+    sourceIntake: null, jobMatch: null, failure: null } }
+}
+
 export type StoredIntakeDocument = Readonly<{ data: string; mediaType: string; name: string }>
 
 export type ResumePreparation = Readonly<{

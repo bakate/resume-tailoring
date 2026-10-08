@@ -51,10 +51,10 @@ export const sourceIntakeSchema = z.strictObject({
   sourceProfile: structuredSourceProfileSchema,
 })
 
-/** A session stored before BAK-148 also kept the raw Source Document text, which nothing reads: it is dropped on restore. */
-const storedSourceIntakeSchema = z.preprocess(dropRawSourceDocumentText, sourceIntakeSchema)
+// Accepts a Source Intake stored before sessions stopped keeping the Source Document text, and drops that text.
+const storedSourceIntakeSchema = z.preprocess(dropSourceDocumentText, sourceIntakeSchema)
 
-function dropRawSourceDocumentText(stored: unknown) {
+function dropSourceDocumentText(stored: unknown) {
   if (typeof stored !== 'object' || stored === null || !('originalContent' in stored)) return stored
   return Object.fromEntries(Object.entries(stored).filter(([key]) => key !== 'originalContent'))
 }
