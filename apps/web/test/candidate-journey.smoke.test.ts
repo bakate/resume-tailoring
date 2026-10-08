@@ -206,6 +206,15 @@ test.describe('Candidate Journey preview-first preparation', () => {
     system.expectAccessRenewedOnce()
   })
 
+  test('opens straight on the Candidate Journey when demo access is already valid, even on a slow network', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenDemoAccessCheckIsSlow()
+
+    await system.openCandidateJourney()
+
+    await system.expectCandidateJourneyWithoutSecurityCheck()
+  })
+
   test('isolates nonblocking ambiguity and still produces a usable preview', async ({ page }) => {
     const system = createSystemUnderTest({ page, scenario: 'isolated-ambiguity' })
     await system.givenCombinedIntake()
@@ -553,6 +562,7 @@ class CandidateJourneyTestSystem {
   #hasTriggeredExpiry = false
   #isAccessExpired = false
   #accessRenewals = 0
+  #isDemoAccessCheckSlow = false
   readonly #focusedAfterDownload: string[] = []
   #releaseHeldSkills: () => void = () => undefined
   readonly #heldSkills = new Promise<void>((resolve) => { this.#releaseHeldSkills = resolve })
@@ -604,7 +614,8 @@ class CandidateJourneyTestSystem {
       return route.fulfill({ json: { ok: true, value: { fields: input.fields.map(({ id }) => ({ fieldId: id, supported: false })) } } })
     })
     // The demo access cookie stays expired until the Candidate passes a new security check.
-    await this.#page.route('**/api/demo-access', (route) => {
+    await this.#page.route('**/api/demo-access', async (route) => {
+      if (this.#isDemoAccessCheckSlow) await new Promise((resolve) => setTimeout(resolve, slowDemoAccessCheckMilliseconds))
       if (this.#isAccessExpired) this.#accessRenewals += 1
       this.#isAccessExpired = false
       return route.fallback()
@@ -631,6 +642,29 @@ class CandidateJourneyTestSystem {
     await this.#page.getByRole('textbox', { name: 'Professional text', exact: true }).fill(
       'Alex Morgan\nalex@example.com\nFrontend Engineer at Northwind. Built accessible billing screens. React and TypeScript.')
     await this.#page.getByRole('textbox', { name: 'Job posting text', exact: true }).fill(postingText)
+  }
+
+  async givenDemoAccessCheckIsSlow() {
+    this.#isDemoAccessCheckSlow = true
+    // Records the security check if it is ever painted, even for one frame, from the first parsed node.
+    await this.#page.addInitScript((title) => {
+      new MutationObserver(() => {
+        if (document.documentElement.textContent.includes(title)) document.documentElement.dataset.sawSecurityCheck = 'true'
+      }).observe(document, { childList: true, subtree: true, characterData: true })
+    }, 'Preparing the demo')
+  }
+
+  async openCandidateJourney() {
+    await this.#installModelAdapters()
+    await this.#page.goto('/')
+    this.#completedAction = 'journey-opened'
+  }
+
+  async expectCandidateJourneyWithoutSecurityCheck() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('heading', { name: 'Your resume, tailored to the job.', exact: true }))
+      .toBeVisible({ timeout: slowDemoAccessCheckMilliseconds / 2 })
+    await expect(this.#page.locator('html')).not.toHaveAttribute('data-saw-security-check', 'true')
   }
 
   expectAccessRenewedOnce() {
@@ -1575,6 +1609,8 @@ function isCancelledByLeavingPage(message: string) {
 }
 
 const postingText = 'Frontend Engineer. React is required. Rust is required. Java is required.'
+// Slow enough that a security check waiting for this response would be painted before the journey.
+const slowDemoAccessCheckMilliseconds = 3_000
 
 function extractionFor(scenario: Scenario) {
   if (scenario === 'blocking-ambiguity') return { experiences: [], projects: [], education: [], languages: [], certifications: [],
