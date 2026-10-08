@@ -42,6 +42,10 @@ _Avoid_: Per-document consent, per-action consent
 The disclosed external processor selected to perform model-backed operations under the current Processing Policy.
 _Avoid_: OpenAI in domain language, AI session
 
+**Candidate API Key**:
+A Language Model Provider key the Candidate supplies to keep preparing Tailored Resumes beyond the free daily quota. It replaces the operator's key for the Candidate's model-backed requests only, transits the server without being stored or logged, lives in this browser tab only, and never falls back to the operator's key when it fails.
+_Avoid_: BYOK, user token, paywall, OpenAI key in domain language
+
 **API Failure**:
 The type, from one closed catalogue, with which a server route answers a failed request, together with its HTTP status; it names what went wrong, never the operation.
 _Avoid_: Error code, operation-prefixed failure
