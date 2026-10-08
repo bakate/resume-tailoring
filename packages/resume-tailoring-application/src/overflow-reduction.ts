@@ -5,7 +5,8 @@ import type { ResumeFieldReference } from './resume-field-editing'
 import type { ResumeDocumentRenderer } from './ports'
 import { validateResumeRendering } from './resume-rendering-state'
 
-type Reduction = Readonly<{ resume: TailoredResume; editing: ResumeEditingState }>
+/** A Tailored Resume with the editing state that holds its Hidden Content. */
+type ReducibleResume = Readonly<{ resume: TailoredResume; editing: ResumeEditingState }>
 
 /** What a step may read besides the resume: which facts the Match Analysis found relevant, and today for ongoing roles. */
 type ReductionContext = Readonly<{ relevantFactIds: ReadonlySet<string>; today: number }>
@@ -13,25 +14,25 @@ type ReductionContext = Readonly<{ relevantFactIds: ReadonlySet<string>; today: 
 /** One step names the fields it hides; an empty list means it has nothing left to hide. */
 type ReductionStep = Readonly<{
   repeats: boolean
-  select: (request: Readonly<{ reduction: Reduction; context: ReductionContext }>) => readonly ResumeFieldReference[]
+  select: (request: Readonly<{ reduction: ReducibleResume; context: ReductionContext }>) => readonly ResumeFieldReference[]
 }>
 
 const relevantExperienceAchievementFloor = 2
 
 /**
- * Overflow Reduction: hides content one step at a time, re-rendering after each, and keeps the first result that fits
+ * Overflow ReducibleResume: hides content one step at a time, re-rendering after each, and keeps the first result that fits
  * on one page. Without one, it keeps the two-page result with the least Hidden Content; beyond two pages after every
  * step, or when the resume cannot be rendered, it leaves the resume unchanged for the existing overflow outcome. It
  * never calls a language model, never removes an experience, and never hides content the Candidate restored.
  */
 export async function reduceToPageBudget({ reduction, relevantFactIds, today, renderer, photoDataUrl }: Readonly<{
-  reduction: Reduction
+  reduction: ReducibleResume
   relevantFactIds: readonly string[]
   today: number
   renderer: ResumeDocumentRenderer
   photoDataUrl?: string
-}>): Promise<Reduction> {
-  const measure = (current: Reduction) => measurePages({ renderer, photoDataUrl, reduction: current })
+}>): Promise<ReducibleResume> {
+  const measure = (current: ReducibleResume) => measurePages({ renderer, photoDataUrl, reduction: current })
   const context = { relevantFactIds: new Set(relevantFactIds), today }
   const initialPages = await measure(reduction)
   if (initialPages === null || initialPages === 1) return reduction
@@ -70,13 +71,13 @@ const reductionSteps: readonly ReductionStep[] = [
   { repeats: true, select: ({ reduction, context }) => readDensestAchievement({ reduction, context }) },
 ]
 
-function readContextExperiences({ resume }: Reduction) {
+function readContextExperiences({ resume }: ReducibleResume) {
   return resume.experiences.filter(({ chronology }) => chronology === 'context')
 }
 
 /** The last achievements an experience may lose while it keeps at least `floor` visible, restored ones never counted out. */
 function hideableAchievementsBeyond({ reduction, experience, floor }: Readonly<{
-  reduction: Reduction; experience: TailoredResumeExperience; floor: number
+  reduction: ReducibleResume; experience: TailoredResumeExperience; floor: number
 }>) {
   const hideable = readHideable({ reduction, references: readExperienceReferences({ resume: reduction.resume, experience,
     fieldNames: ['achievements'] }) })
@@ -96,7 +97,7 @@ function readExperienceReferences({ resume, experience, fieldNames }: Readonly<{
  * Skill items citing no relevant fact; a group left with no visible item loses its category too, so no empty
  * heading remains.
  */
-function readIrrelevantSkills({ reduction, context }: Readonly<{ reduction: Reduction; context: ReductionContext }>) {
+function readIrrelevantSkills({ reduction, context }: Readonly<{ reduction: ReducibleResume; context: ReductionContext }>) {
   const references = readResumeFields({ resume: reduction.resume })
   const items = readHideable({ reduction, references: references.filter(({ field, location }) => location.kind === 'skill-group'
     && location.fieldName === 'items' && !citesRelevantFact({ field, context })) })
@@ -114,7 +115,7 @@ function readIrrelevantSkills({ reduction, context }: Readonly<{ reduction: Redu
  * above the floor of two. An undated experience counts as one year, as its achievement budget does; between equal
  * rates, the older experience loses first.
  */
-function readDensestAchievement({ reduction, context }: Readonly<{ reduction: Reduction; context: ReductionContext }>) {
+function readDensestAchievement({ reduction, context }: Readonly<{ reduction: ReducibleResume; context: ReductionContext }>) {
   const candidates = reduction.resume.experiences.flatMap((experience) => {
     if (experience.chronology !== 'relevant') return []
     const [achievement] = hideableAchievementsBeyond({ reduction, experience, floor: relevantExperienceAchievementFloor })
@@ -133,12 +134,12 @@ function citesRelevantFact({ field, context }: Readonly<{ field: TailoredResumeF
 }
 
 /** Content the Candidate restored is never hidden again. */
-function readHideable({ reduction, references }: Readonly<{ reduction: Reduction; references: readonly ResumeFieldReference[] }>) {
+function readHideable({ reduction, references }: Readonly<{ reduction: ReducibleResume; references: readonly ResumeFieldReference[] }>) {
   const restored = new Set(reduction.editing.restoredFieldIds ?? [])
   return references.filter(({ field }) => !restored.has(field.id))
 }
 
-function hideFields({ reduction, references }: Readonly<{ reduction: Reduction; references: readonly ResumeFieldReference[] }>): Reduction {
+function hideFields({ reduction, references }: Readonly<{ reduction: ReducibleResume; references: readonly ResumeFieldReference[] }>): ReducibleResume {
   return {
     resume: references.reduce((resume, { location }) => removeResumeField({ resume, location }), reduction.resume),
     editing: { ...reduction.editing, hiddenFields: [...reduction.editing.hiddenFields,
@@ -148,7 +149,7 @@ function hideFields({ reduction, references }: Readonly<{ reduction: Reduction; 
 
 /** The page count of the real render, or null when the resume cannot be rendered. */
 async function measurePages({ renderer, photoDataUrl, reduction }: Readonly<{
-  renderer: ResumeDocumentRenderer; photoDataUrl?: string; reduction: Reduction
+  renderer: ResumeDocumentRenderer; photoDataUrl?: string; reduction: ReducibleResume
 }>) {
   const request = { draft: { document: reduction.resume, revision: reduction.editing.revision }, unsupportedFieldIds: [],
     ...(photoDataUrl === undefined ? {} : { photoDataUrl }) }

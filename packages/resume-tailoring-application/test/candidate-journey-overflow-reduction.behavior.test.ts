@@ -94,14 +94,23 @@ describe('Candidate Journey Overflow Reduction to the Page Budget', () => {
     system.expectAchievementCounts({ tailspin: 6, litware: 4, contoso: 2 })
   })
 
-  it('leaves the overflow outcome unchanged when every step still exceeds two pages', async () => {
+  it('leaves the resume unchanged when every step still exceeds two pages', async () => {
     const system = createSystemUnderTest({ linesPerPage: 5 })
     await system.givenMatchedCandidateSession()
 
     await system.prepareTailoredResume()
 
     system.expectNoHiddenContent()
-    system.expectLayoutAssessed({ status: 'overflow' })
+    system.expectAchievementCounts({ tailspin: 6, litware: 4, contoso: 2 })
+  })
+
+  it('keeps the existing overflow outcome for a resume that exceeds two pages after every step', async () => {
+    const system = createSystemUnderTest({ linesPerPage: 5 })
+    await system.givenPreparedTailoredResume()
+
+    await system.assessLayout()
+
+    system.expectOverflowBlockingExport()
   })
 
   it('leaves the resume unchanged when it cannot be rendered', async () => {
@@ -131,7 +140,6 @@ describe('Candidate Journey Overflow Reduction to the Page Budget', () => {
 
     system.expectNoHiddenContent()
     system.expectAchievementCounts({ tailspin: 6, litware: 4, contoso: 2 })
-    system.expectLayoutAssessed({ status: 'fits', pageCount: 2 })
   })
 })
 
@@ -176,21 +184,22 @@ class OverflowReductionTestSystem {
 
   async prepareTailoredResume() {
     this.#journey.startTailoredResumePreparation()
-    await expect.poll(() => this.#readOpenView().operation).toBe(null)
-    expect(this.#readOpenView().preparationOutcome).toMatchObject({ status: 'prepared' })
+    await this.#preparationFinished()
   }
 
   async prepareNormalizedResume() {
     this.#journey.startTailoredResumePreparation({ purpose: 'normalized' })
-    await expect.poll(() => this.#readOpenView().operation).toBe(null)
-    expect(this.#readOpenView().preparationOutcome).toMatchObject({ status: 'prepared' })
+    await this.#preparationFinished()
   }
 
   async restoreHiddenAchievement(text: string) {
     const hidden = this.#readHiddenFields().find(({ field }) => field.text === text)
     if (hidden === undefined) expect.fail(`Expected ${text} to be hidden`)
     this.#journey.restoreResumeField({ fieldId: hidden.field.id })
-    await this.#journey.renderResumeDocument({ document: this.#readResume(), unsupportedFieldIds: [] })
+    await expect.poll(() => this.#readHiddenFields().length).toBe(0)
+  }
+
+  async assessLayout() {
     await this.#journey.assessResumeLayout()
   }
 
@@ -199,13 +208,12 @@ class OverflowReductionTestSystem {
   }
 
   expectHiddenByReduction(texts: readonly string[]) {
-    expect(this.#readHiddenFields().map(({ field, origin }) => ({ text: field.text, origin })))
-      .toEqual(texts.map((text) => ({ text, origin: 'overflow-reduction' })))
+    expect(this.#readHiddenFields().map(readTextAndOrigin)).toEqual(texts.map(hiddenByReduction))
   }
 
   expectHiddenAchievementsByReduction(texts: readonly string[]) {
     expect(this.#readHiddenFields().filter(({ location }) => location.kind === 'experience' && location.fieldName === 'achievements')
-      .map(({ field, origin }) => ({ text: field.text, origin }))).toEqual(texts.map((text) => ({ text, origin: 'overflow-reduction' })))
+      .map(readTextAndOrigin)).toEqual(texts.map(hiddenByReduction))
   }
 
   expectAchievementCounts(counts: Readonly<Record<'tailspin' | 'litware' | 'contoso', number>>) {
@@ -224,10 +232,14 @@ class OverflowReductionTestSystem {
     expect(this.#renderedPageCounts).toEqual(pageCounts)
   }
 
-  expectLayoutAssessed(layout: Readonly<{ status: 'fits' | 'overflow'; pageCount?: number }>) {
-    expect(this.#renderedPageCounts.length).toBeGreaterThan(0)
-    const pageCount = this.#renderedPageCounts.at(-1) ?? 0
-    expect({ status: pageCount <= 2 ? 'fits' : 'overflow', pageCount }).toMatchObject(layout)
+  expectOverflowBlockingExport() {
+    expect(this.#readOpenView().resumeReview?.assessment).toMatchObject({ layout: { status: 'overflow' },
+      exportEligibility: { status: 'blocked', reasons: expect.arrayContaining(['overflow']) as unknown } })
+  }
+
+  async #preparationFinished() {
+    await expect.poll(() => this.#readOpenView().operation === null
+      && this.#readOpenView().preparationOutcome?.status === 'prepared').toBe(true)
   }
 
   #readHiddenFields() {
@@ -245,6 +257,14 @@ class OverflowReductionTestSystem {
     if (view.status !== 'candidate-session-open') expect.fail(`Expected an open Candidate Session, got ${view.status}`)
     return view
   }
+}
+
+function readTextAndOrigin({ field, origin }: Readonly<{ field: Readonly<{ text: string }>; origin: string }>) {
+  return { text: field.text, origin }
+}
+
+function hiddenByReduction(text: string) {
+  return { text, origin: 'overflow-reduction' }
 }
 
 /** One line per Value Proposition paragraph, experience heading, context, achievement, skill and section entry. */

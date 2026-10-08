@@ -462,6 +462,7 @@ function saveReducedResume({ context, reduced }: Readonly<{
   context: CandidateJourneyContext; reduced: CandidateSession | null
 }>): Partial<CandidateJourneyContext> {
   if (reduced === null || context.preparationOutcome?.status !== 'prepared') return {}
+  // The unreduced resume is already saved: when this save fails, the Candidate keeps it and the overflow outcome applies.
   const saved = context.dependencies.persistence.save({ session: reduced })
   return saved.ok ? { session: saved.value, preparationOutcome: { ...context.preparationOutcome, session: saved.value } } : {}
 }
