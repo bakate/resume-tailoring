@@ -1,6 +1,6 @@
 /* global Headers, Request, Response, TextEncoder, URL, crypto, fetch */
 
-import { DailySpendingLimits, dailyLimits, readLimitedCounters } from './daily-spending-limits.js'
+import { DailySpendingLimits, acceptsCandidateApiKey, dailyLimits, readLimitedCounters } from './daily-spending-limits.js'
 
 export { DailySpendingLimits, dailyLimits }
 
@@ -51,6 +51,7 @@ function forwardToOrigin({ request, environment, incomingUrl }) {
   const headers = new Headers(request.headers)
   headers.delete('host')
   headers.delete(originHeaderName)
+  if (!acceptsCandidateApiKey({ pathname: incomingUrl.pathname })) headers.delete(candidateApiKeyHeaderName)
   headers.set(originHeaderName, environment.ORIGIN_SECRET)
 
   const originRequest = new Request(originUrl, {

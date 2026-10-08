@@ -7,7 +7,8 @@ import {
   resumeClaimSemanticValidationSchema,
 } from '../../resume-tailoring/resume-claim-schemas'
 import { createOpenAiRequester } from './openai-request'
-import type { ModelApiKey } from './openai-request'
+import type { ModelApiKey, OpenAiRequestFailure } from './openai-request'
+import { readOpenAiApiFailure } from './openai-api-failure'
 import type { ResumeClaimReformulator, ResumeClaimSemanticValidator } from '@resume-tailoring/application/ports'
 
 type OpenAiModelConfiguration = Readonly<{
@@ -77,7 +78,8 @@ async function reformulateResumeClaim({ configuration, reformulation }: Readonly
     writingInputs,
     revision: { candidateRequest, claim, feedback },
   })
-  return result.ok && result.value.length === 1
+  if (!result.ok) return result
+  return result.value.length === 1
     ? { ok: true, value: result.value[0] ?? claim } as const
     : resumeClaimWritingUnavailableResult
 }
@@ -101,7 +103,7 @@ async function writeResumeClaims({
     responseFormat: resumeClaimResponseFormat,
     userValue: revision === undefined ? writingInputs : { ...writingInputs, revision },
   })
-  if (!response.ok) return resumeClaimWritingUnavailableResult
+  if (!response.ok) return withRequestFailure({ result: resumeClaimWritingUnavailableResult, response })
   return parseWrittenClaims({ value: response.value, writingInputs })
 }
 
@@ -132,7 +134,7 @@ async function validateResumeClaim({
     responseFormat: resumeClaimValidationResponseFormat,
     userValue: validationRequest,
   })
-  if (!response.ok) return resumeClaimValidationUnavailableResult
+  if (!response.ok) return withRequestFailure({ result: resumeClaimValidationUnavailableResult, response })
   const validation = resumeClaimSemanticValidationSchema.safeParse(response.value)
   return validation.success
     ? { ok: true, value: validation.data } as const
@@ -163,7 +165,16 @@ async function requestOpenAi({
     deadlineSignal,
     operation,
   })
-  return response.ok ? parseOpenAiResponse(response.value) : unavailableOpenAiResult
+  return response.ok ? parseOpenAiResponse(response.value) : { ok: false, requestFailure: response.error } as const
+}
+
+/** Keeps why a provider call failed, so a rejected Candidate API Key reaches the Candidate as such. */
+function withRequestFailure<TType extends string>({ result, response }: Readonly<{
+  result: Readonly<{ ok: false; error: Readonly<{ type: TType }> }>
+  response: Readonly<{ ok: false; requestFailure?: OpenAiRequestFailure }>
+}>) {
+  return response.requestFailure === undefined ? result
+    : { ok: false, error: { ...result.error, apiFailure: readOpenAiApiFailure(response.requestFailure) } } as const
 }
 
 function createOpenAiRequestBody({

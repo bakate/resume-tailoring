@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import type { ApiFailureType } from '@resume-tailoring/application/ports'
+import type { ApiFailureType, ReadApiFailure } from '@resume-tailoring/application/ports'
 import { resumeModelUsageSchema } from './candidate-journey/resume-document-schemas'
 
 /**
@@ -35,6 +35,17 @@ export const apiFailureSchema = z.strictObject({
   error: z.strictObject({ type: z.enum(apiFailureTypes), retryAfterSeconds: z.number().int().min(0).optional() }),
   usage: resumeModelUsageSchema.optional(),
 })
+
+/**
+ * The API Failure a route answers with when its server adapter failed: the one read from the provider, or an
+ * unavailable provider when there is none. Only a browser adapter reads a network failure or an unexpected response.
+ */
+export function readRouteApiFailure(apiFailure: ReadApiFailure | undefined): ApiFailure {
+  if (apiFailure === undefined || apiFailure.type === 'network' || apiFailure.type === 'unexpected-response') {
+    return { type: 'provider-unavailable' }
+  }
+  return { ...apiFailure, type: apiFailure.type }
+}
 
 export function failureResponse({ type, retryAfterSeconds, usage }: ApiFailure & Readonly<{
   usage?: z.infer<typeof resumeModelUsageSchema>

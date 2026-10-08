@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { groupedResumeDocument, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+
 import { createDemoAccessCookie } from './demo-access/demo-access-session'
 import { Route as CandidateApiKeyRoute } from './routes/api.candidate-api-key'
 import { Route as JobPostingExtractionRoute } from './routes/api.explainable-job-posting-extraction'
+import { Route as MatchEvidenceRoute } from './routes/api.explainable-match-evidence'
+import { Route as ResumeClaimValidationRoute } from './routes/api.resume-claim-validation'
+import { Route as ResumeClaimWritingRoute } from './routes/api.resume-claim-writing'
+import { Route as ResumeDocumentCoherenceRoute } from './routes/api.resume-document-coherence'
+import { Route as ResumeSectionValidationRoute } from './routes/api.resume-section-validation'
 import { Route as ResumeSectionWritingRoute } from './routes/api.resume-section-writing'
 import { Route as SourceProfileExtractionRoute } from './routes/api.structured-source-profile-extraction'
 
@@ -16,11 +23,37 @@ const environment = {
   TURNSTILE_SITE_KEY: 'turnstile-site-key',
 } as const
 const candidateApiKey = 'sk-proj-CandidateSecret0123456789abcdef'
+const proposedClaim = { segments: [{ text: 'Used React', factIds: ['source-fact-react'] }] }
+const verifiedFacts = [{ id: 'source-fact-react', kind: 'skill', value: 'Used React' }]
+/** Every model-backed route, each with a valid body, so a rejected key is the only reason it can fail. */
 const modelRoutes = [
   { name: 'Job Posting extraction', route: JobPostingExtractionRoute, body: { jobPostingContent: 'Senior engineer' } },
   { name: 'Source Profile extraction', route: SourceProfileExtractionRoute,
     body: { professionalContent: 'Engineer at Example' } },
-  { name: 'Resume Section writing', route: ResumeSectionWritingRoute, body: undefined },
+  { name: 'Match Evidence', route: MatchEvidenceRoute, body: {
+    candidateFacts: [{ id: 'source-fact-1', kind: 'skill', value: 'React' }],
+    requirements: structuredResumeJobMatch.requirements.map(({ capability, id, importance, importanceRationale, sourceExcerpt, value }) =>
+      ({ capability, id, importance, importanceRationale, sourceExcerpt, value })),
+  } },
+  { name: 'Resume Claim validation', route: ResumeClaimValidationRoute,
+    body: { claim: { id: 'resume-claim-react', ...proposedClaim }, verifiedFacts } },
+  { name: 'Resume Claim writing', route: ResumeClaimWritingRoute, body: { operation: 'reformulate', locale: 'en', verifiedFacts,
+    evidence: [{ requirementId: 'job-requirement-react', factIds: ['source-fact-react'] }],
+    requirements: [{ id: 'job-requirement-react', classification: 'required', value: 'React' }],
+    claim: proposedClaim, feedback: [{ code: 'unsupported-meaning', segmentIndex: 0 }] } },
+  { name: 'Resume Section writing', route: ResumeSectionWritingRoute, body: { section: { key: 'skills', kind: 'skills' },
+    locale: 'en', purpose: 'tailored', targetRole: 'Frontend Engineer', jobRequirements: ['React'], relevantFactIds: [],
+    rejectedFields: [], previousContent: null,
+    candidateFacts: structuredResumeSource.candidateFacts.filter(({ path }) => path.startsWith('skills.')) } },
+  { name: 'Resume Section validation', route: ResumeSectionValidationRoute, body: { section: { key: 'education', kind: 'education' },
+    locale: 'en', purpose: 'tailored',
+    fields: [{ id: 'degree', text: 'Computer Science degree', factIds: ['source-fact-education-0-qualification-0'] }],
+    candidateFacts: structuredResumeSource.candidateFacts.filter(({ path }) => path.startsWith('education.')) } },
+  { name: 'Resume document coherence', route: ResumeDocumentCoherenceRoute, body: { document: {
+    purpose: groupedResumeDocument.purpose, locale: groupedResumeDocument.locale, targetRole: groupedResumeDocument.targetRole,
+    valueProposition: groupedResumeDocument.valueProposition, experiences: groupedResumeDocument.experiences,
+    sections: groupedResumeDocument.sections,
+  } } },
 ] as const
 
 describe('Candidate API Key on model-backed routes', () => {
@@ -32,7 +65,15 @@ describe('Candidate API Key on model-backed routes', () => {
     vi.restoreAllMocks()
   })
 
-  it.each(modelRoutes.filter(({ body }) => body !== undefined))(
+  it.each(modelRoutes)('$name signs a call with the operator key when no Candidate API Key is sent', async ({ body, route }) => {
+    const provider = stubProvider(() => Response.json({ error: { code: 'server_error' } }, { status: 500 }))
+
+    await postTo(route, createRequest({ body }))
+
+    expect(provider.authorizations).toEqual([`Bearer ${environment.OPENAI_API_KEY}`])
+  })
+
+  it.each(modelRoutes)(
     '$name never signs a call with the operator key when the Candidate API Key is rejected', async ({ body, route }) => {
       const provider = stubProvider(() => Response.json({ error: { code: 'invalid_api_key',
         message: `Incorrect API key provided: ${candidateApiKey}` } }, { status: 401 }))
@@ -48,7 +89,7 @@ describe('Candidate API Key on model-backed routes', () => {
   it.each(modelRoutes)('$name refuses a malformed Candidate API Key without calling the provider', async ({ body, route }) => {
     const provider = stubProvider(() => Response.json({ output: [] }))
 
-    const response = await postTo(route, createRequest({ body: body ?? {}, candidateApiKey: 'not-a-provider-key' }))
+    const response = await postTo(route, createRequest({ body, candidateApiKey: 'not-a-provider-key' }))
 
     expect(response.status).toBe(401)
     await expect(response.json()).resolves.toEqual({ ok: false, error: { type: 'candidate-api-key-invalid' } })

@@ -185,6 +185,24 @@ describe('Daily spending limits at the edge', () => {
     await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
   })
 
+  it('forwards a Candidate API Key to model-backed routes only', async () => {
+    const system = createSystemUnderTest()
+
+    await system.requestRender({ clientIp: '198.51.100.1', candidateApiKey: 'sk-candidate' })
+
+    await system.expectServedByOrigin()
+    system.expectOriginReceivedNoCandidateApiKey()
+  })
+
+  it('forwards a Candidate API Key to a model-backed route', async () => {
+    const system = createSystemUnderTest()
+
+    await system.sendModelRequest({ clientIp: '198.51.100.1', candidateApiKey: 'sk-candidate' })
+
+    await system.expectServedByOrigin()
+    system.expectOriginReceivedCandidateApiKey('sk-candidate')
+  })
+
   it('stops Candidate API Key validations from one IP at their own limit', async () => {
     const system = createSystemUnderTest()
     await system.givenCandidateApiKeysValidated({ clientIp: '198.51.100.1', count: dailyLimits.keyValidationsPerClient })
@@ -226,8 +244,10 @@ describe('Daily spending limits at the edge', () => {
 
 function createSystemUnderTest({ originStatus = 200 } = {}) {
   const originPaths = []
+  const originCandidateApiKeys = []
   vi.stubGlobal('fetch', vi.fn(async (request) => {
     originPaths.push(new URL(request.url).pathname)
+    originCandidateApiKeys.push(request.headers.get('x-candidate-api-key'))
     return Response.json({ ok: originStatus < 400 }, { status: originStatus })
   }))
   const limits = new DailySpendingLimits({ storage: createInMemoryStorage() })
@@ -287,6 +307,14 @@ function createSystemUnderTest({ originStatus = 200 } = {}) {
     readDailyQuota: ({ clientIp }) => recordAction(() => send({ path: '/api/daily-quota', clientIp, method: 'GET' })),
     openPage: ({ clientIp }) => recordAction(() => send({ path: '/', clientIp, method: 'GET' })),
 
+    expectOriginReceivedNoCandidateApiKey() {
+      readResponse()
+      expect(originCandidateApiKeys.at(-1)).toBeNull()
+    },
+    expectOriginReceivedCandidateApiKey(candidateApiKey) {
+      readResponse()
+      expect(originCandidateApiKeys.at(-1)).toBe(candidateApiKey)
+    },
     async expectServedByOrigin() {
       const served = readResponse()
       expect(served.status).toBe(200)

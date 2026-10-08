@@ -3,7 +3,7 @@ import { createCsrfMiddleware } from '@tanstack/react-start'
 
 import { createOpenAiStructuredSourceProfileExtractor } from '../adapters/server/openai-structured-source-profile-extractor'
 import { structuredSourceProfileRequestSchema } from '../candidate-journey/structured-source-profile-schema'
-import { failureResponse } from '../api-failure'
+import { failureResponse, readRouteApiFailure } from '../api-failure'
 import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
@@ -33,11 +33,9 @@ async function extractStructuredSourceProfile({ request }: Readonly<{ request: R
     reasoningEffort: environmentResult.value.openAiStructuredReasoningEffort,
   })
   const result = await extractor.extract({ professionalContent: contentResult.value })
-  if (result.ok) return Response.json(result, { headers: privateHeaders })
-  // Only a browser adapter reads a network failure or an unexpected response.
-  const apiFailure = result.apiFailure
-  return failureResponse(apiFailure === undefined || apiFailure.type === 'network' || apiFailure.type === 'unexpected-response'
-    ? { type: 'provider-unavailable' } : { ...apiFailure, type: apiFailure.type })
+  return result.ok
+    ? Response.json(result, { headers: privateHeaders })
+    : failureResponse(readRouteApiFailure(result.apiFailure))
 }
 
 async function readProfessionalContent({ request }: Readonly<{ request: Request }>) {
