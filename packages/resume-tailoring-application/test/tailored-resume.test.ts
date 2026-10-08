@@ -68,7 +68,6 @@ const sourceIntake = {
     { kind: 'email', value: 'bakate@example.com' },
   ],
   criticalAmbiguities: [],
-  originalContent: 'Source profile',
   sourceDocument: { kind: 'pasted-text', name: 'source.txt' },
   sourceProfile: {
     certifications: [], education: [], experiences: [], languages: [], projects: [], skills: [],

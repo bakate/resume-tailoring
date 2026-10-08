@@ -59,11 +59,13 @@ export type ResumePreparation = Readonly<{
   jobPosting: StoredIntakeDocument | null
   locale: 'en' | 'fr' | null
   purpose: 'tailored' | 'normalized'
+  /** Null once prepared: the Candidate Session's own Source Intake and Job Match are then the published ones. */
   sourceIntake: SourceIntake | null
   jobMatch: JobMatch | null
   failure: ResumePreparationFailure | null
   /** Why a model-backed step failed; absent when the failure has no Failure Cause, such as an unreadable document. */
   failureCause?: FailureCause
+  /** Kept only to resume an unfinished preparation; dropped once the Tailored Resume is published. */
   sections?: readonly ResumeSectionSnapshot[]
 }>
 

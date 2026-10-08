@@ -1024,7 +1024,6 @@ function createJobMatchSession(): CandidateSession {
       candidateFacts,
       contactDetails: [],
       criticalAmbiguities: [],
-      originalContent: 'Professional source content',
       sourceDocument: { kind: 'pasted-text', name: 'source.txt' },
       sourceProfile: {
         certifications: [], education: [], experiences: [], languages: [], projects: [], skills: [],

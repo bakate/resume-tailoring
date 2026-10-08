@@ -189,6 +189,18 @@ describe('browser Candidate Session persistence', () => {
     expect(restored).toEqual({ ok: true, value: { notice: null, session: jobMatchCandidateSession } })
   })
 
+  it('restores a session stored with the raw Source Document text, without that text', () => {
+    const storedSourceIntake = { ...preparingCandidateSession.sourceIntake, originalContent: 'bakate@example.com\nTypeScript' }
+    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage({
+      initialValue: JSON.stringify({ ...preparingCandidateSession, sourceIntake: storedSourceIntake,
+        preparation: { ...preparingCandidateSession.preparation, sourceIntake: storedSourceIntake } }),
+    }) })
+
+    const restored = persistence.restore()
+
+    expect(restored).toEqual({ ok: true, value: { notice: null, session: preparingCandidateSession } })
+  })
+
   it('restores the saved Resume Sections of an interrupted preparation, with text only on validated sections', () => {
     const session: CandidateSession = { ...preparingCandidateSession, preparation: { ...preparingCandidateSession.preparation,
       sections: [
@@ -260,7 +272,6 @@ const sourceIntakeCandidateSession = {
     }],
     contactDetails: [{ kind: 'email', value: 'bakate@example.com' }],
     criticalAmbiguities: [],
-    originalContent: 'bakate@example.com\nTypeScript',
     sourceDocument: { kind: 'pasted-text', name: 'pasted-professional-text.txt' },
     sourceProfile: {
       certifications: [],

@@ -163,7 +163,8 @@ function publishDocument({ context, outcome }: Readonly<{
   const sourceIntake = context.preparation.sourceIntake
   if (sourceIntake === null) return failPreparation({ context, detail: 'unavailable' })
   const session: CandidateSession = { ...context.session, sourceIntake, jobMatch: context.preparation.jobMatch,
-    phase: 'tailored-resume-preparation', preparedResumeStatus: 'current', preparedResumeRevision: outcome.revision, preparation: { ...context.preparation, status: 'prepared' },
+    phase: 'tailored-resume-preparation', preparedResumeStatus: 'current', preparedResumeRevision: outcome.revision,
+    preparation: settlePreparation(context.preparation),
     resumeEditing: { revision: outcome.revision, hiddenFields: [], unsupportedFieldIds: [], manuallyEdited: false },
     resumeFactLocations: context.session.resumeFactLocations?.filter(({ factId }) => sourceIntake.candidateFacts.some(({ id }) => id === factId)),
     tailoredResume: { ...outcome.document, ...localResumeContacts({ sourceIntake, session: context.session }) } }
@@ -171,6 +172,11 @@ function publishDocument({ context, outcome }: Readonly<{
   const saved = context.dependencies.persistence.save({ session })
   return saved.ok ? { status: 'prepared', revision: outcome.revision, session }
     : failPreparation({ context, detail: 'candidate-session-storage-unavailable' })
+}
+
+/** A prepared preparation keeps no copy of what the session publishes, nor the Resume Section drafts it superseded. */
+function settlePreparation({ revision, sourceDocument, jobPosting, locale, purpose }: ResumePreparation): ResumePreparation {
+  return { revision, status: 'prepared', sourceDocument, jobPosting, locale, purpose, sourceIntake: null, jobMatch: null, failure: null }
 }
 
 function localResumeContacts({ sourceIntake, session }: Readonly<{ sourceIntake: SourceIntake; session: CandidateSession }>) {

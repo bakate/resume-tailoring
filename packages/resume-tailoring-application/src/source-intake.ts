@@ -210,7 +210,6 @@ function buildSourceIntake({
       kind, value,
     })),
     criticalAmbiguities: createCriticalAmbiguities({ assessedCandidateFacts, extraction }),
-    originalContent,
     sourceDocument: { kind: readSourceDocumentKind({ document }), name: document.name },
     sourceProfile: readStructuredSourceProfile({ extraction }),
   }

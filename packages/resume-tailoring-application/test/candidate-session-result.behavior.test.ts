@@ -84,7 +84,7 @@ class CandidateSessionResultSystem {
   expectJobPostingClearedAndResumeKept() {
     const session = this.#expectReopened()
     expect(session.preparation?.jobPosting).toBeNull()
-    expect(session.preparation?.sourceIntake).toEqual(structuredResumeSource)
+    expect(session.sourceIntake).toEqual(structuredResumeSource)
     expect(session.tailoredResume).toEqual(this.#preparedResume)
     expect(session.preparedResumeStatus).not.toBe('outdated')
   }

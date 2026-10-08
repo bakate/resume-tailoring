@@ -44,13 +44,20 @@ export const sourceIntakeSchema = z.strictObject({
     path: z.string().min(1),
     question: z.string().min(1),
   })),
-  originalContent: z.string().min(1),
   sourceDocument: z.strictObject({
     kind: z.enum(['docx', 'pasted-text', 'pdf']),
     name: z.string().min(1),
   }),
   sourceProfile: structuredSourceProfileSchema,
 })
+
+/** A session stored before BAK-148 also kept the raw Source Document text, which nothing reads: it is dropped on restore. */
+const storedSourceIntakeSchema = z.preprocess(dropRawSourceDocumentText, sourceIntakeSchema)
+
+function dropRawSourceDocumentText(stored: unknown) {
+  if (typeof stored !== 'object' || stored === null || !('originalContent' in stored)) return stored
+  return Object.fromEntries(Object.entries(stored).filter(([key]) => key !== 'originalContent'))
+}
 
 const jobRequirementSchema = z.strictObject({
   capability: z.strictObject({
@@ -178,7 +185,7 @@ const resumePreparationSchema = z.strictObject({
   status: z.enum(['outdated', 'pending', 'interrupted', 'awaiting-correction', 'no-relevant-evidence', 'failed', 'prepared']),
   sourceDocument: storedIntakeDocumentSchema.nullable(), jobPosting: storedIntakeDocumentSchema.nullable(),
   locale: z.enum(['en', 'fr']).nullable(), purpose: z.enum(['tailored', 'normalized']),
-  sourceIntake: sourceIntakeSchema.nullable(), jobMatch: jobMatchSchema.nullable(), failure: z.enum(resumePreparationFailures).nullable(),
+  sourceIntake: storedSourceIntakeSchema.nullable(), jobMatch: jobMatchSchema.nullable(), failure: z.enum(resumePreparationFailures).nullable(),
   failureCause: failureCauseSchema.optional(), sections: z.array(resumeSectionSnapshotSchema).optional(),
 })
 
@@ -213,7 +220,7 @@ export const candidateSessionSchema = z.strictObject({
   sessionId: z.custom<CandidateSession['sessionId']>(
     (value) => typeof value === 'string' && candidateSessionIdPattern.test(value),
   ),
-  sourceIntake: sourceIntakeSchema.nullable(),
+  sourceIntake: storedSourceIntakeSchema.nullable(),
   tailoredResume: tailoredResumeSchema.nullable(),
   resumePhoto: z.strictObject({ dataUrl: z.string().regex(/^data:image\/(?:png|jpeg|webp);base64,/u), name: z.string() }).optional(),
   startedAt: z.number().int().nonnegative(),
