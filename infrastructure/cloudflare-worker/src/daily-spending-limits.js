@@ -1,30 +1,23 @@
 /* global Response */
 
 /**
- * The daily limits that bound model spending. Each counts requests from one client IP, except the global ceiling,
- * which counts Tailored Resume preparations across all Candidates. Every window resets at 00:00 Europe/Paris.
+ * The daily limits that bound model spending, each reset at 00:00 Europe/Paris. Measured on 32 real preparations
+ * (2026-10): one sends 21 section requests on average, 30 at p90 and 46 at most, plus three for intake and matching,
+ * and costs about $0.10.
  */
 export const dailyLimits = {
-  /** Tailored Resume preparations one client IP may start per day: the free daily quota the Candidate sees. */
-  preparationsPerClient: 4,
-  /**
-   * Tailored Resume preparations all Candidates together may start per day. Measured on 32 real preparations
-   * (2026-10): about 24 model-backed requests each on average, ≈ $0.10, so 30 a day stay near $90 a month.
-   */
+  /** The Daily Quota: Tailored Resumes one client network may start per day. */
+  dailyQuota: 4,
+  /** Tailored Resumes all Candidates together may start per day: 30 at $0.10 stay near $90 a month. */
   preparationsOverall: 30,
-  /**
-   * Model-backed requests one client IP may send per day: a safety net that stops edit loops. A measured preparation
-   * sends 21 section requests on average, 30 at p90 and 46 at most, plus three for intake and matching; four
-   * journeys with edits stay under 250.
-   */
+  /** Model-backed requests per client network: four journeys with edits stay under 250, so it only stops loops. */
   modelRequestsPerClient: 400,
-  /** PDF renders one client IP may request per day. */
+  /** PDF renders per client network: one per saved edit. */
   rendersPerClient: 200,
 }
 
-/** The Job Posting extraction is the request that starts a Tailored Resume preparation. */
-export const preparationPath = '/api/explainable-job-posting-extraction'
-
+/** The Job Posting extraction starts a Tailored Resume, so it uses one unit of the Daily Quota. */
+const preparationPath = '/api/explainable-job-posting-extraction'
 const modelBackedPaths = new Set([
   '/api/structured-source-profile-extraction',
   preparationPath,
@@ -47,17 +40,15 @@ export function readLimitedCounters({ method, pathname }) {
 }
 
 const clientLimits = {
-  preparations: dailyLimits.preparationsPerClient,
+  preparations: dailyLimits.dailyQuota,
   'model-requests': dailyLimits.modelRequestsPerClient,
   renders: dailyLimits.rendersPerClient,
 }
-const overallPreparationsKey = 'overall:preparations'
 const dayKey = 'day'
-const parisTimeZone = 'Europe/Paris'
 
 /**
  * Durable Object holding today's counters. One instance serves every request, so checking and consuming a limit is
- * atomic. It keeps only keyed digests of client IPs and forgets everything at the daily reset.
+ * atomic. It keeps only keyed digests of client networks and forgets everything at the daily reset.
  */
 export class DailySpendingLimits {
   #storage
@@ -67,9 +58,9 @@ export class DailySpendingLimits {
   }
 
   async fetch(request) {
-    const { operation, clientKey, counters, day } = await request.json()
-    if (operation === 'reserve') return Response.json(await this.#reserve({ clientKey, counters }))
-    if (operation === 'release') return Response.json(await this.#release({ clientKey, counters, day }))
+    const { operation, reservation } = await request.json()
+    if (operation === 'reserve') return Response.json(await this.#reserve(reservation))
+    if (operation === 'release') return Response.json(await this.#release(reservation))
     return new Response('Unknown operation', { status: 400 })
   }
 
@@ -81,30 +72,34 @@ export class DailySpendingLimits {
   async #reserve({ clientKey, counters }) {
     const window = readDailyWindow({ now: Date.now() })
     await this.#startDay(window)
-    const keys = counters.map((counter) => ({ key: `${clientKey}:${counter}`, limit: clientLimits[counter] }))
-    if (counters.includes('preparations')) keys.push({ key: overallPreparationsKey, limit: dailyLimits.preparationsOverall })
-    const counts = await Promise.all(keys.map(async ({ key }) => (await this.#storage.get(key)) ?? 0))
+    const keys = readCounterKeys({ clientKey, counters })
+    const counts = await this.#readCounts(keys)
     const allowed = keys.every(({ limit }, position) => counts[position] < limit)
-    if (allowed) await Promise.all(keys.map(({ key }, position) => this.#storage.put(key, counts[position] + 1)))
-    const consumed = allowed ? 1 : 0
-    // Both the client quota and the global ceiling bound the preparations this client can still start today.
-    const remainingPreparations = counters.includes('preparations')
-      ? Math.max(0, Math.min(...keys.flatMap(({ key, limit }, position) =>
-        key.endsWith(':preparations') ? [limit - counts[position] - consumed] : [])))
-      : undefined
-    return { allowed, day: window.day, resetAt: window.resetAt, remainingPreparations }
+    if (!allowed) {
+      return { allowed, resetAt: window.resetAt, remainingDailyQuota: hasDailyQuota(keys) ? 0 : undefined }
+    }
+    const consumed = counts.map((count) => count + 1)
+    await Promise.all(keys.map(({ key }, position) => this.#storage.put(key, consumed[position])))
+    return {
+      allowed,
+      reservation: { clientKey, counters, day: window.day },
+      resetAt: window.resetAt,
+      remainingDailyQuota: readRemainingDailyQuota({ keys, counts: consumed }),
+    }
   }
 
-  /** Gives back what a reservation consumed when the origin did not serve it, unless the day already changed. */
+  /** Gives back what a reservation consumed, unless the day already changed. */
   async #release({ clientKey, counters, day }) {
-    if ((await this.#storage.get(dayKey)) !== day) return { released: false }
-    const keys = counters.map((counter) => `${clientKey}:${counter}`)
-    if (counters.includes('preparations')) keys.push(overallPreparationsKey)
-    await Promise.all(keys.map(async (key) => {
-      const count = (await this.#storage.get(key)) ?? 0
-      if (count > 0) await this.#storage.put(key, count - 1)
-    }))
-    return { released: true }
+    const keys = readCounterKeys({ clientKey, counters })
+    if ((await this.#storage.get(dayKey)) === day) {
+      const counts = await this.#readCounts(keys)
+      await Promise.all(keys.map(({ key }, position) => this.#storage.put(key, Math.max(0, counts[position] - 1))))
+    }
+    return { remainingDailyQuota: readRemainingDailyQuota({ keys, counts: await this.#readCounts(keys) }) }
+  }
+
+  #readCounts(keys) {
+    return Promise.all(keys.map(async ({ key }) => (await this.#storage.get(key)) ?? 0))
   }
 
   async #startDay({ day, resetAt }) {
@@ -115,8 +110,29 @@ export class DailySpendingLimits {
   }
 }
 
+/** The stored counters behind a request's counters; a preparation also counts towards the global ceiling. */
+function readCounterKeys({ clientKey, counters }) {
+  return counters.flatMap((counter) => counter === 'preparations'
+    ? [
+      { key: `${clientKey}:preparations`, limit: dailyLimits.dailyQuota, boundsDailyQuota: true },
+      { key: 'overall:preparations', limit: dailyLimits.preparationsOverall, boundsDailyQuota: true },
+    ]
+    : [{ key: `${clientKey}:${counter}`, limit: clientLimits[counter], boundsDailyQuota: false }])
+}
+
+function hasDailyQuota(keys) {
+  return keys.some(({ boundsDailyQuota }) => boundsDailyQuota)
+}
+
+/** Both the client's Daily Quota and the global ceiling bound the Tailored Resumes it can still start today. */
+function readRemainingDailyQuota({ keys, counts }) {
+  if (!hasDailyQuota(keys)) return undefined
+  return Math.max(0, Math.min(...keys.flatMap(({ limit, boundsDailyQuota }, position) =>
+    boundsDailyQuota ? [limit - counts[position]] : [])))
+}
+
 /** Today's calendar day in Europe/Paris and the instant of the next 00:00 there. */
-export function readDailyWindow({ now }) {
+function readDailyWindow({ now }) {
   const today = readParisDate(now)
   const tomorrowAtUtcMidnight = Date.UTC(today.year, today.month - 1, today.day + 1)
   // Paris is ahead of UTC, so midnight there happens earlier; a second pass settles a DST change between the two.
@@ -127,15 +143,14 @@ export function readDailyWindow({ now }) {
 }
 
 const parisDateFormat = new Intl.DateTimeFormat('en-US', {
-  timeZone: parisTimeZone, year: 'numeric', month: 'numeric', day: 'numeric',
+  timeZone: 'Europe/Paris', year: 'numeric', month: 'numeric', day: 'numeric',
   hour: 'numeric', minute: 'numeric', second: 'numeric', hourCycle: 'h23',
 })
 
 function readParisDate(instant) {
-  const parts = Object.fromEntries(parisDateFormat.formatToParts(new Date(instant))
+  return Object.fromEntries(parisDateFormat.formatToParts(new Date(instant))
     .filter(({ type }) => type !== 'literal')
     .map(({ type, value }) => [type, Number(value)]))
-  return parts
 }
 
 function readParisOffset(instant) {

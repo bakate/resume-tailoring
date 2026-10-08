@@ -33,21 +33,25 @@ OpenAI spend limit, nor the daily limits below: a renewed cookie would reset any
 ### Daily spending limits
 
 The Worker counts requests in one Durable Object (`DailySpendingLimits`,
-`infrastructure/cloudflare-worker/src/daily-spending-limits.js`), keyed by an HMAC of the client IP.
-Every window resets at 00:00 Europe/Paris, when the object deletes everything it holds.
+`infrastructure/cloudflare-worker/src/daily-spending-limits.js`), keyed by an HMAC of the client
+network: the IPv4 address, or the IPv6 /64 one subscriber usually holds. The HMAC key is
+`ORIGIN_SECRET`, so rotating it resets every count. Every window resets at 00:00 Europe/Paris,
+when the object deletes everything it holds.
 
 | Limit | Per day | Keyed by | Counted on |
 | -- | -- | -- | -- |
-| Daily Quota | 4 | client IP | `POST /api/explainable-job-posting-extraction` |
+| Daily Quota | 4 | client network | `POST /api/explainable-job-posting-extraction` |
 | Global ceiling | 30 | all clients | the same request |
-| Technical ceiling | 400 | client IP | every model-backed API route |
-| PDF renders | 200 | client IP | `POST /api/resume-document` |
+| Technical ceiling | 400 | client network | every model-backed API route |
+| PDF renders | 200 | client network | `POST /api/resume-document` |
 
 Over a limit, the Worker answers `429` with the `rate-limited` API Failure and `retryAfterSeconds`
-until the reset, without reaching the Lambda. A request the origin does not serve (any non-2xx
-status) gives its preparation back. Responses to a Job Posting extraction carry
-`x-resume-quota-remaining` (preparations this client can still start today, bounded by the global
-ceiling) and `x-resume-quota-reset` (the ISO 8601 reset instant).
+until the reset, without reaching the Lambda. A request the application refuses before any model
+call (`400`, `401`, `403` or `413`), such as a demo access renewal, gives back what it counted. A
+provider failure keeps it counted, so a loop of failing model calls still reaches the technical
+ceiling. Responses to a Job Posting extraction carry `x-resume-quota-remaining` (Tailored Resumes
+this client can still start today, bounded by the global ceiling; `0` whenever a limit refuses it)
+and `x-resume-quota-reset` (the ISO 8601 reset instant).
 
 ### Alarms
 

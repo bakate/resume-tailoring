@@ -96,8 +96,8 @@ Resources:
       Protocol: email
       Endpoint: !Ref AlarmEmail
 
-  # The edge quotas allow about 30 preparations a day of about 40 model-backed requests each. An hour above this
-  # volume means traffic is bypassing them or the Candidate Journey is looping.
+  # The edge limits allow 30 Tailored Resumes a day of about 24 model-backed requests each (46 at most), plus pages
+  # and renders. An hour above this volume means traffic is bypassing them or the Candidate Journey is looping.
   InvocationVolumeAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:

@@ -7,6 +7,7 @@ Develop observable behavior one tracer bullet at a time through an agreed public
 - Exercise Resume Tailoring behavior through `CandidateJourney` (`createCandidateJourney` from `@resume-tailoring/application/candidate-journey`).
 - Exercise transport and interaction behavior through the rendered web application.
 - Exercise pure domain rules, such as Candidate Session expiry, Processing Consent, and condensable Resume Fields, through `packages/resume-tailoring-domain/test/` in Given / Action / Then style.
+- Exercise the edge limits through the Cloudflare Worker's public entry (`@resume-tailoring/cloudflare-worker`) in `infrastructure/cloudflare-worker/test/`.
 - Use adapter contract tests only when a production boundary has behavior worth varying.
 
 Behavior tests must not import domain internals or inspect orchestration details.

@@ -1,15 +1,16 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-const behaviorTestSuffix = '.behavior.test.ts'
-const contractTestSuffix = '.contract.test.ts'
+const behaviorTestSuffixes = ['.behavior.test.ts', '.behavior.test.js']
+const contractTestSuffixes = ['.contract.test.ts']
 const forbiddenHarnessActions = /system\.(act|execute|perform|run|submit)\s*\(/
 const testCaseStart = /^(\s*)(it|test)(\.each)?\b/
 const testCaseBodyOpener = /=>\s*\{\s*$/
 const assertion = /\bexpect\b/
 
-const behaviorTests = await findTests({ directoryPath: 'packages', suffix: behaviorTestSuffix })
-const contractTests = await findTests({ directoryPath: 'apps/web', suffix: contractTestSuffix })
+const behaviorTests = (await Promise.all(['packages', 'infrastructure'].map((directoryPath) =>
+  findTests({ directoryPath, suffixes: behaviorTestSuffixes })))).flat()
+const contractTests = await findTests({ directoryPath: 'apps/web', suffixes: contractTestSuffixes })
 const violations = (await Promise.all([
   ...behaviorTests.map((testFile) => inspectBehaviorTest(testFile)),
   ...contractTests.map((testFile) => inspectContractTest(testFile)),
@@ -20,15 +21,15 @@ if (violations.length > 0) {
   process.exitCode = 1
 }
 
-async function findTests({ directoryPath, suffix }) {
+async function findTests({ directoryPath, suffixes }) {
   const entries = await readdir(directoryPath, { withFileTypes: true })
   const nestedFiles = await Promise.all(
     entries.map(async (entry) => {
       const entryPath = join(directoryPath, entry.name)
       if (entry.isDirectory()) {
-        return entry.name === 'node_modules' ? [] : findTests({ directoryPath: entryPath, suffix })
+        return entry.name === 'node_modules' ? [] : findTests({ directoryPath: entryPath, suffixes })
       }
-      return entry.name.endsWith(suffix) ? [entryPath] : []
+      return suffixes.some((suffix) => entry.name.endsWith(suffix)) ? [entryPath] : []
     }),
   )
 
