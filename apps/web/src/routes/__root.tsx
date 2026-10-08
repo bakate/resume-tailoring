@@ -19,6 +19,11 @@ import {
   useLocalization,
 } from '../localization/localization'
 import type { Locale, Localization } from '../localization/localization'
+// Served from our own origin so no visitor request reaches a font provider.
+import '@fontsource/dm-sans/400.css'
+import '@fontsource/dm-sans/500.css'
+import '@fontsource/dm-sans/600.css'
+import '@fontsource/dm-serif-display/400.css'
 import '@mantine/core/styles.css'
 import '@mantine/dropzone/styles.css'
 import '../styles.css'
@@ -31,14 +36,6 @@ export const Route = createRootRoute({
       {
         name: 'viewport',
         content: 'width=device-width, initial-scale=1',
-      },
-    ],
-    links: [
-      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-      { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },
-      {
-        rel: 'stylesheet',
-        href: 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Serif+Display&display=swap',
       },
     ],
   }),
