@@ -235,7 +235,7 @@ describe('browser Candidate Session persistence', () => {
 
   it('restores a session stored with the raw Source Document text, without that text', () => {
     const storedSourceIntake = { ...preparingCandidateSession.sourceIntake, originalContent: 'bakate@example.com\nTypeScript' }
-    const persistence = createBrowserCandidateSessionPersistence({ storage: createMemoryStorage({
+    const persistence = createBrowserCandidateSessionPersistence({ storages: createBrowserStorages({
       initialValue: JSON.stringify({ ...preparingCandidateSession, sourceIntake: storedSourceIntake,
         preparation: { ...preparingCandidateSession.preparation, sourceIntake: storedSourceIntake } }),
     }) })

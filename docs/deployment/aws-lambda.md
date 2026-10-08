@@ -10,6 +10,9 @@ and AWS Lambda Web Adapter for the Nitro HTTP server.
 ## Cost and abuse controls
 
 - Set a hard spend limit on a dedicated OpenAI project before using its API key.
+- Keep production and development in separate OpenAI projects, each with its own API key and spend limit.
+  Local runs, `test:evaluation` and `test:qualification` call the real API and must use the development
+  project, so they never consume the public demo's budget.
 - Disable automatic OpenAI credit recharge.
 - Restrict the OpenAI project to the configured structured and writing models.
 - Configure a Cloudflare Turnstile widget for the `workers.dev` hostname.
