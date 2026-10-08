@@ -23,6 +23,7 @@ import type { ProfileEnrichmentFactKind } from '@resume-tailoring/application/jo
 import type { CandidateFact, SourceIntake } from '@resume-tailoring/application/source-intake'
 import type { Localization } from '../localization/localization'
 import { coverageTones, readCriticalReserveStatus } from './match-analysis-status'
+import type { RequirementCoverage } from './match-analysis-status'
 import { readStatusColor, StatusIcon } from './status-message'
 import type { useCandidateJourney } from './use-candidate-journey'
 
@@ -201,7 +202,7 @@ function RequirementBadges({ coverage, localization, requirement }: Readonly<{
 
 // The icon and the label both tell the coverage; the colour only repeats them.
 function CoverageBadge({ coverage, localization }: Readonly<{
-  coverage: keyof typeof coverageTones
+  coverage: RequirementCoverage
   localization: Localization
 }>) {
   const tone = coverageTones[coverage]

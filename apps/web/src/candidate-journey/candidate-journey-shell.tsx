@@ -16,6 +16,7 @@ import {
   Title,
 } from '@mantine/core'
 import { Link } from '@tanstack/react-router'
+import { IconLoader2 } from '@tabler/icons-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 
@@ -29,7 +30,7 @@ import { candidateJourneyPhases } from './candidate-journey-phases'
 import type { CandidateJourneyPhase } from './candidate-journey-phases'
 import { useCandidateJourney } from './use-candidate-journey'
 import { CombinedIntakeWorkspace } from './combined-intake-workspace'
-import { OperationSpinner, PreparationStepList } from './preparation-step-list'
+import { PhaseProgressList } from './phase-progress-list'
 import { SourceIntakeWorkspace } from './source-intake-workspace'
 import type { CandidateJourneyController } from './use-candidate-journey'
 
@@ -276,14 +277,16 @@ LocalizationProps & Readonly<{
 }>) {
   const activePhaseDefinition = activePhase === null ? null : candidateJourneyPhases.find((phase) =>
     phase.id === activePhase)
-  const phaseMessage = activePhaseDefinition === undefined || activePhaseDefinition === null ? null : formatJourneyMessage({
-    template: localization.translate('candidateJourney.phaseAnnouncement'),
-    value: localization.translate(activePhaseDefinition.titleKey),
-    token: 'phase',
-  })
   const operation = candidateJourney.view.status === 'candidate-session-open'
     ? candidateJourney.view.operation
     : null
+  // While a preparation runs, the phase is named as the progress list shows it.
+  const phaseMessage = activePhaseDefinition === undefined || activePhaseDefinition === null ? null : formatJourneyMessage({
+    template: localization.translate('candidateJourney.phaseAnnouncement'),
+    value: localization.translate(operation === 'preparing-tailored-resume'
+      ? `phaseProgress.${activePhaseDefinition.id}` : activePhaseDefinition.titleKey),
+    token: 'phase',
+  })
   // The previous result is only promised to stay visible when there is one.
   const hasStableResult = candidateJourney.view.status === 'candidate-session-open'
     && candidateJourney.view.session.tailoredResume !== null
@@ -310,8 +313,8 @@ LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) 
     className="candidate-journey-progress" component="section" p={{ base: 'md', sm: 'lg' }} withBorder>
     <Stack gap="sm">
       {operation === 'preparing-tailored-resume' && activePhase !== null
-        ? <PreparationStepList {...{ activePhase, localization }} />
-        : <Group gap="xs" wrap="nowrap"><OperationSpinner />
+        ? <PhaseProgressList {...{ activePhase, localization }} />
+        : <Group gap="xs" wrap="nowrap"><IconLoader2 aria-hidden="true" className="progress-spinner" size={20} stroke={2} />
           <Text fw={700}>{localization.translate(readOperationKey({ candidateJourney, operation }))}</Text></Group>}
       <Text c="dimmed" id="candidate-journey-progress-description" size="sm">
         {readProgressDescription({ candidateJourney, localization })}

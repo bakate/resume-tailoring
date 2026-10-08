@@ -1075,7 +1075,7 @@ class CandidateJourneyTestSystem {
     await expect(javaDetail).toContainText('Uncovered')
     await expect(javaDetail.locator('.mantine-Badge-root', { hasText: 'Uncovered' }).locator('svg')).toHaveCount(1)
     await expect(javaDetail).not.toContainText('Java is required.')
-    await expect(this.#page.getByRole('heading', { name: 'Critical requirements not covered', exact: true })).toBeVisible()
+    await expect(this.#page.getByRole('heading', { name: 'Critical requirements not fully covered', exact: true })).toBeVisible()
     await expect(javaDetail).toContainText('Nothing in your resume supports it.')
     await expect(javaDetail).toContainText('it does not meet this requirement): TypeScript')
     await expect(javaDetail.getByText('Covered', { exact: true })).toHaveCount(0)
@@ -1231,7 +1231,7 @@ class CandidateJourneyTestSystem {
       'Writing your resume (in progress)'])
     await expect(progress.locator('[aria-current="step"]')).toHaveText('Writing your resume (in progress)')
     await expect(progress).not.toContainText('orchestration')
-    await expect(this.#page.locator('.sr-only[role="status"]')).toContainText('Current step: Your tailored resume.')
+    await expect(this.#page.locator('.sr-only[role="status"]')).toContainText('Current step: Writing your resume.')
   }
 
   async expectReadableSecondaryTextAndFocusRing() {
