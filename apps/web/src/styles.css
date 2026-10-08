@@ -297,8 +297,8 @@ h1 {
   padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
 }
 
+/* The lock keeps its size beside a sentence that wraps, aligned with its first line. */
 .privacy-statement-icon {
-  color: var(--mantine-color-forest-8);
   flex-shrink: 0;
   margin-top: 2px;
 }

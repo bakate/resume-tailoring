@@ -15,10 +15,11 @@ export function PrivacyStatement({ localization, processingPolicy }: Localizatio
 }>) {
   return <Box className="privacy-statement" mt="lg">
     <Group gap="xs" wrap="nowrap" align="flex-start">
-      <IconLock aria-hidden="true" className="privacy-statement-icon" size={20} stroke={2} />
-      <Text>{localization.translate('candidateJourney.privateByDesign')}</Text>
+      <IconLock aria-hidden="true" className="privacy-statement-icon" size={20} stroke={2}
+        color="var(--mantine-color-forest-8)" />
+      <Text>{localization.translate('candidateJourney.privacyStatement')}</Text>
     </Group>
-    <details><summary>{localization.translate('candidateJourney.privacyDetails')}</summary>
+    <details><summary>{localization.translate('candidateJourney.privacyLearnMore')}</summary>
       <Stack gap="xs" mt="xs"><ProcessingPolicyDetails {...{ localization, processingPolicy }} /></Stack></details>
   </Box>
 }
