@@ -113,9 +113,9 @@ const sectionWritingInstructions: Record<ResumeSectionKind, string> = {
   'value-proposition': 'Write a specific concise Value Proposition as prose, normally one paragraph of two to four lines, supported by the strongest relevant evidence among the supplied facts.',
   experience: [
     'Write this one experience with id equal to section.key, retaining its role, employer and dates as one coherent entry.',
-    'Choose chronology relevant when the experience holds facts listed in relevantFactIds, context when it is supporting experience worth condensing, and earlier when role, employer and dates suffice. For purpose normalized never choose relevant.',
+    'section.experienceShape is decided before writing: copy its chronology as written and write at most achievementBudget achievements, the ones that best prove relevantFactIds first.',
     'Copy the location fact into location as written, or null when there is none; never move it into context.',
-    'Select and reformulate relevant achievements. Condense contextual experience; earlier experience needs role, employer and dates, not exhaustive bullets. Keep distinct achievements even when they use the same technology.',
+    'Select and reformulate relevant achievements. A context experience is condensed; an earlier experience is role, employer and dates only, with context and location null and no achievements. Keep distinct achievements even when they use the same technology.',
   ].join(' '),
   skills: 'Group skills by category. Category labels organize items and never become standalone bullets. Remove duplicate skill items and redundant paraphrases within a group.',
   education: 'Keep each education entry distinct. Preserve complete qualifications and associated institutions without invented levels.',

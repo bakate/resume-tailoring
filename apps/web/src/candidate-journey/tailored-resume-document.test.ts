@@ -49,6 +49,33 @@ describe('Tailored Resume export document', () => {
     expect(html).toContain('<p class="experience-dates"><span></span><span class="experience-location">Paris</span></p>')
   })
 
+  it('renders an Earlier Experience as one line of role, organization and dates, without achievements', () => {
+    const resume = createTailoredResume({ jobMatch: structuredResumeJobMatch, sourceIntake: structuredResumeSource })
+    const [experience] = resume.experiences
+    if (experience === undefined) throw new Error('The fixture has an experience')
+
+    const html = renderTailoredResumeDocument({ tailoredResume: { ...resume, experiences: [{ ...experience, chronology: 'earlier' }] } })
+
+    expect(html).toContain('<article class="resume-experience earlier-experience"><p class="experience-line">'
+      + '<span class="experience-role">Frontend Engineer</span> · <span class="experience-organization">Northwind</span>'
+      + '<span class="experience-dates">2021 – 2024</span></p></article>')
+    const experiences = html.slice(html.indexOf('<h2>Experience</h2>'), html.indexOf('</section>', html.indexOf('<h2>Experience</h2>')))
+    expect(experiences).not.toContain('Built accessible billing screens')
+    expect(experiences).not.toContain('Customer billing team')
+  })
+
+  it('names an Earlier Experience without role or organization by its context on its one line', () => {
+    const resume = createTailoredResume({ jobMatch: structuredResumeJobMatch, sourceIntake: structuredResumeSource })
+    const [experience] = resume.experiences
+    if (experience === undefined) throw new Error('The fixture has an experience')
+
+    const html = renderTailoredResumeDocument({ tailoredResume: { ...resume, experiences: [{ ...experience,
+      chronology: 'earlier', role: null, organization: null }] } })
+
+    expect(html).toContain('<p class="experience-line"><span class="experience-role">Customer billing team</span>'
+      + '<span class="experience-dates">2021 – 2024</span></p>')
+  })
+
   it('places the photo in its own header column, beside contact details that never break inside', () => {
     const tailoredResume = createTailoredResume({ jobMatch: structuredResumeJobMatch, sourceIntake: structuredResumeSource })
     const photoDataUrl = 'data:image/png;base64,iVBORw0KGgo='

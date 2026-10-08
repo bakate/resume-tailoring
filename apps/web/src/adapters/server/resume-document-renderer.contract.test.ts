@@ -58,6 +58,20 @@ describe('structured resume PDF rendering boundary', () => {
     }
   }, 20_000)
 
+  it('lays an Earlier Experience out on a single line of role, organization and dates', async () => {
+    const [relevant, earlier] = groupedResumeDocument.experiences
+    const request = { draft: { revision: 'earlier', document: { ...groupedResumeDocument,
+      experiences: [relevant, { ...earlier, chronology: 'earlier' as const }] } }, unsupportedFieldIds: [] }
+
+    const result = await renderResumeDocument(request)
+
+    expect(result.pdf).not.toBeNull()
+    if (result.pdf === null) return
+    const lines = await readPdfLines(result.pdf)
+    const line = lines.find((text) => text.includes('Software Developer'))
+    expect(line).toMatch(/Software Developer.*Contoso.*2018 – 2021/u)
+  }, 20_000)
+
   it('blocks overflow beyond two pages without changing the draft', async () => {
     const request = denseRequest({ count: 55 })
     const before = JSON.stringify(request.draft)
@@ -184,6 +198,21 @@ async function readPdfPages(bytes: Uint8Array): Promise<readonly string[]> {
       (_value, pageIndex) => document.getPage(pageIndex + 1)))
     const content = await Promise.all(pages.map((page) => page.getTextContent()))
     return content.map(({ items }) => items.flatMap((item) => 'str' in item ? [item.str] : []).join(' '))
+  } finally { await loading.destroy() }
+}
+
+/** The text of the first page grouped by baseline, top to bottom, so items laid out on one line read together. */
+async function readPdfLines(bytes: Uint8Array): Promise<readonly string[]> {
+  const loading = getDocument({ data: bytes.slice() })
+  try {
+    const page = await (await loading.promise).getPage(1)
+    const lines = new Map<number, string[]>()
+    for (const item of (await page.getTextContent()).items) {
+      if (!('str' in item) || item.str.trim().length === 0) continue
+      const baseline = Math.round(Number(item.transform[5]))
+      lines.set(baseline, [...(lines.get(baseline) ?? []), item.str])
+    }
+    return [...lines.entries()].sort(([top], [bottom]) => bottom - top).map(([, items]) => items.join(' '))
   } finally { await loading.destroy() }
 }
 

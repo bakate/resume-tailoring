@@ -425,6 +425,75 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     system.expectExperienceOrder(['experiences.1', 'experiences.3', 'experiences.4', 'experiences.0', 'experiences.2'])
   })
 
+  it('classifies each experience from the Match Analysis, a short recent role below the six-month threshold included', async () => {
+    const system = createSystemUnderTest({ career: 'classified' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectExperienceChronologies(['earlier', 'relevant', 'context', 'relevant', 'relevant', 'relevant', 'earlier', 'earlier'])
+  })
+
+  it('gives each experience writer its chronology and an achievement budget set by duration', async () => {
+    const system = createSystemUnderTest({ career: 'classified' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectExperiencesWrittenWith([['earlier', 0], ['relevant', 4], ['context', 2], ['relevant', 6],
+      ['relevant', 3], ['relevant', 3], ['earlier', 0], ['earlier', 0]])
+  })
+
+  it('classifies the experiences the same way every time for the same inputs', async () => {
+    const earlier = createSystemUnderTest({ career: 'classified' })
+    await earlier.givenPreparedTailoredResume()
+    const system = createSystemUnderTest({ career: 'classified' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectSameExperienceShapesAs(earlier)
+  })
+
+  it('keeps only the most relevant achievements within each budget when the writer returns too many', async () => {
+    const system = createSystemUnderTest({ career: 'classified' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectAchievementCounts([0, 4, 2, 6, 3, 3, 0, 0])
+    system.expectRelevantAchievementsKept({ experienceKey: 'experiences.1',
+      factIds: ['source-fact-experiences-1-achievements-4', 'source-fact-experiences-1-achievements-5'] })
+  })
+
+  it('keeps only the role, organization and dates of an Earlier Experience', async () => {
+    const system = createSystemUnderTest({ career: 'classified' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectEarlierExperienceShape('experiences.0')
+  })
+
+  it('keeps the context of an Earlier Experience that has no role, organization or dates to show', async () => {
+    const system = createSystemUnderTest({ career: 'classified' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectUnidentifiedEarlierExperienceShape('experiences.7')
+  })
+
+  it('budgets every Normalized Resume experience by duration without claiming relevance', async () => {
+    const system = createSystemUnderTest({ career: 'classified' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareNormalizedResume()
+
+    system.expectExperienceChronologies(['context', 'context', 'context', 'context', 'context', 'context', 'context', 'context'])
+    system.expectAchievementCounts([1, 4, 3, 6, 3, 3, 2, 2])
+  })
+
   it('writes the Normalized Resume through the same sections without the Job Posting', async () => {
     const system = createSystemUnderTest()
     await system.givenMatchedCandidateSession()
@@ -458,6 +527,8 @@ type TestOptions = Readonly<{
    */
   writtenExperience?: 'context-citing-achievement' | 'role-citing-achievement'
   writtenSkills?: 'duplicated' | 'versioned' | 'uncited-on-rewrite'
+  /** Eight experiences, from a short ongoing role to undated ones, each written with every achievement it holds. */
+  career?: 'classified'
   coherence?: 'mixed-projects-once' | 'mixed-projects-twice' | 'redundant-projects-always' | 'document-level-issue'
     | 'redundant-projects-and-mixed-skills-twice' | 'chronology-on-source-dates'
     | 'unnamed-language-mismatch' | 'language-issue-while-language-matches'
@@ -785,6 +856,52 @@ class SectionPreparationTestSystem {
     expect(resume).toContain(' – détail')
   }
 
+  expectSameExperienceShapesAs(other: SectionPreparationTestSystem) {
+    expect(this.#readExperienceShapes()).toEqual(other.#readExperienceShapes())
+  }
+
+  #readExperienceShapes() {
+    this.#expectOutcome()
+    return this.#writingInputs.filter(({ section }) => section.kind === 'experience')
+      .map(({ section }) => [section.key, section.experienceShape] as const)
+      .sort(([left], [right]) => left.localeCompare(right))
+  }
+
+  expectExperienceChronologies(chronologies: readonly string[]) {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    expect(this.#readPreparedExperiences().map(({ chronology }) => chronology)).toEqual(chronologies)
+  }
+
+  expectExperiencesWrittenWith(shapes: readonly (readonly [string, number])[]) {
+    expect(this.#readExperienceShapes().map(([, shape]) => [shape?.chronology, shape?.achievementBudget])).toEqual(shapes)
+  }
+
+  expectAchievementCounts(counts: readonly number[]) {
+    expect(this.#readPreparedExperiences().map(({ achievements }) => achievements.length)).toEqual(counts)
+  }
+
+  expectRelevantAchievementsKept({ experienceKey, factIds }: Readonly<{ experienceKey: string; factIds: readonly string[] }>) {
+    const experience = this.#readPreparedExperiences().find(({ id }) => id === experienceKey)
+    expect(experience?.achievements.slice(0, factIds.length).flatMap((field) => field.factIds)).toEqual(factIds)
+  }
+
+  expectEarlierExperienceShape(experienceKey: string) {
+    expect(this.#readPreparedExperiences().find(({ id }) => id === experienceKey)).toMatchObject({
+      chronology: 'earlier', role: { text: 'Support Analyst' }, organization: { text: 'Fabrikam' },
+      startDate: { text: 'Jun 2026' }, endDate: { text: 'Present' }, location: null, context: null, achievements: [] })
+  }
+
+  expectUnidentifiedEarlierExperienceShape(experienceKey: string) {
+    expect(this.#readPreparedExperiences().find(({ id }) => id === experienceKey)).toMatchObject({
+      chronology: 'earlier', role: null, organization: null, startDate: null, endDate: null, location: null,
+      context: { text: 'Freelance missions' }, achievements: [] })
+  }
+
+  /** In source order, so shapes read the same whatever order the plan gives the experiences. */
+  #readPreparedExperiences() {
+    return [...this.#expectOutcome()?.session.tailoredResume?.experiences ?? []].sort((left, right) => left.id.localeCompare(right.id))
+  }
+
   expectAchievementOrder(achievementIds: readonly string[]) {
     expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
     const experience = this.#expectOutcome()?.session.tailoredResume?.experiences.find(({ id }) => id === 'experiences.0')
@@ -865,15 +982,50 @@ class SectionPreparationTestSystem {
   }
 }
 
-function createMatchedSession({ experienceDates }: TestOptions): CandidateSession {
-  const startedAt = Date.now()
+function createMatchedSession({ experienceDates, career }: TestOptions): CandidateSession {
+  const startedAt = career === undefined ? Date.now() : careerToday
   return {
     expiresAt: startedAt + candidateSessionDurationMilliseconds, startedAt,
     version: candidateSessionStorageVersion, sessionId: 'candidate-session-00000000-0000-4000-8000-000000000068',
     jobMatch: structuredResumeJobMatch, phase: 'job-match', processingConsent: { grantedAt: startedAt, policy: testProcessingPolicy },
     sourceIntake: experienceDates === undefined ? structuredResumeSource : createDatedSource(experienceDates), tailoredResume: null,
+    ...(career === undefined ? {} : { sourceIntake: careerSource, jobMatch: careerJobMatch }),
   }
 }
+
+const careerToday = Date.UTC(2026, 9, 7)
+
+/** Experiences in source order, as [role, organization, start, end, achievement count, relevant achievement indexes]. */
+const careerExperiences = [
+  // Five months, ongoing and unrelated: below the six-month threshold of a Context Experience.
+  ['Support Analyst', 'Fabrikam', 'Jun 2026', 'Present', 1, []],
+  // Seventeen months: one to three years.
+  ['Frontend Engineer', 'Northwind', 'Jan 2025', 'May 2026', 6, [4, 5]],
+  // The most recent unrelated role of at least six months.
+  ['Store Manager', 'Contoso', '2022', '2024', 3, []],
+  // Beyond three years.
+  ['Platform Engineer', 'Tailspin', '03/2015', '12/2021', 8, [0]],
+  // Eight months: under one year.
+  ['Junior Developer', 'Litware', '2014-02', '2014-09', 5, [1]],
+  // No usable dates: the lowest budget.
+  ['Volunteer Developer', 'Adatum', null, null, 4, [0]],
+  ['Intern', 'Wingtip', '2012', '2013', 2, []],
+  // Neither role, organization nor dates: only its context can name it on one line.
+  [null, null, null, null, 2, []],
+] as const
+
+const careerSource: CandidateSession['sourceIntake'] = { ...structuredResumeSource,
+  candidateFacts: careerExperiences.flatMap(([role, organization, startDate, endDate, achievementCount], index) => [
+    ['role', role], ['organization', organization], ['startDate', startDate], ['endDate', endDate],
+    ['context', organization === null ? 'Freelance missions' : `${organization} product team`], ['location', 'Paris'],
+    ...Array.from({ length: achievementCount }, (_value, item) => [`achievements.${String(item)}`, `${role ?? 'Freelance'} achievement ${String(item + 1)}`]),
+  ].flatMap(([name, value]) => value === null ? [] : [{ path: `experiences.${String(index)}.${name ?? ''}${name?.includes('.') === true ? '' : '.0'}`, value }])
+    .map(({ path, value }) => ({ id: `source-fact-${path.replaceAll('.', '-')}`, path, status: 'attested' as const, value: value ?? '' }))),
+}
+
+const careerJobMatch: CandidateSession['jobMatch'] = { ...structuredResumeJobMatch,
+  analysis: { ...structuredResumeJobMatch.analysis, relevantFactIds: careerExperiences.flatMap(
+    ([, , , , , relevant], index) => relevant.map((item) => `source-fact-experiences-${String(index)}-achievements-${String(item)}`)) } }
 
 /** The fixture source with its experiences replaced by one per entry, each dated as given. */
 function createDatedSource(experienceDates: readonly ExperienceDates[]): CandidateSession['sourceIntake'] {
@@ -896,6 +1048,7 @@ function createDependencies({ options, persistence, models }: Readonly<{
 }>): CandidateJourneyDependencies {
   return createFakeCandidateJourneyDependencies({
     persistence,
+    ...(options.career === undefined ? {} : { now: () => careerToday }),
     resumeSectionModels: createFakeResumeSectionModels({
       writeSection: async (input) => {
         await models.onWrite(input)
@@ -904,7 +1057,8 @@ function createDependencies({ options, persistence, models }: Readonly<{
         if (input.section.kind === 'skills' && failure !== undefined && models.onSkillsWrite() === failingWrite) {
           return { ok: false, error: { type: failure } }
         }
-        const written = options.experienceDates !== undefined && input.section.kind === 'experience'
+        const written = options.career !== undefined
+          || (options.experienceDates !== undefined && input.section.kind === 'experience')
           ? writeResumeSectionFromFacts(input) : readGroupedResumeSection(input.section)
         const content = options.writtenSkills === 'duplicated' ? withDuplicatedSkill(written)
           : options.writtenSkills === 'versioned' ? withSkillsVersion({ content: written, version: input.rejectedFields.length + 1 })

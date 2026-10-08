@@ -535,7 +535,7 @@ export const resumePreparationMachine = setup({
   states: {
     planning: {
       entry: [assign(({ context }) => {
-        const plan = planResumeSections(context.request)
+        const plan = planResumeSections({ request: context.request, today: context.now() })
         const restored = restoreValidatedSections({ context, plan })
         return { plan, results: restored, startedKeys: restored.map(({ section }) => section.key),
           sections: readPlannedSections({ plan, restored }) }

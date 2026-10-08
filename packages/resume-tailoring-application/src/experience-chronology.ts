@@ -13,6 +13,65 @@ const ongoingStartPattern = /\b(?:since|depuis)\b/u
 const monthStems = [['jan'], ['feb', 'fev'], ['mar'], ['apr', 'avr'], ['may', 'mai'], ['jun', 'juin'], ['jul', 'juil'],
   ['aug', 'aou'], ['sep'], ['oct'], ['nov'], ['dec']] as const
 
+export type ExperienceChronology = TailoredResumeExperience['chronology']
+
+/** What code decides about one experience before it is written: its chronology and how many achievements it may keep. */
+export type ExperienceShape = Readonly<{ chronology: ExperienceChronology; achievementBudget: number }>
+
+/** The achievement budget of a Relevant Experience, set by its duration; an undated experience gets the lowest. */
+export const relevantExperienceAchievementBudgets = { underOneYear: 3, oneToThreeYears: 4, beyondThreeYears: 6 } as const
+const contextExperienceAchievementLimit = 2
+const contextExperienceMinimumMonths = 6
+
+/**
+ * Shapes experiences given most recent first, as the section plan orders them. In a Tailored Resume, an experience
+ * citing a relevant Candidate Fact is relevant; otherwise the first one lasting at least six months is context, and
+ * every other is earlier. A Normalized Resume claims no relevance: every experience is context, budgeted by duration.
+ */
+export function classifyExperiences({ experiences, purpose, today }: Readonly<{
+  experiences: readonly (DatedExperience & Readonly<{ relevant: boolean }>)[]
+  purpose: 'tailored' | 'normalized'
+  today: number
+}>): readonly ExperienceShape[] {
+  const measured = experiences.map((experience) => ({ relevant: experience.relevant,
+    months: readExperienceMonths({ experience, today }) }))
+  const context = purpose === 'tailored' ? measured.find(({ relevant, months }) => !relevant
+    && months !== null && months >= contextExperienceMinimumMonths) : undefined
+  return measured.map((experience): ExperienceShape => {
+    if (purpose === 'normalized' || experience.relevant) {
+      return { chronology: purpose === 'normalized' ? 'context' : 'relevant', achievementBudget: budgetByDuration(experience.months) }
+    }
+    return experience === context ? { chronology: 'context', achievementBudget: contextExperienceAchievementLimit }
+      : { chronology: 'earlier', achievementBudget: 0 }
+  })
+}
+
+function budgetByDuration(months: number | null) {
+  if (months === null || months < 12) return relevantExperienceAchievementBudgets.underOneYear
+  return months <= 36 ? relevantExperienceAchievementBudgets.oneToThreeYears : relevantExperienceAchievementBudgets.beyondThreeYears
+}
+
+/**
+ * Whole months from the first to the last, both included; an ongoing role runs until today. A year without a month
+ * covers that whole year, never beyond today. Null without a usable start and end, so the duration is never guessed.
+ */
+function readExperienceMonths({ experience, today }: Readonly<{ experience: DatedExperience; today: number }>) {
+  const start = readMonth({ date: experience.startDate })
+  const ongoing = readExperienceDates({ experience }).end === 'ongoing'
+  const end = ongoing ? null : readMonth({ date: experience.endDate })
+  if (start === null || (!ongoing && (experience.endDate === null || end === null))) return null
+  const todayMonth = new Date(today).getUTCFullYear() * 12 + new Date(today).getUTCMonth()
+  const first = toCalendarMonth({ month: start, edge: 'first' })
+  const last = end === null ? todayMonth : Math.min(toCalendarMonth({ month: end, edge: 'last' }), todayMonth)
+  return last < first ? null : last - first + 1
+}
+
+/** A month counted from year zero; a date known only by its year starts in January and ends in December. */
+function toCalendarMonth({ month, edge }: Readonly<{ month: ExperienceMonth; edge: 'first' | 'last' }>) {
+  const monthOfYear = month % 13
+  return Math.floor(month / 13) * 12 + (monthOfYear === 0 ? (edge === 'first' ? 0 : 11) : monthOfYear - 1)
+}
+
 /**
  * Orders experiences reverse-chronologically: by end date (an ongoing role first), then start date, then source
  * order. An experience with no usable date comes last, in source order; it is never rejected.
