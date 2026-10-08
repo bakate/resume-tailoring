@@ -26,7 +26,7 @@ test.describe('Candidate Journey preview-first preparation', () => {
 
     await system.givenUnsupportedProfessionalTextWasSaved()
 
-    await system.saveUnsupportedProfessionalTextAgain()
+    await system.editAndSaveUnsupportedProfessionalTextAgain()
 
     await system.expectUnsupportedDownloadBlocked()
   })
@@ -124,6 +124,29 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.generateResume()
 
     await system.expectReviewActionsInReach({ beside: false })
+  })
+
+  test('edits an experience beside the live preview and downloads without closing the editor', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenScreenSize({ width: 1440, height: 900 })
+    await system.givenStablePreview()
+    await system.givenRequiredContactsArePresent()
+    await system.givenEditsAreSupported()
+    await system.openEditorOnContent()
+
+    await system.saveExperienceRoleAndEmployerTogether()
+
+    await system.expectPreviewUpdatedBesideTheEditor()
+    await system.expectEditorClosedByEscapeOntoEdit()
+  })
+
+  test('gives every editor field a label of its own', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenStablePreview()
+
+    await system.openEditorOnContent()
+
+    await system.expectUniqueFieldLabels()
   })
 
   test('reaches the review actions by keyboard in the order they are shown', async ({ page }) => {
@@ -770,9 +793,10 @@ class CandidateJourneyTestSystem {
 
   async editUnsupportedWordingAndReload() {
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
-    await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
-    await this.#page.getByLabel('Resume field', { exact: true }).first().fill('Led 100 engineers')
-    await this.#page.getByRole('button', { name: 'Save', exact: true }).first().click()
+    await this.#page.getByRole('tab', { name: 'Content', exact: true }).click()
+    await this.#page.getByRole('textbox', { name: 'Summary', exact: true }).fill('Led 100 engineers')
+    await this.#page.getByRole('button', { name: 'Save Summary', exact: true }).click()
+    await expect(this.#page.getByRole('status').filter({ hasText: 'Resume updated.' })).toBeVisible()
     await this.#page.reload()
     this.#completedAction = 'wording-edited-and-reloaded'
   }
@@ -783,18 +807,18 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.frameLocator('iframe').getByText('Led 100 engineers', { exact: true })).toBeVisible()
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeDisabled()
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
-    await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Content', exact: true }).click()
     await expect(this.#page.getByText("This edit adds something your resume doesn't mention.", { exact: true })).toBeVisible()
   }
 
   async expectPreviewFirstReview() {
     await expect(this.#page.getByRole('button', { name: 'Edit resume', exact: true })).toBeVisible()
-    await expect(this.#page.getByLabel('Resume field', { exact: true })).toHaveCount(0)
+    await expect(this.#page.getByRole('textbox', { name: 'Summary', exact: true })).toHaveCount(0)
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeVisible()
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
-    await expect(this.#page.getByRole('dialog')).toBeVisible()
+    await expect(this.#editor()).toBeVisible()
     await this.#page.keyboard.press('Escape')
-    await expect(this.#page.getByRole('dialog')).toHaveCount(0)
+    await expect(this.#editor()).toHaveCount(0)
     await expect(this.#page.getByRole('button', { name: 'Edit resume', exact: true })).toBeFocused()
   }
 
@@ -854,9 +878,8 @@ class CandidateJourneyTestSystem {
 
   async enterUnsupportedProfessionalText() {
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
-    await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
-    await this.#page.getByRole('textbox', { name: 'Resume field', exact: true }).first()
-      .fill('Built accessible billing screens and led 500 engineers')
+    await this.#page.getByRole('tab', { name: 'Content', exact: true }).click()
+    await this.#page.getByRole('textbox', { name: 'Summary', exact: true }).fill('Built accessible billing screens and led 500 engineers')
   }
 
   async givenUnsupportedProfessionalTextWasSaved() {
@@ -865,16 +888,26 @@ class CandidateJourneyTestSystem {
   }
 
   async saveUnsupportedProfessionalTextAgain() {
-    await this.#page.getByRole('button', { name: 'Save', exact: true }).first().click()
+    await this.#page.getByRole('button', { name: 'Save Summary', exact: true }).click()
+  }
+
+  /** Saving again means changing the wording again: an entry without unsaved edits has nothing to save. */
+  async editAndSaveUnsupportedProfessionalTextAgain() {
+    await this.#page.getByRole('textbox', { name: 'Summary', exact: true }).fill('Built accessible billing screens and led 600 engineers')
+    await this.saveUnsupportedProfessionalTextAgain()
   }
 
   async expectUnsavedDownloadBlocked() {
-    await expect(this.#page.getByRole('dialog')).toBeVisible()
-    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true, includeHidden: true })).toBeDisabled()
+    await expect(this.#editor()).toBeVisible()
+    const download = this.#page.getByRole('button', { name: 'Download PDF', exact: true, includeHidden: true })
+    await expect(download).toBeDisabled()
+    if (await this.#editor().getAttribute('role') !== 'dialog') {
+      await expect(download).toHaveAccessibleDescription('Save your changes to download the current PDF.')
+    }
   }
 
   async expectUnsupportedDownloadBlocked() {
-    await expect(this.#page.getByRole('button', { name: 'Confirm this is accurate', exact: true })).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Confirm this is accurate Summary', exact: true })).toBeVisible()
     await this.#page.keyboard.press('Escape')
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeDisabled({ timeout: 20_000 })
     await expect(this.#page.getByText('Resolve or confirm the unsupported professional changes before downloading.', { exact: true })).toBeVisible()
@@ -1023,30 +1056,27 @@ class CandidateJourneyTestSystem {
 
   async hideAndRestoreEmployer() {
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
-    await this.#page.getByRole('tab', { name: 'Experience', exact: true }).click()
-    const employerField = this.#page.locator('textarea').filter({ hasText: 'Northwind' })
-    const fieldCard = employerField.locator('xpath=ancestor::*[contains(@class,"mantine-Paper-root")][1]')
-    await fieldCard.getByRole('button', { name: 'Hide field', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Content', exact: true }).click()
+    await expect(this.#page.getByRole('textbox', { name: 'Employer – Frontend Engineer · Northwind', exact: true })).toHaveValue('Northwind')
+    await this.#page.getByRole('button', { name: 'Hide Employer – Frontend Engineer · Northwind', exact: true }).click()
     await expect(this.#page.frameLocator('iframe').getByText('Northwind', { exact: true })).toHaveCount(0)
-    await this.#page.getByRole('tab', { name: 'Hidden items', exact: true }).click()
-    await this.#page.getByRole('button', { name: 'Restore field', exact: true }).click()
+    await this.#page.getByRole('button', { name: 'Restore Northwind', exact: true }).click()
     await this.#page.keyboard.press('Escape')
     this.#completedAction = 'grouped-resume-prepared'
   }
 
   async hideAndRestoreExperience() {
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
-    await this.#page.getByRole('tab', { name: 'Experience', exact: true }).click()
-    await this.#page.getByRole('button', { name: 'Hide experience', exact: true }).first().click()
+    await this.#page.getByRole('tab', { name: 'Content', exact: true }).click()
+    await this.#page.getByRole('button', { name: /^Hide experience / }).first().click()
     await expect(this.#page.frameLocator('iframe').getByText('Northwind', { exact: true })).toHaveCount(0)
-    await this.#page.getByRole('tab', { name: 'Hidden items', exact: true }).click()
-    await this.#page.getByRole('button', { name: 'Restore experience', exact: true }).click()
+    await this.#page.getByRole('button', { name: /^Restore experience / }).click()
     await this.#page.keyboard.press('Escape')
   }
 
   async moveExperienceBeforeSummary() {
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
-    await this.#page.getByRole('tab', { name: 'Section order', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Layout', exact: true }).click()
     const experienceOrder = this.#page.getByRole('tabpanel').getByText('Experience', { exact: true }).locator('..')
     await experienceOrder.getByRole('button', { name: 'Move Experience up', exact: true }).click()
     await this.#page.keyboard.press('Escape')
@@ -1353,6 +1383,78 @@ class CandidateJourneyTestSystem {
   expectFocusFollowedTheRail() {
     this.#expectAction()
     expect(this.#focusedAfterDownload).toEqual(['Edit resume', 'Change job posting'])
+  }
+
+  /** The writing service, unavailable everywhere else, confirms that edited wording is supported. */
+  async givenEditsAreSupported() {
+    await this.#page.route('**/api/resume-claim-validation', (route) => route.fulfill({ json: { ok: true, value: { supported: true, feedback: [] } } }))
+  }
+
+  async openEditorOnContent() {
+    await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Content', exact: true }).click()
+    this.#completedAction = 'editor-opened'
+  }
+
+  /** One experience has one Save, which saves every field changed in it with one announcement. */
+  async saveExperienceRoleAndEmployerTogether() {
+    const experience = 'Frontend Engineer · Northwind'
+    await this.#page.getByRole('textbox', { name: `Role – ${experience}`, exact: true }).fill('Frontend Developer')
+    await this.#page.getByRole('textbox', { name: `Employer – ${experience}`, exact: true }).fill('Northwind Labs')
+    const card = this.#editor().locator('.mantine-Paper-root').filter({ has: this.#page.getByRole('heading', { name: experience, exact: true }) })
+    await expect(card.getByRole('button', { name: /^Save / })).toHaveCount(1)
+    await this.#page.getByRole('button', { name: `Save ${experience}`, exact: true }).click()
+    await expect(this.#editor().getByRole('status').filter({ hasText: 'Resume updated.' })).toHaveCount(1)
+  }
+
+  async expectPreviewUpdatedBesideTheEditor() {
+    this.#expectAction()
+    const editor = this.#editor()
+    await expect(this.#page.getByRole('dialog')).toHaveCount(0)
+    await expect(this.#page.frameLocator('iframe').getByText('Northwind Labs', { exact: false }).first()).toBeVisible({ timeout: 20_000 })
+    const download = this.#page.getByRole('button', { name: 'Download PDF', exact: true })
+    await expect(download).toBeEnabled({ timeout: 20_000 })
+    const pages = await this.#page.locator('.resume-pdf-pages').boundingBox()
+    const panel = await editor.boundingBox()
+    if (pages === null || panel === null) throw new Error('The preview and the editor must be laid out')
+    expect(panel.x).toBeGreaterThanOrEqual(pages.x + pages.width)
+    // The pages and the editor share the screen: the panel stays in view at the top of the review.
+    await this.#page.evaluate(() => { window.scrollTo(0, 0) })
+    await expect(this.#page.locator('.resume-pdf-pages canvas').first()).toBeInViewport()
+    await expect(editor.getByRole('tab', { name: 'Content', exact: true })).toBeInViewport()
+    // Three tabs on one line.
+    const tabs = await editor.getByRole('tab').all()
+    expect(tabs).toHaveLength(3)
+    const tops = await Promise.all(tabs.map(async (tab) => (await tab.boundingBox())?.y))
+    expect(new Set(tops).size).toBe(1)
+    await this.#page.screenshot({ path: 'test-results/bak-143-desktop-editor.png' })
+    const downloaded = this.#page.waitForEvent('download')
+    await download.click()
+    await downloaded
+  }
+
+  async expectEditorClosedByEscapeOntoEdit() {
+    await this.#page.getByRole('textbox', { name: 'Role – Frontend Developer · Northwind Labs', exact: true }).focus()
+    await this.#page.keyboard.press('Escape')
+    await expect(this.#editor()).toHaveCount(0)
+    await expect(this.#page.getByRole('button', { name: 'Edit resume', exact: true })).toBeFocused()
+  }
+
+  async expectUniqueFieldLabels() {
+    this.#expectAction()
+    const names = await this.#editor().locator('textarea').evaluateAll((fields) =>
+      fields.map((field) => (field as HTMLTextAreaElement).labels[0]?.textContent.trim() ?? ''))
+    expect(names.length).toBeGreaterThan(5)
+    expect(names).not.toContain('')
+    expect(new Set(names).size).toBe(names.length)
+    expect(names).toEqual(expect.arrayContaining(['Summary', 'Role – Frontend Engineer · Northwind', 'Start – Frontend Engineer · Northwind',
+      'Key point 1 – Frontend Engineer · Northwind', 'Category – Front-end', 'Skill 1 – Front-end']))
+    await this.#page.screenshot({ path: `test-results/bak-143-editor-${String(this.#page.viewportSize()?.width ?? 0)}.png` })
+  }
+
+  /** The editor: a panel beside the preview on a desktop, a sheet over it on a smaller screen. */
+  #editor() {
+    return this.#page.getByRole('region', { name: 'Edit resume', exact: true }).or(this.#page.getByRole('dialog', { name: 'Edit resume' }))
   }
 
   async #readFocusedName() {

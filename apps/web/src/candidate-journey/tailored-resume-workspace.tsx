@@ -1,6 +1,7 @@
-import { Button, Group, Modal, Paper, Stack, Text, Title } from '@mantine/core'
+import { Button, CloseButton, Group, Modal, Paper, Stack, Text, Title } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { RefObject } from 'react'
 
 import type { ResumeReviewOperation } from '@resume-tailoring/application/candidate-journey'
 import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
@@ -29,14 +30,21 @@ export function TailoredResumeWorkspace({ candidateJourney, localization, onChan
 
 type ResumeDocumentProps = ResumeReviewProps & Readonly<{ resume: TailoredResume }>
 
-/** The preview beside a rail of actions: the Page Budget status and Download first, then Edit and the secondary actions. */
+/**
+ * The preview beside a rail of actions: the Page Budget status and Download first, then Edit and the secondary actions.
+ * On a desktop the editor opens in the rail, under Download, so the preview stays in view and follows each save.
+ */
 function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting: () => void }>) {
   const { view } = props.candidateJourney
   const photo = useResumePhoto({ photo: view.status === 'candidate-session-open' ? view.session.resumePhoto ?? null : null,
     onChange: props.candidateJourney.updateResumePhoto })
   const [proposalPhoto, setProposalPhoto] = useState<string | undefined>(undefined)
   const [editorTab, setEditorTab] = useState<EditorTab | null>(null)
+  const [unsavedEdits, setUnsavedEdits] = useState(false)
   const editorOpened = editorTab !== null
+  const besidePreview = useMediaQuery('(min-width: 62em)')
+  const editButton = useRef<HTMLButtonElement>(null)
+  const closeEditor = () => { setEditorTab(null); editButton.current?.focus() }
   const [downloadedRevision, setDownloadedRevision] = useState<string | null>(null)
   const revision = props.candidateJourney.view.status === 'candidate-session-open' ? props.candidateJourney.view.resumeReview?.draft.revision ?? null : null
   const { localization } = props
@@ -50,15 +58,16 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
     <Stack gap="lg">
       <PreparationStatus {...props} />
       <div><Title id="tailored-resume-title" order={2}>{localization.translate('resumeReview.preview')}</Title><Text c="dimmed">{localization.translate('resumeReview.description')}</Text></div>
-      <CurrentResumePreview {...props} {...{ editorOpened, photo }} onDownload={() => {
+      <CurrentResumePreview {...props} {...{ unsavedEdits, photo }} onDownload={() => {
         props.candidateJourney.recordResumeDownload(); setDownloadedRevision(revision) }}
         pageBudget={{ overflowReduction: view.status === 'candidate-session-open' && view.resumeReview !== null
           ? view.resumeReview.recovery.overflowReduction : { achievements: 0, other: 0 },
-        reviewHidden: { disabled: blocksResumeEditing(view), open: () => { setEditorTab('recovery') } },
+        reviewHidden: { disabled: blocksResumeEditing(view), open: () => { setEditorTab('hidden') } },
         shortening: { disabled: !shorteningAvailable, shorten: () => { withPhoto(props.candidateJourney.shortenResume) } } }}
         actions={{
-          edit: <Button variant="default" disabled={blocksResumeEditing(view)}
-            onClick={() => { setEditorTab('contacts') }}>{localization.translate('resumeReview.edit')}</Button>,
+          edit: <Button ref={editButton} variant="default" disabled={blocksResumeEditing(view)}
+            aria-expanded={besidePreview ? editorOpened : undefined} aria-controls={besidePreview && editorOpened ? 'resume-editor-panel' : undefined}
+            onClick={() => { if (editorOpened) closeEditor(); else setEditorTab('contacts') }}>{localization.translate('resumeReview.edit')}</Button>,
           secondary: <>
             {downloadedRevision !== null && downloadedRevision === revision
               ? <UsabilityFeedback key={downloadedRevision} candidateJourney={props.candidateJourney} localization={props.localization} /> : null}
@@ -68,14 +77,17 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
               onClick={() => { withPhoto(props.candidateJourney.proposeResumeCondensation) }}>{localization.translate('resumeReview.condense')}</Button> : null}
             <Button variant="default" onClick={props.onChangeJobPosting}>{localization.translate('resumeReview.changeJobPosting')}</Button>
           </>,
-        }}>
+        }}
+        editor={besidePreview && editorTab !== null
+          ? <ResumeEditorPanel {...props} {...{ editorTab, operations, closeEditor }} onUnsavedChange={setUnsavedEdits} /> : null}>
         <CondensationProposal {...props} photoDataUrl={photo.dataUrl}
           proposalLayoutCurrent={photo.ready && !photo.failed && proposalPhoto === photo.dataUrl} />
         <MatchAnalysisDisclosure {...props} />
         <DocumentText document={props.resume} localization={props.localization} />
       </CurrentResumePreview>
     </Stack>
-    <ResumeEditorDialog {...props} {...{ editorTab, operations }} closeEditor={() => { setEditorTab(null) }} />
+    <ResumeEditorDialog {...props} {...{ operations }} editorTab={besidePreview ? null : editorTab}
+      closeEditor={() => { setEditorTab(null) }} onUnsavedChange={setUnsavedEdits} />
   </Paper>
 }
 
@@ -102,14 +114,55 @@ function useRetryableOperations() {
 
 export type RetryableOperations = ReturnType<typeof useRetryableOperations>
 
-function ResumeEditorDialog({ editorTab, ...props }: ResumeDocumentProps & Readonly<{
-  editorTab: EditorTab | null; closeEditor: () => void; operations: RetryableOperations
-}>) {
+type EditorFrameProps = ResumeDocumentProps & Readonly<{
+  closeEditor: () => void; operations: RetryableOperations; onUnsavedChange: (unsaved: boolean) => void
+}>
+
+/** Below a desktop width the preview has no room beside the editor, which opens as a sheet over it. */
+function ResumeEditorDialog({ editorTab, ...props }: EditorFrameProps & Readonly<{ editorTab: EditorTab | null }>) {
   const fullScreen = useMediaQuery('(max-width: 48em)')
   return <Modal opened={editorTab !== null} onClose={props.closeEditor} title={props.localization.translate('resumeReview.edit')}
     fullScreen={fullScreen} size="xl" returnFocus closeButtonProps={{ 'aria-label': props.localization.translate('resumeReview.close') }}>
     <ResumeEditor {...props} initialTab={editorTab ?? 'contacts'} />
   </Modal>
+}
+
+/**
+ * The editor beside the preview, in place of the rail's secondary actions. It takes focus when it opens; Escape or
+ * its close button give focus back to Edit.
+ */
+function ResumeEditorPanel({ editorTab, ...props }: EditorFrameProps & Readonly<{ editorTab: EditorTab }>) {
+  const title = useRef<HTMLHeadingElement>(null)
+  const panel = useRef<HTMLElement>(null)
+  useEffect(() => { if (editorTab === 'contacts') title.current?.focus() }, [editorTab])
+  useCloseOnEscape({ panel, close: props.closeEditor })
+  return <section id="resume-editor-panel" ref={panel} className="resume-editor-panel" aria-labelledby="resume-editor-title">
+    <Group justify="space-between" wrap="nowrap">
+      <Title id="resume-editor-title" ref={title} tabIndex={-1} order={2} size="h3">{props.localization.translate('resumeReview.edit')}</Title>
+      <CloseButton aria-label={props.localization.translate('resumeReview.close')} onClick={props.closeEditor} />
+    </Group>
+    {/* A new tab request, such as reviewing Hidden Content, opens the editor again where it was asked. */}
+    <div className="resume-editor-body"><ResumeEditor key={editorTab} {...props} initialTab={editorTab} /></div>
+  </section>
+}
+
+/**
+ * Escape closes the panel from inside it, and from the page itself: hiding or restoring an item removes the button
+ * that had focus, which leaves focus on the body.
+ */
+function useCloseOnEscape({ panel, close }: Readonly<{ panel: RefObject<HTMLElement | null>; close: () => void }>) {
+  const latestClose = useRef(close)
+  latestClose.current = close
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const focused = document.activeElement
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      if (focused !== null && focused !== document.body && panel.current?.contains(focused) !== true) return
+      event.preventDefault(); latestClose.current()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => { document.removeEventListener('keydown', onKeyDown) }
+  }, [panel])
 }
 
 function overflows(view: ResumeReviewController['view']) {
@@ -184,14 +237,14 @@ function ResumePreview({ resume, title, photoDataUrl }: Readonly<{ resume: Tailo
     srcDoc={renderTailoredResumeDocument({ tailoredResume: resume, photoDataUrl })} />
 }
 
-function CurrentResumePreview({ actions, candidateJourney, children, pageBudget, localization, resume, editorOpened, photo, onDownload }: ResumeDocumentProps & Pick<ResumePreviewProps, 'actions' | 'children'> & Readonly<{
-  pageBudget: ResumePreviewProps['pageBudget']; editorOpened: boolean; photo: ReturnType<typeof useResumePhoto>; onDownload: () => void
+function CurrentResumePreview({ actions, candidateJourney, children, editor, pageBudget, localization, resume, unsavedEdits, photo, onDownload }: ResumeDocumentProps & Pick<ResumePreviewProps, 'actions' | 'children' | 'editor'> & Readonly<{
+  pageBudget: ResumePreviewProps['pageBudget']; unsavedEdits: boolean; photo: ReturnType<typeof useResumePhoto>; onDownload: () => void
 }>) {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open' || view.resumeReview === null) return null
   const enabled = view.session.preparedResumeStatus !== 'outdated'
     && view.resumeReview.operation === null && (view.operation === null || view.operation === 'rendering-resume-document')
-  return <TailoredResumePreview document={resume} localization={localization} enabled={enabled} paused={editorOpened} photo={photo} pageBudget={pageBudget}
+  return <TailoredResumePreview document={resume} localization={localization} enabled={enabled} unsavedEdits={unsavedEdits} photo={photo} editor={editor} pageBudget={pageBudget}
     unsupportedFieldIds={view.resumeReview.unsupportedFieldIds} renderDocument={candidateJourney.renderResumeDocument}
     onDownload={onDownload} actions={actions} onIdentityChange={(identity) => {
       candidateJourney.updateResumeContacts({ identity, contactDetails: resume.contactDetails }) }}>{children}</TailoredResumePreview>

@@ -58,7 +58,31 @@
     border-top: 0;
   }
 
+  /*
+   * The editor needs more room than the actions: the rail widens while it is open, and the pages narrow. Only the
+   * editor's content scrolls, so Download, the editor's title and its tabs stay in view.
+   */
+  .resume-review-layout[data-editing] { grid-template-columns: minmax(0, 1fr) 28rem; }
+  .resume-review-layout[data-editing] .resume-review-rail { overflow: hidden; }
+  .resume-review-layout[data-editing] .resume-review-primary { flex: none; }
+  .resume-editor-panel { flex: 1 1 auto; min-height: 0; }
+  .resume-editor-body { flex: 1 1 auto; min-height: 0; margin: -6px; padding: 6px; overflow-y: auto; }
+  .resume-editor-body .mantine-Tabs-list {
+    position: sticky;
+    top: -6px;
+    z-index: 1;
+    background: var(--mantine-color-white);
+  }
+
   .resume-review-primary-actions { flex-direction: column; }
   .resume-review-primary-actions > * { flex: none; }
   .resume-review-layout .resume-pdf-pages-expand { display: none; }
+}
+
+.resume-editor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-sm);
+  padding-top: var(--mantine-spacing-md);
+  border-top: 1px solid var(--mantine-color-gray-3);
 }

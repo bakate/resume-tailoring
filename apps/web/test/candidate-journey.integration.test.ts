@@ -25,11 +25,11 @@ test.describe('Candidate Journey integration qualification', () => {
     await system.expectPreviewKeptWithoutRendering()
   })
 
-  test('renders the preview once when the editor closes after an edit', async ({ page }) => {
+  test('renders the preview once after a save while the editor stays open', async ({ page }) => {
     const system = createSystemUnderTest({ page })
     await system.givenGeneratedPreview()
 
-    await system.editSummaryAndCloseEditor()
+    await system.editSummaryWithEditorOpen()
 
     await system.expectOneRenderAfterEditing()
   })
@@ -582,12 +582,12 @@ class CandidateJourneyIntegrationSystem {
 
   async givenMobileSectionCorrection() {
     await this.#openEditor()
-    const dialog = this.#page.getByRole('dialog')
+    const dialog = this.#page.getByRole('dialog', { name: 'Edit resume' })
     const box = await dialog.boundingBox()
     expect(box?.width, 'The section editor fills the small screen').toBeGreaterThanOrEqual(400)
-    await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
-    await this.#page.getByRole('textbox', { name: 'Resume field', exact: true }).first().fill(correctedSummary)
-    await this.#page.getByRole('button', { name: 'Save', exact: true }).first().click()
+    await this.#page.getByRole('tab', { name: 'Content', exact: true }).click()
+    await this.#page.getByRole('textbox', { name: 'Summary', exact: true }).fill(correctedSummary)
+    await this.#page.getByRole('button', { name: 'Save Summary', exact: true }).click()
     await expect(dialog.getByRole('status').filter({ hasText: 'Resume updated.' })).toBeVisible()
     await this.#page.getByRole('button', { name: 'Close editor', exact: true }).click()
     await expect(this.#page.getByRole('dialog')).toHaveCount(0)
@@ -601,12 +601,10 @@ class CandidateJourneyIntegrationSystem {
     this.#completedAction = 'editor-toggled'
   }
 
-  async editSummaryAndCloseEditor() {
+  async editSummaryWithEditorOpen() {
     this.#countRendersFromHere()
     await this.#openEditor()
     await this.#saveCorrectedSummary()
-    await this.#expectPreviewVisibleWhileEditing()
-    await this.#closeEditor()
     this.#completedAction = 'summary-edited'
   }
 
@@ -617,9 +615,14 @@ class CandidateJourneyIntegrationSystem {
     await expect(this.#page.locator('.resume-pdf-pages canvas').first()).toBeVisible()
   }
 
+  /** The preview beside the open editor shows the saved edit, and closing the editor renders nothing more. */
   async expectOneRenderAfterEditing() {
     this.#expectAction()
     await expect.poll(() => this.#renderRequestsSinceAction(), { timeout: 30_000 }).toBe(1)
+    await expect(this.#editor()).toBeVisible()
+    await expect(this.#page.locator('.resume-pdf-pages canvas').first()).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled({ timeout: 30_000 })
+    await this.#closeEditor()
     await this.#page.waitForTimeout(1_000)
     expect(this.#renderRequestsSinceAction(), 'One edit renders exactly once').toBe(1)
   }
@@ -633,10 +636,10 @@ class CandidateJourneyIntegrationSystem {
   }
 
   async #saveCorrectedSummary() {
-    await this.#page.getByRole('tab', { name: 'Summary', exact: true }).click()
-    await this.#page.getByRole('textbox', { name: 'Resume field', exact: true }).first().fill(correctedSummary)
-    await this.#page.getByRole('button', { name: 'Save', exact: true }).first().click()
-    await expect(this.#page.getByRole('dialog').getByRole('status').filter({ hasText: 'Resume updated.' })).toBeVisible()
+    await this.#page.getByRole('tab', { name: 'Content', exact: true }).click()
+    await this.#page.getByRole('textbox', { name: 'Summary', exact: true }).fill(correctedSummary)
+    await this.#page.getByRole('button', { name: 'Save Summary', exact: true }).click()
+    await expect(this.#editor().getByRole('status').filter({ hasText: 'Resume updated.' })).toBeVisible()
   }
 
   #renderRequests() { return this.#modelRequests.filter((path) => path === '/api/resume-document').length }
@@ -650,8 +653,8 @@ class CandidateJourneyIntegrationSystem {
 
   async givenOneOmittedAchievementRestored() {
     await this.#openEditor()
-    await this.#page.getByRole('tab', { name: 'Hidden items', exact: true }).click()
-    await this.#page.getByRole('dialog').getByText(denseAchievements[2] ?? '', { exact: true }).locator('..')
+    await this.#page.getByRole('tab', { name: 'Content', exact: true }).click()
+    await this.#editor().getByText(denseAchievements[2] ?? '', { exact: true }).locator('..')
       .getByRole('button', { name: 'Add to the resume', exact: true }).click()
     await this.#closeEditor()
   }
@@ -741,8 +744,8 @@ class CandidateJourneyIntegrationSystem {
 
   async restoreAllOmittedAchievements() {
     await this.#openEditor()
-    await this.#page.getByRole('tab', { name: 'Hidden items', exact: true }).click()
-    const restore = this.#page.getByRole('dialog').getByRole('button', { name: 'Add to the resume', exact: true })
+    await this.#page.getByRole('tab', { name: 'Content', exact: true }).click()
+    const restore = this.#editor().getByRole('button', { name: 'Add to the resume', exact: true })
     while (await restore.count() > 0) {
       const remaining = await restore.count()
       await restore.first().click()
@@ -781,8 +784,8 @@ class CandidateJourneyIntegrationSystem {
 
   async hideDenseExperience() {
     await this.#openEditor()
-    await this.#page.getByRole('tab', { name: 'Experience', exact: true }).click()
-    await this.#page.getByRole('button', { name: 'Hide experience', exact: true }).first().click()
+    await this.#page.getByRole('tab', { name: 'Content', exact: true }).click()
+    await this.#page.getByRole('button', { name: /^Hide experience / }).first().click()
     await this.#closeEditor()
     this.#completedAction = 'experience-hidden'
   }
@@ -923,8 +926,8 @@ class CandidateJourneyIntegrationSystem {
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled({ timeout: 30_000 })
     await this.#expectDocumentTextLacks(denseAchievements.at(-1) ?? '')
     await this.#openEditor()
-    await this.#page.getByRole('tab', { name: 'Hidden items', exact: true }).click()
-    await expect(this.#page.getByRole('button', { name: 'Restore experience', exact: true })).toBeVisible()
+    await this.#page.getByRole('tab', { name: 'Content', exact: true }).click()
+    await expect(this.#page.getByRole('button', { name: /^Restore experience / })).toBeVisible()
   }
 
   async viewLatestResume() {
@@ -988,17 +991,18 @@ class CandidateJourneyIntegrationSystem {
     expect(transition.split(',').every((duration) => parseFloat(duration) <= 0.00001)).toBe(true)
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).focus()
     await this.#page.keyboard.press('Enter')
-    await expect(this.#page.getByRole('dialog')).toBeVisible()
+    await expect(this.#editor()).toBeVisible()
     await this.#page.keyboard.press('Escape')
+    await expect(this.#editor()).toHaveCount(0)
     await expect(this.#page.getByRole('button', { name: 'Edit resume', exact: true })).toBeFocused()
     await this.#expectNamedEditorControls()
   }
 
   async #expectNamedEditorControls() {
     await this.#openEditor()
-    await this.#page.getByRole('tab', { name: 'Experience', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Content', exact: true }).click()
     await expect(this.#page.getByRole('button', { name: 'Move Experience: Northwind up', exact: true }).first()).toBeVisible()
-    await this.#page.getByRole('tab', { name: 'Section order', exact: true }).click()
+    await this.#page.getByRole('tab', { name: 'Layout', exact: true }).click()
     await expect(this.#page.getByRole('button', { name: 'Move Summary up', exact: true })).toBeDisabled()
     await expect(this.#page.getByRole('button', { name: 'Move Experience up', exact: true })).toBeEnabled()
     await this.#closeEditor()
@@ -1123,12 +1127,17 @@ class CandidateJourneyIntegrationSystem {
 
   async #openEditor() {
     await this.#page.getByRole('button', { name: 'Edit resume', exact: true }).click()
-    await expect(this.#page.getByRole('dialog')).toBeVisible()
+    await expect(this.#editor()).toBeVisible()
   }
 
   async #closeEditor() {
     await this.#page.keyboard.press('Escape')
-    await expect(this.#page.getByRole('dialog')).toHaveCount(0)
+    await expect(this.#editor()).toHaveCount(0)
+  }
+
+  /** The editor: a panel beside the preview on a desktop, a sheet over it on a smaller screen. */
+  #editor() {
+    return this.#page.getByRole('region', { name: 'Edit resume', exact: true }).or(this.#page.getByRole('dialog', { name: 'Edit resume' }))
   }
 
   async #openDocumentText() {

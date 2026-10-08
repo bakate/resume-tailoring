@@ -33,6 +33,7 @@ export function useCandidateJourneyController() {
     applyValidatedSectionChange: candidateJourney.applyValidatedSectionChange,
     attestResumeField: candidateJourney.attestResumeField,
     editResumeField: candidateJourney.editResumeField,
+    editResumeFields: candidateJourney.editResumeFields,
     hideResumeField: candidateJourney.hideResumeField,
     restoreResumeField: candidateJourney.restoreResumeField,
     restoreSourceFact: candidateJourney.restoreSourceFact,

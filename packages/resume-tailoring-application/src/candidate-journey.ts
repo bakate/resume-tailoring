@@ -18,10 +18,10 @@ import { assessResumeLayout, proposeResumeCondensation, acceptResumeCondensation
 import type { ResumeProposalDecision } from './structured-resume-contract'
 import { hideResumeEntry, restoreResumeEntry, attestResumeField, hideResumeContent, restoreResumeContent, moveResumeContent, reorderResumeSections, restoreSourceFact } from './resume-content-recovery'
 import type { ResumeSectionName } from './tailored-resume'
-import { applyValidatedSectionChange, changedResumeSession, editResumeField, emptyResumeReview,
+import { applyValidatedSectionChange, changedResumeSession, editResumeField, editResumeFields, emptyResumeReview,
   readResumeEditing, readResumeReview, unavailableResumeResult } from './resume-editing'
-import type { ResumeEditingAccess, ResumeReview, ResumeReviewState } from './resume-editing'
-export type { ResumeReviewOperation } from './resume-editing'
+import type { ResumeEditingAccess, ResumeFieldEdit, ResumeReview, ResumeReviewState } from './resume-editing'
+export type { ResumeFieldEdit, ResumeReviewOperation } from './resume-editing'
 import type { ResumeSectionChange } from './structured-resume-contract'
 import { assign, createActor, fromPromise, setup, waitFor } from 'xstate'
 import type { AnyActorRef, SnapshotFrom } from 'xstate'
@@ -186,6 +186,8 @@ export type CandidateJourney = Readonly<{
   reorderResumeSections: (request: Readonly<{ sectionOrder: readonly ResumeSectionName[] }>) => void
   applyValidatedSectionChange: (change: ResumeSectionChange) => Promise<void>
   editResumeField: (request: Readonly<{ fieldId: string; text: string }>) => Promise<void>
+  /** Saves several edited fields at once, such as every field of one experience, with one validation per section. */
+  editResumeFields: (request: Readonly<{ edits: readonly ResumeFieldEdit[] }>) => Promise<void>
   updateResumeContacts: (contacts: ResumeContacts) => void
   updateResumePhoto: (photo: ResumePhoto | null) => void
   /** Forgets the Job Posting to restore in the intake; the Source Profile and the current result stay. */
@@ -1013,6 +1015,7 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     reorderResumeSections: (request) => { reorderResumeSections({ access: editingAccess, ...request }) },
     applyValidatedSectionChange: (change) => applyValidatedSectionChange({ access: editingAccess, change }),
     editResumeField: (request) => editResumeField({ access: editingAccess, ...request }),
+    editResumeFields: (request) => editResumeFields({ access: editingAccess, ...request }),
     updateResumeContacts: (contacts) => { actor.send({ type: 'UPDATE_RESUME_CONTACTS', contacts }) },
     updateResumePhoto: (photo) => { actor.send({ type: 'UPDATE_RESUME_PHOTO', photo }) },
     changeJobPosting: () => { actor.send({ type: 'CHANGE_JOB_POSTING' }) },

@@ -1,9 +1,11 @@
-import { Button, Group, Paper, Stack, Tabs, Text, Textarea, TextInput, Title } from '@mantine/core'
-import { useState } from 'react'
+import { ActionIcon, Button, Group, Paper, Stack, Tabs, Text, Textarea, TextInput, Title, VisuallyHidden } from '@mantine/core'
+import { IconArrowDown, IconArrowUp } from '@tabler/icons-react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { ResumeSectionName, TailoredResume } from '@resume-tailoring/application/tailored-resume'
 import type { Localization } from '../localization/localization'
-import { readResumeFields } from './tailored-resume-editing'
 import type { ResumeFieldReference } from './tailored-resume-editing'
+import { readEditorEntries, readEditorSections } from './resume-editor-entries'
+import type { EditorEntry, ResumeFieldLabel } from './resume-editor-entries'
 import type { ResumeReviewController, RetryableOperations } from './tailored-resume-workspace'
 import { ResumeOperationFailureAlert } from './failure-recovery'
 
@@ -11,24 +13,42 @@ type EditorProps = Readonly<{
   candidateJourney: ResumeReviewController; localization: Localization; resume: TailoredResume
   operations: RetryableOperations
 }>
-export type EditorTab = 'contacts' | 'recovery'
+/** Where the editor opens: on the contact details, or on the Hidden Content listed at the end of the content. */
+export type EditorTab = 'contacts' | 'hidden'
 type EditorContext = EditorProps & Readonly<{ announce: (message: string) => void }>
 
-export function ResumeEditor({ initialTab, ...props }: EditorProps & Readonly<{ initialTab: EditorTab }>) {
+/**
+ * Three tabs: the contact details, the content with its Hidden Content, and the layout. `onUnsavedChange` says whether
+ * an entry holds edits not saved yet, which keep the current PDF from being downloaded.
+ */
+export function ResumeEditor({ initialTab, onUnsavedChange, ...props }: EditorProps & Readonly<{
+  initialTab: EditorTab; onUnsavedChange: (unsaved: boolean) => void
+}>) {
   const [announcement, announce] = useState('')
-  const { localization, resume } = props
-  const sections = readSections({ resume })
-  return <Stack><EditorStatus {...props} /><Tabs defaultValue={initialTab} keepMounted={false}>
+  const [unsavedEntries, setUnsavedEntries] = useState<ReadonlySet<string>>(new Set())
+  const unsaved = unsavedEntries.size > 0
+  useEffect(() => { onUnsavedChange(unsaved) }, [onUnsavedChange, unsaved])
+  useEffect(() => () => { onUnsavedChange(false) }, [onUnsavedChange])
+  const reportUnsaved = useCallback((entryId: string, entryUnsaved: boolean) => { setUnsavedEntries((current) => {
+    if (current.has(entryId) === entryUnsaved) return current
+    const next = new Set(current)
+    if (entryUnsaved) next.add(entryId); else next.delete(entryId)
+    return next
+  }) }, [])
+  const { localization } = props
+  return <Stack><EditorStatus {...props} />{/* Every tab stays mounted, so switching tabs keeps the drafts typed in the content. */}
+    <Tabs defaultValue={initialTab === 'contacts' ? 'contacts' : 'content'}>
     <Tabs.List aria-label={localization.translate('resumeReview.edit')}>
       <Tabs.Tab value="contacts">{localization.translate('resumeReview.contacts')}</Tabs.Tab>
-      {sections.map((section) => <Tabs.Tab key={section} value={section}>{localization.translate(`resumeReview.section.${section}`)}</Tabs.Tab>)}
-      <Tabs.Tab value="recovery">{localization.translate('resumeReview.recovery')}</Tabs.Tab><Tabs.Tab value="order">{localization.translate('resumeReview.order')}</Tabs.Tab>
+      <Tabs.Tab value="content">{localization.translate('resumeReview.content')}</Tabs.Tab>
+      <Tabs.Tab value="layout">{localization.translate('resumeReview.layout')}</Tabs.Tab>
     </Tabs.List>
     <Tabs.Panel value="contacts" pt="md"><ContactEditor {...props} /></Tabs.Panel>
-    {sections.map((section) => <Tabs.Panel key={section} value={section} pt="md">
-      <SectionEditor {...props} {...{ section, announce }} /></Tabs.Panel>)}
-    <Tabs.Panel value="recovery" pt="md"><ContentRecovery {...props} announce={announce} /></Tabs.Panel>
-    <Tabs.Panel value="order" pt="md"><SectionOrder {...props} announce={announce} /></Tabs.Panel>
+    <Tabs.Panel value="content" pt="md"><Stack gap="xl">
+      <ContentEditor {...props} {...{ announce, reportUnsaved }} />
+      <ContentRecovery {...props} announce={announce} focused={initialTab === 'hidden'} />
+    </Stack></Tabs.Panel>
+    <Tabs.Panel value="layout" pt="md"><SectionOrder {...props} announce={announce} /></Tabs.Panel>
   </Tabs><Text role="status" aria-live="polite" aria-atomic="true">{announcement}</Text></Stack>
 }
 
@@ -41,12 +61,6 @@ function EditorStatus({ candidateJourney, localization, operations }: EditorProp
     {review.failure === null ? null
       : <ResumeOperationFailureAlert failure={review.failure} localization={localization} onRetry={operations.retry} />}
   </>
-}
-
-function readSections({ resume }: Readonly<{ resume: TailoredResume }>): readonly ResumeSectionName[] {
-  const defaultOrder: readonly ResumeSectionName[] = ['value-proposition', 'experiences',
-    ...resume.sections.map(({ section }) => section)]
-  return [...new Set([...(resume.sectionOrder ?? []), ...defaultOrder])]
 }
 
 function ContactEditor({ candidateJourney, localization, resume }: EditorProps) {
@@ -68,23 +82,119 @@ function ContactEditor({ candidateJourney, localization, resume }: EditorProps) 
   </Stack>
 }
 
-function SectionEditor(props: EditorContext & Readonly<{ section: ResumeSectionName }>) {
-  if (props.section === 'experiences') return <ExperienceEditor {...props} />
-  const references = readResumeFields({ resume: props.resume }).filter((reference) => sectionOf(reference) === props.section)
-  return <Stack gap="md">{references.map((reference) => <FieldEditor key={`${reference.key}:${reference.field.text}`}
-    {...props} reference={reference} />)}</Stack>
+type ContentProps = EditorContext & Readonly<{ reportUnsaved: (entryId: string, unsaved: boolean) => void }>
+
+/** Each section under its heading, then its entries: the summary, each experience, each skill group, each other section. */
+function ContentEditor(props: ContentProps) {
+  const entries = readEditorEntries({ resume: props.resume })
+  return <>{readEditorSections({ resume: props.resume }).map((section) => {
+    const sectionEntries = entries.filter((entry) => entry.section === section)
+    if (sectionEntries.length === 0) return null
+    return <Stack key={section} component="section" gap="md" aria-labelledby={`resume-editor-${section}`}>
+      <Title id={`resume-editor-${section}`} order={3}>{props.localization.translate(`resumeReview.section.${section}`)}</Title>
+      {sectionEntries.map((entry) => <EntryEditor key={entry.id} {...props} entry={entry} />)}
+    </Stack>
+  })}</>
 }
 
-function ExperienceEditor(props: EditorContext) {
-  const references = readResumeFields({ resume: props.resume })
-  return <Stack>{props.resume.experiences.map((experience) => <section key={experience.id}>
-    <Group justify="space-between" mb="sm"><Title order={3}>{experience.role?.text ?? props.localization.translate('resumeReview.section.experiences')}</Title>
-      <Button variant="subtle" onClick={() => {
-        props.candidateJourney.hideResumeEntry({ experienceId: experience.id }); props.announce(props.localization.translate('resumeReview.hiddenNotice'))
-      }}>{props.localization.translate('resumeReview.hideEntry')}</Button></Group>
-    <Stack>{references.filter(({ location }) => location.kind === 'experience' && location.experienceId === experience.id)
-      .map((reference) => <FieldEditor key={`${reference.key}:${reference.field.text}`} {...props} reference={reference} />)}</Stack>
-  </section>)}</Stack>
+/**
+ * The fields of one entry, saved together by its one Save button. Drafts are kept by field, so hiding or moving one
+ * field keeps what the Candidate typed in the others.
+ */
+function EntryEditor(props: ContentProps & Readonly<{ entry: EditorEntry }>) {
+  const { announce, candidateJourney, entry, localization, operations, reportUnsaved } = props
+  const [drafts, setDrafts] = useState<Readonly<Record<string, string>>>({})
+  const edits = entry.fields.flatMap(({ reference }) => {
+    const text = drafts[reference.key]
+    return text === undefined || text === reference.field.text ? [] : [{ fieldId: reference.key, text }]
+  })
+  const unsaved = edits.length > 0
+  const review = candidateJourney.view.status === 'candidate-session-open' ? candidateJourney.view.resumeReview : null
+  const blocked = !unsaved || review?.operation !== null || edits.some(({ text }) => text.trim().length === 0)
+  useEffect(() => { reportUnsaved(entry.id, unsaved) }, [entry.id, reportUnsaved, unsaved])
+  useEffect(() => () => { reportUnsaved(entry.id, false) }, [entry.id, reportUnsaved])
+  const save = async () => {
+    await candidateJourney.editResumeFields({ edits })
+    setDrafts({})
+    announce(localization.translate('resumeReview.saved'))
+  }
+  const entryName = entry.name ?? localization.translate(`resumeReview.section.${entry.section}`)
+  return <Paper p="sm" withBorder><Stack gap="sm">
+    {entry.name === null ? null : <Group justify="space-between" align="flex-start" gap="xs">
+      <Title order={4}>{entry.name}</Title>
+      {entry.section === 'experiences' ? <HideExperience {...props} /> : null}
+    </Group>}
+    {entry.fields.map(({ reference, label }) => <FieldEditor key={reference.key} {...props} {...{ reference }}
+      label={readFieldLabel({ entry, label, localization })} text={drafts[reference.key] ?? reference.field.text}
+      onChange={(text) => { setDrafts((current) => ({ ...current, [reference.key]: text })) }} />)}
+    {/* Saving leaves nothing to save: an inert button that keeps its focus, rather than a disabled one that drops it. */}
+    <Group><Button size="compact-sm" data-disabled={blocked || undefined} aria-disabled={blocked}
+      onClick={() => { if (!blocked) operations.attempt(() => { void save() }) }}>
+      {localization.translate('tailoredResume.saveField')}<VisuallyHidden> {entryName}</VisuallyHidden></Button></Group>
+  </Stack></Paper>
+}
+
+function HideExperience({ announce, candidateJourney, entry, localization }: ContentProps & Readonly<{ entry: EditorEntry }>) {
+  const experienceId = entry.id.replace(/^experience:/u, '')
+  return <Button variant="subtle" size="compact-sm" onClick={() => {
+    candidateJourney.hideResumeEntry({ experienceId }); announce(localization.translate('resumeReview.hiddenNotice'))
+  }}>{localization.translate('resumeReview.hideEntry')}<VisuallyHidden> {entry.name}</VisuallyHidden></Button>
+}
+
+/** A field's visible label names its kind; the entry it belongs to completes its accessible name when others share it. */
+function readFieldLabel({ entry, label, localization }: Readonly<{ entry: EditorEntry; label: ResumeFieldLabel; localization: Localization }>) {
+  const kind = label.kind === 'item' ? localization.translate(`resumeReview.section.${entry.section}`)
+    : localization.translate(`resumeEditor.field.${label.kind}`)
+  return { visible: label.position === null ? kind : `${kind} ${String(label.position)}`,
+    context: entry.name === null ? null : ` – ${entry.name}` }
+}
+
+type FieldEditorProps = ContentProps & Readonly<{
+  entry: EditorEntry; reference: ResumeFieldReference; label: ReturnType<typeof readFieldLabel>; text: string
+  onChange: (text: string) => void
+}>
+
+/** The label row carries the field's own actions, moving and hiding it, so each field takes one row plus its text. */
+function FieldEditor(props: FieldEditorProps) {
+  const { announce, candidateJourney, label, localization, reference, text } = props
+  const id = useId()
+  const review = candidateJourney.view.status === 'candidate-session-open' ? candidateJourney.view.resumeReview : null
+  const unsupported = review?.unsupportedFieldIds.includes(reference.key) ?? false
+  const name = `${label.visible}${label.context ?? ''}`
+  return <Stack gap={4}>
+    <Group justify="space-between" wrap="nowrap" gap="xs">
+      <Text component="label" htmlFor={id} fw={500} size="sm">
+        {label.visible}{label.context === null ? null : <VisuallyHidden>{label.context}</VisuallyHidden>}</Text>
+      <Group gap={2} wrap="nowrap">
+        <FieldOrdering {...props} />
+        <Button size="compact-sm" variant="subtle" onClick={() => {
+          candidateJourney.hideResumeField({ fieldId: reference.key }); announce(localization.translate('resumeReview.hiddenNotice'))
+        }}>{localization.translate('tailoredResume.hideField')}<VisuallyHidden> {name}</VisuallyHidden></Button>
+      </Group>
+    </Group>
+    <Textarea id={id} autosize minRows={1} value={text} onChange={(event) => { props.onChange(event.currentTarget.value) }} />
+    {unsupported ? <Group gap="xs" justify="space-between">
+      <Text c="danger.8" size="sm" role="alert">{localization.translate('tailoredResume.unsupportedField')}</Text>
+      <Button size="compact-sm" disabled={text !== reference.field.text}
+        onClick={() => { candidateJourney.attestResumeField({ fieldId: reference.key }); announce(localization.translate('resumeReview.saved')) }}>
+        {localization.translate('tailoredResume.attestField')}<VisuallyHidden> {name}</VisuallyHidden></Button>
+    </Group> : null}
+  </Stack>
+}
+
+function FieldOrdering({ announce, candidateJourney, localization, reference, resume }: FieldEditorProps) {
+  const isMovable = reference.location.kind === 'value-proposition' || reference.location.kind === 'section'
+    || (reference.location.kind === 'experience' && reference.location.fieldName === 'achievements')
+    || (reference.location.kind === 'skill-group' && reference.location.fieldName === 'items')
+  if (!isMovable) return null
+  const name = localization.translate('tailoredResume.entryName').replace('{section}', localization.translate(`resumeReview.section.${sectionOf(reference)}`))
+    .replace('{entry}', readEntryName({ reference, resume }))
+  return <>{(['up', 'down'] as const).map((direction) => {
+    const moveLabel = readMoveLabel({ direction, localization, name })
+    return <ActionIcon key={direction} variant="subtle" aria-label={moveLabel} title={moveLabel}
+      onClick={() => { candidateJourney.moveResumeField({ fieldId: reference.key, direction }); announce(localization.translate('resumeReview.ordered')) }}>
+      {direction === 'up' ? <IconArrowUp aria-hidden size={16} /> : <IconArrowDown aria-hidden size={16} />}</ActionIcon>
+  })}</>
 }
 
 function sectionOf({ location }: ResumeFieldReference): ResumeSectionName {
@@ -92,53 +202,6 @@ function sectionOf({ location }: ResumeFieldReference): ResumeSectionName {
   if (location.kind === 'experience') return 'experiences'
   if (location.kind === 'skill-group') return 'skills'
   return location.section
-}
-
-type FieldEditorProps = EditorContext & Readonly<{ reference: ResumeFieldReference }>
-
-function FieldEditor(props: FieldEditorProps) {
-  const { candidateJourney, localization, reference } = props
-  const [text, setText] = useState(reference.field.text)
-  const { view } = candidateJourney
-  const review = view.status === 'candidate-session-open' ? view.resumeReview : null
-  const unsupported = review?.unsupportedFieldIds.includes(reference.key) ?? false
-  return <Paper p="sm" withBorder><Stack gap="xs">
-    <Textarea label={localization.translate('tailoredResume.fieldLabel')} autosize minRows={2} value={text}
-      onChange={(event) => { setText(event.currentTarget.value) }} />
-    {unsupported ? <Text c="danger.8" role="alert">{localization.translate('tailoredResume.unsupportedField')}</Text> : null}
-    <FieldActions {...props} {...{ text, unsupported, busy: review?.operation !== null }} />
-  </Stack></Paper>
-}
-
-function FieldActions({ announce, candidateJourney, localization, operations, reference, resume, text, unsupported, busy }:
-FieldEditorProps & Readonly<{ text: string; unsupported: boolean; busy: boolean }>) {
-  const save = async () => {
-    await candidateJourney.editResumeField({ fieldId: reference.key, text })
-    announce(localization.translate('resumeReview.saved'))
-  }
-  return <Group><Button size="compact-sm" disabled={busy || text.trim().length === 0}
-    onClick={() => { operations.attempt(() => { void save() }) }}>
-    {localization.translate('tailoredResume.saveField')}</Button>
-    {unsupported ? <Button size="compact-sm" disabled={text !== reference.field.text}
-      onClick={() => { candidateJourney.attestResumeField({ fieldId: reference.key }); announce(localization.translate('resumeReview.saved')) }}>
-      {localization.translate('tailoredResume.attestField')}</Button> : null}
-    <Button size="compact-sm" variant="subtle" onClick={() => {
-      candidateJourney.hideResumeField({ fieldId: reference.key }); announce(localization.translate('resumeReview.hiddenNotice'))
-    }}>{localization.translate('tailoredResume.hideField')}</Button>
-    <FieldOrdering {...{ announce, candidateJourney, localization, reference, resume }} />
-  </Group>
-}
-
-function FieldOrdering({ announce, candidateJourney, localization, reference, resume }: Omit<EditorContext, 'operations'> & Readonly<{ reference: ResumeFieldReference }>) {
-  const isMovable = reference.location.kind === 'value-proposition' || reference.location.kind === 'section'
-    || (reference.location.kind === 'experience' && reference.location.fieldName === 'achievements')
-    || (reference.location.kind === 'skill-group' && reference.location.fieldName === 'items')
-  if (!isMovable) return null
-  const name = localization.translate('tailoredResume.entryName').replace('{section}', localization.translate(`resumeReview.section.${sectionOf(reference)}`))
-    .replace('{entry}', readEntryName({ reference, resume }))
-  return <>{(['up', 'down'] as const).map((direction) => <Button key={direction} size="compact-sm" variant="subtle"
-    onClick={() => { candidateJourney.moveResumeField({ fieldId: reference.key, direction }); announce(localization.translate('resumeReview.ordered')) }}>
-    {readMoveLabel({ direction, localization, name })}</Button>)}</>
 }
 
 /** Names what a field belongs to, so its Move buttons say what they move: its experience, skill group or own wording. */
@@ -173,43 +236,53 @@ function readMoveLabel({ direction, localization, name }: Readonly<{
 type Recovery = NonNullable<Extract<ResumeReviewController['view'], { status: 'candidate-session-open' }>['resumeReview']>['recovery']
 type RecoveryProps = EditorContext & Readonly<{ recovery: Recovery }>
 
-function ContentRecovery(props: EditorContext) {
+/** Hidden Content, under the content it was hidden from; opened from the Page Budget status, it comes into view. */
+function ContentRecovery({ focused, ...props }: EditorContext & Readonly<{ focused: boolean }>) {
+  const heading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    if (!focused) return
+    heading.current?.scrollIntoView({ block: 'start' })
+    heading.current?.focus()
+  }, [focused])
   const { view } = props.candidateJourney
   if (view.status !== 'candidate-session-open' || view.resumeReview === null) return null
   const { recovery } = view.resumeReview
   const empty = recovery.hiddenFields.length === 0 && recovery.hiddenExperiences.length === 0 && recovery.omittedFacts.length === 0
-  return <Stack><Title order={3}>{props.localization.translate('resumeReview.hidden')}</Title>
+  return <Stack component="section" aria-labelledby="resume-editor-hidden">
+    <Title id="resume-editor-hidden" ref={heading} tabIndex={-1} order={3}>{props.localization.translate('resumeReview.recovery')}</Title>
     <HiddenExperienceRecovery {...props} recovery={recovery} />
     <HiddenFieldRecovery {...props} recovery={recovery} />
-    <OmittedFactRecovery {...props} recovery={recovery} />
+    {recovery.omittedFacts.length === 0 ? null : <OmittedFactRecovery {...props} recovery={recovery} />}
     {empty ? <Text>{props.localization.translate('resumeReview.emptyRecovery')}</Text> : null}
   </Stack>
 }
 
 function HiddenExperienceRecovery({ announce, candidateJourney, localization, recovery }: RecoveryProps) {
-  return <>{recovery.hiddenExperiences.map((experience) => <Group key={experience.id} justify="space-between">
-    <Text>{[experience.role?.text, experience.organization?.text].filter(Boolean).join(' · ')}</Text>
-    <Button variant="subtle" onClick={() => {
-      candidateJourney.restoreResumeEntry({ experienceId: experience.id }); announce(localization.translate('resumeReview.restored'))
-    }}>{localization.translate('resumeReview.restoreEntry')}</Button></Group>)}</>
+  return <>{recovery.hiddenExperiences.map((experience) => {
+    const name = [experience.role?.text, experience.organization?.text].filter(Boolean).join(' · ')
+    return <Group key={experience.id} justify="space-between" wrap="nowrap"><Text>{name}</Text>
+      <Button variant="subtle" onClick={() => {
+        candidateJourney.restoreResumeEntry({ experienceId: experience.id }); announce(localization.translate('resumeReview.restored'))
+      }}>{localization.translate('resumeReview.restoreEntry')}<VisuallyHidden> {name}</VisuallyHidden></Button></Group>
+  })}</>
 }
 
 function HiddenFieldRecovery({ announce, candidateJourney, localization, recovery }: RecoveryProps) {
-  return <>{recovery.hiddenFields.map(({ field, origin }) => <Group key={field.id} justify="space-between"><Stack gap={0}>
+  return <>{recovery.hiddenFields.map(({ field, origin }) => <Group key={field.id} justify="space-between" wrap="nowrap"><Stack gap={0}>
     <Text>{field.text}</Text>{origin === 'overflow-reduction' ? <Text size="sm" c="dimmed">{localization.translate('resumeReview.hiddenByReduction')}</Text> : null}</Stack>
     <Button variant="subtle" onClick={() => { candidateJourney.restoreResumeField({ fieldId: field.id }); announce(localization.translate('resumeReview.restored')) }}>
-      {localization.translate('tailoredResume.restoreField')}</Button></Group>)}</>
+      {localization.translate('tailoredResume.restoreField')}<VisuallyHidden> {excerpt(field.text)}</VisuallyHidden></Button></Group>)}</>
 }
 
 function OmittedFactRecovery({ announce, candidateJourney, localization, recovery }: RecoveryProps) {
-  return <><Title order={3}>{localization.translate('resumeReview.omitted')}</Title>
-    {recovery.omittedFacts.map((fact) => <Group key={fact.id} justify="space-between"><Text>{fact.value}</Text>
+  return <><Title order={4}>{localization.translate('resumeReview.omitted')}</Title>
+    {recovery.omittedFacts.map((fact) => <Group key={fact.id} justify="space-between" wrap="nowrap"><Text>{fact.value}</Text>
       <Button variant="subtle" onClick={() => { candidateJourney.restoreSourceFact({ factId: fact.id }); announce(localization.translate('resumeReview.restored')) }}>
         {localization.translate('resumeReview.restore')}</Button></Group>)}</>
 }
 
 function SectionOrder({ announce, candidateJourney, localization, resume }: EditorContext) {
-  const sections = readSections({ resume })
+  const sections = readEditorSections({ resume })
   const move = ({ index, direction }: Readonly<{ index: number; direction: 'up' | 'down' }>) => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1
     const selected = sections[index]
@@ -218,10 +291,11 @@ function SectionOrder({ announce, candidateJourney, localization, resume }: Edit
     const sectionOrder = sections.map((section, sectionIndex) => sectionIndex === index ? target : sectionIndex === targetIndex ? selected : section)
     candidateJourney.reorderResumeSections({ sectionOrder }); announce(localization.translate('resumeReview.ordered'))
   }
-  return <Stack>{sections.map((section, index) => <Group key={section} justify="space-between">
-    <Text>{localization.translate(`resumeReview.section.${section}`)}</Text><Group>{(['up', 'down'] as const).map((direction) =>
-      <Button key={direction} variant="subtle" disabled={direction === 'up' ? index === 0 : index === sections.length - 1}
-        onClick={() => { move({ index, direction }) }}>
-        {readMoveLabel({ direction, localization, name: localization.translate(`resumeReview.section.${section}`) })}</Button>)}</Group>
-  </Group>)}</Stack>
+  return <Stack><Title order={3}>{localization.translate('resumeReview.order')}</Title>
+    {sections.map((section, index) => <Group key={section} justify="space-between">
+      <Text>{localization.translate(`resumeReview.section.${section}`)}</Text><Group>{(['up', 'down'] as const).map((direction) =>
+        <Button key={direction} variant="subtle" disabled={direction === 'up' ? index === 0 : index === sections.length - 1}
+          onClick={() => { move({ index, direction }) }}>
+          {readMoveLabel({ direction, localization, name: localization.translate(`resumeReview.section.${section}`) })}</Button>)}</Group>
+    </Group>)}</Stack>
 }
