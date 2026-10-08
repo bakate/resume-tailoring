@@ -3,6 +3,7 @@ import {
   AppShell,
   Box,
   Button,
+  Checkbox,
   Container,
   Group,
   Modal,
@@ -196,15 +197,23 @@ LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) 
   </>
 }
 
+/** Before the first save, a Candidate on a shared computer can keep nothing once the tab closes. */
 function StartCandidateSessionButton({ candidateJourney, localization }: LocalizationProps & Readonly<{
   candidateJourney: CandidateJourneyController
 }>) {
+  const [keepsNothingAfterTab, setKeepsNothingAfterTab] = useState(false)
   const { view } = candidateJourney
-  return <Button disabled={view.status !== 'candidate-session-absent'}
-    loading={view.status === 'preparing-session'}
-    mt="xl" onClick={candidateJourney.startCandidateSession} size="lg">
-    {localization.translate('candidateJourney.startSession')}
-  </Button>
+  const isAbsent = view.status === 'candidate-session-absent'
+  return <Stack align="flex-start" gap="md" mt="xl">
+    <Button disabled={!isAbsent} loading={view.status === 'preparing-session'} size="lg"
+      onClick={() => { candidateJourney.startCandidateSession({ retention: keepsNothingAfterTab ? 'tab' : 'browser' }) }}>
+      {localization.translate('candidateJourney.startSession')}
+    </Button>
+    <Checkbox checked={keepsNothingAfterTab} disabled={!isAbsent}
+      description={localization.translate('candidateJourney.keepNothingAfterTabDescription')}
+      label={localization.translate('candidateJourney.keepNothingAfterTab')}
+      onChange={(event) => { setKeepsNothingAfterTab(event.currentTarget.checked) }} />
+  </Stack>
 }
 
 function DeleteCandidateSessionModal({

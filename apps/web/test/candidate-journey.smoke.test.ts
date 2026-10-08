@@ -379,6 +379,24 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectDeletedSession()
   })
 
+  test('deletes the Candidate Session when it expires while the page stays open, and says so', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenIntakeOpenOnAControlledClock()
+
+    await system.leaveThePageOpenForADay()
+
+    await system.expectSessionDeletedAtExpiry()
+  })
+
+  test('keeps nothing once the tab closes when the Candidate chose so on a shared computer', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenIntakeOpenOnASharedComputer()
+
+    await system.closeTheTabAndOpenANewOne()
+
+    await system.expectNothingKeptAfterTheTab()
+  })
+
   test('reveals validated sections under resume-language headings while another is still a placeholder', async ({ page }) => {
     const system = createSystemUnderTest({ page, scenario: 'held-skills' })
     await system.givenCombinedIntakeInFrench()
@@ -562,7 +580,7 @@ type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-co
   | 'incoherent' | 'expired-access' | 'copied-experience' | 'failed-experience'
 
 class CandidateJourneyTestSystem {
-  readonly #page: Page
+  #page: Page
   readonly #errors: string[] = []
   #downloadPath: string | null = null
   #scenario: Scenario
@@ -578,7 +596,11 @@ class CandidateJourneyTestSystem {
 
   constructor(page: Page, scenario: Scenario) {
     this.#page = page; this.#scenario = scenario
-    page.on('pageerror', (error) => { if (!isCancelledByLeavingPage(error.message)) this.#errors.push(error.message) })
+    this.#recordPageErrors()
+  }
+
+  #recordPageErrors() {
+    this.#page.on('pageerror', (error) => { if (!isCancelledByLeavingPage(error.message)) this.#errors.push(error.message) })
   }
 
   async #installModelAdapters() {
@@ -1249,6 +1271,54 @@ class CandidateJourneyTestSystem {
     await this.expectGroupedPreview()
   }
 
+  async givenIntakeOpenOnAControlledClock() {
+    await this.#page.clock.install()
+    await this.givenCombinedIntake()
+  }
+
+  async leaveThePageOpenForADay() {
+    await this.#page.clock.fastForward('24:00:00')
+    this.#completedAction = 'left-open'
+  }
+
+  async expectSessionDeletedAtExpiry() {
+    this.#expectAction()
+    await expect(this.#page.getByText('Your data was deleted from this browser after 24 hours.')).toBeVisible()
+    await expect(this.#page.getByRole('button', { name: 'Get started', exact: true })).toBeVisible()
+    await expect(this.#page.getByRole('textbox', { name: 'Professional text' })).toHaveCount(0)
+    expect(await readStoredCandidateSessions(this.#page)).toEqual({ browser: null, tab: null })
+    expect(this.#errors).toEqual([])
+  }
+
+  async givenIntakeOpenOnASharedComputer() {
+    await this.#installModelAdapters()
+    await this.#page.goto('/')
+    await this.#page.getByRole('checkbox', { name: 'Keep nothing after this tab closes' }).check()
+    await this.#page.getByRole('button', { name: 'Get started', exact: true }).click()
+    await this.#page.getByRole('textbox', { name: 'Professional text', exact: true }).fill('Alex Morgan\nalex@example.com')
+    const stored = await readStoredCandidateSessions(this.#page)
+    expect(stored.browser).toBeNull()
+    expect(stored.tab).not.toBeNull()
+  }
+
+  async closeTheTabAndOpenANewOne() {
+    const context = this.#page.context()
+    await this.#page.close()
+    this.#page = await context.newPage()
+    this.#recordPageErrors()
+    await this.#installModelAdapters()
+    await this.#page.goto('/')
+    this.#completedAction = 'tab-closed'
+  }
+
+  async expectNothingKeptAfterTheTab() {
+    this.#expectAction()
+    await expect(this.#page.getByRole('button', { name: 'Get started', exact: true })).toBeEnabled()
+    await expect(this.#page.getByRole('textbox', { name: 'Professional text' })).toHaveCount(0)
+    expect(await readStoredCandidateSessions(this.#page)).toEqual({ browser: null, tab: null })
+    expect(this.#errors).toEqual([])
+  }
+
   async expectDeletedSession() {
     this.#expectAction()
     await expect(this.#page.getByRole('button', { name: 'Get started', exact: true })).toBeVisible()
@@ -1671,7 +1741,13 @@ function matchFor(scenario: Scenario) {
 
 const dropFileCopy = 'Drop your file here or click to choose it'
 const chooseFileCopy = 'Choose a file'
-const privacyStatement = 'Nothing is stored on our servers: your documents stay in this browser for 24 hours.'
+const privacyStatement = 'Nothing is stored on our servers: your documents stay in this browser. They are deleted on your next visit after 24 hours, or right away with “Delete my data”.'
+
+/** The Candidate Session the page keeps in local storage and in the tab's session storage. */
+function readStoredCandidateSessions(page: Page) {
+  return page.evaluate((key) => ({ browser: localStorage.getItem(key), tab: sessionStorage.getItem(key) }),
+    'honest-resume:candidate-session')
+}
 
 /** The width inside an element's padding, where its content lays out. */
 function readContentWidth(locator: Locator) {

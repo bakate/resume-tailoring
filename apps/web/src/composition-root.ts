@@ -6,6 +6,7 @@ import type { CandidateJourney } from '@resume-tailoring/application/candidate-j
 import type { CandidateJourneyDependencies } from '@resume-tailoring/application/ports'
 import { createPrivacySafeBrowserTelemetry } from './adapters/browser/browser-adapters'
 import { createBrowserCandidateSessionPersistence } from './adapters/browser/browser-candidate-session-persistence'
+import type { BrowserCandidateSessionPersistence, CandidateSessionRetention } from './adapters/browser/browser-candidate-session-persistence'
 import { createBrowserResumeDocumentRenderer } from './adapters/browser/browser-resume-document-renderer'
 import { createBrowserJobPostingDocumentReader } from './adapters/browser/job-posting-document-reader'
 import {
@@ -21,8 +22,12 @@ import { createBrowserSourceIntakeDocumentReader } from './adapters/browser/sour
 import { listenForUncaughtErrors, reportUncaughtError } from './adapters/browser/uncaught-error-reporting'
 import { createAccessRecoveringRequest, demoAccessRecovery } from './demo-access/demo-access-recovery'
 
+export type { CandidateSessionRetention }
+
 export type BrowserCandidateJourneySystem = Readonly<{
   candidateJourney: CandidateJourney
+  /** Chooses, before the Candidate Session is first saved, whether it outlives the tab. */
+  chooseCandidateSessionRetention: (retention: CandidateSessionRetention) => void
   languageModelGateway: OpenAiLanguageModelGateway
 }>
 
@@ -33,14 +38,18 @@ export function createBrowserCandidateJourneySystem(): BrowserCandidateJourneySy
     readProcessingConsent: () => readProcessingConsent({ candidateJourney }),
     request,
   })
-  candidateJourney = createCandidateJourney({
-    dependencies: createBrowserDependencies({ languageModelGateway, request }),
+  const persistence = createBrowserCandidateSessionPersistence({
+    storages: { browser: localStorage, tab: sessionStorage }, page: window,
   })
-  return { candidateJourney, languageModelGateway }
+  candidateJourney = createCandidateJourney({
+    dependencies: createBrowserDependencies({ languageModelGateway, persistence, request }),
+  })
+  return { candidateJourney, chooseCandidateSessionRetention: persistence.chooseRetention, languageModelGateway }
 }
 
-function createBrowserDependencies({ languageModelGateway, request }: Readonly<{
+function createBrowserDependencies({ languageModelGateway, persistence, request }: Readonly<{
   languageModelGateway: OpenAiLanguageModelGateway
+  persistence: BrowserCandidateSessionPersistence
   request: typeof fetch
 }>): CandidateJourneyDependencies {
   const telemetry = createPrivacySafeBrowserTelemetry()
@@ -55,7 +64,7 @@ function createBrowserDependencies({ languageModelGateway, request }: Readonly<{
     languageModelGateway,
     matchEvidenceMatcher: createGatewayMatchEvidenceMatcher({ languageModelGateway }),
     now: () => Date.now(),
-    persistence: createBrowserCandidateSessionPersistence({ storage: localStorage, page: window }),
+    persistence,
     sourceDocumentReader: createBrowserSourceIntakeDocumentReader(),
     sourceProfileExtractor: createGatewaySourceProfileExtractor({ languageModelGateway }),
   }
