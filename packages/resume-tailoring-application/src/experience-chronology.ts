@@ -2,6 +2,7 @@ import type { TailoredResumeExperience } from './tailored-resume'
 
 /** An experience to order: its index in the source and its dates as the source or the Candidate wrote them. */
 export type DatedExperience = Readonly<{ sourceIndex: number; startDate: string | null; endDate: string | null }>
+type ExperienceDates = Pick<DatedExperience, 'startDate' | 'endDate'>
 
 /** `year * 13 + month`, where month 0 is a date known only by its year: it sorts before every month of that year. */
 type ExperienceMonth = number
@@ -55,7 +56,7 @@ function budgetByDuration(months: number | null) {
  * Whole months from the first to the last, both included; an ongoing role runs until today. A year without a month
  * covers that whole year, never beyond today. Null without a usable start and end, so the duration is never guessed.
  */
-function readExperienceMonths({ experience, today }: Readonly<{ experience: DatedExperience; today: number }>) {
+export function readExperienceMonths({ experience, today }: Readonly<{ experience: ExperienceDates; today: number }>) {
   const start = readMonth({ date: experience.startDate })
   const ongoing = readExperienceDates({ experience }).end === 'ongoing'
   const end = ongoing ? null : readMonth({ date: experience.endDate })
@@ -96,7 +97,7 @@ export function orderResumeExperiences({ experiences }: Readonly<{
     .map(({ experience }) => experience)
 }
 
-function readExperienceDates({ experience: { startDate, endDate } }: Readonly<{ experience: DatedExperience }>): Readonly<{
+function readExperienceDates({ experience: { startDate, endDate } }: Readonly<{ experience: ExperienceDates }>): Readonly<{
   start: ExperienceMonth | null; end: ExperienceEnd | null
 }> {
   const start = readMonth({ date: startDate })
