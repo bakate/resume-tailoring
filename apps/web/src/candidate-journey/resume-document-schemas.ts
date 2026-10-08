@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { resumeCoherenceIssueKinds, resumeSectionKinds } from '@resume-tailoring/application/candidate-journey'
+import { resumeCoherenceIssueKinds, resumeSectionKinds, resumeStructureRejectionKinds } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeSectionKind } from '@resume-tailoring/application/candidate-journey'
 import { sourceIntakeSchema, tailoredResumeFieldSchema, tailoredResumeSchema } from './candidate-session'
 
@@ -43,7 +43,7 @@ export const resumeSectionWritingInputSchema = z.strictObject({
   locale: localeSchema, purpose: purposeSchema,
   // Absent from clients loaded before rewrites learned their rejected fields, and `reason` before the coherence check named fields.
   rejectedFields: z.array(z.strictObject({ fieldId: z.string().min(1), text: z.string().max(5_000),
-    reason: z.enum(['unsupported', ...resumeCoherenceIssueKinds]).default('unsupported'),
+    reason: z.enum(['unsupported', ...resumeCoherenceIssueKinds, ...resumeStructureRejectionKinds]).default('unsupported'),
     unsupportedProposition: z.string().max(5_000).optional() })).max(200).default([]),
   // Absent from clients loaded before coherence rewrites started from the previous version.
   previousContent: resumeSectionContentSchema.nullable().default(null),

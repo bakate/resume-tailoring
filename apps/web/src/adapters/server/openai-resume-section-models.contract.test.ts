@@ -41,6 +41,22 @@ describe('Resume section model adapters', () => {
     expect(readModelInput(body)).toMatchObject({ previousContent })
   })
 
+  it('accepts a rewrite with the fields its structure was rejected for and passes them to the writer', async () => {
+    let body: RequestBody | null = null
+    const content = readResumeSection({ document: groupedResumeDocument, section: sectionFor('experience') })
+    const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
+      body = readBody(options)
+      return Promise.resolve(Response.json(modelResponse(sectionOutput(content))))
+    } })
+    const rejectedFields = [{ fieldId: 'experiences.0.role', text: 'Frontend Engineer building accessible screens', reason: 'misplaced-fact' },
+      { fieldId: 'experiences.0.organization', text: '', reason: 'missing-field' }]
+    const input = resumeSectionWritingInputSchema.parse({ ...writingInput('experience'), rejectedFields })
+
+    await writer.write(input)
+
+    expect(readModelInput(body)).toMatchObject({ rejectedFields })
+  })
+
   it('accepts an experience with the class and achievement budget code set and passes them to the writer', async () => {
     let body: RequestBody | null = null
     const content = readResumeSection({ document: groupedResumeDocument, section: sectionFor('experience') })

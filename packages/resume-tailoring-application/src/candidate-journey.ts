@@ -1,6 +1,7 @@
 export { resumePreparationFailures } from '@resume-tailoring/domain/candidate-session'
 export { hiddenContentOrigins } from '@resume-tailoring/domain/tailored-resume'
-export { isCopiedFromSource, readProfessionalResumeFields, resumeCoherenceIssueKinds, resumeSectionKinds } from './resume-sections'
+export { isCopiedFromSource, readProfessionalResumeFields, resumeCoherenceIssueKinds, resumeSectionKinds,
+  resumeStructureRejectionKinds } from './resume-sections'
 export type { ResumeCoherenceInput, ResumeCoherenceIssue, ResumeCoherenceIssueKind, ResumeDocumentCoherence,
   ResumeFieldRejection, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage, ResumeRejectedField,
   ResumeSectionContent, ResumeSectionKind, ResumeSectionModelError, ResumeSectionModelFailure, ResumeSectionModelResult,

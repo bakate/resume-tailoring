@@ -7,7 +7,7 @@ import type { CandidateJourney, CandidateJourneyView, CandidateSession,
 import { readGroupedResumeSection, structuredResumeJobMatch,
   structuredResumeSource, writeResumeSectionFromFacts } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createFakeCandidateJourneyDependencies, createFakeResumeSectionModels, createInMemoryCandidateSessionPersistence,
-  testProcessingPolicy } from '@resume-tailoring/application/testing'
+  createRecordingTelemetry, testProcessingPolicy } from '@resume-tailoring/application/testing'
 import type { TailoredResumeField } from '@resume-tailoring/application/tailored-resume'
 import type { CandidateJourneyDependencies } from '@resume-tailoring/application/ports'
 
@@ -94,6 +94,16 @@ describe('Candidate Journey section-by-section resume preparation', () => {
     await system.prepareTailoredResume()
 
     system.expectFirstExperienceCopiedFromItsFactsAndResumePrepared()
+  })
+
+  it('rewrites an experience rejected for structure with the field and reason it was rejected for', async () => {
+    const system = createSystemUnderTest({ writtenExperience: 'role-citing-achievement' })
+    await system.givenMatchedCandidateSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectFirstExperienceRewrittenWithItsRoleRejectedForCitingAnAchievement()
+    system.expectFirstExperienceRecordedAsCopiedAfterTwoAttempts()
   })
 
   it('saves and restores an experience copied after its rewrite still fails as copied, not written', async () => {
@@ -228,7 +238,7 @@ describe('Candidate Journey section-by-section resume preparation', () => {
 
     await system.prepareTailoredResume()
 
-    system.expectSkillsWrittenAgainWithTheCoherenceFeedback()
+    system.expectSkillsWrittenAgainWithTheCoherenceFeedbackAndEachSkillCitingAnUnknownFact()
   })
 
   it('removes a field the coherence check finds redundant without rewriting or checking again', async () => {
@@ -589,6 +599,7 @@ class SectionPreparationTestSystem {
   #skillsValidations = 0
   #coherenceChecks = 0
   readonly #rejectedFields: ResumeRejectedField[] = []
+  readonly #telemetry = createRecordingTelemetry()
   #outcome: CandidateJourneyView | null = null
 
   constructor(options: TestOptions) {
@@ -598,7 +609,7 @@ class SectionPreparationTestSystem {
   }
 
   #createJourney({ heldSection }: Readonly<{ heldSection: TestOptions['heldSection'] }>) {
-    return createCandidateJourney({ dependencies: createDependencies({ options: this.#options, persistence: this.#persistence, models: {
+    return createCandidateJourney({ dependencies: createDependencies({ options: this.#options, persistence: this.#persistence, telemetry: this.#telemetry, models: {
       onWrite: async (input) => {
         this.#writingInputs.push(input)
         this.#writesInFlight += 1
@@ -852,6 +863,17 @@ class SectionPreparationTestSystem {
     expect(retriedRewrite?.rejectedFields).toEqual(this.#rejectedFields)
   }
 
+  expectSkillsWrittenAgainWithTheCoherenceFeedbackAndEachSkillCitingAnUnknownFact() {
+    expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
+    const [, failedRewrite, retriedRewrite] = this.#writingInputs.filter(({ section }) => section.key === 'skills')
+    expect(retriedRewrite?.previousContent).toEqual(failedRewrite?.previousContent)
+    const written = readGroupedResumeSection({ key: 'skills', kind: 'skills' })
+    const skills = written.kind === 'skills' ? written.groups.flatMap(({ items }) => items) : []
+    expect(skills).not.toHaveLength(0)
+    expect(retriedRewrite?.rejectedFields).toEqual([...this.#rejectedFields,
+      ...skills.map(({ id, text }) => ({ fieldId: id, text, reason: 'unknown-fact' }))])
+  }
+
   expectLastRejectedFieldRemovedAndResumePrepared() {
     expect(this.#expectOutcome()?.preparationOutcome).toMatchObject({ status: 'prepared' })
     const removed = this.#rejectedFields.at(-1)
@@ -1007,6 +1029,17 @@ class SectionPreparationTestSystem {
     })
   }
 
+  expectFirstExperienceRewrittenWithItsRoleRejectedForCitingAnAchievement() {
+    const writes = this.#writingInputs.filter(({ section }) => section.key === 'experiences.0')
+    expect(writes.map(({ rejectedFields }) => rejectedFields)).toEqual([[], [{ fieldId: 'experiences.0.role',
+      text: 'Frontend Engineer building accessible screens', reason: 'misplaced-fact' }]])
+  }
+
+  expectFirstExperienceRecordedAsCopiedAfterTwoAttempts() {
+    expect(this.#telemetry.events.filter((event) => event.name === 'resume-section-prepared' && event.sectionKind === 'experience'
+      && event.outcome === 'copied-from-source')).toEqual([expect.objectContaining({ attemptCount: 2 })])
+  }
+
   expectOnlyFirstExperienceCopied() {
     const session = this.#expectOutcome()?.session
     expect(session?.preparation?.sections?.flatMap((section) => section.status === 'validated'
@@ -1119,15 +1152,16 @@ function createDatedSource(experienceDates: readonly ExperienceDates[]): Candida
     ...structuredResumeSource.candidateFacts.filter(({ path }) => !path.startsWith('experiences.'))] }
 }
 
-function createDependencies({ options, persistence, models }: Readonly<{
+function createDependencies({ options, persistence, telemetry, models }: Readonly<{
   options: TestOptions
   persistence: CandidateJourneyDependencies['persistence']
+  telemetry: CandidateJourneyDependencies['telemetry']
   models: Readonly<{ onWrite: (input: ResumeSectionWritingInput) => Promise<void>
     onSkillsWrite: () => number; onSkillsValidation: () => number
     onRejectedField: (field: ResumeRejectedField) => void; onCoherenceCheck: () => number }>
 }>): CandidateJourneyDependencies {
   return createFakeCandidateJourneyDependencies({
-    persistence,
+    persistence, telemetry,
     ...(options.career === undefined ? {} : { now: () => careerToday }),
     resumeSectionModels: createFakeResumeSectionModels({
       writeSection: async (input) => {
