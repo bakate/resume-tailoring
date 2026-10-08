@@ -1,0 +1,2 @@
+/* The status icon keeps its size beside a sentence that wraps, aligned with its first line. */
+.status-message-icon { flex-shrink: 0; margin-top: 1px; }

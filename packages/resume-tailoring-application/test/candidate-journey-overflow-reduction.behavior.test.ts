@@ -141,6 +141,44 @@ describe('Candidate Journey Overflow Reduction to the Page Budget', () => {
     system.expectNoHiddenContent()
     system.expectAchievementCounts({ tailspin: 6, litware: 4, contoso: 2 })
   })
+
+  it('shortens restored content that overflows the Page Budget by hiding other content first', async () => {
+    const system = createSystemUnderTest({ linesPerPage: Math.ceil(fullResumeLines / 2) - 1 })
+    await system.givenPreparedTailoredResume()
+    await system.restoreHiddenAchievement('contoso achievement 2')
+    await system.assessLayout()
+    system.expectOverflowBlockingExport()
+
+    await system.shortenResume()
+
+    system.expectHiddenByReduction(['contoso achievement 1'])
+    system.expectMeasuredPageCount(2)
+  })
+
+  it('hides restored content again when the Candidate shortens and nothing else is left to hide', async () => {
+    // Two pages hold the resume only once every hideable line is gone.
+    const system = createSystemUnderTest({ linesPerPage: 8 })
+    await system.givenPreparedTailoredResume()
+    await system.restoreHiddenAchievement('contoso achievement 2')
+    await system.assessLayout()
+    system.expectOverflowBlockingExport()
+
+    await system.shortenResume()
+
+    system.expectHiddenByReductionIncluding('contoso achievement 2')
+    system.expectMeasuredPageCount(2)
+  })
+
+  it('proposes shorter wording when no reduction brings the resume back within two pages', async () => {
+    const system = createSystemUnderTest({ linesPerPage: 5 })
+    await system.givenPreparedTailoredResume()
+    await system.assessLayout()
+
+    await system.shortenResume()
+
+    system.expectNoHiddenContent()
+    system.expectCondensationProposed()
+  })
 })
 
 function createSystemUnderTest(options: TestOptions) {
@@ -161,6 +199,9 @@ class OverflowReductionTestSystem {
     this.#journey = createCandidateJourney({ dependencies: createFakeCandidateJourneyDependencies({
       now: () => careerToday,
       persistence: createInMemoryCandidateSessionPersistence({ session: createMatchedSession() }),
+      // Condensation keeps each claim's wording; the layout is measured by the renderer below.
+      resumeDocumentPorts: { condenseClaim: ({ claim }) => Promise.resolve({ ok: true, value: claim }),
+        validateClaim: () => Promise.resolve({ ok: true, value: { supported: true } }) },
       resumeSectionModels: createFakeResumeSectionModels({
         writeSection: (input) => Promise.resolve({ ok: true, value: writeResumeSectionFromFacts(input) }) }),
       resumeDocumentRenderer: createFakeResumeDocumentRenderer({ render: (request) => {
@@ -196,7 +237,11 @@ class OverflowReductionTestSystem {
     const hidden = this.#readHiddenFields().find(({ field }) => field.text === text)
     if (hidden === undefined) expect.fail(`Expected ${text} to be hidden`)
     this.#journey.restoreResumeField({ fieldId: hidden.field.id })
-    await expect.poll(() => this.#readHiddenFields().length).toBe(0)
+    await expect.poll(() => this.#readHiddenFields().some(({ field }) => field.id === hidden.field.id)).toBe(false)
+  }
+
+  async shortenResume() {
+    await this.#journey.shortenResume()
   }
 
   async assessLayout() {
@@ -214,6 +259,20 @@ class OverflowReductionTestSystem {
   expectHiddenAchievementsByReduction(texts: readonly string[]) {
     expect(this.#readHiddenFields().filter(({ location }) => location.kind === 'experience' && location.fieldName === 'achievements')
       .map(readTextAndOrigin)).toEqual(texts.map(hiddenByReduction))
+  }
+
+  expectHiddenByReductionIncluding(text: string) {
+    expect(this.#readHiddenFields().map(readTextAndOrigin)).toContainEqual(hiddenByReduction(text))
+  }
+
+  expectCondensationProposed() {
+    expect(this.#readOpenView().resumeReview?.proposal).toMatchObject({ layout: { status: 'overflow' } })
+  }
+
+  expectMeasuredPageCount(pageCount: number) {
+    const assessment = this.#readOpenView().resumeReview?.assessment
+    expect(assessment?.layout).toMatchObject({ status: 'fits', pageCount })
+    expect(assessment?.exportEligibility.status === 'blocked' ? assessment.exportEligibility.reasons : []).not.toContain('overflow')
   }
 
   expectAchievementCounts(counts: Readonly<Record<'tailspin' | 'litware' | 'contoso', number>>) {

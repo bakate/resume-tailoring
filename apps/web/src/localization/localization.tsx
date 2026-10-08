@@ -292,8 +292,7 @@ const englishCatalog = {
   'resumeReview.validating': 'Checking the edited section…',
   'resumeReview.condensing': 'Preparing a shorter proposal…',
   'resumeReview.unchecked': 'Page count has not been checked for this version.',
-  'resumeReview.fits': 'The current version fits within two pages. Nothing is deleted: hidden content can be restored from the editor.',
-  'resumeReview.overflow': 'This version exceeds two pages. Try a shorter proposal, or choose content to hide in the editor. Nothing is deleted: hidden content can be restored from the editor.',
+  'resumeReview.shortening': 'Shortening the resume…',
   'resumeReview.reviewHidden': 'Review hidden content',
   'resumeReview.hiddenByReduction': 'Hidden to fit the page',
   'resumeReview.section.value-proposition': 'Summary',
@@ -329,10 +328,14 @@ const englishCatalog = {
   'resumePreview.detectedName': 'Detected in your resume, check it.',
   'resumePreview.missing-identity': 'Add your full name to download the PDF.',
   'resumePreview.missing-contact': 'Add an email address or phone number in contact details.',
-  'resumePreview.overflow': 'This document exceeds two pages. Condense or choose content to remove; your draft has been preserved.',
   'resumePreview.stale-layout': 'The document changed. Wait for the current preview before downloading.',
   'resumePreview.paused': 'Close the editor to download the current PDF.',
   'resumePreview.copiedExperiences': 'Experiences taken as written',
+  'pageBudget.fitsOne': 'Fits on one page.',
+  'pageBudget.fitsTwo': 'Fits on two pages.',
+  'pageBudget.overflow': 'Your resume runs to {pageCount} pages, two at most.',
+  'pageBudget.proposalOverflow': 'This proposal still runs over two pages.',
+  'pageBudget.shorten': 'Shorten the resume',
 } as const
 
 type TranslationKey = keyof typeof englishCatalog
@@ -629,8 +632,7 @@ const frenchCatalog = {
   'resumeReview.validating': 'Vérification de la rubrique modifiée…',
   'resumeReview.condensing': 'Préparation d’une proposition plus courte…',
   'resumeReview.unchecked': 'Le nombre de pages de cette version n’a pas été vérifié.',
-  'resumeReview.fits': 'La version actuelle tient sur deux pages maximum. Rien n’est supprimé : le contenu masqué se restaure depuis l’éditeur.',
-  'resumeReview.overflow': 'Cette version dépasse deux pages. Essaie une proposition plus courte ou choisis le contenu à masquer dans l’éditeur. Rien n’est supprimé : le contenu masqué se restaure depuis l’éditeur.',
+  'resumeReview.shortening': 'Raccourcissement du CV…',
   'resumeReview.reviewHidden': 'Voir le contenu masqué',
   'resumeReview.hiddenByReduction': 'Masqué pour tenir sur la page',
   'resumeReview.section.value-proposition': 'Profil',
@@ -666,10 +668,14 @@ const frenchCatalog = {
   'resumePreview.detectedName': 'Détecté dans ton CV, vérifie-le.',
   'resumePreview.missing-identity': 'Ajoute ton nom complet pour télécharger le PDF.',
   'resumePreview.missing-contact': 'Ajoute une adresse e-mail ou un numéro de téléphone dans les coordonnées.',
-  'resumePreview.overflow': 'Ce document dépasse deux pages. Condense-le ou choisis du contenu à retirer ; ton brouillon est conservé.',
   'resumePreview.stale-layout': 'Le document a changé. Attends l’aperçu actuel avant de télécharger.',
   'resumePreview.paused': 'Ferme l’éditeur pour télécharger le PDF actuel.',
   'resumePreview.copiedExperiences': 'Expériences reprises telles quelles',
+  'pageBudget.fitsOne': 'Tient sur une page.',
+  'pageBudget.fitsTwo': 'Tient sur deux pages.',
+  'pageBudget.overflow': 'Ton CV fait {pageCount} pages, deux au maximum.',
+  'pageBudget.proposalOverflow': 'Cette proposition dépasse encore deux pages.',
+  'pageBudget.shorten': 'Raccourcir le CV',
 } as const satisfies TranslationCatalog
 
 export type Locale = 'en' | 'fr'

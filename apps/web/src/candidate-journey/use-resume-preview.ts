@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ResumePhoto, ResumeRenderInput, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
 import type { Localization } from '../localization/localization'
+import type { OverflowReductionCounts } from './page-budget-status'
 
 export type ResumePreviewProps = Readonly<{
   document: TailoredResume
@@ -12,13 +13,20 @@ export type ResumePreviewProps = Readonly<{
   photo: ReturnType<typeof useResumePhoto>
   renderDocument: (request: ResumeRenderInput) => Promise<ResumeRenderResult>
   unsupportedFieldIds: readonly string[]
-  /** Offered as the primary action only while the current assessment reports an overflow. */
-  condensation?: Readonly<{ label: string; disabled: boolean; propose: () => void }>
+  /**
+   * The Page Budget status under the Download button: what Overflow Reduction hid and the way to review it, or while
+   * the current assessment reports an overflow, shortening as the primary action.
+   */
+  pageBudget?: Readonly<{
+    overflowReduction: OverflowReductionCounts
+    reviewHidden: Readonly<{ disabled: boolean; open: () => void }>
+    shortening: Readonly<{ disabled: boolean; shorten: () => void }>
+  }>
   onDownload: () => void
   onIdentityChange: (identity: TailoredResume['identity']) => void
 }>
 
-type PreviewInput = Omit<ResumePreviewProps, 'condensation' | 'localization' | 'onDownload' | 'onIdentityChange'> & Readonly<{
+type PreviewInput = Omit<ResumePreviewProps, 'pageBudget' | 'localization' | 'onDownload' | 'onIdentityChange'> & Readonly<{
   attempt: number
 }>
 
