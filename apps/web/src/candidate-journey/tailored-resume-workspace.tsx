@@ -13,8 +13,7 @@ import { renderTailoredResumeDocument } from './tailored-resume-document'
 import { ResumeEditor } from './resume-editor'
 import type { EditorTab } from './resume-editor'
 import { ResumeOperationFailureAlert } from './failure-recovery'
-import { describeOverflowReduction, resumeReviewCopy } from './resume-review-copy'
-import type { ResumeReviewCopy } from './resume-review-copy'
+import { describeOverflowReduction } from '../localization/overflow-reduction-summary'
 
 export type ResumeReviewController = ReturnType<typeof useCandidateJourney>
 export type ResumeReviewProps = Readonly<{ candidateJourney: ResumeReviewController; localization: Localization }>
@@ -39,31 +38,31 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
   const editorOpened = editorTab !== null
   const [downloadedRevision, setDownloadedRevision] = useState<string | null>(null)
   const revision = props.candidateJourney.view.status === 'candidate-session-open' ? props.candidateJourney.view.resumeReview?.draft.revision ?? null : null
-  const copy = resumeReviewCopy[props.localization.locale]
+  const { localization } = props
   const operations = useRetryableOperations()
   return <Paper aria-labelledby="tailored-resume-title" component="section"
     className="candidate-journey-workspace" p={{ base: 'md', sm: 'xl' }} shadow="xs" withBorder>
     <Stack gap="lg">
       <PreparationStatus {...props} />
-      <div><Title id="tailored-resume-title" order={2}>{copy.preview}</Title><Text c="dimmed">{copy.description}</Text></div>
-      <OverflowReductionSummary {...props} copy={copy} openHiddenContent={() => { setEditorTab('recovery') }} />
+      <div><Title id="tailored-resume-title" order={2}>{localization.translate('resumeReview.preview')}</Title><Text c="dimmed">{localization.translate('resumeReview.description')}</Text></div>
+      <OverflowReductionSummary {...props} openHiddenContent={() => { setEditorTab('recovery') }} />
       <CurrentResumePreview {...props} {...{ editorOpened, photo }} onDownload={() => {
         props.candidateJourney.recordResumeDownload(); setDownloadedRevision(revision) }}
-        condensation={{ label: copy.condense, disabled: !canCondense({ candidateJourney: props.candidateJourney, photo }),
+        condensation={{ label: localization.translate('resumeReview.condense'), disabled: !canCondense({ candidateJourney: props.candidateJourney, photo }),
           propose: () => { operations.attempt(() => {
             setProposalPhoto(photo.dataUrl); void props.candidateJourney.proposeResumeCondensation({ photoDataUrl: photo.dataUrl }) }) } }} />
       {downloadedRevision !== null && downloadedRevision === revision
-        ? <UsabilityFeedback key={downloadedRevision} candidateJourney={props.candidateJourney} copy={copy} /> : null}
-      <ReviewStatus {...props} copy={copy} onRetry={operations.retry} />
-      <CondensationProposal {...props} copy={copy} photoDataUrl={photo.dataUrl}
+        ? <UsabilityFeedback key={downloadedRevision} candidateJourney={props.candidateJourney} localization={props.localization} /> : null}
+      <ReviewStatus {...props} onRetry={operations.retry} />
+      <CondensationProposal {...props} photoDataUrl={photo.dataUrl}
         proposalLayoutCurrent={photo.ready && !photo.failed && proposalPhoto === photo.dataUrl} />
       <Group><Button variant="default" disabled={blocksResumeEditing(view)}
-        onClick={() => { setEditorTab('contacts') }}>{copy.edit}</Button>
-        <Button variant="default" onClick={props.onChangeJobPosting}>{copy.changeJobPosting}</Button></Group>
+        onClick={() => { setEditorTab('contacts') }}>{localization.translate('resumeReview.edit')}</Button>
+        <Button variant="default" onClick={props.onChangeJobPosting}>{localization.translate('resumeReview.changeJobPosting')}</Button></Group>
       <MatchAnalysisDisclosure {...props} />
-      <DocumentText document={props.resume} locale={props.localization.locale} />
+      <DocumentText document={props.resume} localization={props.localization} />
     </Stack>
-    <ResumeEditorDialog {...props} {...{ copy, editorTab, operations }} closeEditor={() => { setEditorTab(null) }} />
+    <ResumeEditorDialog {...props} {...{ editorTab, operations }} closeEditor={() => { setEditorTab(null) }} />
   </Paper>
 }
 
@@ -91,18 +90,18 @@ function useRetryableOperations() {
 export type RetryableOperations = ReturnType<typeof useRetryableOperations>
 
 function ResumeEditorDialog({ editorTab, ...props }: ResumeDocumentProps & Readonly<{
-  copy: ResumeReviewCopy; editorTab: EditorTab | null; closeEditor: () => void; operations: RetryableOperations
+  editorTab: EditorTab | null; closeEditor: () => void; operations: RetryableOperations
 }>) {
   const fullScreen = useMediaQuery('(max-width: 48em)')
-  return <Modal opened={editorTab !== null} onClose={props.closeEditor} title={props.copy.edit}
-    fullScreen={fullScreen} size="xl" returnFocus closeButtonProps={{ 'aria-label': props.copy.close }}>
+  return <Modal opened={editorTab !== null} onClose={props.closeEditor} title={props.localization.translate('resumeReview.edit')}
+    fullScreen={fullScreen} size="xl" returnFocus closeButtonProps={{ 'aria-label': props.localization.translate('resumeReview.close') }}>
     <ResumeEditor {...props} initialTab={editorTab ?? 'contacts'} />
   </Modal>
 }
 
 /** Says how much Hidden Content Overflow Reduction produced, and opens the editor where the Candidate restores it. */
-function OverflowReductionSummary({ candidateJourney, copy, openHiddenContent }: ResumeReviewProps & Readonly<{
-  copy: ResumeReviewCopy; openHiddenContent: () => void
+function OverflowReductionSummary({ candidateJourney, localization, openHiddenContent }: ResumeReviewProps & Readonly<{
+  openHiddenContent: () => void
 }>) {
   const { view } = candidateJourney
   const review = view.status === 'candidate-session-open' ? view.resumeReview : null
@@ -113,7 +112,7 @@ function OverflowReductionSummary({ candidateJourney, copy, openHiddenContent }:
   const summary = describeOverflowReduction({ locale: review.draft.document.locale, ...review.recovery.overflowReduction, pageCount })
   if (summary === null) return null
   return <Group justify="space-between"><Text>{summary}</Text>
-    <Button variant="subtle" disabled={blocksResumeEditing(view)} onClick={openHiddenContent}>{copy.reviewHidden}</Button></Group>
+    <Button variant="subtle" disabled={blocksResumeEditing(view)} onClick={openHiddenContent}>{localization.translate('resumeReview.reviewHidden')}</Button></Group>
 }
 
 /** A preview render is background work: disabling the button for it drops keyboard focus when the editor closes. */
@@ -138,23 +137,21 @@ function MatchAnalysisDisclosure({ candidateJourney, localization }: ResumeRevie
     <JobMatchWorkspace {...{ candidateJourney, localization }} /></details>
 }
 
-function ReviewStatus({ candidateJourney, copy, localization, onRetry }: ResumeReviewProps & Readonly<{
-  copy: ResumeReviewCopy; onRetry: () => void
-}>) {
+function ReviewStatus({ candidateJourney, localization, onRetry }: ResumeReviewProps & Readonly<{ onRetry: () => void }>) {
   const review = candidateJourney.view.status === 'candidate-session-open' ? candidateJourney.view.resumeReview : null
   if (review === null) return null
   const layout = review.assessment?.layout
   const measured = layout !== undefined && layout.revision === review.draft.revision
-  const layoutText = !measured ? '' : layout.status === 'fits' ? copy.fits : layout.status === 'overflow' ? copy.overflow : ''
-  const operationText = review.operation === 'validating-section' ? copy.validating
-    : review.operation === 'condensing' ? copy.condensing : review.operation === 'assessing-layout' ? copy.checking : ''
+  const layoutText = !measured ? '' : layout.status === 'fits' ? localization.translate('resumeReview.fits') : layout.status === 'overflow' ? localization.translate('resumeReview.overflow') : ''
+  const operationText = review.operation === 'validating-section' ? localization.translate('resumeReview.validating')
+    : review.operation === 'condensing' ? localization.translate('resumeReview.condensing') : review.operation === 'assessing-layout' ? localization.translate('resumeReview.checking') : ''
   return <Stack gap="xs"><Text role="status" aria-live="polite">{operationText || layoutText}</Text>
     {review.failure === null ? null : <ResumeOperationFailureAlert failure={review.failure} {...{ localization, onRetry }} />}
   </Stack>
 }
 
-function CondensationProposal({ candidateJourney, copy, localization, resume, photoDataUrl, proposalLayoutCurrent }: Readonly<{
-  candidateJourney: ResumeReviewController; copy: ResumeReviewCopy; localization: Localization; resume: TailoredResume
+function CondensationProposal({ candidateJourney, localization, resume, photoDataUrl, proposalLayoutCurrent }: Readonly<{
+  candidateJourney: ResumeReviewController; localization: Localization; resume: TailoredResume
   photoDataUrl?: string; proposalLayoutCurrent: boolean
 }>) {
   const review = candidateJourney.view.status === 'candidate-session-open' ? candidateJourney.view.resumeReview : null
@@ -163,13 +160,13 @@ function CondensationProposal({ candidateJourney, copy, localization, resume, ph
   const decision = { proposalId: proposal.id, baseRevision: proposal.baseRevision }
   const proposedResume = { ...proposal.document, identity: resume.identity, contactDetails: resume.contactDetails }
   return <Paper p="md" withBorder><Stack>
-    <Title order={3}>{copy.proposal}</Title><Text>{copy.proposalDescription}</Text>
-    <ResumePreview resume={proposedResume} title={copy.proposal} photoDataUrl={photoDataUrl} />
-    <Text>{!proposalLayoutCurrent ? copy.unchecked : proposal.layout.status === 'fits' ? copy.fits : proposal.layout.status === 'overflow' ? copy.overflow
+    <Title order={3}>{localization.translate('resumeReview.proposal')}</Title><Text>{localization.translate('resumeReview.proposalDescription')}</Text>
+    <ResumePreview resume={proposedResume} title={localization.translate('resumeReview.proposal')} photoDataUrl={photoDataUrl} />
+    <Text>{!proposalLayoutCurrent ? localization.translate('resumeReview.unchecked') : proposal.layout.status === 'fits' ? localization.translate('resumeReview.fits') : proposal.layout.status === 'overflow' ? localization.translate('resumeReview.overflow')
       : localization.translate('failure.review.pageCountUnavailable')}</Text>
     <Group><Button disabled={review?.draft.revision !== proposal.baseRevision}
-      onClick={() => { candidateJourney.acceptResumeCondensation(decision) }}>{copy.accept}</Button>
-      <Button variant="default" onClick={() => { candidateJourney.rejectResumeCondensation(decision) }}>{copy.reject}</Button></Group>
+      onClick={() => { candidateJourney.acceptResumeCondensation(decision) }}>{localization.translate('resumeReview.accept')}</Button>
+      <Button variant="default" onClick={() => { candidateJourney.rejectResumeCondensation(decision) }}>{localization.translate('resumeReview.reject')}</Button></Group>
   </Stack></Paper>
 }
 
@@ -191,13 +188,13 @@ function CurrentResumePreview({ candidateJourney, condensation, localization, re
       candidateJourney.updateResumeContacts({ identity, contactDetails: resume.contactDetails }) }} />
 }
 
-function UsabilityFeedback({ candidateJourney, copy }: Readonly<{ candidateJourney: ResumeReviewController; copy: ResumeReviewCopy }>) {
+function UsabilityFeedback({ candidateJourney, localization }: ResumeReviewProps) {
   const [recorded, setRecorded] = useState(false)
   const rate = (useful: boolean) => { candidateJourney.rateResumeUsefulness({ useful }); setRecorded(true) }
-  if (recorded) return <Text role="status">{copy.usabilityRecorded}</Text>
+  if (recorded) return <Text role="status">{localization.translate('resumeReview.usabilityRecorded')}</Text>
   return <div role="group" aria-labelledby="resume-usability-question"><Stack gap="xs">
-    <Text id="resume-usability-question" fw={600}>{copy.usability}</Text>
-    <Group><Button variant="default" onClick={() => { rate(true) }}>{copy.usable}</Button>
-      <Button variant="default" onClick={() => { rate(false) }}>{copy.needsRewriting}</Button></Group>
+    <Text id="resume-usability-question" fw={600}>{localization.translate('resumeReview.usability')}</Text>
+    <Group><Button variant="default" onClick={() => { rate(true) }}>{localization.translate('resumeReview.usable')}</Button>
+      <Button variant="default" onClick={() => { rate(false) }}>{localization.translate('resumeReview.needsRewriting')}</Button></Group>
   </Stack></div>
 }

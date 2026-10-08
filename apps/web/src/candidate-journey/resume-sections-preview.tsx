@@ -3,10 +3,10 @@ import type { CandidateSession, ResumeSectionSnapshot } from '@resume-tailoring/
 import type { ResumeSectionContent, ResumeSectionKind } from '@resume-tailoring/application/candidate-journey'
 import { isCopiedFromSource } from '@resume-tailoring/application/candidate-journey'
 import { inferTailoredResumeLocale } from '@resume-tailoring/application/tailored-resume'
+import type { ResumeSectionName } from '@resume-tailoring/application/tailored-resume'
 import type { Localization } from '../localization/localization'
 import type { useCandidateJourney } from './use-candidate-journey'
 import { CopiedNotice } from './copied-notice'
-import { resumeReviewCopy } from './resume-review-copy'
 import { readResumeHeading } from './tailored-resume-document'
 import type { ResumeHeadingKey } from './tailored-resume-document'
 
@@ -74,7 +74,7 @@ function ResumeSectionPreview({ localization, section }: Readonly<{ localization
     <ValidatedSectionContent content={section.content} />
     {isCopiedFromSource(section.content) ? <CopiedNotice localization={localization} /> : null}
   </Stack>
-  const label = resumeReviewCopy[localization.locale][sectionLabelKeys[section.kind]]
+  const label = localization.translate(`resumeReview.section.${sectionLabelKeys[section.kind]}`)
   const message = localization.translate(section.status === 'failed' ? 'resumeSections.failed' : 'resumeSections.writing')
     .replace('{section}', label)
   return <Stack gap="xs">
@@ -109,4 +109,4 @@ const sectionHeadingKeys = {
 const sectionLabelKeys = {
   'value-proposition': 'value-proposition', experience: 'experiences', skills: 'skills', education: 'education',
   languages: 'languages', projects: 'projects', certifications: 'certifications',
-} as const satisfies Record<ResumeSectionKind, keyof typeof resumeReviewCopy['en']>
+} as const satisfies Record<ResumeSectionKind, ResumeSectionName>

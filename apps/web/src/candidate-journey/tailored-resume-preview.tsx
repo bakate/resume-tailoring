@@ -8,37 +8,34 @@ import { FailureExplanation, RecoveryAction } from './failure-recovery'
 import { renderTailoredResumeDocument } from './tailored-resume-document'
 import { ResumePdfPages } from './resume-pdf-pages'
 import { CopiedNotice } from './copied-notice'
-import { resumePreviewMessages } from './resume-preview-messages'
 import { useRenderedResume } from './use-resume-preview'
 import type { ResumePreviewProps } from './use-resume-preview'
 import './resume-preview.css'
 
-type PreviewMessages = typeof resumePreviewMessages['en'] | typeof resumePreviewMessages['fr']
 type CandidateNameDraft = ReturnType<typeof useCandidateNameDraft>
 type RenderedResumeProps = Readonly<{
-  current: ResumeRenderResult; document: TailoredResume; localization: Localization; messages: PreviewMessages; name: CandidateNameDraft
+  current: ResumeRenderResult; document: TailoredResume; localization: Localization; name: CandidateNameDraft
   condensation?: ResumePreviewProps['condensation']; onDownload: () => void; onRetry: () => void; paused: boolean
 }>
 
 export function TailoredResumePreview(props: ResumePreviewProps) {
   const { localization } = props
-  const messages = resumePreviewMessages[localization.locale]
   const [attempt, setAttempt] = useState(0)
   const { photo } = props
   const { current } = useRenderedResume({ ...props, attempt, photo })
   const name = useCandidateNameDraft({ identity: props.document.identity, onCommit: props.onIdentityChange })
   const onRetry = () => { setAttempt((value) => value + 1) }
-  return <section aria-label={messages.title}>
-    {current === null ? <Stack><Text role="status">{photo.failed ? messages.photoInvalid : messages.pending}</Text>
-      <Button disabled>{messages.download}</Button>
-      <CandidateNameField identity={props.document.identity} explain={false} messages={messages} name={name} /></Stack>
+  return <section aria-label={localization.translate('resumePreview.title')}>
+    {current === null ? <Stack><Text role="status">{photo.failed ? localization.translate('resumePreview.photoInvalid') : localization.translate('resumePreview.pending')}</Text>
+      <Button disabled>{localization.translate('resumePreview.download')}</Button>
+      <CandidateNameField identity={props.document.identity} explain={false} localization={localization} name={name} /></Stack>
       : current.assessment.layout.status === 'unavailable' ? <RenderFailure {...{ localization, onRetry }} failure={current.failure} />
-        : <RenderedResume key={current.assessment.layout.revision} {...{ ...props, current, messages, name, onRetry }} />}
-    <PhotoPicker photo={photo} messages={messages} disabled={props.enabled === false} />
+        : <RenderedResume key={current.assessment.layout.revision} {...{ ...props, current, name, onRetry }} />}
+    <PhotoPicker photo={photo} localization={localization} disabled={props.enabled === false} />
   </section>
 }
 
-function RenderedResume({ condensation, current, document, localization, messages, name, onDownload, onRetry, paused }: RenderedResumeProps) {
+function RenderedResume({ condensation, current, document, localization, name, onDownload, onRetry, paused }: RenderedResumeProps) {
   const [preview, setPreview] = useState<'pending' | 'ready' | 'failed'>('pending')
   const ready = useCallback(() => { setPreview('ready') }, [])
   const failed = useCallback(() => { setPreview('failed') }, [])
@@ -46,14 +43,14 @@ function RenderedResume({ condensation, current, document, localization, message
   const bytes = eligibility.status === 'eligible' && preview === 'ready' && !paused ? current.pdf : null
   const blocker = eligibility.status === 'blocked' ? readPrimaryBlocker({ reasons: eligibility.reasons }) : null
   return <Stack gap="sm" mt="md">
-    {blocker === null || blocker === 'missing-identity' ? null : <Text role="alert" c="danger.8">{messages[blocker]}</Text>}
-    {current.pdf === null ? null : <ResumePdfPages bytes={current.pdf} onReady={ready} onFailure={failed} pageLabel={messages.page} />}
-    <CopiedExperiences {...{ document, localization, messages }} />
+    {blocker === null || blocker === 'missing-identity' ? null : <Text role="alert" c="danger.8">{localization.translate(`resumePreview.${blocker}`)}</Text>}
+    {current.pdf === null ? null : <ResumePdfPages bytes={current.pdf} onReady={ready} onFailure={failed} pageLabel={localization.translate('resumePreview.page')} />}
+    <CopiedExperiences {...{ document, localization }} />
     {preview === 'failed' ? <RenderFailure {...{ localization, onRetry }} failure={undefined} /> : null}
     {eligibility.status === 'blocked' && eligibility.reasons.includes('overflow') && condensation !== undefined
       ? <Button disabled={condensation.disabled} onClick={condensation.propose}>{condensation.label}</Button> : null}
-    <ResumeDownload {...{ bytes, localization, messages, onDownload, purpose: document.purpose }} />
-    <CandidateNameField identity={document.identity} explain={blocker === 'missing-identity'} messages={messages} name={name} />
+    <ResumeDownload {...{ bytes, localization, onDownload, purpose: document.purpose }} />
+    <CandidateNameField identity={document.identity} explain={blocker === 'missing-identity'} localization={localization} name={name} />
   </Stack>
 }
 
@@ -61,12 +58,10 @@ function RenderedResume({ condensation, current, document, localization, message
  * The PDF pages are the exported document, so the notice for each experience copied from the Candidate's own wording
  * is listed beside them and never printed.
  */
-function CopiedExperiences({ document, localization, messages }: Readonly<{
-  document: TailoredResume; localization: Localization; messages: PreviewMessages
-}>) {
+function CopiedExperiences({ document, localization }: Readonly<{ document: TailoredResume; localization: Localization }>) {
   const copied = document.experiences.filter((experience) => isCopiedFromSource({ kind: 'experience', experience }))
   if (copied.length === 0) return null
-  return <List aria-label={messages.copiedExperiences} listStyleType="none" spacing={4}>
+  return <List aria-label={localization.translate('resumePreview.copiedExperiences')} listStyleType="none" spacing={4}>
     {copied.map(({ id, role, organization }) => <List.Item key={id}>
       <Text fw={600} size="sm">{[role?.text, organization?.text].filter(Boolean).join(' – ')}</Text>
       <CopiedNotice localization={localization} /></List.Item>)}
@@ -101,35 +96,35 @@ function useCandidateNameDraft({ identity, onCommit }: Readonly<{
   return { draft, setDraft, commit }
 }
 
-function CandidateNameField({ identity, explain, messages, name }: Readonly<{
-  identity: TailoredResume['identity']; explain: boolean; messages: PreviewMessages; name: CandidateNameDraft
+function CandidateNameField({ identity, explain, localization, name }: Readonly<{
+  identity: TailoredResume['identity']; explain: boolean; localization: Localization; name: CandidateNameDraft
 }>) {
-  return <TextInput label={messages.fullName} value={name.draft} autoComplete="name"
-    description={identity?.origin === 'detected' ? messages.detectedName : undefined}
-    error={explain && (identity?.value.trim() ?? '').length === 0 ? messages['missing-identity'] : undefined}
+  return <TextInput label={localization.translate('resumePreview.fullName')} value={name.draft} autoComplete="name"
+    description={identity?.origin === 'detected' ? localization.translate('resumePreview.detectedName') : undefined}
+    error={explain && (identity?.value.trim() ?? '').length === 0 ? localization.translate('resumePreview.missing-identity') : undefined}
     onChange={(event) => { name.setDraft(event.currentTarget.value) }} onBlur={name.commit}
     onKeyDown={(event) => { if (event.key === 'Enter') name.commit() }} />
 }
 
 /** A photo picker that reads as one: the chosen photo's thumbnail, an explicit action and the accepted formats. */
-function PhotoPicker({ disabled, messages, photo }: Readonly<{
-  disabled: boolean; messages: PreviewMessages; photo: ResumePreviewProps['photo']
+function PhotoPicker({ disabled, localization, photo }: Readonly<{
+  disabled: boolean; localization: Localization; photo: ResumePreviewProps['photo']
 }>) {
   const chosen = photo.name !== null
   return <div role="group" aria-labelledby="resume-photo-label"><Stack gap={6} mt="sm">
-    <Text id="resume-photo-label" fw={600} size="sm">{messages.photo}</Text>
+    <Text id="resume-photo-label" fw={600} size="sm">{localization.translate('resumePreview.photo')}</Text>
     <Group gap="md" wrap="nowrap">
       <Avatar src={photo.ready ? photo.dataUrl : undefined} alt="" radius="xl" size="lg" />
       <Stack gap={4}>
         <Group gap="xs">
           <FileButton accept="image/png,image/jpeg,image/webp" disabled={disabled} onChange={photo.select}>
-            {(props) => <Button {...props} variant="default" size="xs">{chosen ? messages.photoChange : messages.photoAdd}</Button>}
+            {(props) => <Button {...props} variant="default" size="xs">{chosen ? localization.translate('resumePreview.photoChange') : localization.translate('resumePreview.photoAdd')}</Button>}
           </FileButton>
           {chosen ? <Button variant="subtle" size="xs" disabled={disabled} onClick={() => { photo.select(null) }}>
-            {messages.photoRemove}</Button> : null}
+            {localization.translate('resumePreview.photoRemove')}</Button> : null}
         </Group>
         <Text c={photo.failed ? 'danger.8' : 'dimmed'} role={photo.failed ? 'alert' : undefined} size="xs">
-          {photo.failed ? messages.photoInvalid : photo.name ?? messages.photoHint}</Text>
+          {photo.failed ? localization.translate('resumePreview.photoInvalid') : photo.name ?? localization.translate('resumePreview.photoHint')}</Text>
       </Stack>
     </Group>
   </Stack></div>
@@ -150,8 +145,8 @@ function RenderFailure({ failure, localization, onRetry }: Readonly<{
   </Stack>
 }
 
-function ResumeDownload({ bytes, localization, messages, onDownload, purpose }: Readonly<{
-  bytes: Uint8Array | null; localization: Localization; messages: PreviewMessages; onDownload: () => void
+function ResumeDownload({ bytes, localization, onDownload, purpose }: Readonly<{
+  bytes: Uint8Array | null; localization: Localization; onDownload: () => void
   purpose: TailoredResume['purpose']
 }>) {
   const [download, setDownload] = useState<'idle' | 'failed' | 'handed-off'>('idle')
@@ -160,16 +155,15 @@ function ResumeDownload({ bytes, localization, messages, onDownload, purpose }: 
     const outcome = handOffResumePdf({ bytes, purpose })
     setDownload(outcome ? 'handed-off' : 'failed')
     if (outcome) onDownload()
-  }}>{messages.download}</Button>
+  }}>{localization.translate('resumePreview.download')}</Button>
     {download === 'idle' ? null : <Text role={download === 'failed' ? 'alert' : 'status'}>
-      {download === 'failed' ? localization.translate('failure.preview.download') : messages.downloaded}</Text>}
+      {download === 'failed' ? localization.translate('failure.preview.download') : localization.translate('resumePreview.downloaded')}</Text>}
   </>
 }
 
-export function DocumentText({ document, locale }: Readonly<{ document: TailoredResume; locale: TailoredResume['locale'] }>) {
-  const messages = resumePreviewMessages[locale]
-  return <details><summary>{messages.textVersion}</summary>
-    <iframe className="tailored-resume-preview-frame" sandbox="" title={messages.previewTitle}
+export function DocumentText({ document, localization }: Readonly<{ document: TailoredResume; localization: Localization }>) {
+  return <details><summary>{localization.translate('resumePreview.textVersion')}</summary>
+    <iframe className="tailored-resume-preview-frame" sandbox="" title={localization.translate('resumePreview.previewTitle')}
       srcDoc={renderTailoredResumeDocument({ tailoredResume: document })} />
   </details>
 }
