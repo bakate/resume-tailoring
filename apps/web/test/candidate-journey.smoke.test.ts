@@ -1607,8 +1607,8 @@ class CandidateJourneyTestSystem {
   }
 
   async requestEveryPageTwice() {
-    const paths = ['/', '/resume', '/a-page-that-does-not-exist', '/', '/resume', '/a-page-that-does-not-exist']
-    for (const path of paths) {
+    const paths = ['/', '/resume', '/a-page-that-does-not-exist']
+    for (const path of [...paths, ...paths]) {
       const response = await this.#page.request.get(path)
       this.#servedPages.push({ body: await response.text(), policy: response.headers()['content-security-policy'] ?? null })
     }
@@ -1621,7 +1621,7 @@ class CandidateJourneyTestSystem {
       expect(policy, 'Every page must be served with a Content-Security-Policy').not.toBeNull()
       const scriptSources = /(?:^|;)\s*script-src ([^;]+)/u.exec(policy ?? '')?.[1] ?? ''
       expect(scriptSources).not.toMatch(/'unsafe-inline'|'unsafe-eval'/u)
-      expect(policy).toMatch(/(?:^|;)\s*connect-src 'self'(?: ws:)?(?:;|$)/u)
+      expect(policy).toMatch(/(?:^|;)\s*connect-src 'self'(?:;|$)/u)
       const nonce = /'nonce-([^']+)'/u.exec(scriptSources)?.[1] ?? ''
       expect(nonce, 'The script policy must name the request nonce').not.toBe('')
       expect(body).toContain(`<script nonce="${nonce}"`)

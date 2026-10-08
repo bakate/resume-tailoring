@@ -14,7 +14,10 @@ export function getRouter() {
   })
 }
 
-/** The server stamps the request's CSP nonce on every inline script; the browser reads it back from the page. */
+/**
+ * The server stamps the request's CSP nonce on every inline script. In the browser, TanStack Router reads it back from
+ * the page's `csp-nonce` meta tag itself, so there is nothing to pass here.
+ */
 const readRequestNonce = createIsomorphicFn()
   .server(() => getGlobalStartContext()?.nonce)
   .client(() => undefined)

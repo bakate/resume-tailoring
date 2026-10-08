@@ -8,11 +8,7 @@ const pageSecurityMiddleware = createMiddleware().server(async ({ next }) => {
   const result = await next({ context: { nonce } })
   return {
     ...result,
-    response: withPageSecurityHeaders({
-      mode: import.meta.env.DEV ? 'development' : 'production',
-      nonce,
-      response: result.response,
-    }),
+    response: withPageSecurityHeaders({ nonce, response: result.response }),
   }
 })
 

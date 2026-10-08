@@ -6,7 +6,7 @@ const nonce = 'cmFuZG9tLW5vbmNlLXZhbHVl'
 
 describe('page security headers', () => {
   it('serves a page under a strict policy bound to the request nonce', () => {
-    const response = withPageSecurityHeaders({ mode: 'production', nonce, response: htmlPage() })
+    const response = withPageSecurityHeaders({ nonce, response: htmlPage() })
 
     expect(readPolicy(response)).toEqual({
       'base-uri': ["'none'"],
@@ -25,7 +25,7 @@ describe('page security headers', () => {
   })
 
   it('sends the baseline security headers with every response', () => {
-    const response = withPageSecurityHeaders({ mode: 'production', nonce, response: Response.json({ ok: true }) })
+    const response = withPageSecurityHeaders({ nonce, response: Response.json({ ok: true }) })
 
     expect(response.headers.get('content-security-policy')).not.toBeNull()
     expect(response.headers.get('referrer-policy')).toBe('no-referrer')
@@ -34,7 +34,7 @@ describe('page security headers', () => {
   })
 
   it('keeps the status and body of the page it secures', async () => {
-    const response = withPageSecurityHeaders({ mode: 'production', nonce, response: htmlPage({ status: 404 }) })
+    const response = withPageSecurityHeaders({ nonce, response: htmlPage({ status: 404 }) })
 
     expect(response.status).toBe(404)
     expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8')
@@ -43,7 +43,6 @@ describe('page security headers', () => {
 
   it('secures a response whose headers cannot be changed', () => {
     const response = withPageSecurityHeaders({
-      mode: 'production',
       nonce,
       response: Response.redirect('https://resume.example/', 307),
     })
@@ -51,14 +50,6 @@ describe('page security headers', () => {
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toBe('https://resume.example/')
     expect(response.headers.get('content-security-policy')).toContain(`'nonce-${nonce}'`)
-  })
-
-  it('lets the development server reach its hot reload socket without allowing any other host', () => {
-    const response = withPageSecurityHeaders({ mode: 'development', nonce, response: htmlPage() })
-
-    const policy = readPolicy(response)
-    expect(policy['connect-src']).toEqual(["'self'", 'ws:'])
-    expect(policy['script-src']).toEqual(["'self'", `'nonce-${nonce}'`, 'https://challenges.cloudflare.com'])
   })
 
   it('creates a fresh unguessable nonce for each request', () => {
