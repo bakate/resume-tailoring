@@ -1,10 +1,12 @@
 import { Button, Group, Modal, Stack, Text } from '@mantine/core'
+import { ClientOnly } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { z } from 'zod'
 
 import { LocalizationFailure, useLocalization } from '../localization/localization'
 import type { Localization } from '../localization/localization'
+import type { InitialDemoAccess } from './demo-access-initial-state'
 import { demoAccessRecovery } from './demo-access-recovery'
 import type { DemoAccessRenewal } from './demo-access-recovery'
 
@@ -41,17 +43,21 @@ declare global {
   }
 }
 
-export function DemoAccessGate({ children }: Readonly<{ children: ReactNode }>) {
+export function DemoAccessGate({ children, initialAccess }: Readonly<{
+  children: ReactNode
+  initialAccess: InitialDemoAccess
+}>) {
   const localizationResult = useLocalization()
-  const { grantAccess, refreshAccess, showFailure, state } = useAccessCheck()
+  const { grantAccess, refreshAccess, showFailure, state } = useAccessCheck({ initialAccess })
   const [renewal, setRenewal] = useState<DemoAccessRenewal | null>(null)
   const isGranted = state.status === 'granted'
   useEffect(() => isGranted ? handleRenewalsWhileGranted({ setRenewal }) : undefined, [isGranted])
   const closeRenewal = useCallback(() => { setRenewal(null) }, [])
   if (!localizationResult.ok) return <LocalizationFailure />
   if (isGranted) {
+    // The server may grant access, but the Candidate Journey reads its Candidate Session from this browser.
     return <>
-      {children}
+      <ClientOnly>{children}</ClientOnly>
       {renewal === null
         ? null
         : <DemoAccessRenewalModal localization={localizationResult.value} onClose={closeRenewal} renewal={renewal} />}
@@ -84,16 +90,22 @@ export function DemoAccessGate({ children }: Readonly<{ children: ReactNode }>) 
   )
 }
 
-/** Checks demo access on mount; the gate and the renewal modal react differently once it is granted. */
-function useAccessCheck() {
-  const [state, setState] = useState<GateState>({ status: 'checking' })
+/**
+ * Checks demo access on mount unless the server already decided it while rendering the page; the gate and the renewal
+ * modal react differently once it is granted.
+ */
+function useAccessCheck({ initialAccess = { status: 'unknown' } }: Readonly<{ initialAccess?: InitialDemoAccess }> = {}) {
+  const [state, setState] = useState<GateState>(() => initialAccess.status === 'unknown'
+    ? { status: 'checking' }
+    : initialAccess)
   const refreshAccess = useCallback(() => {
     setState({ status: 'checking' })
     void readAccess().then(setState)
   }, [])
   const grantAccess = useCallback(() => { setState({ status: 'granted' }) }, [])
   const showFailure = useCallback(() => { setState({ status: 'unavailable' }) }, [])
-  useEffect(refreshAccess, [refreshAccess])
+  const isDecided = initialAccess.status !== 'unknown'
+  useEffect(() => { if (!isDecided) refreshAccess() }, [isDecided, refreshAccess])
   return { grantAccess, refreshAccess, showFailure, state }
 }
 
