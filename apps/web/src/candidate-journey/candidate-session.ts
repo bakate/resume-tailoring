@@ -1,4 +1,4 @@
-import { failureCauseTypes, hiddenContentOrigins, resumePreparationFailures, resumeSectionKinds } from '@resume-tailoring/application/candidate-journey'
+import { delayedFailureCauseTypes, failureCauseTypes, hiddenContentOrigins, resumePreparationFailures, resumeSectionKinds } from '@resume-tailoring/application/candidate-journey'
 import { z } from 'zod'
 
 import {
@@ -176,8 +176,8 @@ const resumeSectionSnapshotSchema = z.discriminatedUnion('status', [
     status: z.literal('validated'), content: resumeSectionContentSchema }),
 ])
 const failureCauseSchema = z.discriminatedUnion('type', [
-  z.strictObject({ type: z.literal('rate-limited'), retryAfterSeconds: z.number().int().nonnegative() }),
-  z.strictObject({ type: z.enum(failureCauseTypes).exclude(['rate-limited']) }),
+  z.strictObject({ type: z.enum(delayedFailureCauseTypes), retryAfterSeconds: z.number().int().nonnegative() }),
+  z.strictObject({ type: z.enum(failureCauseTypes).exclude([...delayedFailureCauseTypes]) }),
 ])
 const storedIntakeDocumentSchema = z.strictObject({ data: z.string(), mediaType: z.string(), name: z.string() })
 const resumePreparationSchema = z.strictObject({

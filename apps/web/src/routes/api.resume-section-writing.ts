@@ -7,8 +7,8 @@ import { processResumeModel } from './-resume-document-model'
 export const Route = createFileRoute('/api/resume-section-writing')({ server: {
   middleware: [createCsrfMiddleware()], handlers: { POST: ({ request }) => processResumeModel({
     request, schema: resumeSectionWritingInputSchema,
-    processInput: (input, environment) => createOpenAiResumeSectionWriter({
-      apiKey: environment.openAiApiKey, model: environment.openAiWritingModel,
+    processInput: (input, environment, apiKey) => createOpenAiResumeSectionWriter({
+      apiKey, model: environment.openAiWritingModel,
       reasoningEffort: environment.openAiWritingReasoningEffort,
     }).write(input),
   }) },

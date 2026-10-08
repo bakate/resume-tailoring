@@ -9,6 +9,10 @@ const originHeaderName = 'x-resume-studio-origin'
 const limitsInstanceName = 'daily-spending-limits'
 /** Statuses the application answers before any model call: missing access, invalid or oversized input. */
 const unservedStatuses = new Set([400, 401, 403, 413])
+const candidateApiKeyHeaderName = 'x-candidate-api-key'
+const dailyQuotaPath = '/api/daily-quota'
+/** Limits a Candidate API Key lifts: past them, the Candidate may continue with their own key. */
+const modelLimitScopes = new Set(['daily-quota', 'overall', 'model-requests'])
 
 export default {
   async fetch(request, environment) {
@@ -17,10 +21,16 @@ export default {
     }
 
     const incomingUrl = new URL(request.url)
-    const counters = readLimitedCounters({ method: request.method, pathname: incomingUrl.pathname })
+    const limits = environment.DAILY_SPENDING_LIMITS.get(environment.DAILY_SPENDING_LIMITS.idFromName(limitsInstanceName))
+    if (request.method === 'GET' && incomingUrl.pathname === dailyQuotaPath) {
+      return readDailyQuota({ limits, clientKey: await readClientKey({ request, environment }) })
+    }
+    const counters = readLimitedCounters({
+      method: request.method, pathname: incomingUrl.pathname,
+      carriesCandidateApiKey: request.headers.has(candidateApiKeyHeaderName),
+    })
     if (counters.length === 0) return forwardToOrigin({ request, environment, incomingUrl })
 
-    const limits = environment.DAILY_SPENDING_LIMITS.get(environment.DAILY_SPENDING_LIMITS.idFromName(limitsInstanceName))
     const clientKey = await readClientKey({ request, environment })
     const reserved = await sendToDailySpendingLimits({ limits, operation: 'reserve', reservation: { clientKey, counters } })
     if (!reserved.allowed) return withDailyQuotaHeaders({ response: rateLimitedResponse(reserved), quota: reserved })
@@ -52,6 +62,16 @@ function forwardToOrigin({ request, environment, incomingUrl }) {
     redirect: 'manual',
   })
   return fetch(originRequest)
+}
+
+/** The Daily Quota left to a client, so the interface can show it before the Candidate starts a preparation. */
+async function readDailyQuota({ limits, clientKey }) {
+  const quota = await sendToDailySpendingLimits({ limits, operation: 'peek', reservation: { clientKey } })
+  return withDailyQuotaHeaders({
+    response: Response.json({ ok: true, value: { remaining: quota.remainingDailyQuota, resetAt: quota.resetAt } },
+      { headers: privateHeaders }),
+    quota,
+  })
 }
 
 async function sendToDailySpendingLimits({ limits, operation, reservation }) {
@@ -86,14 +106,24 @@ function readClientNetwork(clientIp) {
   return `${groups.slice(0, 4).map((group) => parseInt(group, 16).toString(16)).join(':')}::/64`
 }
 
-/** The API Failure the application already answers with, so the Candidate gets the wait-and-retry Recovery. */
-function rateLimitedResponse({ resetAt }) {
+/**
+ * Past a model limit, the request fails as past the Daily Quota, and names which limit refused it, so the Candidate
+ * can continue with a Candidate API Key or come back after the reset. Past a limit no key lifts, it is rate limited.
+ */
+function rateLimitedResponse({ exhaustedLimit, resetAt }) {
   const retryAfterSeconds = Math.max(0, Math.ceil((Date.parse(resetAt) - Date.now()) / 1000))
-  return Response.json({ ok: false, error: { type: 'rate-limited', retryAfterSeconds } }, {
+  const liftedByCandidateApiKey = modelLimitScopes.has(exhaustedLimit)
+  const type = liftedByCandidateApiKey ? 'daily-quota-reached' : 'rate-limited'
+  return Response.json({ ok: false, error: { type, retryAfterSeconds } }, {
     status: 429,
-    headers: { 'Cache-Control': 'no-store, max-age=0', Pragma: 'no-cache', 'Retry-After': String(retryAfterSeconds) },
+    headers: {
+      ...privateHeaders, 'Retry-After': String(retryAfterSeconds),
+      ...(liftedByCandidateApiKey ? { 'x-resume-quota-scope': exhaustedLimit, 'x-resume-quota-reset': resetAt } : {}),
+    },
   })
 }
+
+const privateHeaders = { 'Cache-Control': 'no-store, max-age=0', Pragma: 'no-cache' }
 
 /** Responses to a request that starts a Tailored Resume tell the Candidate how many remain today and when they reset. */
 function withDailyQuotaHeaders({ response, quota }) {

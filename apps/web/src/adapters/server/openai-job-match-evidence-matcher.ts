@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { OpenAiReasoningEffort } from '../../openai-model-configuration'
 import {
   createOpenAiRequester,
+  type ModelApiKey,
   type OpenAiRequestFailure,
 } from './openai-request'
 import { requirementCoverageInstructions } from '../../resume-tailoring/requirement-coverage-instructions'
@@ -15,7 +16,7 @@ import type { MatchEvidenceMatcher } from '@resume-tailoring/application/ports'
 export function createOpenAiJobMatchEvidenceMatcher({
   apiKey, model, reasoningEffort, request = fetch,
 }: Readonly<{
-  apiKey: string
+  apiKey: ModelApiKey
   model: string
   reasoningEffort: OpenAiReasoningEffort
   request?: typeof fetch
@@ -43,7 +44,7 @@ type InvalidModelOutputCause =
 export async function requestOpenAiJobMatchEvidence({
   apiKey, matchRequest, model, reasoningEffort, request = fetch,
 }: Readonly<{
-  apiKey: string
+  apiKey: ModelApiKey
   matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
   model: string
   reasoningEffort: OpenAiReasoningEffort

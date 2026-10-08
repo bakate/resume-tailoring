@@ -7,10 +7,11 @@ import {
   resumeClaimSemanticValidationSchema,
 } from '../../resume-tailoring/resume-claim-schemas'
 import { createOpenAiRequester } from './openai-request'
+import type { ModelApiKey } from './openai-request'
 import type { ResumeClaimReformulator, ResumeClaimSemanticValidator } from '@resume-tailoring/application/ports'
 
 type OpenAiModelConfiguration = Readonly<{
-  apiKey: string
+  apiKey: ModelApiKey
   model: string
   reasoningEffort: 'low' | 'medium'
   request?: typeof fetch

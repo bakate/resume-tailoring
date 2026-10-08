@@ -60,7 +60,7 @@ async function prepareRealSizedResume({ environment, runIndex }: Readonly<{
  * The adapters are called directly, so the browser-to-route hop a Candidate also waits for is not measured.
  */
 function createConfiguredSectionModels({ environment }: Readonly<{ environment: ServerEnvironment }>) {
-  const apiKey = environment.openAiApiKey
+  const apiKey = { source: 'operator', value: environment.openAiApiKey } as const
   const writer = createOpenAiResumeSectionWriter({ apiKey, model: environment.openAiWritingModel,
     reasoningEffort: environment.openAiWritingReasoningEffort })
   const structured = { apiKey, model: environment.openAiStructuredModel,

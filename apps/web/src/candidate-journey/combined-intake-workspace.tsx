@@ -13,6 +13,7 @@ import type { useCandidateJourney } from './use-candidate-journey'
 import { CriticalAmbiguityQuestions, sourceIntakeFailureKeys } from './source-intake-workspace'
 import { jobMatchFailureKeys } from './job-match-workspace'
 import { ProcessingPolicyNotice, processingPolicyNoticeId } from './processing-policy-notice'
+import { DailyQuotaStatus } from '../candidate-api-key/candidate-api-key-wall'
 import { FailureExplanation, RecoveryAction } from './failure-recovery'
 
 type IntakeProps = Readonly<{ candidateJourney: ReturnType<typeof useCandidateJourney>; localization: Localization }>
@@ -52,6 +53,7 @@ function CombinedIntakeForm(props: OpenIntakeProps) {
         onClick={() => { controls.requestGeneration({ purpose: 'tailored' }) }} size="lg">
         {localization.translate(session.tailoredResume === null ? 'combinedIntake.generate' : 'combinedIntake.regenerate')}</Button>}
     <ProcessingPolicyNotice {...{ candidateJourney, localization }} />
+    <DailyQuotaStatus localization={localization} />
     <PreparationFeedback {...{ candidateJourney, localization }}
       onRetry={() => { controls.requestGeneration({ purpose: session.preparation?.purpose ?? 'tailored' }) }}
       onNormalized={() => { controls.requestGeneration({ purpose: 'normalized' }) }} />

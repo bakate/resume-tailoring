@@ -13,6 +13,7 @@ import { Route as CandidateJourneyRouteImport } from './routes/_candidate-journe
 import { Route as CandidateJourneyIndexRouteImport } from './routes/_candidate-journey.index'
 import { Route as CandidateJourneyResumeRouteImport } from './routes/_candidate-journey.resume'
 import { Route as ApiAnalyticsRouteImport } from './routes/api.analytics'
+import { Route as ApiCandidateApiKeyRouteImport } from './routes/api.candidate-api-key'
 import { Route as ApiDemoAccessRouteImport } from './routes/api.demo-access'
 import { Route as ApiExplainableJobPostingExtractionRouteImport } from './routes/api.explainable-job-posting-extraction'
 import { Route as ApiExplainableMatchEvidenceRouteImport } from './routes/api.explainable-match-evidence'
@@ -41,6 +42,11 @@ const CandidateJourneyResumeRoute = CandidateJourneyResumeRouteImport.update({
 const ApiAnalyticsRoute = ApiAnalyticsRouteImport.update({
   id: '/api/analytics',
   path: '/api/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCandidateApiKeyRoute = ApiCandidateApiKeyRouteImport.update({
+  id: '/api/candidate-api-key',
+  path: '/api/candidate-api-key',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDemoAccessRoute = ApiDemoAccessRouteImport.update({
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/': typeof CandidateJourneyIndexRoute
   '/resume': typeof CandidateJourneyResumeRoute
   '/api/analytics': typeof ApiAnalyticsRoute
+  '/api/candidate-api-key': typeof ApiCandidateApiKeyRoute
   '/api/demo-access': typeof ApiDemoAccessRoute
   '/api/explainable-job-posting-extraction': typeof ApiExplainableJobPostingExtractionRoute
   '/api/explainable-match-evidence': typeof ApiExplainableMatchEvidenceRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/resume': typeof CandidateJourneyResumeRoute
   '/api/analytics': typeof ApiAnalyticsRoute
+  '/api/candidate-api-key': typeof ApiCandidateApiKeyRoute
   '/api/demo-access': typeof ApiDemoAccessRoute
   '/api/explainable-job-posting-extraction': typeof ApiExplainableJobPostingExtractionRoute
   '/api/explainable-match-evidence': typeof ApiExplainableMatchEvidenceRoute
@@ -135,6 +143,7 @@ export interface FileRoutesById {
   '/_candidate-journey': typeof CandidateJourneyRouteWithChildren
   '/_candidate-journey/resume': typeof CandidateJourneyResumeRoute
   '/api/analytics': typeof ApiAnalyticsRoute
+  '/api/candidate-api-key': typeof ApiCandidateApiKeyRoute
   '/api/demo-access': typeof ApiDemoAccessRoute
   '/api/explainable-job-posting-extraction': typeof ApiExplainableJobPostingExtractionRoute
   '/api/explainable-match-evidence': typeof ApiExplainableMatchEvidenceRoute
@@ -153,6 +162,7 @@ export interface FileRouteTypes {
     | '/'
     | '/resume'
     | '/api/analytics'
+    | '/api/candidate-api-key'
     | '/api/demo-access'
     | '/api/explainable-job-posting-extraction'
     | '/api/explainable-match-evidence'
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
   to:
     | '/resume'
     | '/api/analytics'
+    | '/api/candidate-api-key'
     | '/api/demo-access'
     | '/api/explainable-job-posting-extraction'
     | '/api/explainable-match-evidence'
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/_candidate-journey'
     | '/_candidate-journey/resume'
     | '/api/analytics'
+    | '/api/candidate-api-key'
     | '/api/demo-access'
     | '/api/explainable-job-posting-extraction'
     | '/api/explainable-match-evidence'
@@ -199,6 +211,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   CandidateJourneyRoute: typeof CandidateJourneyRouteWithChildren
   ApiAnalyticsRoute: typeof ApiAnalyticsRoute
+  ApiCandidateApiKeyRoute: typeof ApiCandidateApiKeyRoute
   ApiDemoAccessRoute: typeof ApiDemoAccessRoute
   ApiExplainableJobPostingExtractionRoute: typeof ApiExplainableJobPostingExtractionRoute
   ApiExplainableMatchEvidenceRoute: typeof ApiExplainableMatchEvidenceRoute
@@ -239,6 +252,13 @@ declare module '@tanstack/react-router' {
       path: '/api/analytics'
       fullPath: '/api/analytics'
       preLoaderRoute: typeof ApiAnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/candidate-api-key': {
+      id: '/api/candidate-api-key'
+      path: '/api/candidate-api-key'
+      fullPath: '/api/candidate-api-key'
+      preLoaderRoute: typeof ApiCandidateApiKeyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/demo-access': {
@@ -330,6 +350,7 @@ const CandidateJourneyRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   CandidateJourneyRoute: CandidateJourneyRouteWithChildren,
   ApiAnalyticsRoute: ApiAnalyticsRoute,
+  ApiCandidateApiKeyRoute: ApiCandidateApiKeyRoute,
   ApiDemoAccessRoute: ApiDemoAccessRoute,
   ApiExplainableJobPostingExtractionRoute:
     ApiExplainableJobPostingExtractionRoute,

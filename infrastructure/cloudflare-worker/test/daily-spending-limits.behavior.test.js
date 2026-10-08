@@ -27,13 +27,13 @@ describe('Daily spending limits at the edge', () => {
     system.expectRemainingDailyQuota({ remaining: dailyLimits.dailyQuota - 1, resetAt: nextMidnightInParis })
   })
 
-  it('refuses the fifth Tailored Resume from the same IP with the rate-limited API Failure until the reset', async () => {
+  it('refuses the fifth Tailored Resume from the same IP as past the Daily Quota until the reset', async () => {
     const system = createSystemUnderTest()
     await system.givenTailoredResumesStarted({ clientIp: '198.51.100.1', count: dailyLimits.dailyQuota })
 
     await system.startTailoredResume({ clientIp: '198.51.100.1' })
 
-    await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
+    await system.expectDailyQuotaReachedUntilReset({ retryAfterSeconds: secondsUntilMidnight, scope: 'daily-quota' })
     system.expectRemainingDailyQuota({ remaining: 0, resetAt: nextMidnightInParis })
   })
 
@@ -43,7 +43,7 @@ describe('Daily spending limits at the edge', () => {
 
     await system.startTailoredResume({ clientIp: '198.51.100.1', cookie: 'demo_access=renewed' })
 
-    await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
+    await system.expectDailyQuotaReachedUntilReset({ retryAfterSeconds: secondsUntilMidnight, scope: 'daily-quota' })
   })
 
   it('keeps a separate Daily Quota for another IP', async () => {
@@ -63,7 +63,7 @@ describe('Daily spending limits at the edge', () => {
 
     await system.startTailoredResume({ clientIp: '2001:db8:1:2::99' })
 
-    await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
+    await system.expectDailyQuotaReachedUntilReset({ retryAfterSeconds: secondsUntilMidnight, scope: 'daily-quota' })
   })
 
   it('refuses every new Tailored Resume once the global daily ceiling is reached', async () => {
@@ -74,7 +74,7 @@ describe('Daily spending limits at the edge', () => {
 
     await system.startTailoredResume({ clientIp: '203.0.113.250' })
 
-    await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
+    await system.expectDailyQuotaReachedUntilReset({ retryAfterSeconds: secondsUntilMidnight, scope: 'overall' })
     system.expectRemainingDailyQuota({ remaining: 0, resetAt: nextMidnightInParis })
   })
 
@@ -125,7 +125,7 @@ describe('Daily spending limits at the edge', () => {
 
     await system.sendModelRequest({ clientIp: '198.51.100.1' })
 
-    await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
+    await system.expectDailyQuotaReachedUntilReset({ retryAfterSeconds: secondsUntilMidnight, scope: 'model-requests' })
     system.expectNoDailyQuotaAnnounced()
   })
 
@@ -135,7 +135,7 @@ describe('Daily spending limits at the edge', () => {
 
     await system.startTailoredResume({ clientIp: '198.51.100.1' })
 
-    await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
+    await system.expectDailyQuotaReachedUntilReset({ retryAfterSeconds: secondsUntilMidnight, scope: 'model-requests' })
     system.expectRemainingDailyQuota({ remaining: 0, resetAt: nextMidnightInParis })
   })
 
@@ -146,6 +146,72 @@ describe('Daily spending limits at the edge', () => {
     await system.requestRender({ clientIp: '198.51.100.1' })
 
     await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
+  })
+
+  it('lifts the Daily Quota for a Tailored Resume that carries a Candidate API Key', async () => {
+    const system = createSystemUnderTest()
+    await system.givenTailoredResumesStarted({ clientIp: '198.51.100.1', count: dailyLimits.dailyQuota })
+
+    await system.startTailoredResume({ clientIp: '198.51.100.1', candidateApiKey: 'sk-candidate' })
+
+    await system.expectServedByOrigin()
+    system.expectNoDailyQuotaAnnounced()
+  })
+
+  it('lifts the technical ceiling for model-backed requests that carry a Candidate API Key', async () => {
+    const system = createSystemUnderTest()
+    await system.givenModelRequestsSent({ clientIp: '198.51.100.1', count: dailyLimits.modelRequestsPerClient })
+
+    await system.sendModelRequest({ clientIp: '198.51.100.1', candidateApiKey: 'sk-candidate' })
+
+    await system.expectServedByOrigin()
+  })
+
+  it('never counts a Tailored Resume started with a Candidate API Key against the Daily Quota', async () => {
+    const system = createSystemUnderTest()
+    await system.givenTailoredResumesStarted({ clientIp: '198.51.100.1', count: 2, candidateApiKey: 'sk-candidate' })
+
+    await system.startTailoredResume({ clientIp: '198.51.100.1' })
+
+    system.expectRemainingDailyQuota({ remaining: dailyLimits.dailyQuota - 1, resetAt: nextMidnightInParis })
+  })
+
+  it('keeps the PDF render limit for a Candidate using their own key', async () => {
+    const system = createSystemUnderTest()
+    await system.givenRendersRequested({ clientIp: '198.51.100.1', count: dailyLimits.rendersPerClient })
+
+    await system.requestRender({ clientIp: '198.51.100.1', candidateApiKey: 'sk-candidate' })
+
+    await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
+  })
+
+  it('stops Candidate API Key validations from one IP at their own limit', async () => {
+    const system = createSystemUnderTest()
+    await system.givenCandidateApiKeysValidated({ clientIp: '198.51.100.1', count: dailyLimits.keyValidationsPerClient })
+
+    await system.validateCandidateApiKey({ clientIp: '198.51.100.1' })
+
+    await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
+  })
+
+  it('tells how many Tailored Resumes remain today without spending one', async () => {
+    const system = createSystemUnderTest()
+    await system.givenTailoredResumesStarted({ clientIp: '198.51.100.1', count: 1 })
+
+    await system.readDailyQuota({ clientIp: '198.51.100.1' })
+
+    await system.expectDailyQuotaAnswered({ remaining: dailyLimits.dailyQuota - 1, resetAt: nextMidnightInParis })
+  })
+
+  it('tells that no Tailored Resume remains once the global daily ceiling is reached', async () => {
+    const system = createSystemUnderTest()
+    await system.givenTailoredResumesFromAddresses({
+      clientIps: Array.from({ length: dailyLimits.preparationsOverall }, (_, index) => `203.0.113.${String(index)}`),
+    })
+
+    await system.readDailyQuota({ clientIp: '198.51.100.1' })
+
+    await system.expectDailyQuotaAnswered({ remaining: 0, resetAt: nextMidnightInParis })
   })
 
   it('never limits pages', async () => {
@@ -173,14 +239,18 @@ function createSystemUnderTest({ originStatus = 200 } = {}) {
       get: () => ({ fetch: async (url, init) => limits.fetch(new Request(url, init)) }),
     },
   }
-  const send = ({ path, clientIp, method = 'POST', cookie }) => worker.fetch(new Request(`https://demo.example${path}`, {
+  const send = ({ path, clientIp, method = 'POST', cookie, candidateApiKey }) => worker.fetch(new Request(`https://demo.example${path}`, {
     method,
-    headers: { 'cf-connecting-ip': clientIp, ...(cookie === undefined ? {} : { cookie }) },
+    headers: { 'cf-connecting-ip': clientIp, ...(cookie === undefined ? {} : { cookie }),
+      ...(candidateApiKey === undefined ? {} : { 'x-candidate-api-key': candidateApiKey }) },
     ...(method === 'POST' ? { body: '{}' } : {}),
   }), environment)
-  const preparation = ({ clientIp, cookie }) => send({ path: '/api/explainable-job-posting-extraction', clientIp, cookie })
-  const modelRequest = ({ clientIp }) => send({ path: '/api/resume-section-writing', clientIp })
-  const render = ({ clientIp }) => send({ path: '/api/resume-document', clientIp })
+  const preparation = ({ clientIp, cookie, candidateApiKey }) => send({
+    path: '/api/explainable-job-posting-extraction', clientIp, cookie, candidateApiKey,
+  })
+  const modelRequest = ({ clientIp, candidateApiKey }) => send({ path: '/api/resume-section-writing', clientIp, candidateApiKey })
+  const render = ({ clientIp, candidateApiKey }) => send({ path: '/api/resume-document', clientIp, candidateApiKey })
+  const keyValidation = ({ clientIp }) => send({ path: '/api/candidate-api-key', clientIp, candidateApiKey: 'sk-candidate' })
   const repeat = async ({ count, sendOne }) => {
     for (let index = 0; index < count; index += 1) await sendOne()
   }
@@ -198,16 +268,23 @@ function createSystemUnderTest({ originStatus = 200 } = {}) {
 
   return {
     givenTimeIs: (instant) => { vi.setSystemTime(instant) },
-    givenTailoredResumesStarted: ({ clientIp, count }) => repeat({ count, sendOne: () => preparation({ clientIp }) }),
+    givenTailoredResumesStarted: ({ clientIp, count, candidateApiKey }) => repeat({
+      count, sendOne: () => preparation({ clientIp, candidateApiKey }),
+    }),
     givenTailoredResumesFromAddresses: async ({ clientIps }) => {
       for (const clientIp of clientIps) await preparation({ clientIp })
     },
     givenModelRequestsSent: ({ clientIp, count }) => repeat({ count, sendOne: () => modelRequest({ clientIp }) }),
     givenRendersRequested: ({ clientIp, count }) => repeat({ count, sendOne: () => render({ clientIp }) }),
+    givenCandidateApiKeysValidated: ({ clientIp, count }) => repeat({ count, sendOne: () => keyValidation({ clientIp }) }),
 
-    startTailoredResume: ({ clientIp, cookie }) => recordAction(() => preparation({ clientIp, cookie })),
-    sendModelRequest: ({ clientIp }) => recordAction(() => modelRequest({ clientIp })),
-    requestRender: ({ clientIp }) => recordAction(() => render({ clientIp })),
+    startTailoredResume: ({ clientIp, cookie, candidateApiKey }) => recordAction(() => preparation({
+      clientIp, cookie, candidateApiKey,
+    })),
+    sendModelRequest: ({ clientIp, candidateApiKey }) => recordAction(() => modelRequest({ clientIp, candidateApiKey })),
+    requestRender: ({ clientIp, candidateApiKey }) => recordAction(() => render({ clientIp, candidateApiKey })),
+    validateCandidateApiKey: ({ clientIp }) => recordAction(() => keyValidation({ clientIp })),
+    readDailyQuota: ({ clientIp }) => recordAction(() => send({ path: '/api/daily-quota', clientIp, method: 'GET' })),
     openPage: ({ clientIp }) => recordAction(() => send({ path: '/', clientIp, method: 'GET' })),
 
     async expectServedByOrigin() {
@@ -220,6 +297,21 @@ function createSystemUnderTest({ originStatus = 200 } = {}) {
       expect(refused.status).toBe(429)
       expect(refused.headers.get('Retry-After')).toBe(String(retryAfterSeconds))
       expect(await refused.json()).toEqual({ ok: false, error: { type: 'rate-limited', retryAfterSeconds } })
+      expect(originPaths.length).toBe(originRequestsBeforeAction)
+    },
+    async expectDailyQuotaReachedUntilReset({ retryAfterSeconds, scope }) {
+      const refused = readResponse()
+      expect(refused.status).toBe(429)
+      expect(refused.headers.get('Retry-After')).toBe(String(retryAfterSeconds))
+      expect(refused.headers.get('x-resume-quota-scope')).toBe(scope)
+      expect(await refused.json()).toEqual({ ok: false, error: { type: 'daily-quota-reached', retryAfterSeconds } })
+      expect(originPaths.length).toBe(originRequestsBeforeAction)
+    },
+    async expectDailyQuotaAnswered({ remaining, resetAt }) {
+      const answered = readResponse()
+      expect(answered.status).toBe(200)
+      expect(answered.headers.get('Cache-Control')).toContain('no-store')
+      expect(await answered.json()).toEqual({ ok: true, value: { remaining, resetAt } })
       expect(originPaths.length).toBe(originRequestsBeforeAction)
     },
     expectRemainingDailyQuota({ remaining, resetAt }) {

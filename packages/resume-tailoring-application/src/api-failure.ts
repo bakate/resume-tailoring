@@ -6,10 +6,14 @@ export const apiFailureTypes = [
   'invalid-input',
   'input-too-large',
   'rate-limited',
+  'daily-quota-reached',
   'timeout',
   'provider-unavailable',
   'invalid-provider-response',
   'service-misconfigured',
+  'candidate-api-key-invalid',
+  'candidate-api-key-model-unavailable',
+  'provider-credit-exhausted',
 ] as const
 export type ApiFailureType = typeof apiFailureTypes[number]
 

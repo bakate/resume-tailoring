@@ -100,10 +100,16 @@ export const resumePreparationFailures = [
 ] as const
 export type ResumePreparationFailure = typeof resumePreparationFailures[number]
 
-/** The provider-neutral reasons a model-backed operation fails, from which the application derives the Recovery. */
+/**
+ * The provider-neutral reasons a model-backed operation fails, from which the application derives the Recovery. The
+ * Daily Quota and the Candidate API Key causes name why the Candidate's own choice, not waiting, lets them continue.
+ */
 export const failureCauseTypes = [
-  'access-required', 'rate-limited', 'timeout', 'input-too-large', 'service-unavailable', 'network', 'unexpected',
+  'access-required', 'rate-limited', 'daily-quota-reached', 'timeout', 'input-too-large', 'service-unavailable',
+  'network', 'unexpected', 'candidate-api-key-invalid', 'candidate-api-key-model-unavailable', 'provider-credit-exhausted',
 ] as const
+/** The causes that end after a delay, which they carry. */
+export const delayedFailureCauseTypes = ['rate-limited', 'daily-quota-reached'] as const
 export type FailureCause =
-  | Readonly<{ type: 'rate-limited'; retryAfterSeconds: number }>
-  | Readonly<{ type: Exclude<typeof failureCauseTypes[number], 'rate-limited'> }>
+  | Readonly<{ type: typeof delayedFailureCauseTypes[number]; retryAfterSeconds: number }>
+  | Readonly<{ type: Exclude<typeof failureCauseTypes[number], typeof delayedFailureCauseTypes[number]> }>

@@ -6,6 +6,7 @@ import type {
 import type { LanguageModelGatewayAdapter, LanguageModelRole } from './ports'
 
 export type { ProcessingConsent, ProcessingPolicy }
+export { hasProcessingConsentForPolicy }
 
 export type LanguageModelGateway<
   TStructuredRequest,

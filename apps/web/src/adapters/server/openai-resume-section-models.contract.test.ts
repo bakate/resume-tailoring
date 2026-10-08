@@ -175,8 +175,8 @@ describe('Resume section model adapters', () => {
 
 type RequestBody = Record<string, unknown>
 
-const writingRole = { apiKey: 'test-key', model: 'writing-role', reasoningEffort: 'medium' } as const
-const structuredRole = { apiKey: 'test-key', model: 'structured-role', reasoningEffort: 'low' } as const
+const writingRole = { apiKey: { source: 'operator', value: 'test-key' }, model: 'writing-role', reasoningEffort: 'medium' } as const
+const structuredRole = { apiKey: { source: 'operator', value: 'test-key' }, model: 'structured-role', reasoningEffort: 'low' } as const
 
 function sectionFor(kind: ResumeSectionKind) {
   return { key: kind === 'experience' ? 'experiences.0' : kind, kind }

@@ -4,12 +4,13 @@ import type { ResumeSectionContent, ResumeSectionKind, ResumeSectionModelResult,
 import type { ResumeCoherenceChecker, ResumeFieldValidator, ResumeSectionWriter } from '@resume-tailoring/application/ports'
 import type { OpenAiReasoningEffort } from '../../openai-model-configuration'
 import { createOpenAiRequester } from './openai-request'
+import type { ModelApiKey } from './openai-request'
 import { readOpenAiApiFailure } from './openai-api-failure'
 import { resumeDocumentCoherenceSchema, resumeFieldValidationSchema, resumeSectionOutputSchemas,
   resumeStructuredOutputFormat } from '../../candidate-journey/resume-document-schemas'
 
 type ModelConfiguration = Readonly<{
-  apiKey: string; model: string; reasoningEffort: OpenAiReasoningEffort; request?: typeof fetch
+  apiKey: ModelApiKey; model: string; reasoningEffort: OpenAiReasoningEffort; request?: typeof fetch
 }>
 type ResumeSectionOperation = 'resume-section-writing' | 'resume-section-validation' | 'resume-document-coherence'
 

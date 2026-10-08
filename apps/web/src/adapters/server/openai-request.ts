@@ -7,16 +7,24 @@ type OpenAiOperation =
   | 'resume-claim-validation'
   | 'resume-claim-writing'
   | 'structured-source-profile-extraction'
+  | 'candidate-api-key-validation'
+
+/**
+ * The key a model request is signed with: the operator's, or a Candidate API Key. A request is signed with the key it
+ * was given or not sent; nothing here ever swaps one key for the other.
+ */
+export type ModelApiKey = Readonly<{ source: 'operator' | 'candidate'; value: string }>
 
 export type OpenAiRequestFailure = Readonly<{
   type: 'invalid-response' | 'rate-limited' | 'timeout' | 'transport'
     | 'upstream-invalid-request' | 'upstream-failure'
+    | 'candidate-api-key-invalid' | 'candidate-api-key-model-unavailable' | 'provider-credit-exhausted'
   status?: number
   retryAfter?: string
 }>
 
 type OpenAiRequesterDependencies = Readonly<{
-  apiKey: string
+  apiKey: ModelApiKey
   request?: typeof fetch
 }>
 
@@ -25,6 +33,8 @@ type OpenAiRequestDetails = Readonly<{
   deadlineSignal?: AbortSignal
   operation: OpenAiOperation
 }>
+type OpenAiEndpoint = Readonly<{ method: 'GET' | 'POST'; path: string }>
+const responsesEndpoint: OpenAiEndpoint = { method: 'POST', path: '/v1/responses' }
 
 export function createOpenAiRequester({
   apiKey,
@@ -32,6 +42,12 @@ export function createOpenAiRequester({
 }: OpenAiRequesterDependencies) {
   return {
     send: (details: OpenAiRequestDetails) => sendOpenAiRequest({ apiKey, request, ...details }),
+    /** Reads one model's description, which costs nothing, to learn whether the key may use that model. */
+    checkModelAccess: async ({ model }: Readonly<{ model: string }>) => {
+      const result = await sendOpenAiRequest({ apiKey, request, operation: 'candidate-api-key-validation',
+        endpoint: { method: 'GET', path: `/v1/models/${encodeURIComponent(model)}` } })
+      return result.ok ? { ok: true } as const : result
+    },
   }
 }
 
@@ -43,39 +59,45 @@ async function sendOpenAiRequest({
   apiKey,
   body,
   deadlineSignal = createOpenAiRequestDeadline(),
+  endpoint = responsesEndpoint,
   operation,
   request,
-}: OpenAiRequestDetails & Required<OpenAiRequesterDependencies>) {
+}: Omit<OpenAiRequestDetails, 'body'> & Readonly<{ body?: unknown; endpoint?: OpenAiEndpoint }>
+  & Required<OpenAiRequesterDependencies>) {
   const startedAtMilliseconds = Date.now()
-  const requestCharacterCount = JSON.stringify(body).length
-  const responseResult = await fetchOpenAiResponse({ apiKey, body, deadlineSignal, request })
+  const requestCharacterCount = body === undefined ? 0 : JSON.stringify(body).length
+  const apiKeySource = apiKey.source
+  const responseResult = await fetchOpenAiResponse({ apiKey, body, deadlineSignal, endpoint, request })
   if (!responseResult.ok) {
-    return recordFailure({ ...responseResult.error, operation, requestCharacterCount, startedAtMilliseconds })
+    return recordFailure({ ...responseResult.error, apiKeySource, operation, requestCharacterCount, startedAtMilliseconds })
   }
   if (!responseResult.value.ok) {
+    const { status } = responseResult.value
+    const upstreamError = await readUpstreamErrorIdentifiers({ apiKey, response: responseResult.value })
     return recordFailure({
-      cause: readUpstreamFailure({ status: responseResult.value.status }), operation,
-      retryAfter: responseResult.value.headers.get('retry-after') ?? undefined,
-      requestCharacterCount, startedAtMilliseconds, status: responseResult.value.status,
-      ...await readUpstreamErrorIdentifiers({ response: responseResult.value }),
+      apiKeySource, cause: readUpstreamFailure({ apiKeySource, status, upstreamErrorCode: upstreamError.upstreamErrorCode }),
+      operation, retryAfter: responseResult.value.headers.get('retry-after') ?? undefined,
+      requestCharacterCount, startedAtMilliseconds, status, ...upstreamError,
     })
   }
-  return readOpenAiResponse({ operation, requestCharacterCount, response: responseResult.value, startedAtMilliseconds })
+  return readOpenAiResponse({ apiKeySource, operation, requestCharacterCount, response: responseResult.value, startedAtMilliseconds })
 }
 
 async function fetchOpenAiResponse({
-  apiKey, body, deadlineSignal, request,
+  apiKey, body, deadlineSignal, endpoint, request,
 }: Readonly<{
-  apiKey: string
+  apiKey: ModelApiKey
   body: unknown
   deadlineSignal: AbortSignal
+  endpoint: OpenAiEndpoint
   request: typeof fetch
 }>) {
   try {
-    const value = await request('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    const value = await request(`https://api.openai.com${endpoint.path}`, {
+      method: endpoint.method,
+      headers: { Authorization: `Bearer ${apiKey.value}`,
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       signal: deadlineSignal,
     })
     return { ok: true, value } as const
@@ -85,8 +107,9 @@ async function fetchOpenAiResponse({
 }
 
 async function readOpenAiResponse({
-  operation, requestCharacterCount, response, startedAtMilliseconds,
+  apiKeySource, operation, requestCharacterCount, response, startedAtMilliseconds,
 }: Readonly<{
+  apiKeySource: ModelApiKey['source']
   operation: OpenAiOperation
   requestCharacterCount: number
   response: Response
@@ -95,16 +118,19 @@ async function readOpenAiResponse({
   try {
     return { ok: true, value: await response.json() as unknown } as const
   } catch {
-    return recordFailure({ cause: 'invalid-response', operation, requestCharacterCount, startedAtMilliseconds })
+    return recordFailure({ apiKeySource, cause: 'invalid-response', operation, requestCharacterCount, startedAtMilliseconds })
   }
 }
 
-// Only identifier-like code and param values are logged; provider messages may echo Candidate content.
-async function readUpstreamErrorIdentifiers({ response }: Readonly<{ response: Response }>) {
+/**
+ * Only identifier-like code and param values are logged; provider messages may echo Candidate content or the key
+ * itself, so an identifier that looks like a key, or holds part of the one used, is dropped too.
+ */
+async function readUpstreamErrorIdentifiers({ apiKey, response }: Readonly<{ apiKey: ModelApiKey; response: Response }>) {
   try {
     const { error } = await response.json() as { error?: { code?: unknown; param?: unknown } }
-    const upstreamErrorCode = readErrorIdentifier({ value: error?.code })
-    const upstreamErrorParam = readErrorIdentifier({ value: error?.param })
+    const upstreamErrorCode = readErrorIdentifier({ apiKey, value: error?.code })
+    const upstreamErrorParam = readErrorIdentifier({ apiKey, value: error?.param })
     return {
       ...(upstreamErrorCode === undefined ? {} : { upstreamErrorCode }),
       ...(upstreamErrorParam === undefined ? {} : { upstreamErrorParam }),
@@ -114,8 +140,19 @@ async function readUpstreamErrorIdentifiers({ response }: Readonly<{ response: R
   }
 }
 
-function readErrorIdentifier({ value }: Readonly<{ value: unknown }>) {
-  return typeof value === 'string' && /^[\w.[\]$-]{1,120}$/u.test(value) ? value : undefined
+function readErrorIdentifier({ apiKey, value }: Readonly<{ apiKey: ModelApiKey; value: unknown }>) {
+  if (typeof value !== 'string' || !/^[\w.[\]$-]{1,120}$/u.test(value)) return undefined
+  return mayHoldApiKey({ apiKey, value }) ? undefined : value
+}
+
+/** Provider keys start with `sk-`; any eight consecutive characters of the key used also count as holding it. */
+function mayHoldApiKey({ apiKey, value }: Readonly<{ apiKey: ModelApiKey; value: string }>) {
+  if (/sk-/iu.test(value)) return true
+  const fragmentLength = 8
+  for (let start = 0; start + fragmentLength <= apiKey.value.length; start += 1) {
+    if (value.includes(apiKey.value.slice(start, start + fragmentLength))) return true
+  }
+  return false
 }
 
 function readFailureCause({ error }: Readonly<{ error: unknown }>) {
@@ -125,6 +162,7 @@ function readFailureCause({ error }: Readonly<{ error: unknown }>) {
 }
 
 function recordFailure({
+  apiKeySource,
   cause,
   operation,
   requestCharacterCount,
@@ -134,6 +172,7 @@ function recordFailure({
   upstreamErrorCode,
   upstreamErrorParam,
 }: Readonly<{
+  apiKeySource: ModelApiKey['source']
   cause: OpenAiRequestFailure['type']
   operation: OpenAiOperation
   requestCharacterCount: number
@@ -145,7 +184,7 @@ function recordFailure({
 }>) {
   const durationMilliseconds = Math.max(0, Date.now() - startedAtMilliseconds)
   const dimensions = {
-    cause, durationMilliseconds, operation, requestCharacterCount,
+    apiKeySource, cause, durationMilliseconds, operation, requestCharacterCount,
     ...(retryAfter === undefined ? {} : { retryAfter }),
     ...(status === undefined ? {} : { status }),
     ...(upstreamErrorCode === undefined ? {} : { upstreamErrorCode }),
@@ -161,10 +200,23 @@ function recordFailure({
   } } as const
 }
 
-function readUpstreamFailure({ status }: Readonly<{ status: number }>) {
-  if (status === 429) return 'rate-limited' as const
-  if (status >= 500) return 'upstream-failure' as const
-  return 'upstream-invalid-request' as const
+/**
+ * Exhausted credit is not a rate limit: waiting does not restore it. A rejected key, a model it cannot reach, or
+ * exhausted credit is the Candidate's to fix when it is their key, and a defect or an outage when it is the operator's.
+ */
+function readUpstreamFailure({ apiKeySource, status, upstreamErrorCode }: Readonly<{
+  apiKeySource: ModelApiKey['source']; status: number; upstreamErrorCode: string | undefined
+}>): OpenAiRequestFailure['type'] {
+  const isCandidateKey = apiKeySource === 'candidate'
+  if (status === 429 && upstreamErrorCode === 'insufficient_quota') {
+    return isCandidateKey ? 'provider-credit-exhausted' : 'upstream-failure'
+  }
+  if (status === 429) return 'rate-limited'
+  if (status >= 500) return 'upstream-failure'
+  if (!isCandidateKey) return 'upstream-invalid-request'
+  if ((status === 403 || status === 404) && upstreamErrorCode === 'model_not_found') return 'candidate-api-key-model-unavailable'
+  if (status === 401 || status === 403) return 'candidate-api-key-invalid'
+  return 'upstream-invalid-request'
 }
 
 const openAiRequestTimeoutMilliseconds = 90_000
