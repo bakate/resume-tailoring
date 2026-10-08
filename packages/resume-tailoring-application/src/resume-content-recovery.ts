@@ -1,6 +1,6 @@
 import type { CandidateSession } from '@resume-tailoring/domain/candidate-session'
 import type { CandidateFact } from './source-intake'
-import type { ResumeFieldLocation, ResumeSectionName, TailoredResume } from './tailored-resume'
+import type { ResumeEditingState, ResumeFieldLocation, ResumeSectionName, TailoredResume } from './tailored-resume'
 import { createTailoredResume } from './tailored-resume'
 import { orderResumeExperiences } from './experience-chronology'
 import { moveResumeField, readResumeFields, removeResumeField, restoreResumeField, updateResumeField } from './resume-field-editing'
@@ -17,7 +17,7 @@ export function hideResumeContent({ access, fieldId }: FieldRequest) {
   const editing = readResumeEditing({ session })
   const document = removeResumeField({ resume: session.tailoredResume, location: reference.location })
   access.save({ baseRevision: editing.revision, correctionKind: 'resume-claim-removal', session: changedResumeSession({ session, document, revision: access.createIdentifier(),
-    editing: { ...editing, hiddenFields: [...editing.hiddenFields, { field: reference.field, location: reference.location }] } }) })
+    editing: { ...editing, hiddenFields: [...editing.hiddenFields, { field: reference.field, location: reference.location, origin: 'candidate' }] } }) })
 }
 
 export function restoreResumeContent({ access, fieldId }: FieldRequest) {
@@ -29,7 +29,8 @@ export function restoreResumeContent({ access, fieldId }: FieldRequest) {
   const parent = restoreHiddenParent({ session, document: session.tailoredResume, location: hiddenField.location })
   const document = restoreResumeField({ resume: parent.document, hiddenField })
   access.save({ baseRevision: editing.revision, session: changedResumeSession({ session, document, revision: access.createIdentifier(),
-    editing: { ...parent.editing, hiddenFields: editing.hiddenFields.filter(({ field }) => field.id !== fieldId) } }) })
+    editing: { ...parent.editing, hiddenFields: editing.hiddenFields.filter(({ field }) => field.id !== fieldId),
+      restoredFieldIds: markRestored({ editing, fieldId }) } }) })
 }
 
 export function moveResumeContent({ access, fieldId, direction }: FieldRequest & Readonly<{ direction: 'up' | 'down' }>) {
@@ -82,7 +83,12 @@ export function restoreSourceFact({ access, factId }: Readonly<{ access: ResumeE
     : restoreResumeField({ resume: container, hiddenField: reference })
   access.save({ baseRevision: parent.editing.revision, session: changedResumeSession({ session, document, revision: access.createIdentifier(),
     editing: { ...parent.editing, hiddenFields: parent.editing.hiddenFields.filter(({ field }) => field.id !== reference.field.id),
-      unsupportedFieldIds: parent.editing.unsupportedFieldIds.filter((id) => id !== reference.field.id) } }) })
+      unsupportedFieldIds: parent.editing.unsupportedFieldIds.filter((id) => id !== reference.field.id),
+      restoredFieldIds: markRestored({ editing: parent.editing, fieldId: reference.field.id }) } }) })
+}
+
+function markRestored({ editing, fieldId }: Readonly<{ editing: ResumeEditingState; fieldId: string }>) {
+  return [...new Set([...editing.restoredFieldIds ?? [], fieldId])]
 }
 
 function ensureRestoreContainer({ document, original, location }: Readonly<{

@@ -12,6 +12,8 @@ type LayoutExample = Readonly<{ layout: ResumeLayoutOutcome; eligibility: Resume
 type CondensationFailure = 'unavailable' | 'unsupported-content' | 'processing-consent-required'
 
 const condensedSummary = 'Accessible billing screens'
+const northwindAchievementId = 'source-fact-experiences-0-achievements-0'
+const northwindContextId = 'source-fact-experiences-0-context-0'
 
 describe('Candidate Journey resume editing', () => {
   it('keeps only the unsupported field unresolved when a section validation accepts the other edited field', async () => {
@@ -79,6 +81,25 @@ describe('Candidate Journey resume editing', () => {
     await system.reopenCandidateSession()
 
     system.expectRecoveredHiddenUnsupportedSummary()
+  })
+  it('keeps the origin of content hidden by Overflow Reduction apart from content the Candidate hid after reopening', async () => {
+    const system = createSystemUnderTest()
+    await system.givenReviewableResume()
+    system.givenSummaryHidden()
+    await system.givenOverflowReductionHidNorthwindDetail()
+
+    await system.reopenCandidateSession()
+
+    system.expectNorthwindDetailHiddenByOverflowReduction()
+  })
+  it('restores content hidden by Overflow Reduction in one action and protects it from being hidden again', async () => {
+    const system = createSystemUnderTest()
+    await system.givenReviewableResume()
+    await system.givenOverflowReductionHidNorthwindDetail()
+
+    system.restoreNorthwindAchievement()
+
+    system.expectRestoredNorthwindAchievementProtected()
   })
   it('replaces the current draft only when its separate proposal is accepted', async () => {
     const system = createSystemUnderTest()
@@ -483,6 +504,59 @@ class StructuredResumeTestSystem {
     this.#journey.start()
     await this.#expectOpenCandidateSession()
     this.#outcome = this.#journey.readView()
+  }
+
+  /** Stores the Candidate Session as Overflow Reduction leaves it after hiding Northwind's context and achievement. */
+  async givenOverflowReductionHidNorthwindDetail() {
+    const restored = this.#dependencies.persistence.restore()
+    const session = restored.ok ? restored.value.session : null
+    const resume = session?.tailoredResume
+    const editing = session?.resumeEditing
+    const northwind = resume?.experiences.find(({ id }) => id === 'experiences.0')
+    if (session == null || resume == null || editing === undefined || northwind?.context == null) {
+      throw new Error('Expected a prepared Candidate Session with Northwind detail')
+    }
+    const location = { kind: 'experience', experienceId: northwind.id } as const
+    const hiddenFields = [
+      { field: northwind.context, location: { ...location, fieldName: 'context', fieldId: northwind.context.id }, origin: 'overflow-reduction' },
+      ...northwind.achievements.map((field) => ({ field, location: { ...location, fieldName: 'achievements', fieldId: field.id },
+        origin: 'overflow-reduction' } as const)),
+    ] as const
+    this.#dependencies.persistence.save({ session: { ...session,
+      tailoredResume: { ...resume, experiences: resume.experiences.map((experience) => experience.id === northwind.id
+        ? { ...experience, context: null, achievements: [] } : experience) },
+      resumeEditing: { ...editing, revision: `${editing.revision}:reduced`, hiddenFields: [...editing.hiddenFields, ...hiddenFields] } } })
+    await this.reopenCandidateSession()
+  }
+
+  restoreNorthwindAchievement() {
+    this.#journey.restoreResumeField({ fieldId: northwindAchievementId })
+    this.#outcome = this.#journey.readView()
+  }
+
+  expectNorthwindDetailHiddenByOverflowReduction() {
+    const northwind = this.#readNorthwind()
+    expect(northwind?.achievements).toEqual([])
+    expect(northwind?.context).toBeNull()
+    expect(this.#review()?.recovery.hiddenFields.map(({ field, origin }) => ({ id: field.id, origin }))).toEqual([
+      { id: this.#summaryId, origin: 'candidate' },
+      { id: northwindContextId, origin: 'overflow-reduction' },
+      { id: northwindAchievementId, origin: 'overflow-reduction' },
+    ])
+    expect(this.#review()?.recovery.overflowReduction).toEqual({ achievements: 1, other: 1 })
+  }
+
+  expectRestoredNorthwindAchievementProtected() {
+    const northwind = this.#readNorthwind()
+    expect(northwind?.achievements.map(({ id }) => id)).toEqual([northwindAchievementId])
+    expect(northwind?.context).toBeNull()
+    expect(this.#review()?.recovery.hiddenFields.map(({ field }) => field.id)).toEqual([northwindContextId])
+    expect(this.#review()?.recovery.overflowReduction).toEqual({ achievements: 0, other: 1 })
+    expect(this.#expectPreparedSession()?.resumeEditing?.restoredFieldIds).toEqual([northwindAchievementId])
+  }
+
+  #readNorthwind() {
+    return this.#expectPreparedSession()?.tailoredResume?.experiences.find(({ id }) => id === 'experiences.0')
   }
 
   expectRecoveredHiddenUnsupportedSummary() {
