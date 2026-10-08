@@ -248,7 +248,7 @@ function DetailedSourceProfile({
       values={profile.skills.map((skill) => skill.name)} />
     <ProfileSection title={localization.translate('sourceIntake.education')}
       values={profile.education.map((education) => (
-        formatProfileSummary({ values: [education.qualification, education.institution] })
+        formatProfileSummary({ values: [education.qualification, education.institution, education.dates ?? null] })
       ))} />
     <ProfileSection title={localization.translate('sourceIntake.languages')}
       values={profile.languages.map((language) => language.name)} />

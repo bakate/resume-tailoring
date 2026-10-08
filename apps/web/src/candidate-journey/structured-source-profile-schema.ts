@@ -7,6 +7,8 @@ export const structuredSourceProfileSchema = z.strictObject({
     name: z.string().min(1),
   })),
   education: z.array(z.strictObject({
+    // Optional so a Source Profile saved before education dates were extracted still restores.
+    dates: z.string().min(1).nullable().optional(),
     institution: z.string().min(1).nullable(),
     qualification: z.string().min(1).nullable(),
   })),
@@ -35,9 +37,12 @@ export const structuredSourceProfileSchema = z.strictObject({
 })
 
 export const structuredSourceProfileExtractionSchema = structuredSourceProfileSchema.extend({
-  // Strict structured output requires every key, so the model always states a location, or null.
+  // Strict structured output requires every key, so the model always states a location and education dates, or null.
   experiences: z.array(structuredSourceProfileSchema.shape.experiences.element.extend({
     location: z.string().min(1).nullable(),
+  })),
+  education: z.array(structuredSourceProfileSchema.shape.education.element.extend({
+    dates: z.string().min(1).nullable(),
   })),
   criticalAmbiguities: z.array(z.strictObject({
     path: z.string().regex(/^(?:experiences|projects|skills|education|languages|certifications)\.\d+\.[a-zA-Z]+\.\d+$/u),
@@ -51,7 +56,8 @@ export const structuredSourceProfileRequestSchema = z.strictObject({
 
 export const structuredSourceProfileSuccessSchema = z.strictObject({
   ok: z.literal(true),
-  value: structuredSourceProfileExtractionSchema,
+  // A server deployed before education dates were extracted answers without them.
+  value: structuredSourceProfileExtractionSchema.extend({ education: structuredSourceProfileSchema.shape.education }),
 })
 
 export const structuredSourceProfileResponseFormat = {

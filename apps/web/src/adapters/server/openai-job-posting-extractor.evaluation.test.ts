@@ -52,6 +52,7 @@ async function evaluateJobPosting({ jobPostingContent }: Readonly<{
   const metrics: EvaluationMetric[] = []
   const result = await createJobMatch({
     candidateFacts: [],
+    now: Date.now,
     document: { bytes: new TextEncoder().encode(jobPostingContent),
       mediaType: 'text/plain', name: 'job-posting.txt' },
     jobPostingDocumentReader: { read: (document) => Promise.resolve({

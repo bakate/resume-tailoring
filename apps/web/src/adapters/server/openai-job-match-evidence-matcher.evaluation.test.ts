@@ -190,6 +190,18 @@ const evaluationCases: readonly EvaluationCase[] = [
     }],
   },
   {
+    // BAK-139: Jest and Cypress were shown as Adjacent Evidence that "does not meet" this requirement.
+    name: 'unit and end-to-end testing proven by listed testing tools alone',
+    candidateFacts: [
+      { id: 'source-fact-jest', kind: 'skill', value: 'Jest' },
+      { id: 'source-fact-cypress', kind: 'skill', value: 'Cypress' },
+    ],
+    requirements: [{
+      capabilityName: 'Tests unitaires et end-to-end', expectation: 'covered',
+      id: 'job-requirement-unit-and-end-to-end-tests', value: 'Écrire des tests unitaires et end-to-end',
+    }],
+  },
+  {
     name: 'French requirement proven by English mentoring evidence',
     candidateFacts: [{
       id: 'source-fact-mentoring', kind: 'experience',

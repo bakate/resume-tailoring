@@ -148,12 +148,16 @@ export const tailoredResumeSchema = z.strictObject({
     section: z.enum(['certifications', 'education', 'languages', 'projects']),
   })])),
   targetRole: jobMatchSchema.shape.targetRole,
+  // Optional so a Tailored Resume prepared before headlines existed still restores, headed by its Target Role.
+  headline: tailoredResumeFieldSchema.nullable().optional(),
   valueProposition: z.strictObject({ kind: z.enum(['evidence-excerpts', 'prose']),
     paragraphs: z.array(tailoredResumeFieldSchema) }),
 })
 
 const resumeSectionContentSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('value-proposition'), paragraphs: z.array(tailoredResumeFieldSchema) }),
+  // `headline` is optional so a section saved before the writer also wrote the headline still restores.
+  z.strictObject({ kind: z.literal('value-proposition'), paragraphs: z.array(tailoredResumeFieldSchema),
+    headline: tailoredResumeFieldSchema.nullable().optional() }),
   z.strictObject({ kind: z.literal('experience'), experience: tailoredResumeSchema.shape.experiences.element }),
   z.strictObject({ kind: z.literal('skills'), groups: tailoredResumeSchema.shape.sections.def.element.options[0].shape.groups }),
   z.strictObject({ kind: z.enum(['education', 'languages', 'projects', 'certifications']), fields: z.array(tailoredResumeFieldSchema) }),

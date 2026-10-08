@@ -16,11 +16,30 @@ describe('Resume section model adapters', () => {
 
     const outcome = await writer.write(writingInput(kind))
 
-    expect(outcome).toEqual({ ok: true, value: content, usage: { inputTokens: 900, outputTokens: 120 } })
+    expect(outcome).toEqual({ ok: true, value: content.kind === 'value-proposition' ? { ...content, headline: null } : content,
+      usage: { inputTokens: 900, outputTokens: 120 } })
     expect(body).toMatchObject({ model: 'writing-role', store: false,
       text: { format: { type: 'json_schema', strict: true, name: `resume_section_${kind.replaceAll('-', '_')}` } } })
     expect(JSON.stringify(body)).not.toContain('alex@example.com')
     expect(JSON.stringify(body)).not.toContain('Alex Morgan')
+  })
+
+  it('writes the headline with the Value Proposition, under a schema that always asks for it', async () => {
+    let body: RequestBody | null = null
+    const headline = { id: 'headline', text: 'Frontend Engineer – React',
+      factIds: ['source-fact-experiences-0-role-0', 'source-fact-skills-0-name-0'] } as const
+    const content = { kind: 'value-proposition', headline,
+      paragraphs: groupedResumeDocument.valueProposition.paragraphs } as const satisfies ResumeSectionContent
+    const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
+      body = readBody(options)
+      return Promise.resolve(Response.json(modelResponse(sectionOutput(content))))
+    } })
+
+    const outcome = await writer.write(writingInput('value-proposition'))
+
+    expect(outcome.ok && outcome.value.kind === 'value-proposition' ? outcome.value.headline : null).toEqual(headline)
+    expect((body as { text?: { format?: { schema?: { required?: unknown } } } } | null)?.text?.format?.schema?.required)
+      .toEqual(expect.arrayContaining(['headline', 'paragraphs']))
   })
 
   it('accepts a coherence rewrite with the previous version of its section and passes it to the writer', async () => {
@@ -178,7 +197,7 @@ function validationInput() {
 
 function sectionOutput(content: ResumeSectionContent) {
   if (content.kind === 'experience') return content.experience
-  if (content.kind === 'value-proposition') return { paragraphs: content.paragraphs }
+  if (content.kind === 'value-proposition') return { paragraphs: content.paragraphs, headline: content.headline ?? null }
   return content.kind === 'skills' ? { groups: content.groups } : { fields: content.fields }
 }
 

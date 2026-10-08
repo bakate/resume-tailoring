@@ -170,6 +170,16 @@ describe('Candidate Journey resume editing', () => {
 
     system.expectCondensedFirstExperienceStillCopied()
   })
+  it('keeps the headline of a Tailored Resume through an accepted condensation', async () => {
+    const system = createSystemUnderTest()
+    await system.givenReviewableResume()
+    system.givenFaithfulCondensation()
+    await system.proposeCondensation()
+
+    system.acceptProposal()
+
+    system.expectHeadline('Frontend Engineer')
+  })
   it('rejects a proposal decision after contact changes invalidate its revision', async () => {
     const system = createSystemUnderTest()
     await system.givenReviewableResume()
@@ -465,6 +475,10 @@ class StructuredResumeTestSystem {
   givenFaithfulCondensation() { this.givenSupportedValidation() }
 
   givenFirstExperienceCopiedFromItsFacts() { this.#unsupportedSectionKeys.add('experiences.0') }
+
+  expectHeadline(text: string) {
+    expect(this.#expectPreparedSession()?.tailoredResume?.headline?.text).toBe(text)
+  }
 
   expectCondensedFirstExperienceStillCopied() {
     const experience = this.#expectPreparedSession()?.tailoredResume?.experiences.find(({ id }) => id === 'experiences.0')

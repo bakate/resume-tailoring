@@ -39,6 +39,8 @@ export type SourceProfileSkill = Readonly<{
 }>
 
 export type SourceProfileEducation = Readonly<{
+  /** The year or period of the qualification as the source writes it; absent from profiles extracted before it existed. */
+  dates?: string | null
   institution: string | null
   qualification: string | null
 }>

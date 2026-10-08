@@ -97,6 +97,13 @@ function readValidation({ context, result }: Readonly<{
   const usage = addUsage(context.usage, result.usage)
   if (!result.ok) return { content: context.content, failure: result.error, rejectedFields: [], usage }
   if (context.content === null) return { content: null, failure: unsupported, rejectedFields: [], usage }
+  // An unsupported headline is dropped rather than rewritten: the resume is then headed by the latest role held.
+  const content = context.content
+  const headlineId = content.kind === 'value-proposition' ? content.headline?.id : undefined
+  const rejected = readRejectedFields({ content, validation: result.value })
+  if (content.kind === 'value-proposition' && rejected.length > 0 && rejected.every(({ fieldId }) => fieldId === headlineId)) {
+    return { content: { ...content, headline: null }, failure: null, rejectedFields: [], usage }
+  }
   return isSectionFullyValidated({ content: context.content, validation: result.value })
     ? { content: context.content, failure: null, rejectedFields: [], usage }
     // The coherence feedback a rewritten section started from still applies to its next rewrite.

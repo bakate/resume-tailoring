@@ -945,7 +945,8 @@ class CandidateJourneyIntegrationSystem {
   async expectAnotherOpportunityPreview() {
     this.#expectAction()
     await this.#expectCurrentPreview()
-    await this.#expectDocumentTextContains('Accessibility Lead')
+    // The resume is headed by a title the Candidate held, never by the new Target Role.
+    await this.#expectDocumentTextLacks('Accessibility Lead')
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toBeEnabled({ timeout: 30_000 })
     expect(this.#modelRequests.filter((path) => path.endsWith('/api/structured-source-profile-extraction'))).toHaveLength(1)
     expect(this.#modelRequests.filter((path) => path.endsWith('/api/explainable-job-posting-extraction'))).toHaveLength(2)

@@ -336,6 +336,7 @@ async function analyzeFrenchJobPosting() {
     jobPostingDocumentReader: createFakeJobPostingDocumentReader(),
     jobPostingExtractor: createFakeJobPostingExtractor({ extract: () => Promise.resolve({ ok: true, value: extraction }) }),
     matchEvidenceMatcher: emptyMatchEvidenceMatcher,
+    now: () => currentTime,
   })
 }
 
@@ -351,6 +352,7 @@ async function analyzeJobPostingWithEmphasizedResponsibilities() {
       targetRole: null,
     } }) }),
     matchEvidenceMatcher: emptyMatchEvidenceMatcher,
+    now: () => currentTime,
   })
 }
 
