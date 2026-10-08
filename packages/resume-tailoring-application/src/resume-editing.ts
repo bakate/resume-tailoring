@@ -12,13 +12,16 @@ import { verifyResumeField } from './resume-claim-verification'
 
 export type ResumeReview = ResumeDocumentReview & Readonly<{
   recovery: ReturnType<typeof readResumeRecovery>
-  operation: 'validating-section' | 'condensing' | 'shortening' | 'assessing-layout' | null
+  operation: ResumeReviewOperation | null
   unsupportedFieldIds: readonly string[]
   manuallyEdited: boolean
 }>
 export type ResumeReviewState = Pick<ResumeReview, 'proposal' | 'assessment' | 'failure' | 'operation'>
 export const emptyResumeReview: ResumeReviewState = { proposal: null, assessment: null, failure: null, operation: null }
 export type ResumeCorrectionKind = Extract<PrivacySafeTelemetryEvent, { name: 'resume-correction-recorded' }>['correctionKind']
+
+/** What the review is busy with; shortening brings an overflowing resume back within its Page Budget. */
+export type ResumeReviewOperation = 'validating-section' | 'condensing' | 'shortening' | 'assessing-layout'
 
 export type ResumeEditingAccess = Readonly<{
   readReview: () => ResumeReview | null

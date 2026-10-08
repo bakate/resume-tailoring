@@ -293,11 +293,6 @@ const englishCatalog = {
   'resumeReview.condensing': 'Preparing a shorter proposal…',
   'resumeReview.unchecked': 'Page count has not been checked for this version.',
   'resumeReview.shortening': 'Shortening the resume…',
-  'pageBudget.fitsOne': 'Fits on one page.',
-  'pageBudget.fitsTwo': 'Fits on two pages.',
-  'pageBudget.overflow': 'Over two pages: shorten it to download it.',
-  'pageBudget.overTwo': 'Over two pages.',
-  'pageBudget.shorten': 'Shorten the resume',
   'resumeReview.reviewHidden': 'Review hidden content',
   'resumeReview.hiddenByReduction': 'Hidden to fit the page',
   'resumeReview.section.value-proposition': 'Summary',
@@ -336,6 +331,11 @@ const englishCatalog = {
   'resumePreview.stale-layout': 'The document changed. Wait for the current preview before downloading.',
   'resumePreview.paused': 'Close the editor to download the current PDF.',
   'resumePreview.copiedExperiences': 'Experiences taken as written',
+  'pageBudget.fitsOne': 'Fits on one page.',
+  'pageBudget.fitsTwo': 'Fits on two pages.',
+  'pageBudget.overflow': 'Your resume runs to {pageCount} pages, two at most.',
+  'pageBudget.proposalOverflow': 'This proposal still runs over two pages.',
+  'pageBudget.shorten': 'Shorten the resume',
 } as const
 
 type TranslationKey = keyof typeof englishCatalog
@@ -633,11 +633,6 @@ const frenchCatalog = {
   'resumeReview.condensing': 'Préparation d’une proposition plus courte…',
   'resumeReview.unchecked': 'Le nombre de pages de cette version n’a pas été vérifié.',
   'resumeReview.shortening': 'Raccourcissement du CV…',
-  'pageBudget.fitsOne': 'Tient sur une page.',
-  'pageBudget.fitsTwo': 'Tient sur deux pages.',
-  'pageBudget.overflow': 'Plus de deux pages : raccourcis-le pour le télécharger.',
-  'pageBudget.overTwo': 'Plus de deux pages.',
-  'pageBudget.shorten': 'Raccourcir le CV',
   'resumeReview.reviewHidden': 'Voir le contenu masqué',
   'resumeReview.hiddenByReduction': 'Masqué pour tenir sur la page',
   'resumeReview.section.value-proposition': 'Profil',
@@ -676,6 +671,11 @@ const frenchCatalog = {
   'resumePreview.stale-layout': 'Le document a changé. Attends l’aperçu actuel avant de télécharger.',
   'resumePreview.paused': 'Ferme l’éditeur pour télécharger le PDF actuel.',
   'resumePreview.copiedExperiences': 'Expériences reprises telles quelles',
+  'pageBudget.fitsOne': 'Tient sur une page.',
+  'pageBudget.fitsTwo': 'Tient sur deux pages.',
+  'pageBudget.overflow': 'Ton CV fait {pageCount} pages, deux au maximum.',
+  'pageBudget.proposalOverflow': 'Cette proposition dépasse encore deux pages.',
+  'pageBudget.shorten': 'Raccourcir le CV',
 } as const satisfies TranslationCatalog
 
 export type Locale = 'en' | 'fr'

@@ -16,10 +16,10 @@ describe('Page Budget status', () => {
       .toEqual({ tone: 'success', message: { kind: 'reduced', pageCount: 1, ...overflowReduction }, action: 'review-hidden' })
   })
 
-  it('reports an overflow alone, whatever was hidden, with shortening as its action', () => {
+  it('reports an overflow alone with its page count, whatever was hidden, with shortening as its action', () => {
     expect(readPageBudgetStatus({ layout: { status: 'overflow', revision: 'r', pageCount: 3 },
       overflowReduction: { achievements: 2, other: 1 } }))
-      .toEqual({ tone: 'error', message: { kind: 'overflow' }, action: 'shorten' })
+      .toEqual({ tone: 'error', message: { kind: 'overflow', pageCount: 3 }, action: 'shorten' })
   })
 
   it('reports nothing for a layout it could not measure', () => {

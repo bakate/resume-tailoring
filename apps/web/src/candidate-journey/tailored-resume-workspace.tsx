@@ -2,6 +2,7 @@ import { Button, Group, Modal, Paper, Stack, Text, Title } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
 import { useRef, useState } from 'react'
 
+import type { ResumeReviewOperation } from '@resume-tailoring/application/candidate-journey'
 import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
 import type { Localization } from '../localization/localization'
 import type { useCandidateJourney } from './use-candidate-journey'
@@ -13,9 +14,9 @@ import { renderTailoredResumeDocument } from './tailored-resume-document'
 import { ResumeEditor } from './resume-editor'
 import type { EditorTab } from './resume-editor'
 import { ResumeOperationFailureAlert } from './failure-recovery'
+import { fitsKeys } from './page-budget-status'
 
 export type ResumeReviewController = ReturnType<typeof useCandidateJourney>
-type ResumeReviewOperation = NonNullable<Extract<ResumeReviewController['view'], { status: 'candidate-session-open' }>['resumeReview']>['operation']
 export type ResumeReviewProps = Readonly<{ candidateJourney: ResumeReviewController; localization: Localization }>
 
 export function TailoredResumeWorkspace({ candidateJourney, localization, onChangeJobPosting }: ResumeReviewProps & Readonly<{
@@ -40,6 +41,10 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
   const revision = props.candidateJourney.view.status === 'candidate-session-open' ? props.candidateJourney.view.resumeReview?.draft.revision ?? null : null
   const { localization } = props
   const operations = useRetryableOperations()
+  const shorteningAvailable = canCondense({ candidateJourney: props.candidateJourney, photo })
+  /** Shortening and condensing measure the proposal with the photo the Candidate sees at that moment. */
+  const withPhoto = (shorten: (request: Readonly<{ photoDataUrl?: string }>) => Promise<void>) => { operations.attempt(() => {
+    setProposalPhoto(photo.dataUrl); void shorten({ photoDataUrl: photo.dataUrl }) }) }
   return <Paper aria-labelledby="tailored-resume-title" component="section"
     className="candidate-journey-workspace" p={{ base: 'md', sm: 'xl' }} shadow="xs" withBorder>
     <Stack gap="lg">
@@ -49,12 +54,8 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
         props.candidateJourney.recordResumeDownload(); setDownloadedRevision(revision) }}
         pageBudget={{ overflowReduction: view.status === 'candidate-session-open' && view.resumeReview !== null
           ? view.resumeReview.recovery.overflowReduction : { achievements: 0, other: 0 },
-        busy: !canCondense({ candidateJourney: props.candidateJourney, photo }),
-        reviewHidden: () => { setEditorTab('recovery') },
-        shorten: () => { operations.attempt(() => {
-          setProposalPhoto(photo.dataUrl); void props.candidateJourney.shortenResume({ photoDataUrl: photo.dataUrl }) }) },
-        propose: () => { operations.attempt(() => {
-          setProposalPhoto(photo.dataUrl); void props.candidateJourney.proposeResumeCondensation({ photoDataUrl: photo.dataUrl }) }) } }} />
+        reviewHidden: { disabled: blocksResumeEditing(view), open: () => { setEditorTab('recovery') } },
+        shortening: { disabled: !shorteningAvailable, shorten: () => { withPhoto(props.candidateJourney.shortenResume) } } }} />
       {downloadedRevision !== null && downloadedRevision === revision
         ? <UsabilityFeedback key={downloadedRevision} candidateJourney={props.candidateJourney} localization={props.localization} /> : null}
       <ReviewStatus {...props} onRetry={operations.retry} />
@@ -62,6 +63,9 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
         proposalLayoutCurrent={photo.ready && !photo.failed && proposalPhoto === photo.dataUrl} />
       <Group><Button variant="default" disabled={blocksResumeEditing(view)}
         onClick={() => { setEditorTab('contacts') }}>{localization.translate('resumeReview.edit')}</Button>
+        {/* Shorter wording keeps every item: the alternative to shortening, offered while the resume overflows. */}
+        {overflows(view) ? <Button variant="default" disabled={!shorteningAvailable}
+          onClick={() => { withPhoto(props.candidateJourney.proposeResumeCondensation) }}>{localization.translate('resumeReview.condense')}</Button> : null}
         <Button variant="default" onClick={props.onChangeJobPosting}>{localization.translate('resumeReview.changeJobPosting')}</Button></Group>
       <MatchAnalysisDisclosure {...props} />
       <DocumentText document={props.resume} localization={props.localization} />
@@ -103,6 +107,12 @@ function ResumeEditorDialog({ editorTab, ...props }: ResumeDocumentProps & Reado
   </Modal>
 }
 
+function overflows(view: ResumeReviewController['view']) {
+  const review = view.status === 'candidate-session-open' ? view.resumeReview : null
+  const layout = review?.assessment?.layout
+  return layout?.status === 'overflow' && layout.revision === review?.draft.revision
+}
+
 /** A preview render is background work: disabling the button for it drops keyboard focus when the editor closes. */
 function blocksResumeEditing(view: ResumeReviewController['view']) {
   return view.status === 'candidate-session-open' && view.operation !== null && view.operation !== 'rendering-resume-document'
@@ -140,7 +150,7 @@ const operationKeys = {
   condensing: 'resumeReview.condensing',
   shortening: 'resumeReview.shortening',
   'assessing-layout': 'resumeReview.checking',
-} as const satisfies Record<NonNullable<ResumeReviewOperation>, Parameters<Localization['translate']>[0]>
+} as const satisfies Record<ResumeReviewOperation, Parameters<Localization['translate']>[0]>
 
 function CondensationProposal({ candidateJourney, localization, resume, photoDataUrl, proposalLayoutCurrent }: Readonly<{
   candidateJourney: ResumeReviewController; localization: Localization; resume: TailoredResume
@@ -155,8 +165,8 @@ function CondensationProposal({ candidateJourney, localization, resume, photoDat
     <Title order={3}>{localization.translate('resumeReview.proposal')}</Title><Text>{localization.translate('resumeReview.proposalDescription')}</Text>
     <ResumePreview resume={proposedResume} title={localization.translate('resumeReview.proposal')} photoDataUrl={photoDataUrl} />
     <Text>{!proposalLayoutCurrent ? localization.translate('resumeReview.unchecked')
-      : proposal.layout.status === 'fits' ? localization.translate(proposal.layout.pageCount === 1 ? 'pageBudget.fitsOne' : 'pageBudget.fitsTwo')
-        : proposal.layout.status === 'overflow' ? localization.translate('pageBudget.overTwo')
+      : proposal.layout.status === 'fits' ? localization.translate(fitsKeys[proposal.layout.pageCount])
+        : proposal.layout.status === 'overflow' ? localization.translate('pageBudget.proposalOverflow')
           : localization.translate('failure.review.pageCountUnavailable')}</Text>
     <Group><Button disabled={review?.draft.revision !== proposal.baseRevision}
       onClick={() => { candidateJourney.acceptResumeCondensation(decision) }}>{localization.translate('resumeReview.accept')}</Button>

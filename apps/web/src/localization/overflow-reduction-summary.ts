@@ -2,7 +2,7 @@ import type { Locale } from './localization'
 
 type OverflowReduction = Readonly<{ locale: Locale; achievements: number; other: number; pageCount: 1 | 2 | null }>
 
-/** The summary above the preview of the Hidden Content Overflow Reduction produced, or null when it hid nothing. */
+/** The Page Budget status naming the Hidden Content Overflow Reduction produced, or null when it hid nothing. */
 export function describeOverflowReduction({ locale, achievements, other, pageCount }: OverflowReduction) {
   if (achievements + other === 0) return null
   return locale === 'fr' ? describeInFrench({ achievements, other, pageCount }) : describeInEnglish({ achievements, other, pageCount })

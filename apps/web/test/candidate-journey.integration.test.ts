@@ -652,7 +652,7 @@ class CandidateJourneyIntegrationSystem {
     await this.givenOverflowingDraft()
     await this.requestCondensationProposal()
     await expect(this.#page.getByRole('heading', { name: 'Shorter version proposal' })).toBeVisible({ timeout: 30_000 })
-    await expect(this.#proposal().getByText('Over two pages.', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(this.#proposal().getByText('This proposal still runs over two pages.', { exact: true })).toBeVisible({ timeout: 30_000 })
   }
 
   async givenReplacedJobPosting() {
@@ -1152,7 +1152,7 @@ const correctedSummary = 'Built accessible billing screens with React.'
 const candidateContent = ['Northwind', 'Contoso', 'billing', 'Alex', 'Morgan', 'example.com', 'Frontend', 'Accessibility'] as const
 const reactMatch = { factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' } as const
 
-const overflowStatus = 'Over two pages: shorten it to download it.'
+const overflowStatus = /^Your resume runs to \d+ pages, two at most\.$/u
 
 /** Enough to overflow two pages in full (from 16), few enough that the condensed experience still fits whole (up to 28). */
 const denseTopics = ['checkout', 'invoicing', 'refunds', 'onboarding', 'reporting', 'search', 'navigation', 'settings',

@@ -14,19 +14,19 @@ import type { CombinedIntakeOutcome, CombinedIntakeRequest, PreparationPhase, Pr
 
 import type { MatchScoreBand, PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
 import type { ResumeCorrectionKind } from './resume-editing'
-import { assessResumeLayout, proposeResumeCondensation, acceptResumeCondensation, rejectResumeCondensation,
-  shortenResume } from './resume-condensation'
+import { assessResumeLayout, proposeResumeCondensation, acceptResumeCondensation, rejectResumeCondensation } from './resume-condensation'
 import type { ResumeProposalDecision } from './structured-resume-contract'
 import { hideResumeEntry, restoreResumeEntry, attestResumeField, hideResumeContent, restoreResumeContent, moveResumeContent, reorderResumeSections, restoreSourceFact } from './resume-content-recovery'
 import type { ResumeSectionName } from './tailored-resume'
 import { applyValidatedSectionChange, changedResumeSession, editResumeField, emptyResumeReview,
   readResumeEditing, readResumeReview, unavailableResumeResult } from './resume-editing'
 import type { ResumeEditingAccess, ResumeReview, ResumeReviewState } from './resume-editing'
+export type { ResumeReviewOperation } from './resume-editing'
 import type { ResumeSectionChange } from './structured-resume-contract'
 import { assign, createActor, fromPromise, setup, waitFor } from 'xstate'
 import type { AnyActorRef, SnapshotFrom } from 'xstate'
 import { prepareResumeRendering, staleResumeRendering, validateResumeRendering } from './resume-rendering-state'
-import { reduceToPageBudget } from './overflow-reduction'
+import { reduceToPageBudget, shortenResume } from './overflow-reduction'
 import type { ResumeRenderingState } from './resume-rendering-state'
 
 import { unavailableResumeRender } from './resume-export'
@@ -452,12 +452,10 @@ function hasJobMatchConsent({ input, session }: Readonly<{
 const fitPageBudget = fromPromise<CandidateSession | null, Readonly<{
   dependencies: CandidateJourneyDependencies; session: CandidateSession | null
 }>>(async ({ input: { dependencies, session } }) => {
-  const renderer = dependencies.resumeDocumentRenderer
   // The Page Budget belongs to a Tailored Resume: a Normalized Resume claims no relevance to rank its content by.
-  if (session?.tailoredResume?.purpose !== 'tailored' || renderer === undefined) return null
+  if (session?.tailoredResume?.purpose !== 'tailored' || dependencies.resumeDocumentRenderer === undefined) return null
   const reduction = { resume: session.tailoredResume, editing: readResumeEditing({ session }) }
-  const reduced = await reduceToPageBudget({ reduction, today: dependencies.now(),
-    assessLayout: async (request) => validateResumeRendering({ request, result: await renderer.render(request) }).assessment,
+  const reduced = await reduceToPageBudget({ reduction, today: dependencies.now(), assessLayout: assessRenderedLayout(dependencies),
     relevantFactIds: session.jobMatch?.analysis.relevantFactIds ?? [], photoDataUrl: session.resumePhoto?.dataUrl })
   return reduced === reduction ? null : { ...session, tailoredResume: reduced.resume, resumeEditing: reduced.editing }
 })
@@ -987,10 +985,7 @@ export function createCandidateJourney({ dependencies }: Readonly<{
   })
   const editingAccess: ResumeEditingAccess = {
     get ports() { return { ...dependencies.resumeDocumentPorts,
-      assessLayout: dependencies.resumeDocumentPorts?.assessLayout ?? (async (request) => {
-        const result = await renderCandidateDocument({ dependencies, request })
-        return validateResumeRendering({ request, result }).assessment
-      }),
+      assessLayout: dependencies.resumeDocumentPorts?.assessLayout ?? assessRenderedLayout(dependencies),
     } },
     readReview: () => view.status === 'candidate-session-open' ? view.resumeReview : null,
     readSession: () => actor.getSnapshot().matches('candidateSessionAvailable')
@@ -1163,6 +1158,12 @@ export type {
   ResumeProposalDecision, ResumeProposalDecisionOutcome, ResumeSectionChange, ResumeSectionChangeOutcome,
 } from './structured-resume-contract'
 
+
+/** Measures a draft with the real renderer, as its export would lay it out. */
+function assessRenderedLayout(dependencies: CandidateJourneyDependencies) {
+  return async (request: ResumeRenderRequest) =>
+    validateResumeRendering({ request, result: await renderCandidateDocument({ dependencies, request }) }).assessment
+}
 
 async function renderCandidateDocument({ dependencies, request }: Readonly<{
   dependencies: CandidateJourneyDependencies; request: ResumeRenderRequest

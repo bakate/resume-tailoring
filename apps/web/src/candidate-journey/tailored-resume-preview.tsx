@@ -8,7 +8,7 @@ import { FailureExplanation, RecoveryAction } from './failure-recovery'
 import { renderTailoredResumeDocument } from './tailored-resume-document'
 import { ResumePdfPages } from './resume-pdf-pages'
 import { CopiedNotice } from './copied-notice'
-import { readPageBudgetStatus } from './page-budget-status'
+import { fitsKeys, readPageBudgetStatus } from './page-budget-status'
 import type { PageBudgetStatus } from './page-budget-status'
 import { StatusMessage } from './status-message'
 import { describeOverflowReduction } from '../localization/overflow-reduction-summary'
@@ -60,34 +60,29 @@ function RenderedResume({ pageBudget, current, document, localization, name, onD
       explanation={explanation === null ? null : { id: explanationId, hint: explanation.hint }} />
     {/* The reason a download is blocked, and the action that unblocks it, sit right under the button. */}
     {blocker === 'overflow' || blocker === null || blocker === 'missing-identity'
-      ? <PageBudget status={budgetStatus} id={explainedBy('blocker')} {...{ localization, pageBudget }} />
+      ? budgetStatus === null || pageBudget === undefined ? null
+        : <PageBudget status={budgetStatus} id={explainedBy('blocker')} {...{ localization, pageBudget }} />
       : <StatusMessage tone="error" id={explainedBy('blocker')}>{localization.translate(`resumePreview.${blocker}`)}</StatusMessage>}
     <CandidateNameField identity={document.identity} explain={blocker === 'missing-identity'} errorId={explainedBy('name')}
       localization={localization} name={name} />
   </Stack>
 }
 
-/**
- * The one Page Budget status of the current render. An overflow makes shortening the primary action, with shorter
- * wording, which keeps every item, offered beside it.
- */
+/** The one Page Budget status of the current render; an overflow makes shortening the primary action. */
 function PageBudget({ id, localization, pageBudget, status }: Readonly<{
-  id?: string; localization: Localization; pageBudget: ResumePreviewProps['pageBudget']; status: PageBudgetStatus | null
+  id?: string; localization: Localization; pageBudget: NonNullable<ResumePreviewProps['pageBudget']>; status: PageBudgetStatus
 }>) {
-  if (status === null || pageBudget === undefined) return null
   const { message } = status
-  const text = message.kind === 'overflow' ? localization.translate('pageBudget.overflow')
+  // A reduced status always counts some Hidden Content, so its summary is never empty.
+  const text = message.kind === 'overflow'
+    ? localization.translate('pageBudget.overflow').replace('{pageCount}', String(message.pageCount))
     : message.kind === 'reduced' ? describeOverflowReduction({ locale: localization.locale, ...message }) ?? ''
-      : localization.translate(message.pageCount === 1 ? 'pageBudget.fitsOne' : 'pageBudget.fitsTwo')
-  if (status.action === 'shorten') return <Stack gap="xs">
-    <StatusMessage tone={status.tone} id={id} action={<Button disabled={pageBudget.busy} onClick={pageBudget.shorten}>
-      {localization.translate('pageBudget.shorten')}</Button>}>{text}</StatusMessage>
-    <Button variant="subtle" w="fit-content" disabled={pageBudget.busy} onClick={pageBudget.propose}>
-      {localization.translate('resumeReview.condense')}</Button>
-  </Stack>
-  return <StatusMessage tone={status.tone} id={id} action={status.action === 'review-hidden'
-    ? <Button variant="subtle" size="compact-sm" disabled={pageBudget.busy} onClick={pageBudget.reviewHidden}>
-      {localization.translate('resumeReview.reviewHidden')}</Button> : undefined}>{text}</StatusMessage>
+      : localization.translate(fitsKeys[message.pageCount])
+  const action = status.action === 'shorten'
+    ? <Button disabled={pageBudget.shortening.disabled} onClick={pageBudget.shortening.shorten}>{localization.translate('pageBudget.shorten')}</Button>
+    : status.action === 'review-hidden' ? <Button variant="subtle" size="compact-sm" disabled={pageBudget.reviewHidden.disabled}
+      onClick={pageBudget.reviewHidden.open}>{localization.translate('resumeReview.reviewHidden')}</Button> : undefined
+  return <StatusMessage tone={status.tone} id={id} action={action}>{text}</StatusMessage>
 }
 
 /**

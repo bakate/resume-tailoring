@@ -4,18 +4,21 @@ import { readResumeFields, removeResumeField } from './resume-field-editing'
 import type { ResumeFieldReference } from './resume-field-editing'
 import type { ResumeRenderRequest } from './resume-export'
 import type { ResumeLayoutOutcome } from './structured-resume-contract'
+import { changedResumeSession, readResumeEditing } from './resume-editing'
+import type { ResumeEditingAccess } from './resume-editing'
+import { assessResumeLayout, proposeResumeCondensation } from './resume-condensation'
 
 /** A Tailored Resume with the editing state that holds its Hidden Content. */
 type ReducibleResume = Readonly<{ resume: TailoredResume; editing: ResumeEditingState }>
 
 /** Lays a resume out as the export would; a failure to lay it out may throw or answer unavailable. */
-export type ResumeLayoutMeasure = (request: ResumeRenderRequest) => Promise<Readonly<{ layout: ResumeLayoutOutcome }>>
+export type AssessLayout = (request: ResumeRenderRequest) => Promise<Readonly<{ layout: ResumeLayoutOutcome }>>
 
 type ReductionRequest = Readonly<{
   reduction: ReducibleResume
   relevantFactIds: readonly string[]
   today: number
-  assessLayout: ResumeLayoutMeasure
+  assessLayout: AssessLayout
   photoDataUrl?: string
 }>
 
@@ -29,6 +32,31 @@ type ReductionStep = Readonly<{
 }>
 
 const relevantExperienceAchievementFloor = 2
+
+/**
+ * The one-click way back within the Page Budget: Overflow Reduction of the current draft, saved as the Candidate's own
+ * removal. When no reduction reaches two pages, it proposes shorter wording instead.
+ */
+export async function shortenResume({ access, today, photoDataUrl }: Readonly<{
+  access: ResumeEditingAccess; today: number; photoDataUrl?: string
+}>) {
+  const review = access.readReview()
+  const session = access.readSession()
+  const assessLayout = access.ports.assessLayout
+  if (review === null || session?.tailoredResume == null || review.operation !== null || assessLayout === undefined) return
+  const baseRevision = review.draft.revision
+  access.report({ baseRevision, review: { ...review, proposal: null, failure: null, operation: 'shortening' } })
+  const shortened = await shortenToPageBudget({ assessLayout, today, photoDataUrl,
+    reduction: { resume: session.tailoredResume, editing: readResumeEditing({ session }) },
+    relevantFactIds: session.jobMatch?.analysis.relevantFactIds ?? [] })
+  const current = access.readReview()
+  if (current?.draft.revision !== baseRevision) return
+  access.report({ baseRevision, review: { ...current, operation: null } })
+  if (shortened === null) { await proposeResumeCondensation({ access, photoDataUrl }); return }
+  access.save({ baseRevision, correctionKind: 'resume-claim-removal', session: changedResumeSession({ session,
+    document: shortened.resume, editing: shortened.editing, revision: access.createIdentifier() }) })
+  await assessResumeLayout({ access, photoDataUrl })
+}
 
 /**
  * Overflow Reduction: hides content one step at a time, re-rendering after each, and keeps the first result that fits
@@ -184,7 +212,7 @@ function hideFields({ reduction, references }: Readonly<{ reduction: ReducibleRe
 
 /** The page count of the real render, or null when the resume cannot be rendered. */
 async function measurePages({ assessLayout, photoDataUrl, reduction }: Readonly<{
-  assessLayout: ResumeLayoutMeasure; photoDataUrl?: string; reduction: ReducibleResume
+  assessLayout: AssessLayout; photoDataUrl?: string; reduction: ReducibleResume
 }>) {
   const request = { draft: { document: reduction.resume, revision: reduction.editing.revision }, unsupportedFieldIds: [],
     ...(photoDataUrl === undefined ? {} : { photoDataUrl }) }
