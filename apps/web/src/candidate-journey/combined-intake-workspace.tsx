@@ -145,7 +145,7 @@ function SourceDocumentCard({ hasSource, ...props }: Omit<DocumentCardProps, 'ki
   if (!hasSource || replacing) return <DocumentCard {...props} kind="source" footer={hasSource
     ? <Button onClick={() => { setReplacing(false); props.onChange(emptyChoice) }} size="compact-sm" variant="subtle">
         {localization.translate('combinedIntake.keepSourceAction')}</Button> : null} />
-  return <Paper className="intake-document" p={{ base: 0, sm: 'lg' }} radius="md" withBorder>
+  return <Paper className="intake-document" radius="md" withBorder>
     <Stack gap="sm">
       <Text className="intake-document-title" fw={700} size="lg">{localization.translate('combinedIntake.sourceTitle')}</Text>
       <Text c="forest.8" fw={600} role="status">{localization.translate('combinedIntake.sourceReady')}</Text>
@@ -168,11 +168,12 @@ function DocumentCard({ busy, choice, footer = null, kind, localization, missing
   footer?: ReactNode; kind: DocumentKind
 }>) {
   const [rejected, setRejected] = useState(false)
-  // A finger cannot drag a file onto the page, so a touch screen only offers to choose one.
-  const touch = useMediaQuery('(pointer: coarse)')
+  // A finger cannot drag a file onto the page, so a touch screen only offers to choose one. The intake renders only in the
+  // browser, once the Candidate Session is read, so the first paint can already use the right copy.
+  const touch = useMediaQuery('(pointer: coarse)', undefined, { getInitialValueInEffect: false })
   const source = kind === 'source'
   const title = localization.translate(source ? 'combinedIntake.sourceTitle' : 'combinedIntake.postingTitle')
-  return <Paper className="intake-document" component="fieldset" p={{ base: 0, sm: 'lg' }} radius="md" withBorder>
+  return <Paper className="intake-document" component="fieldset" radius="md" withBorder>
     <Stack gap="sm">
       <Text className="intake-document-title" component="legend" fw={700} size="lg">{title}</Text>
       {choice.method === 'upload' && choice.file !== null

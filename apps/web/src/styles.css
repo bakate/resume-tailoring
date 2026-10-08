@@ -1952,12 +1952,14 @@ h1 {
 .intake-document {
   margin: 0;
   min-width: 0;
+  padding: var(--mantine-spacing-lg);
 }
 
 /* On a phone the intake card is the only card: its documents and their text areas take the full width. */
 @media (max-width: 47.99em) {
   .intake-document {
     border: 0;
+    padding: 0;
   }
 }
 

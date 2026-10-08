@@ -381,7 +381,7 @@ test.describe('Candidate Journey preview-first preparation', () => {
 
     await system.openUnconsentedIntake()
 
-    await system.expectFileActionFor({ touch: hasTouch })
+    await system.expectFileChoiceCopyFor({ touch: hasTouch })
   })
 
   for (const width of [320, 375]) {
@@ -391,7 +391,9 @@ test.describe('Candidate Journey preview-first preparation', () => {
 
       await system.openUnconsentedIntake()
 
-      await system.expectIntakeFitsTheScreen()
+      await system.expectNoHorizontalScroll()
+      await system.expectNoNestedDocumentCards()
+      await system.expectHeaderWithinItsBar()
     })
   }
 
@@ -1176,24 +1178,24 @@ class CandidateJourneyTestSystem {
     await this.#page.setViewportSize({ width, height: 800 })
   }
 
-  async expectFileActionFor({ touch }: Readonly<{ touch: boolean }>) {
+  async expectFileChoiceCopyFor({ touch }: Readonly<{ touch: boolean }>) {
     this.#expectAction()
-    const intake = this.#page.getByRole('region', { name: 'Your resume and the job posting', exact: true })
-    const [shown, hidden] = touch
-      ? ['Choose a file', 'Drop your file here or click to choose it']
-      : ['Drop your file here or click to choose it', 'Choose a file']
-    await expect(intake.getByText(shown, { exact: true })).toHaveCount(2)
-    await expect(intake.getByText(hidden, { exact: true })).toHaveCount(0)
+    const [shown, hidden] = touch ? [chooseFileCopy, dropFileCopy] : [dropFileCopy, chooseFileCopy]
+    await expect(this.#intake.getByText(shown, { exact: true })).toHaveCount(2)
+    await expect(this.#intake.getByText(hidden, { exact: true })).toHaveCount(0)
   }
 
-  async expectIntakeFitsTheScreen() {
+  async expectNoHorizontalScroll() {
     this.#expectAction()
-    const intake = this.#page.getByRole('region', { name: 'Your resume and the job posting', exact: true })
-    await expect(intake).toBeVisible()
+    await expect(this.#intake).toBeVisible()
     expect(await this.#page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
       .toBeLessThanOrEqual(0)
-    // The intake, then a dropzone or a text area: never a card inside a card inside a card.
-    expect(await intake.evaluate((section) => Math.max(...[...section.querySelectorAll('*')].map((element) => {
+  }
+
+  /** The intake, then a dropzone or a text area: never a card inside a card inside a card, and text areas span the intake. */
+  async expectNoNestedDocumentCards() {
+    this.#expectAction()
+    expect(await this.#intake.evaluate((section) => Math.max(...[...section.querySelectorAll('*')].map((element) => {
       let depth = 0
       for (let node: Element | null = element; node !== null && section.contains(node); node = node.parentElement) {
         const style = getComputedStyle(node)
@@ -1201,11 +1203,16 @@ class CandidateJourneyTestSystem {
       }
       return depth
     })))).toBeLessThanOrEqual(2)
-    const source = intake.getByRole('textbox', { name: 'Professional text', exact: true })
-    // On a phone the text area spans the intake, with no card padding around it.
-    const sourceWidth = (await source.boundingBox())?.width ?? 0
-    expect(sourceWidth).toBeGreaterThanOrEqual(await readContentWidth(intake) - 2)
-    // On one line or two, the header holds the brand, its badge and the language switch, the last two side by side.
+    const intakeWidth = await readContentWidth(this.#intake)
+    for (const name of ['Professional text', 'Job posting text']) {
+      const textArea = await this.#intake.getByRole('textbox', { name, exact: true }).boundingBox()
+      expect(textArea?.width ?? 0).toBeGreaterThanOrEqual(intakeWidth - 2)
+    }
+  }
+
+  /** On one line or two, the header holds the brand, its badge and the language switch, the last two side by side. */
+  async expectHeaderWithinItsBar() {
+    this.#expectAction()
     const banner = this.#page.getByRole('banner')
     const [header, brand, badge, locale] = await Promise.all([banner, banner.getByRole('link', { name: 'Resume Studio', exact: true }),
       banner.getByText('Private by design', { exact: true }), banner.getByRole('radiogroup', { name: 'Language', exact: true }),
@@ -1216,6 +1223,10 @@ class CandidateJourneyTestSystem {
       expect(box.y + box.height).toBeLessThanOrEqual(header.y + header.height)
     }
     expect(Math.abs((badge.y + badge.height / 2) - (locale.y + locale.height / 2))).toBeLessThanOrEqual(1)
+  }
+
+  get #intake() {
+    return this.#page.getByRole('region', { name: 'Your resume and the job posting', exact: true })
   }
 
   async expectOneRetryActionOnTheDocuments() {
@@ -1292,6 +1303,9 @@ function matchFor(scenario: Scenario) {
   evidence: [{ requirementId: 'job-requirement-react', coverage: 'covered', factMatches: [factMatch] }],
   relevance: [{ requirementId: 'job-requirement-react', factMatch }] }
 }
+
+const dropFileCopy = 'Drop your file here or click to choose it'
+const chooseFileCopy = 'Choose a file'
 
 /** The width inside an element's padding, where its content lays out. */
 function readContentWidth(locator: Locator) {
