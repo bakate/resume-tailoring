@@ -22,6 +22,8 @@ import {
 import type { ProfileEnrichmentFactKind } from '@resume-tailoring/application/job-match'
 import type { CandidateFact, SourceIntake } from '@resume-tailoring/application/source-intake'
 import type { Localization } from '../localization/localization'
+import { coverageTones, readCriticalReserveStatus } from './match-analysis-status'
+import { readStatusColor, StatusIcon } from './status-message'
 import type { useCandidateJourney } from './use-candidate-journey'
 
 type CandidateJourneyController = ReturnType<typeof useCandidateJourney>
@@ -125,14 +127,14 @@ function CriticalReserve({ jobMatch, localization }: Readonly<{
   jobMatch: JobMatch
   localization: Localization
 }>) {
-  const status = jobMatch.analysis.criticalRequirementReserve.status
+  const { headingKey, messageKey, tone } = readCriticalReserveStatus(jobMatch.analysis.criticalRequirementReserve)
   const requirements = readRequirements({
     ids: jobMatch.analysis.criticalRequirementReserve.requirementIds,
     jobMatch,
   })
-  return <Paper p="md" withBorder><Title order={4}>
-    {localization.translate('jobMatch.criticalReserve')}
-  </Title><Text mt="xs">{localization.translate(`jobMatch.criticalReserve.${status}`)}</Text>
+  return <Paper p="md" withBorder><Group gap="xs" wrap="nowrap"><StatusIcon tone={tone} />
+    <Title order={4}>{localization.translate(headingKey)}</Title>
+  </Group><Text mt="xs">{localization.translate(messageKey)}</Text>
     {requirements.length === 0 ? null : <List mt="xs">{requirements.map((requirement) => (
       <List.Item key={requirement.id}>{requirement.value}</List.Item>
     ))}</List>}
@@ -182,9 +184,6 @@ function RequirementDetail({
   return <Paper p="md" withBorder><Stack gap="xs">
     <RequirementBadges coverage={evidence?.coverage ?? 'uncovered'}
       {...{ localization, requirement }} />
-    <Text size="sm">{requirement.importanceRationale}</Text>
-    <Text size="sm"><strong>{localization.translate('jobMatch.sourceExcerpt')}:</strong>{' '}
-      {requirement.sourceExcerpt}</Text>
     <RequirementEvidence {...{ evidenceValues, localization }} />
     <AdjacentEvidenceNote {...{ jobMatch, localization, requirement, sourceFacts }} />
   </Stack></Paper>
@@ -197,9 +196,18 @@ function RequirementBadges({ coverage, localization, requirement }: Readonly<{
 }>) {
   return <Group><Text fw={700}>{requirement.value}</Text><Badge variant="light">
     {localization.translate(`jobMatch.importance.${requirement.importance}`)}
-  </Badge><Badge color="forest" variant="light">
+  </Badge><CoverageBadge {...{ coverage, localization }} /></Group>
+}
+
+// The icon and the label both tell the coverage; the colour only repeats them.
+function CoverageBadge({ coverage, localization }: Readonly<{
+  coverage: keyof typeof coverageTones
+  localization: Localization
+}>) {
+  const tone = coverageTones[coverage]
+  return <Badge color={readStatusColor({ tone })} leftSection={<StatusIcon size={14} tone={tone} />} variant="light">
     {localization.translate(`jobMatch.coverage.${coverage}`)}
-  </Badge></Group>
+  </Badge>
 }
 
 function RequirementEvidence({ evidenceValues, localization }: Readonly<{

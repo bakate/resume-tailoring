@@ -10,7 +10,6 @@ import {
   Paper,
   SegmentedControl,
   SimpleGrid,
-  Skeleton,
   Stack,
   Text,
   ThemeIcon,
@@ -30,6 +29,7 @@ import { candidateJourneyPhases } from './candidate-journey-phases'
 import type { CandidateJourneyPhase } from './candidate-journey-phases'
 import { useCandidateJourney } from './use-candidate-journey'
 import { CombinedIntakeWorkspace } from './combined-intake-workspace'
+import { OperationSpinner, PreparationStepList } from './preparation-step-list'
 import { SourceIntakeWorkspace } from './source-intake-workspace'
 import type { CandidateJourneyController } from './use-candidate-journey'
 
@@ -304,20 +304,19 @@ LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) 
   if (candidateJourney.view.status !== 'candidate-session-open'
     || candidateJourney.view.operation === null) return null
   const { operation } = candidateJourney.view
+  const activePhase = readActivePhase(candidateJourney)
   return <Paper aria-busy="true" aria-describedby="candidate-journey-progress-description"
     aria-label={localization.translate('candidateJourney.progressLabel')}
     className="candidate-journey-progress" component="section" p={{ base: 'md', sm: 'lg' }} withBorder>
-    <Group align="flex-start" wrap="nowrap">
-      <Skeleton aria-hidden="true" circle height={36} width={36} />
-      <Stack flex={1} gap="xs">
-        <Text fw={700}>{localization.translate(readOperationKey({ candidateJourney, operation }))}</Text>
-        <Text c="dimmed" id="candidate-journey-progress-description" size="sm">
-          {readProgressDescription({ candidateJourney, localization })}
-        </Text>
-        <Skeleton aria-hidden="true" height={10} radius="xl" width="72%" />
-        <Skeleton aria-hidden="true" height={10} radius="xl" width="48%" />
-      </Stack>
-    </Group>
+    <Stack gap="sm">
+      {operation === 'preparing-tailored-resume' && activePhase !== null
+        ? <PreparationStepList {...{ activePhase, localization }} />
+        : <Group gap="xs" wrap="nowrap"><OperationSpinner />
+          <Text fw={700}>{localization.translate(readOperationKey({ candidateJourney, operation }))}</Text></Group>}
+      <Text c="dimmed" id="candidate-journey-progress-description" size="sm">
+        {readProgressDescription({ candidateJourney, localization })}
+      </Text>
+    </Stack>
   </Paper>
 }
 

@@ -19,13 +19,23 @@ const tones = {
 export function StatusMessage({ tone, children, action, id }: Readonly<{
   tone: StatusTone; children: string; action?: ReactNode; id?: string
 }>) {
-  const { color, Icon } = tones[tone]
   return <Group gap="xs" justify="space-between" wrap="wrap">
     <Group gap="xs" wrap="nowrap" align="flex-start" role={tone === 'error' ? 'alert' : 'status'}>
-      <Icon aria-hidden="true" className="status-message-icon" size={20} stroke={2}
-        color={`var(--mantine-color-${color}-8)`} />
+      <StatusIcon tone={tone} />
       <Text id={id} size="sm" c={tone === 'error' ? 'danger.8' : undefined}>{children}</Text>
     </Group>
     {action ?? null}
   </Group>
+}
+
+/** The icon of a tone, decoration beside the words that carry its meaning. */
+export function StatusIcon({ tone, size = 20 }: Readonly<{ tone: StatusTone; size?: number }>) {
+  const { color, Icon } = tones[tone]
+  return <Icon aria-hidden="true" className="status-message-icon" size={size} stroke={2}
+    color={`var(--mantine-color-${color}-8)`} />
+}
+
+/** The theme colour of a tone, for a surface such as a badge that carries its icon. */
+export function readStatusColor({ tone }: Readonly<{ tone: StatusTone }>) {
+  return tones[tone].color
 }
