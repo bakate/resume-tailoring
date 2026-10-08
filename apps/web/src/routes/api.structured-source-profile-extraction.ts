@@ -4,6 +4,7 @@ import { createCsrfMiddleware } from '@tanstack/react-start'
 import { createOpenAiStructuredSourceProfileExtractor } from '../adapters/server/openai-structured-source-profile-extractor'
 import { structuredSourceProfileRequestSchema } from '../candidate-journey/structured-source-profile-schema'
 import { failureResponse } from '../api-failure'
+import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
 
@@ -35,16 +36,14 @@ async function extractStructuredSourceProfile({ request }: Readonly<{ request: R
 }
 
 async function readProfessionalContent({ request }: Readonly<{ request: Request }>) {
-  try {
-    const result = structuredSourceProfileRequestSchema.safeParse(await request.json())
-    if (result.success) return { ok: true, value: result.data.professionalContent } as const
-    const isOversized = result.error.issues.some(
-      (issue) => issue.code === 'too_big' && issue.path[0] === 'professionalContent',
-    )
-    return { ok: false, type: isOversized ? 'input-too-large' : 'invalid-input' } as const
-  } catch {
-    return { ok: false, type: 'invalid-input' } as const
-  }
+  const body = await readJsonRequestBody({ request, maxBytes: apiRequestBodyLimits.modelRequest })
+  if (!body.ok) return body
+  const result = structuredSourceProfileRequestSchema.safeParse(body.value)
+  if (result.success) return { ok: true, value: result.data.professionalContent } as const
+  const isOversized = result.error.issues.some(
+    (issue) => issue.code === 'too_big' && issue.path[0] === 'professionalContent',
+  )
+  return { ok: false, type: isOversized ? 'input-too-large' : 'invalid-input' } as const
 }
 
 const privateHeaders = {

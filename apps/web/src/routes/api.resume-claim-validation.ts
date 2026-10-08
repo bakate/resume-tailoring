@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
 import { failureResponse } from '../api-failure'
+import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
 import { createOpenAiResumeClaimSemanticValidator } from '../adapters/server/openai-resume-claim-service'
@@ -18,7 +19,7 @@ async function validateResumeClaim({ request }: Readonly<{ request: Request }>) 
   const accessResponse = createDemoAccessGuardResponse({ request })
   if (accessResponse !== null) return accessResponse
   const validationRequest = await readValidationRequest({ request })
-  if (!validationRequest.ok) return failureResponse({ type: 'invalid-input' })
+  if (!validationRequest.ok) return failureResponse({ type: validationRequest.type })
   const environment = validateServerEnvironment({ environment: process.env })
   if (!environment.ok) return failureResponse({ type: 'service-misconfigured' })
   const validator = createOpenAiResumeClaimSemanticValidator({
@@ -33,16 +34,14 @@ async function validateResumeClaim({ request }: Readonly<{ request: Request }>) 
 }
 
 async function readValidationRequest({ request }: Readonly<{ request: Request }>) {
-  try {
-    const result = resumeClaimValidationRequestSchema.safeParse(await request.json() as unknown)
-    return result.success ? { ok: true, value: result.data } as const : invalidResult
-  } catch {
-    return invalidResult
-  }
+  const body = await readJsonRequestBody({ request, maxBytes: apiRequestBodyLimits.modelRequest })
+  if (!body.ok) return body
+  const result = resumeClaimValidationRequestSchema.safeParse(body.value)
+  return result.success ? { ok: true, value: result.data } as const : invalidResult
 }
 
 const privateHeaders = {
   'Cache-Control': 'no-store, max-age=0',
   Pragma: 'no-cache',
 } as const
-const invalidResult = { ok: false } as const
+const invalidResult = { ok: false, type: 'invalid-input' } as const
