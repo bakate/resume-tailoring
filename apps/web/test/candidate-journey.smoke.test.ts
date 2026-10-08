@@ -1070,8 +1070,12 @@ class CandidateJourneyTestSystem {
     await expect(gaps.first()).toContainText(
       'Related experience you can highlight instead (it does not meet this requirement): TypeScript')
     await this.#page.getByText('All requirements and the experience that meets them', { exact: true }).click()
-    const javaDetail = this.#page.locator('.mantine-Paper-root').filter({ hasText: 'Java is required.' }).last()
+    const javaDetail = this.#page.locator('.mantine-Paper-root')
+      .filter({ has: this.#page.getByText('Java', { exact: true }) }).filter({ hasText: 'Your experience' }).last()
     await expect(javaDetail).toContainText('Uncovered')
+    await expect(javaDetail.locator('.mantine-Badge-root', { hasText: 'Uncovered' }).locator('svg')).toHaveCount(1)
+    await expect(javaDetail).not.toContainText('Java is required.')
+    await expect(this.#page.getByRole('heading', { name: 'Critical requirements not fully covered', exact: true })).toBeVisible()
     await expect(javaDetail).toContainText('Nothing in your resume supports it.')
     await expect(javaDetail).toContainText('it does not meet this requirement): TypeScript')
     await expect(javaDetail.getByText('Covered', { exact: true })).toHaveCount(0)
@@ -1222,8 +1226,12 @@ class CandidateJourneyTestSystem {
     const progress = this.#page.getByRole('region', { name: 'Progress', exact: true })
     await expect(progress).toContainText('Writing')
     await expect(progress).toContainText('Step 3 of 3')
+    const steps = progress.getByRole('listitem')
+    await expect(steps).toHaveText(['Reading your resume (done)', 'Reading the job posting and comparing (done)',
+      'Writing your resume (in progress)'])
+    await expect(progress.locator('[aria-current="step"]')).toHaveText('Writing your resume (in progress)')
     await expect(progress).not.toContainText('orchestration')
-    await expect(this.#page.locator('.sr-only[role="status"]')).toContainText('Current step: Your tailored resume.')
+    await expect(this.#page.locator('.sr-only[role="status"]')).toContainText('Current step: Writing your resume.')
   }
 
   async expectReadableSecondaryTextAndFocusRing() {

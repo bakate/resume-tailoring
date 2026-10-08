@@ -1,0 +1,13 @@
+/* A numbered list in markup, read as three steps; the icons replace the numbers on screen. */
+.phase-progress-list { list-style: none; margin: 0; padding: 0; }
+.phase-progress-list svg { flex-shrink: 0; }
+
+.phase-progress-icon-done { color: var(--mantine-color-forest-8); }
+.phase-progress-icon-upcoming { color: var(--mantine-color-dimmed); }
+/* Reduced motion stops the spin through the global animation reset. */
+.phase-progress-icon-current,
+.progress-spinner {
+  color: var(--mantine-color-forest-8);
+  animation: progress-spin 1s linear infinite;
+}
+@keyframes progress-spin { to { transform: rotate(360deg); } }
