@@ -340,7 +340,9 @@ function PreparationFailureAlert({ busy, cause, failure, failureDetails, hasStab
   busy: boolean; failureDetails: ReactNode; hasStableResume: boolean; localization: Localization
   onBack: (() => void) | undefined; onRetry: () => void
 }>) {
-  const step = interrupted || failure === null || (cause !== undefined && failure === 'unavailable') ? null
+  // Past the Daily Quota nothing failed to analyze: the step that was refused says nothing the cause does not.
+  const step = interrupted || failure === null || (cause !== undefined && failure === 'unavailable')
+    || cause?.type === 'daily-quota-reached' ? null
     : localization.translate(failure in retryableFailureCauses
       ? retryableFailureCauses[failure as keyof typeof retryableFailureCauses] : preparationFailureKeys[failure])
   return <Alert color={interrupted ? 'caution' : 'danger'} role="alert"
