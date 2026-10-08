@@ -1,6 +1,7 @@
 import type { z } from 'zod'
 import type { ResumeSectionModelError, ResumeSectionModelResult } from '@resume-tailoring/application/candidate-journey'
 import { failureResponse } from '../api-failure'
+import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
 import type { ApiFailure } from '../api-failure'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
@@ -25,12 +26,10 @@ export async function processResumeModel<TInput>({ request, schema, processInput
 }
 
 async function readInput<TInput>({ request, schema }: Readonly<{ request: Request; schema: z.ZodType<TInput> }>) {
-  try {
-    const text = await request.text()
-    if (text.length > 500_000) return { ok: false, type: 'input-too-large' } as const
-    const parsed = schema.safeParse(JSON.parse(text))
-    return parsed.success ? { ok: true, value: parsed.data } as const : { ok: false, type: 'invalid-input' } as const
-  } catch { return { ok: false, type: 'invalid-input' } as const }
+  const body = await readJsonRequestBody({ request, maxBytes: apiRequestBodyLimits.resumeModel })
+  if (!body.ok) return body
+  const parsed = schema.safeParse(body.value)
+  return parsed.success ? { ok: true, value: parsed.data } as const : { ok: false, type: 'invalid-input' } as const
 }
 
 /**

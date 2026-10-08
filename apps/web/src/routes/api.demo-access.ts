@@ -3,6 +3,7 @@ import { createCsrfMiddleware } from '@tanstack/react-start'
 import { z } from 'zod'
 
 import { failureResponse } from '../api-failure'
+import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
 import {
   createDemoOriginGuardResponse,
   readDemoAccessDecision,
@@ -43,7 +44,7 @@ async function establishAccess({ request }: Readonly<{ request: Request }>) {
   if (!environmentResult.ok) return failureResponse({ type: 'demo-access-unavailable' })
   if (environmentResult.value.mode === 'disabled') return createAccessResponse()
   const tokenResult = await readChallengeToken({ request })
-  if (!tokenResult.ok) return failureResponse({ type: 'invalid-input' })
+  if (!tokenResult.ok) return failureResponse({ type: tokenResult.type })
   const verification = await verifyTurnstileToken({
     expectedHostname: environmentResult.value.publicHostname,
     secretKey: environmentResult.value.turnstileSecretKey,
@@ -56,12 +57,10 @@ async function establishAccess({ request }: Readonly<{ request: Request }>) {
 }
 
 async function readChallengeToken({ request }: Readonly<{ request: Request }>) {
-  try {
-    const result = challengeRequestSchema.safeParse(await request.json() as unknown)
-    return result.success ? { ok: true, value: result.data.token } as const : invalidTokenResult
-  } catch {
-    return invalidTokenResult
-  }
+  const body = await readJsonRequestBody({ request, maxBytes: apiRequestBodyLimits.demoAccess })
+  if (!body.ok) return body
+  const result = challengeRequestSchema.safeParse(body.value)
+  return result.success ? { ok: true, value: result.data.token } as const : invalidTokenResult
 }
 
 function createAccessResponse({ sessionSecret }: Readonly<{ sessionSecret?: string }> = {}) {
@@ -79,4 +78,4 @@ const privateHeaders = {
   'Cache-Control': 'no-store, max-age=0',
   Pragma: 'no-cache',
 } as const
-const invalidTokenResult = { ok: false } as const
+const invalidTokenResult = { ok: false, type: 'invalid-input' } as const

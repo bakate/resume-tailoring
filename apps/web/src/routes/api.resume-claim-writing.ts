@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
 import { failureResponse } from '../api-failure'
+import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
 import { createOpenAiResumeClaimReformulator } from '../adapters/server/openai-resume-claim-service'
@@ -19,7 +20,7 @@ async function writeResumeClaims({ request }: Readonly<{ request: Request }>) {
   const accessResponse = createDemoAccessGuardResponse({ request })
   if (accessResponse !== null) return accessResponse
   const writingRequest = await readWritingRequest({ request })
-  if (!writingRequest.ok) return failureResponse({ type: 'invalid-input' })
+  if (!writingRequest.ok) return failureResponse({ type: writingRequest.type })
   const environment = validateServerEnvironment({ environment: process.env })
   if (!environment.ok) return failureResponse({ type: 'service-misconfigured' })
   const reformulator = createOpenAiResumeClaimReformulator({
@@ -46,16 +47,14 @@ function reformulateResumeClaim({
 }
 
 async function readWritingRequest({ request }: Readonly<{ request: Request }>) {
-  try {
-    const result = resumeClaimWritingRequestSchema.safeParse(await request.json() as unknown)
-    return result.success ? { ok: true, value: result.data } as const : invalidResult
-  } catch {
-    return invalidResult
-  }
+  const body = await readJsonRequestBody({ request, maxBytes: apiRequestBodyLimits.modelRequest })
+  if (!body.ok) return body
+  const result = resumeClaimWritingRequestSchema.safeParse(body.value)
+  return result.success ? { ok: true, value: result.data } as const : invalidResult
 }
 
 const privateHeaders = {
   'Cache-Control': 'no-store, max-age=0',
   Pragma: 'no-cache',
 } as const
-const invalidResult = { ok: false } as const
+const invalidResult = { ok: false, type: 'invalid-input' } as const
