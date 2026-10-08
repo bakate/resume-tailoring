@@ -255,8 +255,10 @@ function restoreChoice(document?: StoredIntakeDocument | null): DocumentChoice {
 }
 
 /** The outcome of a preparation without a usable result; `onBack` leads from `/resume` to the documents on `/`. */
-export function PreparationFeedback({ candidateJourney, localization, onBack, onRetry, onNormalized }: IntakeProps & Readonly<{
+export function PreparationFeedback({ candidateJourney, failureDetails, localization, onBack, onRetry, onNormalized }: IntakeProps & Readonly<{
   onBack?: () => void; onRetry: () => void; onNormalized: () => void
+  /** What the failure left undone, shown in its alert above the Recovery; the result page names the failed sections. */
+  failureDetails?: ReactNode
 }>) {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open') return null
@@ -264,7 +266,7 @@ export function PreparationFeedback({ candidateJourney, localization, onBack, on
   const failedPreparation = readFailedPreparation(view.session)
   return <>
     {failedPreparation === null ? <InputFailure {...{ failure: preparation?.failure ?? null, localization }} />
-      : <PreparationFailureAlert {...{ ...failedPreparation, localization, onBack, onRetry }} busy={view.operation !== null}
+      : <PreparationFailureAlert {...{ ...failedPreparation, failureDetails, localization, onBack, onRetry }} busy={view.operation !== null}
         hasStableResume={view.session.tailoredResume !== null} />}
     {preparation?.status === 'awaiting-correction' && preparation.sourceIntake !== null
       ? <CriticalAmbiguityQuestions {...{ candidateJourney, localization, sourceIntake: preparation.sourceIntake }} /> : null}
@@ -327,9 +329,10 @@ function readFailedPreparation(session: CandidateSession): FailedPreparation | n
  * The context title says which step failed; a Failure Cause adds why, and its Recovery replaces the plain retry. Without
  * a cause, an unavailable service keeps its generic wording.
  */
-function PreparationFailureAlert({ busy, cause, failure, hasStableResume, interrupted, localization, onBack, onRetry, recoverable }:
-FailedPreparation & Readonly<{
-  busy: boolean; hasStableResume: boolean; localization: Localization; onBack: (() => void) | undefined; onRetry: () => void
+function PreparationFailureAlert({ busy, cause, failure, failureDetails, hasStableResume, interrupted, localization, onBack, onRetry,
+  recoverable }: FailedPreparation & Readonly<{
+  busy: boolean; failureDetails: ReactNode; hasStableResume: boolean; localization: Localization
+  onBack: (() => void) | undefined; onRetry: () => void
 }>) {
   const step = interrupted || failure === null || (cause !== undefined && failure === 'unavailable') ? null
     : localization.translate(failure in retryableFailureCauses
@@ -339,6 +342,7 @@ FailedPreparation & Readonly<{
     <Stack gap="sm">
       {step === null ? null : <Text size="sm">{step}</Text>}
       {cause === undefined ? null : <FailureExplanation {...{ cause, localization }} />}
+      {failureDetails}
       <Text c="dimmed" size="sm">{localization.translate(hasStableResume ? 'combinedIntake.inputsAndResumeKept' : 'combinedIntake.inputsKept')}</Text>
       <Group>{cause !== undefined ? <RecoveryAction {...{ busy, cause, localization, onRetry }} recovery={readRecovery(cause)}
         onShortenInput={onBack ?? showIntake} />

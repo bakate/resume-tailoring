@@ -260,6 +260,15 @@ test.describe('Candidate Journey preview-first preparation', () => {
     await system.expectIncoherentSectionsExplained()
   })
 
+  test('summarizes a failed experience above the kept sections and leads to it', async ({ page }) => {
+    const system = createSystemUnderTest({ page, scenario: 'failed-experience' })
+    await system.givenCombinedIntake()
+
+    await system.generateResume()
+
+    await system.expectFailedExperienceSummarized()
+  })
+
   test('recovers interrupted preparation after reload', async ({ page }) => {
     const system = createSystemUnderTest({ page, scenario: 'interrupted' })
     await system.givenInterruptedPreparation()
@@ -448,7 +457,7 @@ function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: P
 
 type Scenario = 'normal' | 'isolated-ambiguity' | 'blocking-ambiguity' | 'low-coverage' | 'adjacent-evidence' | 'no-correspondence'
   | 'unsafe-output' | 'interrupted' | 'unavailable' | 'pending-writing' | 'posting-extraction-unavailable' | 'held-skills'
-  | 'incoherent' | 'expired-access' | 'copied-experience'
+  | 'incoherent' | 'expired-access' | 'copied-experience' | 'failed-experience'
 
 class CandidateJourneyTestSystem {
   readonly #page: Page
@@ -489,6 +498,10 @@ class CandidateJourneyTestSystem {
         return this.#heldSkills.then(() => route.fallback())
       }
       if (this.#scenario === 'unavailable') return route.fulfill({ status: 502, json: { ok: false, error: { type: 'invalid-provider-response' } } })
+      // Only the second experience cannot be written, so the preparation fails with every other section kept.
+      if (this.#scenario === 'failed-experience' && (route.request().postDataJSON() as ResumeSectionWritingInput).section.key === 'experiences.1') {
+        return route.fulfill({ status: 502, json: { ok: false, error: { type: 'provider-unavailable' } } })
+      }
       if (this.#scenario === 'expired-access' && !this.#hasTriggeredExpiry) {
         this.#hasTriggeredExpiry = true
         this.#isAccessExpired = true
@@ -1061,10 +1074,26 @@ class CandidateJourneyTestSystem {
     this.#expectAction()
     await expect(this.#page.getByText('Some sections repeated or contradicted one another', { exact: false })).toBeVisible()
     const keptSections = this.#page.getByRole('region', { name: 'Checked sections kept' })
-    await expect(keptSections.getByText('could not be prepared', { exact: false })).toBeVisible()
+    await expect(keptSections.getByText('Not prepared: Summary.', { exact: true })).toBeVisible()
     await expect(keptSections.getByRole('heading', { name: 'Experience' })).toBeVisible()
     await expect(this.#page.getByRole('heading', { name: 'Your resume is taking shape' })).toHaveCount(0)
     await expect(this.#page.getByRole('button', { name: 'Try again' })).toBeEnabled()
+  }
+
+  async expectFailedExperienceSummarized() {
+    this.#expectAction()
+    const summary = this.#page.getByRole('alert').filter({ hasText: 'Preparation could not finish.' })
+    const keptSections = this.#page.getByRole('region', { name: 'Checked sections kept' })
+    const failedExperience = 'Experience: Software Developer – Contoso'
+    await expect(keptSections.getByRole('heading', { name: 'Experience' })).toBeVisible()
+    const [summaryBox, keptBox] = await Promise.all([summary.boundingBox(), keptSections.boundingBox()])
+    expect(summaryBox?.y).toBeLessThan(keptBox?.y ?? 0)
+    await expect(this.#page.getByRole('button', { name: 'Try again' })).toHaveCount(1)
+
+    await summary.getByRole('link', { name: failedExperience }).click()
+
+    await expect(keptSections.getByRole('group', { name: failedExperience })).toBeFocused()
+    await expect(keptSections.getByText(`Not prepared: ${failedExperience}.`, { exact: true })).toBeVisible()
   }
 
   async expectUnsafeOutputRejected() {

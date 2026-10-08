@@ -17,7 +17,7 @@ const forbiddenPatterns = [
   },
   {
     label: 'non-semantic Mantine text color',
-    pattern: /\bc\s*=\s*['"`](?!danger(?:\.\d)?\b|dimmed\b|forest(?:\.\d)?\b)[^'"`]+['"`]/u,
+    pattern: /\bc\s*=\s*['"`](?!caution(?:\.\d)?\b|danger(?:\.\d)?\b|dimmed\b|forest(?:\.\d)?\b)[^'"`]+['"`]/u,
   },
 ]
 
