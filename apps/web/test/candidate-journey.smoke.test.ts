@@ -1692,7 +1692,7 @@ class CandidateJourneyTestSystem {
       (await document.fonts.load(face)).length > 0)), interfaceFontFaces)
     expect(loadedFaces).toEqual(interfaceFontFaces.map(() => true))
     const ownOrigin = new URL(this.#page.url()).origin
-    expect(this.#requestedUrls.filter((url) => !isServedBy({ url, ownOrigin }))).toEqual([])
+    expect(this.#requestedUrls.filter((url) => !isAllowedRequest({ url, ownOrigin }))).toEqual([])
   }
 
   async #showDocumentText() {
@@ -1738,7 +1738,7 @@ function isCancelledByLeavingPage(message: string) {
 }
 
 /** Only the Turnstile security check may come from elsewhere; data: and blob: URLs never leave the browser. */
-function isServedBy({ url, ownOrigin }: Readonly<{ url: string; ownOrigin: string }>) {
+function isAllowedRequest({ url, ownOrigin }: Readonly<{ url: string; ownOrigin: string }>) {
   const { origin, protocol } = new URL(url)
   return origin === ownOrigin || origin === turnstileOrigin || protocol === 'data:' || protocol === 'blob:'
 }

@@ -19,7 +19,7 @@ import {
   useLocalization,
 } from '../localization/localization'
 import type { Locale, Localization } from '../localization/localization'
-// Served from our own origin so no visitor request reaches a font provider.
+// Served from our own origin so no request from the Candidate's browser reaches a font provider.
 import '@fontsource/dm-sans/400.css'
 import '@fontsource/dm-sans/500.css'
 import '@fontsource/dm-sans/600.css'
