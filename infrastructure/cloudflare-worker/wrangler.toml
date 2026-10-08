@@ -6,3 +6,12 @@ preview_urls = false
 
 [vars]
 ORIGIN_URL = "https://3wvbrcr53xhhufkizn55ln55c40jfqmc.lambda-url.eu-west-3.on.aws"
+
+# Daily spending limits live in one Durable Object: the application keeps no server-side state.
+[[durable_objects.bindings]]
+name = "DAILY_SPENDING_LIMITS"
+class_name = "DailySpendingLimits"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DailySpendingLimits"]

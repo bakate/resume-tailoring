@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+  - infrastructure/cloudflare-worker
 
 # -----------------------------------------------------------------------------
 # PNPM Catalog

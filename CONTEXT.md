@@ -42,8 +42,12 @@ _Avoid_: Per-document consent, per-action consent
 The disclosed external processor selected to perform model-backed operations under the current Processing Policy.
 _Avoid_: OpenAI in domain language, AI session
 
+**Daily Quota**:
+The number of Tailored Resume preparations one client IP may start for free each day, counted when a Job Posting is extracted and reset at 00:00 Europe/Paris. A global daily ceiling across all Candidates bounds it too; past either, the request fails as rate limited until the reset.
+_Avoid_: Credits, per-session limit, per-cookie limit
+
 **Candidate API Key**:
-A Language Model Provider key the Candidate supplies to keep preparing Tailored Resumes beyond the free daily quota. It replaces the operator's key for the Candidate's model-backed requests only, transits the server without being stored or logged, lives in this browser tab only, and never falls back to the operator's key when it fails.
+A Language Model Provider key the Candidate supplies to keep preparing Tailored Resumes beyond the Daily Quota. It replaces the operator's key for the Candidate's model-backed requests only, transits the server without being stored or logged, lives in this browser tab only, and never falls back to the operator's key when it fails.
 _Avoid_: BYOK, user token, paywall, OpenAI key in domain language
 
 **API Failure**:
