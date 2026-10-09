@@ -62,7 +62,8 @@ before the Candidate starts a preparation.
 A model-backed request that carries the `x-candidate-api-key` header counts against none of the model
 limits: it spends the Candidate's provider account. The application signs it with that key or refuses
 it and never falls back to `OPENAI_API_KEY`, which is what keeps this bypass from spending the operator
-key. PDF renders, key validations and Turnstile still apply.
+key. PDF renders, key validations and Turnstile still apply. The Worker forwards that header to the
+model-backed routes and `POST /api/candidate-api-key` only, and strips it from every other request.
 
 ### Alarms
 

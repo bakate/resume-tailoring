@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
-import { failureResponse } from '../api-failure'
+import { failureResponse, readRouteApiFailure } from '../api-failure'
 import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
@@ -33,7 +33,7 @@ async function validateResumeClaim({ request }: Readonly<{ request: Request }>) 
   const result = await validator.validate(validationRequest.value)
   return result.ok
     ? Response.json(result, { headers: privateHeaders })
-    : failureResponse({ type: 'provider-unavailable' })
+    : failureResponse(readRouteApiFailure(result.error.apiFailure))
 }
 
 async function readValidationRequest({ request }: Readonly<{ request: Request }>) {

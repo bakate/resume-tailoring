@@ -43,7 +43,7 @@ The disclosed external processor selected to perform model-backed operations und
 _Avoid_: OpenAI in domain language, AI session
 
 **Daily Quota**:
-The number of Tailored Resumes one client network (an IPv4 address or an IPv6 /64) may start for free each day. Each Job Posting extracted for a Job Match uses one, and all reset at 00:00 Europe/Paris. A global daily ceiling across all Candidates bounds it too; past either, the request fails as rate limited until the reset.
+The number of Tailored Resumes one client network (an IPv4 address or an IPv6 /64) may start for free each day. Each Job Posting extracted for a Job Match uses one, and all reset at 00:00 Europe/Paris. A global daily ceiling across all Candidates bounds it too; past either, the preparation is refused as Daily Quota reached until the reset, unless the Candidate brings a Candidate API Key.
 _Avoid_: Credits, per-session limit, per-cookie limit
 
 **Candidate API Key**:

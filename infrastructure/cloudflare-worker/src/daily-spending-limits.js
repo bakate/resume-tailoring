@@ -33,6 +33,11 @@ const modelBackedPaths = new Set([
 const renderPath = '/api/resume-document'
 const keyValidationPath = '/api/candidate-api-key'
 
+/** Whether a route may receive a Candidate API Key; every other route never sees it. */
+export function acceptsCandidateApiKey({ pathname }) {
+  return modelBackedPaths.has(pathname) || pathname === keyValidationPath
+}
+
 /**
  * The counters a request consumes, or none when its route is not limited. A model-backed request that carries a
  * Candidate API Key spends the Candidate's provider account, not the operator's, so no model limit applies to it.
