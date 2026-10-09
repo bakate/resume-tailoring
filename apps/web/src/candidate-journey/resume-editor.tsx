@@ -1,5 +1,5 @@
 import { ActionIcon, Button, Group, Paper, Stack, Tabs, Text, Textarea, TextInput, Title, VisuallyHidden } from '@mantine/core'
-import { IconArrowDown, IconArrowUp } from '@tabler/icons-react'
+import { IconArrowDown, IconArrowUp, IconEye, IconEyeOff } from '@tabler/icons-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { ResumeSectionName, TailoredResume } from '@resume-tailoring/application/tailored-resume'
 import type { Localization } from '../localization/localization'
@@ -8,6 +8,7 @@ import { readEditorEntries, readEditorSections } from './resume-editor-entries'
 import type { EditorEntry, ResumeFieldLabel } from './resume-editor-entries'
 import type { ResumeReviewController, RetryableOperations } from './tailored-resume-workspace'
 import { ResumeOperationFailureAlert } from './failure-recovery'
+import { PrivacyNote } from './processing-policy-notice'
 
 type EditorProps = Readonly<{
   candidateJourney: ResumeReviewController; localization: Localization; resume: TailoredResume
@@ -72,7 +73,7 @@ function ContactEditor({ candidateJourney, localization, resume }: EditorProps) 
     const remaining = resume.contactDetails.filter((contact) => contact.kind !== kind)
     candidateJourney.updateResumeContacts({ identity: resume.identity, contactDetails: detail === null ? remaining : [...remaining, detail] })
   }
-  return <Stack gap="sm"><Text size="sm">{localization.translate('resumeReview.localContacts')}</Text>
+  return <Stack gap="sm"><PrivacyNote>{localization.translate('resumeReview.localContacts')}</PrivacyNote>
     <TextInput label={localization.translate('tailoredResume.name')} value={resume.identity?.value ?? ''}
       onChange={(event) => { updateContact({ kind: 'personal-information', value: event.currentTarget.value }) }} />
     {(['email', 'phone'] as const).map((kind) => <TextInput key={kind}
@@ -136,7 +137,7 @@ function EntryEditor(props: ContentProps & Readonly<{ entry: EditorEntry }>) {
 
 function HideExperience({ announce, candidateJourney, entry, localization }: ContentProps & Readonly<{ entry: EditorEntry }>) {
   const experienceId = entry.id.replace(/^experience:/u, '')
-  return <Button variant="subtle" size="compact-sm" onClick={() => {
+  return <Button variant="subtle" size="compact-sm" leftSection={hideIcon} onClick={() => {
     candidateJourney.hideResumeEntry({ experienceId }); announce(localization.translate('resumeReview.hiddenNotice'))
   }}>{localization.translate('resumeReview.hideEntry')}<VisuallyHidden> {entry.name}</VisuallyHidden></Button>
 }
@@ -167,7 +168,7 @@ function FieldEditor(props: FieldEditorProps) {
         {label.visible}{label.context === null ? null : <VisuallyHidden>{label.context}</VisuallyHidden>}</Text>
       <Group gap={2} wrap="nowrap">
         <FieldOrdering {...props} />
-        <Button size="compact-sm" variant="subtle" onClick={() => {
+        <Button size="compact-sm" variant="subtle" leftSection={hideIcon} onClick={() => {
           candidateJourney.hideResumeField({ fieldId: reference.key }); announce(localization.translate('resumeReview.hiddenNotice'))
         }}>{localization.translate('tailoredResume.hideField')}<VisuallyHidden> {name}</VisuallyHidden></Button>
       </Group>
@@ -189,12 +190,17 @@ function FieldOrdering({ announce, candidateJourney, localization, reference, re
   if (!isMovable) return null
   const name = localization.translate('tailoredResume.entryName').replace('{section}', localization.translate(`resumeReview.section.${sectionOf(reference)}`))
     .replace('{entry}', readEntryName({ reference, resume }))
-  return <>{(['up', 'down'] as const).map((direction) => {
-    const moveLabel = readMoveLabel({ direction, localization, name })
-    return <ActionIcon key={direction} variant="subtle" aria-label={moveLabel} title={moveLabel}
-      onClick={() => { candidateJourney.moveResumeField({ fieldId: reference.key, direction }); announce(localization.translate('resumeReview.ordered')) }}>
-      {direction === 'up' ? <IconArrowUp aria-hidden size={16} /> : <IconArrowDown aria-hidden size={16} />}</ActionIcon>
-  })}</>
+  return <>{(['up', 'down'] as const).map((direction) => <MoveButton key={direction} {...{ direction, localization, name }}
+    onClick={() => { candidateJourney.moveResumeField({ fieldId: reference.key, direction }); announce(localization.translate('resumeReview.ordered')) }} />)}</>
+}
+
+/** An arrow alone moves a field or a section; its accessible name and tooltip say what it moves and where. */
+function MoveButton({ direction, disabled = false, localization, name, onClick }: Readonly<{
+  direction: 'up' | 'down'; disabled?: boolean; localization: Localization; name: string; onClick: () => void
+}>) {
+  const moveLabel = readMoveLabel({ direction, localization, name })
+  return <ActionIcon variant="subtle" aria-label={moveLabel} title={moveLabel} disabled={disabled} onClick={onClick}>
+    {direction === 'up' ? <IconArrowUp aria-hidden size={16} /> : <IconArrowDown aria-hidden size={16} />}</ActionIcon>
 }
 
 function sectionOf({ location }: ResumeFieldReference): ResumeSectionName {
@@ -261,7 +267,7 @@ function HiddenExperienceRecovery({ announce, candidateJourney, localization, re
   return <>{recovery.hiddenExperiences.map((experience) => {
     const name = [experience.role?.text, experience.organization?.text].filter(Boolean).join(' · ')
     return <Group key={experience.id} justify="space-between" wrap="nowrap"><Text>{name}</Text>
-      <Button variant="subtle" onClick={() => {
+      <Button variant="subtle" leftSection={restoreIcon} onClick={() => {
         candidateJourney.restoreResumeEntry({ experienceId: experience.id }); announce(localization.translate('resumeReview.restored'))
       }}>{localization.translate('resumeReview.restoreEntry')}<VisuallyHidden> {name}</VisuallyHidden></Button></Group>
   })}</>
@@ -270,14 +276,14 @@ function HiddenExperienceRecovery({ announce, candidateJourney, localization, re
 function HiddenFieldRecovery({ announce, candidateJourney, localization, recovery }: RecoveryProps) {
   return <>{recovery.hiddenFields.map(({ field, origin }) => <Group key={field.id} justify="space-between" wrap="nowrap"><Stack gap={0}>
     <Text>{field.text}</Text>{origin === 'overflow-reduction' ? <Text size="sm" c="dimmed">{localization.translate('resumeReview.hiddenByReduction')}</Text> : null}</Stack>
-    <Button variant="subtle" onClick={() => { candidateJourney.restoreResumeField({ fieldId: field.id }); announce(localization.translate('resumeReview.restored')) }}>
+    <Button variant="subtle" leftSection={restoreIcon} onClick={() => { candidateJourney.restoreResumeField({ fieldId: field.id }); announce(localization.translate('resumeReview.restored')) }}>
       {localization.translate('tailoredResume.restoreField')}<VisuallyHidden> {excerpt(field.text)}</VisuallyHidden></Button></Group>)}</>
 }
 
 function OmittedFactRecovery({ announce, candidateJourney, localization, recovery }: RecoveryProps) {
   return <><Title order={4}>{localization.translate('resumeReview.omitted')}</Title>
     {recovery.omittedFacts.map((fact) => <Group key={fact.id} justify="space-between" wrap="nowrap"><Text>{fact.value}</Text>
-      <Button variant="subtle" onClick={() => { candidateJourney.restoreSourceFact({ factId: fact.id }); announce(localization.translate('resumeReview.restored')) }}>
+      <Button variant="subtle" leftSection={restoreIcon} onClick={() => { candidateJourney.restoreSourceFact({ factId: fact.id }); announce(localization.translate('resumeReview.restored')) }}>
         {localization.translate('resumeReview.restore')}</Button></Group>)}</>
 }
 
@@ -293,9 +299,12 @@ function SectionOrder({ announce, candidateJourney, localization, resume }: Edit
   }
   return <Stack><Title order={3}>{localization.translate('resumeReview.order')}</Title>
     {sections.map((section, index) => <Group key={section} justify="space-between">
-      <Text>{localization.translate(`resumeReview.section.${section}`)}</Text><Group>{(['up', 'down'] as const).map((direction) =>
-        <Button key={direction} variant="subtle" disabled={direction === 'up' ? index === 0 : index === sections.length - 1}
-          onClick={() => { move({ index, direction }) }}>
-          {readMoveLabel({ direction, localization, name: localization.translate(`resumeReview.section.${section}`) })}</Button>)}</Group>
+      <Text>{localization.translate(`resumeReview.section.${section}`)}</Text><Group gap={2} wrap="nowrap">{(['up', 'down'] as const).map((direction) =>
+        <MoveButton key={direction} {...{ direction, localization }} name={localization.translate(`resumeReview.section.${section}`)}
+          disabled={direction === 'up' ? index === 0 : index === sections.length - 1} onClick={() => { move({ index, direction }) }} />)}</Group>
     </Group>)}</Stack>
 }
+
+// Hiding and restoring read as one pair everywhere: an eye shut on what leaves the resume, open on what comes back.
+const hideIcon = <IconEyeOff aria-hidden size={16} />
+const restoreIcon = <IconEye aria-hidden size={16} />

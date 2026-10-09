@@ -99,8 +99,10 @@ function RequirementSummary({ ids, jobMatch, localization, sourceFacts = [], tit
     const requirement = jobMatch.requirements.find((candidate) => candidate.id === id)
     return requirement === undefined ? [] : [requirement]
   })
+  // A strength reads as a success and a gap as a warning, the icons the Critical Requirement Reserve below uses too.
+  const icon = <StatusIcon tone={titleKey === 'jobMatch.strengths' ? 'success' : 'warning'} size={18} />
   return <Paper p="md" withBorder><Title order={4}>{localization.translate(titleKey)}</Title>
-    <List mt="sm">{requirements.map((requirement) => (
+    <List mt="sm" spacing="xs" icon={icon}>{requirements.map((requirement) => (
       <List.Item key={requirement.id}>{requirement.value}
         <AdjacentEvidenceNote {...{ jobMatch, localization, requirement, sourceFacts }} />
       </List.Item>

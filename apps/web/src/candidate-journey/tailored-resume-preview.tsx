@@ -1,4 +1,5 @@
 import { Avatar, Button, FileButton, Group, List, Stack, Text, TextInput } from '@mantine/core'
+import { IconDownload, IconEye } from '@tabler/icons-react'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { isCopiedFromSource } from '@resume-tailoring/application/candidate-journey'
@@ -133,7 +134,7 @@ function PageBudget({ id, localization, pageBudget, status }: Readonly<{
   const action = status.action === 'shorten'
     ? <Button disabled={pageBudget.shortening.disabled} onClick={pageBudget.shortening.shorten}>{localization.translate('pageBudget.shorten')}</Button>
     : status.action === 'review-hidden' ? <Button variant="subtle" size="compact-sm" disabled={pageBudget.reviewHidden.disabled}
-      onClick={pageBudget.reviewHidden.open}>{localization.translate('resumeReview.reviewHidden')}</Button> : undefined
+      leftSection={<IconEye aria-hidden="true" size={16} />} onClick={pageBudget.reviewHidden.open}>{localization.translate('resumeReview.reviewHidden')}</Button> : undefined
   return <StatusMessage tone={status.tone} id={id} action={action}>{text}</StatusMessage>
 }
 
@@ -251,7 +252,8 @@ function ResumeDownload({ bytes, edit, explanation, localization, onDownload, pu
   edit: ReactNode; localization: Localization; onDownload: () => void; purpose: TailoredResume['purpose']
 }>) {
   const [download, setDownload] = useRevisionState<'idle' | 'failed' | 'handed-off'>(revision, 'idle')
-  return <><div className="resume-review-primary-actions"><Button disabled={bytes === null} aria-describedby={explanation?.id} onClick={() => {
+  return <><div className="resume-review-primary-actions"><Button disabled={bytes === null} aria-describedby={explanation?.id}
+    leftSection={<IconDownload aria-hidden="true" size={16} />} onClick={() => {
     if (bytes === null) return
     const handedOff = handOffResumePdf({ bytes, purpose })
     setDownload(() => handedOff ? 'handed-off' : 'failed')

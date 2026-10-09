@@ -1,6 +1,7 @@
 import { Box, Group, List, Stack, Text } from '@mantine/core'
 import { IconLock } from '@tabler/icons-react'
 
+import type { ReactNode } from 'react'
 import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
 import type { Localization } from '../localization/localization'
 import type { useCandidateJourney } from './use-candidate-journey'
@@ -23,6 +24,14 @@ export function PrivacyStatement({ localization, processingPolicy }: Localizatio
   </Box>
 }
 
+/** A smaller privacy line elsewhere on the page: the same lock as the privacy statement, beside one sentence. */
+export function PrivacyNote({ children, id }: Readonly<{ children: ReactNode; id?: string }>) {
+  return <Group gap="xs" wrap="nowrap" align="flex-start">
+    <IconLock aria-hidden="true" className="privacy-statement-icon" size={16} stroke={2} />
+    <Text c="dimmed" id={id} size="sm">{children}</Text>
+  </Group>
+}
+
 /** What generating agrees to, read as the description of the generation action. */
 export function ProcessingPolicyNotice({ candidateJourney, localization }: LocalizationProps & Readonly<{
   candidateJourney: ReturnType<typeof useCandidateJourney>
@@ -30,10 +39,12 @@ export function ProcessingPolicyNotice({ candidateJourney, localization }: Local
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open') return null
   const { processingPolicy } = view
-  const summary = localization.translate(view.processingConsentStatus === 'granted'
-    ? 'processingPolicy.grantedSummary' : 'processingPolicy.consentByGeneration')
+  const granted = view.processingConsentStatus === 'granted'
+  const summary = localization.translate(granted ? 'processingPolicy.grantedSummary' : 'processingPolicy.consentByGeneration')
     .replace('{provider}', processingPolicy.provider)
-  return <Text c="dimmed" id={processingPolicyNoticeId} size="sm">{summary}</Text>
+  // Before consent, the privacy statement above is the intake's one lock; once granted, this line carries its own.
+  return granted ? <PrivacyNote id={processingPolicyNoticeId}>{summary}</PrivacyNote>
+    : <Text c="dimmed" id={processingPolicyNoticeId} size="sm">{summary}</Text>
 }
 
 function ProcessingPolicyDetails({ localization, processingPolicy }: LocalizationProps & Readonly<{
