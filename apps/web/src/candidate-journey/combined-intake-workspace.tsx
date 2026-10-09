@@ -151,7 +151,7 @@ function SourceDocumentCard({ hasSource, ...props }: Omit<DocumentCardProps, 'ki
     <Stack gap="sm">
       <Text className="intake-document-title" fw={700} size="lg">{localization.translate('combinedIntake.sourceTitle')}</Text>
       <Group gap="xs" wrap="nowrap" role="status">
-        <IconFileCheck aria-hidden="true" size={20} stroke={2} color="var(--mantine-color-forest-8)" />
+        <IconFileCheck aria-hidden="true" className="intake-icon" size={20} stroke={2} />
         <Text c="forest.8" fw={600}>{localization.translate('combinedIntake.sourceReady')}</Text>
       </Group>
       <Group><Button onClick={() => { setReplacing(true) }} variant="default">
@@ -189,7 +189,7 @@ function DocumentCard({ busy, choice, footer = null, kind, localization, missing
             onDrop={([file]) => { setRejected(false); if (file !== undefined) onChange({ method: 'upload', text: '', file }) }}
             onReject={() => { setRejected(true) }}>
             <Stack align="center" gap={4} py="md">
-              <IconUpload aria-hidden="true" size={28} stroke={1.5} color="var(--mantine-color-forest-8)" />
+              <IconUpload aria-hidden="true" className="intake-icon" size={28} stroke={1.5} />
               <Text fw={600} ta="center">{localization.translate(touch ? 'combinedIntake.chooseFile' : 'combinedIntake.dropFile')}</Text>
               <Text c="dimmed" size="sm">{localization.translate(source ? 'combinedIntake.sourceHint' : 'combinedIntake.postingHint')}</Text>
             </Stack>

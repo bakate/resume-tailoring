@@ -290,6 +290,12 @@ h1 {
   border-color: var(--mantine-color-forest-6);
 }
 
+/* The upload and resume-ready icons take the brand colour and keep their size beside text that wraps. */
+.intake-icon {
+  color: var(--mantine-color-forest-8);
+  flex-shrink: 0;
+}
+
 .intake-selected-file {
   background: var(--mantine-color-gray-0);
   border: 1px solid var(--mantine-color-gray-3);
