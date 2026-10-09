@@ -1773,7 +1773,7 @@ function matchFor(scenario: Scenario) {
   relevance: [{ requirementId: 'job-requirement-react', factMatch }] }
 }
 
-const dropFileCopy = 'Drop your file here or click to choose it'
+const dropFileCopy = 'Drop your file or click here'
 const chooseFileCopy = 'Choose a file'
 const privacyStatement = 'Nothing is stored on our servers: your documents stay in this browser. They are deleted on your next visit after 24 hours, or right away with “Delete my data”.'
 

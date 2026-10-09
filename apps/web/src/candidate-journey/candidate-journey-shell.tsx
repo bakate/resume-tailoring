@@ -16,7 +16,7 @@ import {
   Title,
 } from '@mantine/core'
 import { Link } from '@tanstack/react-router'
-import { IconLoader2 } from '@tabler/icons-react'
+import { IconArrowRight, IconLoader2, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 
@@ -107,7 +107,7 @@ function LatestResumeBanner({ candidateJourney, localization }: CandidateJourney
   return <Alert color="forest" variant="light">
     <Group justify="space-between" wrap="wrap">
       <Text fw={600}>{localization.translate(preparing ? 'resultBanner.preparing' : 'resultBanner.ready')}</Text>
-      <Button component={Link} to="/resume" variant="light" rightSection={<span aria-hidden="true">→</span>}>
+      <Button component={Link} to="/resume" variant="light" rightSection={<IconArrowRight aria-hidden="true" size={16} />}>
         {localization.translate('resultBanner.view')}
       </Button>
     </Group>
@@ -186,7 +186,7 @@ LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) 
   const openDeleteConfirmation = () => { setDeleteConfirmationOpen(true) }
   return <>
     <Group mt="xl">
-      <Button color="danger" onClick={openDeleteConfirmation} variant="subtle">
+      <Button color="danger" leftSection={<IconTrash aria-hidden="true" size={16} />} onClick={openDeleteConfirmation} variant="subtle">
         {localization.translate('candidateJourney.deleteSession')}
       </Button>
     </Group>
@@ -252,7 +252,7 @@ LocalizationProps & Readonly<{ closeModal: () => void; deleteSession: () => void
     <Button onClick={closeModal} variant="default">
       {localization.translate('candidateJourney.deleteCancel')}
     </Button>
-    <Button color="danger" onClick={deleteSession}>
+    <Button color="danger" leftSection={<IconTrash aria-hidden="true" size={16} />} onClick={deleteSession}>
       {localization.translate('candidateJourney.deleteConfirm')}
     </Button>
   </Group>

@@ -1,6 +1,7 @@
 import { Alert, Button, CloseButton, Divider, Fieldset, Group, Modal, Paper, Select, SimpleGrid, Stack, Text, Textarea, Title } from '@mantine/core'
 import { Dropzone } from '@mantine/dropzone'
 import { useMediaQuery } from '@mantine/hooks'
+import { IconFileCheck, IconUpload } from '@tabler/icons-react'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
@@ -149,7 +150,10 @@ function SourceDocumentCard({ hasSource, ...props }: Omit<DocumentCardProps, 'ki
   return <Paper className="intake-document" radius="md" withBorder>
     <Stack gap="sm">
       <Text className="intake-document-title" fw={700} size="lg">{localization.translate('combinedIntake.sourceTitle')}</Text>
-      <Text c="forest.8" fw={600} role="status">{localization.translate('combinedIntake.sourceReady')}</Text>
+      <Group gap="xs" wrap="nowrap" role="status">
+        <IconFileCheck aria-hidden="true" className="intake-icon" size={20} stroke={2} />
+        <Text c="forest.8" fw={600}>{localization.translate('combinedIntake.sourceReady')}</Text>
+      </Group>
       <Group><Button onClick={() => { setReplacing(true) }} variant="default">
         {localization.translate('combinedIntake.replaceSourceAction')}</Button></Group>
     </Stack>
@@ -185,6 +189,7 @@ function DocumentCard({ busy, choice, footer = null, kind, localization, missing
             onDrop={([file]) => { setRejected(false); if (file !== undefined) onChange({ method: 'upload', text: '', file }) }}
             onReject={() => { setRejected(true) }}>
             <Stack align="center" gap={4} py="md">
+              <IconUpload aria-hidden="true" className="intake-icon" size={28} stroke={1.5} />
               <Text fw={600} ta="center">{localization.translate(touch ? 'combinedIntake.chooseFile' : 'combinedIntake.dropFile')}</Text>
               <Text c="dimmed" size="sm">{localization.translate(source ? 'combinedIntake.sourceHint' : 'combinedIntake.postingHint')}</Text>
             </Stack>

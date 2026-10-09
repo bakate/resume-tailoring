@@ -1,4 +1,5 @@
-import { Anchor } from '@mantine/core'
+import { Anchor, Group } from '@mantine/core'
+import { IconArrowLeft } from '@tabler/icons-react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 
@@ -28,7 +29,8 @@ function ResumeResult({ localization }: Readonly<{ localization: Localization }>
   const purpose = view.session.preparation?.purpose ?? 'tailored'
   return <>
     <Anchor component={Link} to="/" fw={600} w="fit-content">
-      <span aria-hidden="true">← </span>{localization.translate('resumeResult.backToDocuments')}
+      <Group component="span" gap={4} wrap="nowrap"><IconArrowLeft aria-hidden="true" size={16} />
+        {localization.translate('resumeResult.backToDocuments')}</Group>
     </Anchor>
     {isResultOperation(candidateJourney) ? <CandidateJourneyProgress {...{ candidateJourney, localization }} /> : null}
     {/* A failure opens the page, naming what it left undone above the sections it kept. */}

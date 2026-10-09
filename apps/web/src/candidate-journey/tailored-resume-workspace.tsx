@@ -1,5 +1,6 @@
 import { Button, CloseButton, Group, Modal, Paper, Stack, Text, Title } from '@mantine/core'
 import { useMediaQuery } from '@mantine/hooks'
+import { IconArrowsExchange, IconPencil } from '@tabler/icons-react'
 import { useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 
@@ -66,6 +67,7 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
         shortening: { disabled: !shorteningAvailable, shorten: () => { withPhoto(props.candidateJourney.shortenResume) } } }}
         actions={{
           edit: <Button ref={editButton} variant="default" disabled={blocksResumeEditing(view)}
+            leftSection={<IconPencil aria-hidden="true" size={16} />}
             aria-expanded={besidePreview ? editorOpened : undefined} aria-controls={besidePreview && editorOpened ? 'resume-editor-panel' : undefined}
             onClick={() => { if (editorOpened) closeEditor(); else setEditorTab('contacts') }}>{localization.translate('resumeReview.edit')}</Button>,
           secondary: <>
@@ -75,7 +77,8 @@ function ResumeReview(props: ResumeDocumentProps & Readonly<{ onChangeJobPosting
             {/* Shorter wording keeps every item: the alternative to shortening, offered while the resume overflows. */}
             {overflows(view) ? <Button variant="default" disabled={!shorteningAvailable}
               onClick={() => { withPhoto(props.candidateJourney.proposeResumeCondensation) }}>{localization.translate('resumeReview.condense')}</Button> : null}
-            <Button variant="default" onClick={props.onChangeJobPosting}>{localization.translate('resumeReview.changeJobPosting')}</Button>
+            <Button variant="default" leftSection={<IconArrowsExchange aria-hidden="true" size={16} />}
+              onClick={props.onChangeJobPosting}>{localization.translate('resumeReview.changeJobPosting')}</Button>
           </>,
         }}
         editor={besidePreview && editorTab !== null
