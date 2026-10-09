@@ -6,7 +6,7 @@ import type { OpenAiReasoningEffort } from '../../openai-model-configuration'
 import { createOpenAiRequester } from './openai-request'
 import type { ModelApiKey } from './openai-request'
 import { readOpenAiApiFailure } from './openai-api-failure'
-import { delimitUntrustedContent, untrustedContentInstruction } from './untrusted-model-input'
+import { delimitSuppliedData, untrustedContentInstruction } from './untrusted-model-input'
 import { resumeDocumentCoherenceSchema, resumeFieldValidationSchema, resumeSectionOutputSchemas,
   resumeStructuredOutputFormat } from '../../candidate-journey/resume-document-schemas'
 
@@ -64,7 +64,7 @@ async function processResumeModel<TValue>({ configuration, input, instructions, 
     model: configuration.model, reasoning: { effort: configuration.reasoningEffort }, store: false,
     max_output_tokens: maximumOutputTokens,
     input: [{ role: 'developer', content: [{ type: 'input_text', text: instructions }] },
-      { role: 'user', content: [{ type: 'input_text', text: delimitUntrustedContent({ kind: 'supplied-data', content: JSON.stringify(input) }) }] }],
+      { role: 'user', content: [{ type: 'input_text', text: delimitSuppliedData(input) }] }],
     text: { format: resumeStructuredOutputFormat({ name: outputName, schema }) },
   } })
   if (!response.ok) return { ok: false, error: readOpenAiApiFailure(response.error) }

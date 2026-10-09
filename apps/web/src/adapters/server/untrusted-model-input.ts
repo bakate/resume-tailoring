@@ -25,4 +25,9 @@ export function delimitUntrustedContent({ content, kind }: Readonly<{ content: s
   return `<${tag}>\n${content.replaceAll(forgedClosingTagPattern, '<\\/$1')}\n</${tag}>`
 }
 
-const forgedClosingTagPattern = new RegExp(`</(${Object.values(tags).join('|')})`, 'giu')
+/** Delimits the JSON value a model receives, whose Candidate Facts and Job Requirements are untrusted alike. */
+export function delimitSuppliedData(value: unknown) {
+  return delimitUntrustedContent({ kind: 'supplied-data', content: JSON.stringify(value) })
+}
+
+const forgedClosingTagPattern = new RegExp(`<\\s*/\\s*(${Object.values(tags).join('|')})`, 'giu')

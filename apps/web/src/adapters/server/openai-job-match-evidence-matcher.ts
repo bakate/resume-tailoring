@@ -12,7 +12,7 @@ import {
   matchEvidenceResponseFormat,
 } from '../../candidate-journey/job-match-schemas'
 import type { MatchEvidenceMatcher } from '@resume-tailoring/application/ports'
-import { delimitUntrustedContent, untrustedContentInstruction } from './untrusted-model-input'
+import { delimitSuppliedData, untrustedContentInstruction } from './untrusted-model-input'
 
 export function createOpenAiJobMatchEvidenceMatcher({
   apiKey, model, reasoningEffort, request = fetch,
@@ -91,7 +91,7 @@ function createRequestBody({ matchRequest, model, reasoningEffort, repairInstruc
   return {
     input: [
       { role: 'developer', content: [{ type: 'input_text', text: matchingInstructions }] },
-      { role: 'user', content: [{ type: 'input_text', text: delimitUntrustedContent({ kind: 'supplied-data', content: JSON.stringify(matchRequest) }) }] },
+      { role: 'user', content: [{ type: 'input_text', text: delimitSuppliedData(matchRequest) }] },
       ...(repairInstruction === undefined ? [] : [
         { role: 'user', content: [{ type: 'input_text', text: repairInstruction }] },
       ]),

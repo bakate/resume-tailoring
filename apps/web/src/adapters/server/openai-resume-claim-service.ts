@@ -10,7 +10,7 @@ import { createOpenAiRequester } from './openai-request'
 import type { ModelApiKey, OpenAiRequestFailure } from './openai-request'
 import { readOpenAiApiFailure } from './openai-api-failure'
 import type { ResumeClaimReformulator, ResumeClaimSemanticValidator } from '@resume-tailoring/application/ports'
-import { delimitUntrustedContent, untrustedContentInstruction } from './untrusted-model-input'
+import { delimitSuppliedData, untrustedContentInstruction } from './untrusted-model-input'
 
 type OpenAiModelConfiguration = Readonly<{
   apiKey: ModelApiKey
@@ -197,7 +197,7 @@ function createOpenAiInput({ developerText, userValue }: Readonly<{
 }>) {
   return [
     { role: 'developer', content: [{ type: 'input_text', text: developerText }] },
-    { role: 'user', content: [{ type: 'input_text', text: delimitUntrustedContent({ kind: 'supplied-data', content: JSON.stringify(userValue) }) }] },
+    { role: 'user', content: [{ type: 'input_text', text: delimitSuppliedData(userValue) }] },
   ]
 }
 
