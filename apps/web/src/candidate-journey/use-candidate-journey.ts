@@ -52,7 +52,6 @@ export function useCandidateJourneyController() {
     rateResumeUsefulness: candidateJourney.rateResumeUsefulness,
     recordResumeDownload: candidateJourney.recordResumeDownload,
     grantProcessingConsent: candidateJourney.grantProcessingConsent,
-    languageModelGateway: candidateJourneySystem.languageModelGateway,
     resolveCriticalAmbiguity: candidateJourney.resolveCriticalAmbiguity,
     /** Starts the Candidate Session, kept in this browser or, on a shared computer, only until the tab closes. */
     startCandidateSession: ({ retention }: Readonly<{ retention: CandidateSessionRetention }>) => {

@@ -72,7 +72,7 @@ type OpenAiModelAdapters = Readonly<{
   structuredSourceProfileExtractor: StructuredSourceProfileExtractor
 }>
 
-const openAiProcessingPolicy = {
+export const openAiProcessingPolicy = {
   provider: 'OpenAI',
   purposes: [
     'Extract and structure professional evidence',

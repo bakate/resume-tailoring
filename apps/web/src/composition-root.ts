@@ -15,7 +15,7 @@ import {
   createGatewayResumeSectionModels,
   createGatewaySourceProfileExtractor,
 } from './adapters/browser/language-model-gateway-ports'
-import { createOpenAiLanguageModelGateway } from './adapters/browser/openai-language-model-gateway'
+import { createOpenAiLanguageModelGateway, openAiProcessingPolicy } from './adapters/browser/openai-language-model-gateway'
 import type { OpenAiLanguageModelGateway } from './adapters/browser/openai-language-model-gateway'
 import { createResumeDocumentModelAdapters } from './adapters/browser/resume-document-model-adapters'
 import { createBrowserSourceIntakeDocumentReader } from './adapters/browser/source-intake-document-reader'
@@ -29,8 +29,10 @@ export type BrowserCandidateJourneySystem = Readonly<{
   candidateJourney: CandidateJourney
   /** Chooses, before the Candidate Session is first saved, whether it outlives the tab. */
   chooseCandidateSessionRetention: (retention: CandidateSessionRetention) => void
-  languageModelGateway: OpenAiLanguageModelGateway
 }>
+
+/** The Processing Policy the landing page states before any Candidate Journey, and so any gateway, exists. */
+export const processingPolicy = openAiProcessingPolicy
 
 export function createBrowserCandidateJourneySystem(): BrowserCandidateJourneySystem {
   let candidateJourney: CandidateJourney | null = null
@@ -48,7 +50,7 @@ export function createBrowserCandidateJourneySystem(): BrowserCandidateJourneySy
   candidateJourney = createCandidateJourney({
     dependencies: createBrowserDependencies({ languageModelGateway, persistence, request }),
   })
-  return { candidateJourney, chooseCandidateSessionRetention: persistence.chooseRetention, languageModelGateway }
+  return { candidateJourney, chooseCandidateSessionRetention: persistence.chooseRetention }
 }
 
 function createBrowserDependencies({ languageModelGateway, persistence, request }: Readonly<{
