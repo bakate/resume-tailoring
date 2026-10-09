@@ -69,4 +69,4 @@ describe('every model prompt treats supplied documents as untrusted data', () =>
   })
 })
 
-const configuration = { apiKey: 'test-api-key', model: 'structured-model', reasoningEffort: 'low' } as const
+const configuration = { apiKey: { source: 'operator', value: 'test-api-key' }, model: 'structured-model', reasoningEffort: 'low' } as const
