@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { z } from 'zod'
 
+import { BrandMark } from '../brand-mark'
 import { LocalizationFailure, useLocalization } from '../localization/localization'
 import type { Localization } from '../localization/localization'
 import type { InitialDemoAccess } from './demo-access-initial-state'
@@ -66,7 +67,7 @@ export function DemoAccessGate({ children, initialAccess }: Readonly<{
   const { translate } = localizationResult.value
   return (
     <main className="demo-access-gate">
-      <p className="demo-access-brand">{translate('brand.name')}</p>
+      <p className="demo-access-brand"><BrandMark size={28} />{translate('brand.name')}</p>
       <section aria-live="polite" className="demo-access-card">
         <h1>{translate('demoAccess.title')}</h1>
         <p>{translate('demoAccess.description')}</p>

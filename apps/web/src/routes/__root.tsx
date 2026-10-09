@@ -9,16 +9,17 @@ import { MantineProvider } from '@mantine/core'
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 
+import { BrandMark } from '../brand-mark'
 import { candidateJourneyCssVariablesResolver, candidateJourneyTheme } from '../candidate-journey/candidate-journey-theme'
 import { listenForUncaughtBrowserErrors } from '../composition-root'
 import { GlobalErrorFallback } from '../global-error-fallback'
 import {
   LocalizationFailure,
   LocalizationProvider,
-  defaultDocumentTitle,
   useLocalization,
 } from '../localization/localization'
 import type { Locale, Localization } from '../localization/localization'
+import { searchMetadata } from '../search-metadata'
 // Served from our own origin so no request from the Candidate's browser reaches a font provider.
 import '@fontsource/dm-sans/400.css'
 import '@fontsource/dm-sans/500.css'
@@ -32,12 +33,16 @@ export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
-      { title: defaultDocumentTitle },
+      { title: searchMetadata.title },
       {
         name: 'viewport',
         content: 'width=device-width, initial-scale=1',
       },
+      ...searchMetadata.meta,
     ],
+    links: [...searchMetadata.links],
+    // A JSON-LD data block is never executed, so the page Content-Security-Policy does not need its nonce.
+    scripts: [{ type: 'application/ld+json', children: JSON.stringify(searchMetadata.structuredData) }],
   }),
   component: RootComponent,
   errorComponent: RootErrorComponent,
@@ -82,7 +87,7 @@ function NotFound() {
   const { translate } = localizationResult.value
   return (
     <main className="standalone-page">
-      <p className="standalone-page-brand">{translate('brand.name')}</p>
+      <p className="standalone-page-brand"><BrandMark size={28} />{translate('brand.name')}</p>
       <h1>{translate('notFound.title')}</h1>
       <p>{translate('notFound.description')}</p>
       <Link to="/">{translate('notFound.return')}</Link>

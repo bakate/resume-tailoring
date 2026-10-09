@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://resume-studio.bakateba.workers.dev/sitemap.xml
