@@ -1,6 +1,11 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 
+import { localeStorageKey, readBrowserLocale } from './locale-resolution'
+import type { Locale } from './locale-resolution'
+
+export type { Locale }
+
 const englishCatalog = {
   'candidateJourney.operation.renderingResumeDocument': 'Preparing the PDF preview',
   'combinedIntake.outdated': 'Your documents changed. Generate again to update your resume.',
@@ -794,8 +799,6 @@ const frenchCatalog = {
   'pageBudget.shorten': 'Raccourcir le CV',
 } as const satisfies TranslationCatalog
 
-export type Locale = 'en' | 'fr'
-
 export type Localization = Readonly<{
   locale: Locale
   preferencePersistenceError: 'unavailable' | null
@@ -817,17 +820,21 @@ const catalogs: Readonly<Record<Locale, TranslationCatalog>> = {
   en: englishCatalog,
   fr: frenchCatalog,
 }
-const defaultLocale: Locale = 'en'
-const localeStorageKey = 'honest-resume-locale'
-const pendingLocaleState = {
-  locale: defaultLocale,
-  preferencePersistenceError: null,
-  readiness: 'pending',
-} as const satisfies LocaleState
 const LocalizationContext = createContext<Localization | null>(null)
 
-export function LocalizationProvider({ children }: Readonly<{ children: ReactNode }>) {
-  const [localeState, setLocaleState] = useState<LocaleState>(pendingLocaleState)
+/**
+ * Speaks the server's language until the browser has read the Candidate's: the page is readable before hydration and
+ * hydrates without a mismatch, then switches if the Candidate chose, or their browser prefers, another language.
+ */
+export function LocalizationProvider({ children, renderedLocale }: Readonly<{
+  children: ReactNode
+  renderedLocale: Locale
+}>) {
+  const [localeState, setLocaleState] = useState<LocaleState>(() => ({
+    locale: renderedLocale,
+    preferencePersistenceError: null,
+    readiness: 'pending',
+  }))
   useEffect(() => {
     setLocaleState(readInitialLocale())
   }, [])
@@ -858,35 +865,18 @@ export function LocalizationFailure() {
 
 function readInitialLocale(): LocaleState {
   const storedLocale = readStoredLocale()
-  if (storedLocale.ok && storedLocale.value !== null) {
-    return createReadyLocaleState({ locale: storedLocale.value, persistenceError: null })
-  }
   return createReadyLocaleState({
-    locale: readSupportedLocale({ languages: navigator.languages }),
+    locale: readBrowserLocale({ languages: navigator.languages, storedLocale: storedLocale.ok ? storedLocale.value : null }),
     persistenceError: storedLocale.ok ? null : storedLocale.error,
   })
 }
 
-function readStoredLocale(): BrowserStorageResult<Locale | null> {
+function readStoredLocale(): BrowserStorageResult<string | null> {
   try {
-    const storedLocale = localStorage.getItem(localeStorageKey)
-    return { ok: true, value: parseLocale({ value: storedLocale }) }
+    return { ok: true, value: localStorage.getItem(localeStorageKey) }
   } catch {
     return { ok: false, error: 'unavailable' }
   }
-}
-
-function readSupportedLocale({ languages }: Readonly<{ languages: readonly string[] }>): Locale {
-  for (const language of languages) {
-    const [languageCode] = language.toLowerCase().split('-')
-    const locale = parseLocale({ value: languageCode })
-    if (locale !== null) return locale
-  }
-  return defaultLocale
-}
-
-function parseLocale({ value }: Readonly<{ value: string | null | undefined }>): Locale | null {
-  return value === 'en' || value === 'fr' ? value : null
 }
 
 function selectLocale({

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { z } from 'zod'
 
-import { BrandMark } from '../brand-mark'
 import { LocalizationFailure, useLocalization } from '../localization/localization'
 import type { Localization } from '../localization/localization'
 import type { InitialDemoAccess } from './demo-access-initial-state'
@@ -65,29 +64,27 @@ export function DemoAccessGate({ children, initialAccess }: Readonly<{
     </>
   }
   const { translate } = localizationResult.value
+  // Takes the place of the Candidate Journey only: the page around it is public and rendered by the server.
   return (
-    <main className="demo-access-gate">
-      <p className="demo-access-brand"><BrandMark size={28} />{translate('brand.name')}</p>
-      <section aria-live="polite" className="demo-access-card">
-        <h1>{translate('demoAccess.title')}</h1>
-        <p>{translate('demoAccess.description')}</p>
-        {state.status === 'checking'
-          ? <p>{translate('demoAccess.verifying')}</p>
-          : null}
-        {state.status === 'challenge'
-          ? <TurnstileChallenge
-              onFailure={showFailure}
-              onGranted={grantAccess}
-              siteKey={state.siteKey}
-            />
-          : null}
-        {state.status === 'unavailable'
-          ? <button className="primary-action" onClick={refreshAccess} type="button">
-              {translate('demoAccess.retry')}
-            </button>
-          : null}
-      </section>
-    </main>
+    <section aria-live="polite" className="demo-access-card">
+      <h2>{translate('demoAccess.title')}</h2>
+      <p>{translate('demoAccess.description')}</p>
+      {state.status === 'checking'
+        ? <p>{translate('demoAccess.verifying')}</p>
+        : null}
+      {state.status === 'challenge'
+        ? <TurnstileChallenge
+            onFailure={showFailure}
+            onGranted={grantAccess}
+            siteKey={state.siteKey}
+          />
+        : null}
+      {state.status === 'unavailable'
+        ? <button className="primary-action" onClick={refreshAccess} type="button">
+            {translate('demoAccess.retry')}
+          </button>
+        : null}
+    </section>
   )
 }
 

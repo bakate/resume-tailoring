@@ -1,6 +1,6 @@
 /**
- * What search engines and link previews read about the site. The server renders before it knows the Candidate's
- * language, so this copy is written once, in French, for the audience the product addresses first.
+ * What search engines and link previews read about the site. They rarely state a language, so the server renders `/`
+ * for them in French, and this copy is written once, in French too, for the audience the product addresses first.
  */
 export const siteOrigin = 'https://resume-studio.bakateba.workers.dev'
 

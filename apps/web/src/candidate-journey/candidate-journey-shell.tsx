@@ -21,6 +21,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { BrandMark } from '../brand-mark'
+import { processingPolicy } from '../composition-root'
 import {
   LocalizationFailure,
   useLocalization,
@@ -36,15 +37,14 @@ import { PrivacyStatement } from './processing-policy-notice'
 import { SourceIntakeWorkspace } from './source-intake-workspace'
 import type { CandidateJourneyController } from './use-candidate-journey'
 
-/** The chrome both Candidate Journey routes share: header, skip link and live announcements. */
+/**
+ * The chrome both Candidate Journey routes share: header and skip link. It needs no Candidate Session, so the server
+ * renders it ahead of demo access.
+ */
 export function CandidateJourneyShell({ children }: Readonly<{ children: ReactNode }>) {
   const localizationResult = useLocalization()
   if (!localizationResult.ok) return <LocalizationFailure />
-  return <LocalizedCandidateJourneyShell localization={localizationResult.value}>{children}</LocalizedCandidateJourneyShell>
-}
-
-function LocalizedCandidateJourneyShell({ children, localization }: LocalizationProps & Readonly<{ children: ReactNode }>) {
-  const candidateJourney = useCandidateJourney()
+  const localization = localizationResult.value
   return (
     <AppShell className="candidate-journey-app" header={{ height: 76 }} padding={{ base: 'sm', sm: 'xl' }}>
       <a className="skip-link" href="#main-content">
@@ -52,14 +52,47 @@ function LocalizedCandidateJourneyShell({ children, localization }: Localization
       </a>
       <CandidateJourneyHeader localization={localization} />
       <AppShell.Main id="main-content"><Container size="xl"><Stack gap="xl">
-        <CandidateJourneyStatusAnnouncements {...{ activePhase: readActivePhase(candidateJourney), candidateJourney, localization }} />
         {children}
       </Stack></Container></AppShell.Main>
     </AppShell>
   )
 }
 
-/** `/`: the introduction, the intake, the source evidence and the phases; the result lives on `/resume`. */
+/**
+ * What `/` says before anything else: what the product does and how it treats the Candidate's documents. It is public,
+ * rendered by the server and readable without JavaScript, so search engines and link previews read it too.
+ */
+export function CandidateJourneyLanding() {
+  const localizationResult = useLocalization()
+  if (!localizationResult.ok) return <LocalizationFailure />
+  const localization = localizationResult.value
+  return (
+    <Box maw="48rem" pt="xl">
+      <Text c="forest.8" fw={700} mb="sm" tt="uppercase">
+        {localization.translate('candidateJourney.eyebrow')}
+      </Text>
+      <Title fz={{ base: '2.75rem', sm: '3.75rem' }} order={1}>
+        {localization.translate('candidateJourney.title')}
+      </Title>
+      <Text c="dimmed" mt="lg" size="xl">
+        {localization.translate('candidateJourney.description')}
+      </Text>
+      <PrivacyStatement localization={localization} processingPolicy={processingPolicy} />
+    </Box>
+  )
+}
+
+/** Live announcements of the Candidate Journey's progress, for assistive technology. */
+export function CandidateJourneyStatus() {
+  const localizationResult = useLocalization()
+  const candidateJourney = useCandidateJourney()
+  if (!localizationResult.ok) return null
+  return <CandidateJourneyStatusAnnouncements {...{
+    activePhase: readActivePhase(candidateJourney), candidateJourney, localization: localizationResult.value,
+  }} />
+}
+
+/** `/`, below the landing: the Candidate Session, the intake, the source evidence and the phases; the result lives on `/resume`. */
 export function CandidateIntakePage() {
   const localizationResult = useLocalization()
   if (!localizationResult.ok) return <LocalizationFailure />
@@ -70,7 +103,7 @@ export function CandidateIntakePage() {
 function CandidateIntake({ localization }: LocalizationProps) {
   const candidateJourney = useCandidateJourney()
   return <>
-    <CandidateJourneyIntroduction {...{ candidateJourney, localization }} />
+    <CandidateSessionPanel {...{ candidateJourney, localization }} />
     {isResultOperation(candidateJourney) ? null : <CandidateJourneyProgress {...{ candidateJourney, localization }} />}
     <LatestResumeBanner {...{ candidateJourney, localization }} />
     <CombinedIntakeWorkspace {...{ candidateJourney, localization }} />
@@ -149,22 +182,9 @@ function selectLocale({ locale, localization }: LocalizationProps & Readonly<{ l
   localization.selectLocale(locale)
 }
 
-function CandidateJourneyIntroduction({ candidateJourney, localization }: LocalizationProps & Readonly<{
-  candidateJourney: CandidateJourneyController
-}>) {
+function CandidateSessionPanel({ candidateJourney, localization }: CandidateJourneyProps) {
   return (
-    <Box maw="48rem" pt="xl">
-      <Text c="forest.8" fw={700} mb="sm" tt="uppercase">
-        {localization.translate('candidateJourney.eyebrow')}
-      </Text>
-      <Title fz={{ base: '2.75rem', sm: '3.75rem' }} order={1}>
-        {localization.translate('candidateJourney.title')}
-      </Title>
-      <Text c="dimmed" mt="lg" size="xl">
-        {localization.translate('candidateJourney.description')}
-      </Text>
-      <PrivacyStatement localization={localization}
-        processingPolicy={candidateJourney.languageModelGateway.processingPolicy} />
+    <Box maw="48rem">
       <CandidateSessionControls {...{ candidateJourney, localization }} />
       <CandidateSessionNotice localization={localization} view={candidateJourney.view} />
     </Box>
@@ -186,7 +206,7 @@ LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) 
   const closeDeleteConfirmation = () => { setDeleteConfirmationOpen(false) }
   const openDeleteConfirmation = () => { setDeleteConfirmationOpen(true) }
   return <>
-    <Group mt="xl">
+    <Group>
       <Button color="danger" leftSection={<IconTrash aria-hidden="true" size={16} />} onClick={openDeleteConfirmation} variant="subtle">
         {localization.translate('candidateJourney.deleteSession')}
       </Button>
@@ -204,7 +224,7 @@ function StartCandidateSessionButton({ candidateJourney, localization }: Localiz
   const [keepsNothingAfterTab, setKeepsNothingAfterTab] = useState(false)
   const { view } = candidateJourney
   const isAbsent = view.status === 'candidate-session-absent'
-  return <Stack align="flex-start" gap="md" mt="xl">
+  return <Stack align="flex-start" gap="md">
     <Button disabled={!isAbsent} loading={view.status === 'preparing-session'} size="lg"
       onClick={() => { candidateJourney.startCandidateSession({ retention: keepsNothingAfterTab ? 'tab' : 'browser' }) }}>
       {localization.translate('candidateJourney.startSession')}

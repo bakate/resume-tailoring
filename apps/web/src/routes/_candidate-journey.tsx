@@ -1,7 +1,7 @@
-import { Outlet, createFileRoute } from '@tanstack/react-router'
+import { Outlet, createFileRoute, useMatch } from '@tanstack/react-router'
 
 import { CandidateApiKeyWall } from '../candidate-api-key/candidate-api-key-wall'
-import { CandidateJourneyShell } from '../candidate-journey/candidate-journey-shell'
+import { CandidateJourneyLanding, CandidateJourneyShell, CandidateJourneyStatus } from '../candidate-journey/candidate-journey-shell'
 import { CandidateJourneyControllerProvider, useCandidateJourneyController } from '../candidate-journey/use-candidate-journey'
 import { DemoAccessGate } from '../demo-access/demo-access-gate'
 import { readInitialDemoAccess } from '../demo-access/demo-access-initial-state'
@@ -15,12 +15,20 @@ export const Route = createFileRoute('/_candidate-journey')({
   component: CandidateJourneyLayout,
 })
 
+/**
+ * The shell and, on `/`, the landing are public and rendered by the server; only the Candidate Journey, and with it
+ * every model call, waits behind demo access.
+ */
 function CandidateJourneyLayout() {
   const initialAccess = Route.useLoaderData()
+  const isIntake = useMatch({ from: '/_candidate-journey/', shouldThrow: false }) !== undefined
   return (
-    <DemoAccessGate initialAccess={initialAccess}>
-      <CandidateJourney />
-    </DemoAccessGate>
+    <CandidateJourneyShell>
+      {isIntake ? <CandidateJourneyLanding /> : null}
+      <DemoAccessGate initialAccess={initialAccess}>
+        <CandidateJourney />
+      </DemoAccessGate>
+    </CandidateJourneyShell>
   )
 }
 
@@ -29,9 +37,8 @@ function CandidateJourney() {
   const localization = useLocalization()
   return (
     <CandidateJourneyControllerProvider value={candidateJourney}>
-      <CandidateJourneyShell>
-        <Outlet />
-      </CandidateJourneyShell>
+      <CandidateJourneyStatus />
+      <Outlet />
       {localization.ok ? <CandidateApiKeyWall localization={localization.value} /> : null}
     </CandidateJourneyControllerProvider>
   )
