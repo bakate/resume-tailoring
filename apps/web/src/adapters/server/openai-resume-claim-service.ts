@@ -10,6 +10,7 @@ import { createOpenAiRequester } from './openai-request'
 import type { ModelApiKey, OpenAiRequestFailure } from './openai-request'
 import { readOpenAiApiFailure } from './openai-api-failure'
 import type { ResumeClaimReformulator, ResumeClaimSemanticValidator } from '@resume-tailoring/application/ports'
+import { delimitUntrustedContent, untrustedContentInstruction } from './untrusted-model-input'
 
 type OpenAiModelConfiguration = Readonly<{
   apiKey: ModelApiKey
@@ -196,7 +197,7 @@ function createOpenAiInput({ developerText, userValue }: Readonly<{
 }>) {
   return [
     { role: 'developer', content: [{ type: 'input_text', text: developerText }] },
-    { role: 'user', content: [{ type: 'input_text', text: JSON.stringify(userValue) }] },
+    { role: 'user', content: [{ type: 'input_text', text: delimitUntrustedContent({ kind: 'supplied-data', content: JSON.stringify(userValue) }) }] },
   ]
 }
 
@@ -225,6 +226,7 @@ function readOutputText({ output }: Readonly<{ output: readonly unknown[] }>) {
 }
 
 const writingInstructions = [
+  untrustedContentInstruction,
   'Write concise Tailored Resume claims only from the supplied Candidate Facts.',
   'Write every claim in the exact language requested by locale: en means English and fr means French.',
   'Split every claim into the smallest semantic segments and link each segment to every exact fact that supports it.',
@@ -235,6 +237,7 @@ const writingInstructions = [
 ].join(' ')
 
 const validationInstructions = [
+  untrustedContentInstruction,
   'Decide whether every Resume Claim segment is fully supported by its referenced Candidate Facts.',
   'Every referenced fact must directly support that segment; reject unrelated or redundant fact references as inexact-fact-reference.',
   'Reject additions or strengthening of causality, scope, autonomy, seniority, duration, frequency, quantity, or outcome.',

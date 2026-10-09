@@ -12,6 +12,7 @@ import {
   matchEvidenceResponseFormat,
 } from '../../candidate-journey/job-match-schemas'
 import type { MatchEvidenceMatcher } from '@resume-tailoring/application/ports'
+import { delimitUntrustedContent, untrustedContentInstruction } from './untrusted-model-input'
 
 export function createOpenAiJobMatchEvidenceMatcher({
   apiKey, model, reasoningEffort, request = fetch,
@@ -90,7 +91,7 @@ function createRequestBody({ matchRequest, model, reasoningEffort, repairInstruc
   return {
     input: [
       { role: 'developer', content: [{ type: 'input_text', text: matchingInstructions }] },
-      { role: 'user', content: [{ type: 'input_text', text: JSON.stringify(matchRequest) }] },
+      { role: 'user', content: [{ type: 'input_text', text: delimitUntrustedContent({ kind: 'supplied-data', content: JSON.stringify(matchRequest) }) }] },
       ...(repairInstruction === undefined ? [] : [
         { role: 'user', content: [{ type: 'input_text', text: repairInstruction }] },
       ]),
@@ -158,6 +159,7 @@ function readOutputText({ value }: Readonly<{ value: unknown }>) {
 }
 
 const matchingInstructions = [
+  untrustedContentInstruction,
   ...requirementCoverageInstructions,
   'List a related but distinct capability in adjacentEvidence instead, with the requirementId and, for each Candidate Fact, a short contiguous factExcerpt copied verbatim from that fact. Adjacent Evidence never counts as coverage; omit it for covered or partially covered requirements.',
   'Return relevance links for Candidate Facts relevant enough to support an honest Tailored Resume, with the same verbatim excerpts.',

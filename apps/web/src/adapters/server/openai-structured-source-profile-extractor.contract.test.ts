@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createOpenAiStructuredSourceProfileExtractor } from './openai-structured-source-profile-extractor'
+import { delimitUntrustedContent } from './untrusted-model-input'
 
 describe('OpenAI structured Source Profile extractor contract', () => {
   it('uses a stateless Structured Output request for minimized professional content', async () => {
@@ -24,7 +25,8 @@ describe('OpenAI structured Source Profile extractor contract', () => {
       store: false,
       input: [
         { role: 'developer' },
-        { role: 'user', content: [{ type: 'input_text', text: 'TypeScript' }] },
+        { role: 'user', content: [{ type: 'input_text',
+          text: delimitUntrustedContent({ kind: 'source-document', content: 'TypeScript' }) }] },
       ],
       text: { format: { name: 'structured_source_profile', strict: true } },
     })

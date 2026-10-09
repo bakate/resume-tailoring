@@ -203,7 +203,8 @@ function sectionOutput(content: ResumeSectionContent) {
 
 function readModelInput(body: RequestBody | null): unknown {
   const input = body?.input as readonly Readonly<{ role: string; content: readonly Readonly<{ text: string }>[] }>[] | undefined
-  return JSON.parse(input?.find(({ role }) => role === 'user')?.content[0]?.text ?? 'null')
+  const text = input?.find(({ role }) => role === 'user')?.content[0]?.text ?? '<supplied_data>\nnull\n</supplied_data>'
+  return JSON.parse(text.replace(/^<supplied_data>\n/u, '').replace(/\n<\/supplied_data>$/u, ''))
 }
 
 function modelResponse(value: unknown) {

@@ -9,6 +9,7 @@ import {
   structuredSourceProfileResponseFormat,
 } from '../../candidate-journey/structured-source-profile-schema'
 import type { StructuredSourceProfileExtractor } from '@resume-tailoring/application/ports'
+import { delimitUntrustedContent, untrustedContentInstruction } from './untrusted-model-input'
 
 export function createOpenAiStructuredSourceProfileExtractor({
   apiKey,
@@ -50,7 +51,7 @@ async function requestExtraction({
     body: {
       input: [
         { role: 'developer', content: [{ type: 'input_text', text: extractionInstructions }] },
-        { role: 'user', content: [{ type: 'input_text', text: professionalContent }] },
+        { role: 'user', content: [{ type: 'input_text', text: delimitUntrustedContent({ kind: 'source-document', content: professionalContent }) }] },
       ],
       max_output_tokens: 16_000,
       model,
@@ -90,6 +91,7 @@ function readOutputText({ output }: Readonly<{ output: readonly unknown[] }>) {
 }
 
 const extractionInstructions = [
+  untrustedContentInstruction,
   'Build an exhaustive structured Source Profile using only explicit Candidate evidence.',
   'Preserve experiences, projects, skills, education, languages, and certifications separately.',
   'Never infer dates, seniority, proficiency, organizations, qualifications, or outcomes.',
