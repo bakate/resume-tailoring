@@ -850,7 +850,6 @@ export function useLocalization() {
   return { ok: true, value: localization } as const
 }
 
-export const defaultDocumentTitle = englishCatalog['brand.name']
 export const localizationUnavailableMessage = englishCatalog['locale.unavailable']
 
 export function LocalizationFailure() {

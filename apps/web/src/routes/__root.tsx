@@ -16,10 +16,10 @@ import { GlobalErrorFallback } from '../global-error-fallback'
 import {
   LocalizationFailure,
   LocalizationProvider,
-  defaultDocumentTitle,
   useLocalization,
 } from '../localization/localization'
 import type { Locale, Localization } from '../localization/localization'
+import { searchMetadata } from '../search-metadata'
 // Served from our own origin so no request from the Candidate's browser reaches a font provider.
 import '@fontsource/dm-sans/400.css'
 import '@fontsource/dm-sans/500.css'
@@ -33,19 +33,16 @@ export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
-      { title: defaultDocumentTitle },
+      { title: searchMetadata.title },
       {
         name: 'viewport',
         content: 'width=device-width, initial-scale=1',
       },
-      { name: 'theme-color', content: '#164f3d' },
+      ...searchMetadata.meta,
     ],
-    // The SVG serves current browsers; the ICO serves those that ask for /favicon.ico or ignore SVG icons.
-    links: [
-      { rel: 'icon', href: '/favicon.ico', sizes: '32x32' },
-      { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
-      { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
-    ],
+    links: [...searchMetadata.links],
+    // A JSON-LD data block is never executed, so the page Content-Security-Policy does not need its nonce.
+    scripts: [{ type: 'application/ld+json', children: JSON.stringify(searchMetadata.structuredData) }],
   }),
   component: RootComponent,
   errorComponent: RootErrorComponent,
