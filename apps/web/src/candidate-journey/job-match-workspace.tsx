@@ -34,8 +34,7 @@ export function JobMatchWorkspace({ candidateJourney, localization }: Readonly<{
 }>) {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open') return null
-  const sourceIntake = view.session.preparation?.sourceIntake ?? view.session.sourceIntake
-  const jobMatch = view.session.preparation?.jobMatch ?? view.session.jobMatch
+  const { sourceIntake, jobMatch } = view.preparationInputs
   if (sourceIntake === null || jobMatch === null) return null
   return <Paper component="section" aria-label={localization.translate('jobMatch.title')} p={{ base: 'md', sm: 'xl' }} withBorder>
     <JobMatchResult {...{ candidateJourney, localization, sourceIntake, jobMatch }} />

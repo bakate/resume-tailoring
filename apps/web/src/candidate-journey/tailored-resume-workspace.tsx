@@ -187,8 +187,8 @@ function canCondense({ candidateJourney, photo }: Readonly<{
 function MatchAnalysisDisclosure({ candidateJourney, localization }: ResumeReviewProps) {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open') return null
-  const { preparation } = view.session
-  if ((preparation?.sourceIntake ?? view.session.sourceIntake) === null || (preparation?.jobMatch ?? view.session.jobMatch) === null) return null
+  const { sourceIntake, jobMatch } = view.preparationInputs
+  if (sourceIntake === null || jobMatch === null) return null
   return <details><summary>{localization.translate('combinedIntake.analysis')}</summary>
     <JobMatchWorkspace {...{ candidateJourney, localization }} /></details>
 }

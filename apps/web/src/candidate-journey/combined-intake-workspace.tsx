@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import { inferTailoredResumeLocale } from '@resume-tailoring/application/tailored-resume'
 import { readRecovery } from '@resume-tailoring/application/candidate-journey'
-import type { CandidateSession, FailureCause, ResumePreparationFailure, StoredIntakeDocument } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateSession, CandidateSessionInputs, FailureCause, ResumePreparationFailure, StoredIntakeDocument } from '@resume-tailoring/application/candidate-journey'
 import type { SourceDocument } from '@resume-tailoring/application/source-intake'
 import type { Localization } from '../localization/localization'
 import type { useCandidateJourney } from './use-candidate-journey'
@@ -17,7 +17,7 @@ import { DailyQuotaStatus } from '../candidate-api-key/candidate-api-key-wall'
 import { FailureExplanation, RecoveryAction } from './failure-recovery'
 
 type IntakeProps = Readonly<{ candidateJourney: ReturnType<typeof useCandidateJourney>; localization: Localization }>
-type OpenIntakeProps = IntakeProps & Readonly<{ session: CandidateSession }>
+type OpenIntakeProps = IntakeProps & Readonly<{ session: CandidateSession; inputs: CandidateSessionInputs }>
 type DocumentChoice = Readonly<{ method: 'paste' | 'upload'; text: string; file: File | null }>
 type DocumentKind = 'source' | 'posting'
 type ResumePurpose = 'tailored' | 'normalized'
@@ -33,7 +33,7 @@ type IntakeActionsInput = OpenIntakeProps & Readonly<{
 export function CombinedIntakeWorkspace(props: IntakeProps) {
   const { view } = props.candidateJourney
   if (view.status !== 'candidate-session-open') return null
-  return <CombinedIntakeForm {...props} session={view.session} key={view.session.sessionId} />
+  return <CombinedIntakeForm {...props} session={view.session} inputs={view.preparationInputs} key={view.session.sessionId} />
 }
 
 function CombinedIntakeForm(props: OpenIntakeProps) {
@@ -66,7 +66,7 @@ function useIntakeForm(props: OpenIntakeProps) {
   const [state, setState] = useState<IntakeState>(() => ({ sourceChoice: initialSource(props.candidateJourney),
     postingChoice: initialPosting(props.candidateJourney), locale: props.session.preparation?.locale ?? 'automatic',
     missingDocuments: [], confirmation: false, purpose: 'tailored' }))
-  const extractedSource = props.session.preparation?.sourceIntake ?? props.session.sourceIntake
+  const extractedSource = props.inputs.sourceIntake
   useEffect(() => {
     if (extractedSource !== null) setState((current) => ({ ...current, sourceChoice: { method: 'paste', text: '', file: null } }))
   }, [extractedSource])
@@ -103,23 +103,22 @@ function createIntakeActions(input: IntakeActionsInput) {
     cancelGeneration: () => { input.setState((current) => ({ ...current, confirmation: false })) } }
 }
 
-async function readIntakeRequest({ state, session, purpose }: Readonly<{
-  state: IntakeState; session: CandidateSession; purpose: ResumePurpose
+async function readIntakeRequest({ state, inputs, purpose }: Readonly<{
+  state: IntakeState; inputs: CandidateSessionInputs; purpose: ResumePurpose
 }>) {
   const [sourceDocument, jobPosting] = await Promise.all([
     selectedDocument({ choice: state.sourceChoice }), selectedDocument({ choice: state.postingChoice }),
   ])
-  const source = session.preparation?.sourceIntake ?? session.sourceIntake
-  const missingDocuments = [...(sourceDocument === null && source === null ? ['source' as const] : []),
+  const missingDocuments = [...(sourceDocument === null && inputs.sourceIntake === null ? ['source' as const] : []),
     ...(jobPosting === null ? ['posting' as const] : [])]
   if (jobPosting === null || missingDocuments.length > 0) return { ok: false, missingDocuments } as const
   return { ok: true, value: { ...(sourceDocument === null ? {} : { sourceDocument }), jobPosting,
     locale: state.locale === 'en' || state.locale === 'fr' ? state.locale : null, purpose } } as const
 }
 
-function IntakeFields({ session, localization, controls, busy }: OpenIntakeProps & Readonly<{ controls: IntakeControls; busy: boolean }>) {
+function IntakeFields({ inputs, localization, controls, busy }: OpenIntakeProps & Readonly<{ controls: IntakeControls; busy: boolean }>) {
   const { state, updateInputs } = controls
-  const hasSource = (session.preparation?.sourceIntake ?? session.sourceIntake) !== null
+  const hasSource = inputs.sourceIntake !== null
   return <>
     <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
       <SourceDocumentCard {...{ busy, hasSource, localization }} choice={state.sourceChoice}

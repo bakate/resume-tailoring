@@ -31,7 +31,7 @@ export function SourceIntakeWorkspace({
   const sourceForm = useSourceDocumentForm({ candidateJourney })
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open') return null
-  const sourceIntake = view.session.preparation?.sourceIntake ?? view.session.sourceIntake
+  const { sourceIntake } = view.preparationInputs
   return <Paper aria-busy={view.operation === 'processing-source-document' || view.operation === 'resolving-critical-ambiguity'}
     aria-labelledby="source-intake-title" component="section" className="candidate-journey-workspace"
     p={{ base: 'md', sm: 'xl' }} shadow="xs" withBorder>
