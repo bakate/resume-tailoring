@@ -14,6 +14,7 @@ import {
   jobPostingExtractionSchema,
 } from '../../candidate-journey/job-match-schemas'
 import type { JobPostingExtractor } from '@resume-tailoring/application/ports'
+import { delimitUntrustedContent, untrustedContentInstruction } from './untrusted-model-input'
 
 export function createOpenAiJobPostingExtractor({
   apiKey, model, reasoningEffort, request = fetch,
@@ -64,7 +65,7 @@ function createRequestBody({ jobPostingContent, model, reasoningEffort }: Readon
   return {
     input: [
       { role: 'developer', content: [{ type: 'input_text', text: extractionInstructions }] },
-      { role: 'user', content: [{ type: 'input_text', text: jobPostingContent }] },
+      { role: 'user', content: [{ type: 'input_text', text: delimitUntrustedContent({ kind: 'job-posting', content: jobPostingContent }) }] },
     ],
     max_output_tokens: 20_000,
     model,
@@ -113,6 +114,7 @@ function readOutputText({ value }: Readonly<{ value: unknown }>) {
 }
 
 const extractionInstructions = [
+  untrustedContentInstruction,
   'Analyze exactly one Job Posting and ignore navigation, employer branding, benefits marketing, equal-opportunity boilerplate, and legal boilerplate.',
   'Extract targetRole only when an unambiguous role title is explicit; copy its value and sourceExcerpt exactly.',
   'Extract only explicit professional qualifications, responsibilities, or expectations, as one requirement per assessable capability.',

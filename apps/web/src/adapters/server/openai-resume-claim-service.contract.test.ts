@@ -5,6 +5,7 @@ import {
   createOpenAiResumeClaimSemanticValidator,
   createOpenAiResumeClaimReformulator,
 } from './openai-resume-claim-service'
+import { delimitSuppliedData } from './untrusted-model-input'
 
 describe('OpenAI Resume Claim service contract', () => {
   it('reformulates a claim through a strict stateless writing-model request', async () => {
@@ -28,7 +29,7 @@ describe('OpenAI Resume Claim service contract', () => {
         { role: 'developer', content: [{ type: 'input_text' }] },
         {
           role: 'user',
-          content: [{ type: 'input_text', text: JSON.stringify({ ...writingInputs,
+          content: [{ type: 'input_text', text: delimitSuppliedData({ ...writingInputs,
             revision: { claim: proposedClaim, feedback: reformulation.feedback } }) }],
         },
       ],
