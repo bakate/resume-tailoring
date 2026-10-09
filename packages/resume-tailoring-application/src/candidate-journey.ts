@@ -41,10 +41,13 @@ import {
   candidateSessionStorageVersion,
   hasValidCandidateSessionLifetime,
   isCandidateSessionExpired,
+  readPreparationInputs,
+  readPublishedInputs,
   settlePublishedPreparation,
 } from '@resume-tailoring/domain/candidate-session'
 import type {
   CandidateSession,
+  CandidateSessionInputs,
   CandidateJourneyPhase,
   ResumePhoto,
   ResumeSectionSnapshot,
@@ -80,7 +83,7 @@ export {
   candidateSessionStorageVersion,
   hasValidCandidateSessionLifetime,
 } from '@resume-tailoring/domain/candidate-session'
-export type { CandidateJourneyPhase, CandidateSession }
+export type { CandidateJourneyPhase, CandidateSession, CandidateSessionInputs }
 export type { StoredIntakeDocument, ResumePhoto, ResumePreparationFailure, ResumeSectionSnapshot } from '@resume-tailoring/domain/candidate-session'
 
 type CandidateJourneySourceIntakeFailure =
@@ -149,6 +152,9 @@ type CandidateJourneyOperation = 'rendering-resume-document' | 'preparing-tailor
   | 'processing-profile-enrichment' | 'processing-source-document'
   | 'resolving-critical-ambiguity' | null
 
+/** The latest result the Candidate has validated, which the journey announces. */
+export type ValidatedResult = 'tailored-resume' | 'match-analysis' | 'source-profile'
+
 export type CandidateJourneyView =
   | Readonly<{ status: 'preparing-session' }>
   | Readonly<{ status: 'candidate-session-absent'; notice: CandidateSessionNotice }>
@@ -156,6 +162,8 @@ export type CandidateJourneyView =
       status: 'candidate-session-open'
       preparationOutcome: CombinedIntakeOutcome | null
       preparationPhase: PreparationPhase | null
+      /** The Source Intake and Job Match in force for the preparation, which the Candidate sees and corrects. */
+      preparationInputs: CandidateSessionInputs
       resumeReview: ResumeReview | null
       processingConsentStatus: 'granted' | 'required'
       processingPolicy: ProcessingPolicy
@@ -165,6 +173,7 @@ export type CandidateJourneyView =
       session: CandidateSession
       sourceIntakeFailure: CandidateJourneySourceIntakeFailure | null
       sourceIntakeExplainedFailure: ExplainedFailure | null
+      validatedResult: ValidatedResult | null
     }>
   | Readonly<{ status: 'candidate-session-unavailable' }>
 
@@ -332,8 +341,9 @@ const persistCriticalAmbiguityResolution = fromPromise<
 >(({ input }: Readonly<{
   input: ResolveAmbiguityActorInput
 }>) => {
-  const sourceIntake = input.session?.preparation?.sourceIntake ?? input.session?.sourceIntake
-  if (sourceIntake === null || sourceIntake === undefined || input.session === null) return Promise.resolve(ambiguityUnavailableResult)
+  if (input.session === null) return Promise.resolve(ambiguityUnavailableResult)
+  const { sourceIntake } = readPreparationInputs({ session: input.session })
+  if (sourceIntake === null) return Promise.resolve(ambiguityUnavailableResult)
   const resolution = resolveCriticalAmbiguity({
     answer: input.answer,
     criticalAmbiguityId: input.ambiguityId,
@@ -402,10 +412,7 @@ const confirmProfileEnrichment = fromPromise<
 async function processProfileEnrichment({ input }: Readonly<{
   input: ProfileEnrichmentActorInput
 }>): Promise<ProfileEnrichmentActorResult> {
-  const session = input.session === null ? null : { ...input.session,
-    sourceIntake: input.session.preparation?.sourceIntake ?? input.session.sourceIntake,
-    jobMatch: input.session.preparation?.jobMatch ?? input.session.jobMatch,
-  }
+  const session = input.session === null ? null : { ...input.session, ...readPreparationInputs({ session: input.session }) }
   if (session?.sourceIntake === null || session === null || session.jobMatch === null) {
     return profileEnrichmentUnavailableResult
   }
@@ -1091,6 +1098,7 @@ function readOpenCandidateSessionView({ snapshot, session }: Readonly<{
   return {
     preparationOutcome: snapshot.context.preparationOutcome,
     preparationPhase: snapshot.context.preparationPhase,
+    preparationInputs: readPreparationInputs({ session }),
     resumeReview: readResumeReview({ session, review: snapshot.context.resumeReview }),
     processingConsentStatus: hasProcessingConsentForPolicy({
       consent: session.processingConsent, policy: processingPolicy,
@@ -1103,7 +1111,14 @@ function readOpenCandidateSessionView({ snapshot, session }: Readonly<{
     sourceIntakeFailure: snapshot.context.sourceIntakeFailure,
     sourceIntakeExplainedFailure: snapshot.context.sourceIntakeExplainedFailure,
     status: 'candidate-session-open',
+    validatedResult: readValidatedResult({ session }),
   }
+}
+
+function readValidatedResult({ session }: Readonly<{ session: CandidateSession }>): ValidatedResult | null {
+  if (session.tailoredResume !== null) return 'tailored-resume'
+  if (session.jobMatch !== null) return 'match-analysis'
+  return session.sourceIntake?.criticalAmbiguities.length === 0 ? 'source-profile' : null
 }
 
 function readCandidateJourneyOperation({ snapshot }: Readonly<{
@@ -1255,7 +1270,7 @@ function recordResumeOutcome({ dependencies, event, view }: Readonly<{
   event: (matchScoreBand: MatchScoreBand) => PrivacySafeTelemetryEvent
 }>) {
   if (view.status !== 'candidate-session-open' || view.session.tailoredResume === null) return
-  const jobMatch = view.session.jobMatch ?? view.session.preparation?.jobMatch ?? null
+  const { jobMatch } = readPublishedInputs({ session: view.session })
   if (jobMatch === null) return
   recordTelemetry({ dependencies, event: event(readMatchScoreBand(jobMatch.analysis.matchScore)) })
 }

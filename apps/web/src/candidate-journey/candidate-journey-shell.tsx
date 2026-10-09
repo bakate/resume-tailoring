@@ -25,7 +25,7 @@ import {
   useLocalization,
 } from '../localization/localization'
 import type { Localization } from '../localization/localization'
-import type { CandidateJourneyView } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateJourneyView, ValidatedResult } from '@resume-tailoring/application/candidate-journey'
 import { candidateJourneyPhases } from './candidate-journey-phases'
 import type { CandidateJourneyPhase } from './candidate-journey-phases'
 import { useCandidateJourney } from './use-candidate-journey'
@@ -117,8 +117,7 @@ function LatestResumeBanner({ candidateJourney, localization }: CandidateJourney
 function SourceEvidenceDisclosure({ candidateJourney, localization }: CandidateJourneyProps) {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open') return null
-  const sourceIntake = view.session.preparation?.sourceIntake ?? view.session.sourceIntake
-  if (sourceIntake === null) return null
+  if (view.preparationInputs.sourceIntake === null) return null
   return <details><summary>{localization.translate('combinedIntake.inspection')}</summary>
     <SourceIntakeWorkspace {...{ candidateJourney, localization }} /></details>
 }
@@ -338,16 +337,15 @@ function readProgressDescription({ candidateJourney, localization }: CandidateJo
 
 function readValidatedResultMessage({ candidateJourney, localization }:
 LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) {
-  if (candidateJourney.view.status !== 'candidate-session-open') return null
-  const result = candidateJourney.view.session.tailoredResume !== null
-    ? 'candidateJourney.result.tailoredResume'
-    : candidateJourney.view.session.jobMatch !== null
-      ? 'candidateJourney.result.matchAnalysis'
-      : candidateJourney.view.session.sourceIntake?.criticalAmbiguities.length === 0
-        ? 'candidateJourney.result.sourceProfile'
-        : null
-  return result === null ? null : localization.translate('candidateJourney.validatedResultAnnouncement')
-    .replace('{result}', localization.translate(result))
+  if (candidateJourney.view.status !== 'candidate-session-open' || candidateJourney.view.validatedResult === null) return null
+  return localization.translate('candidateJourney.validatedResultAnnouncement')
+    .replace('{result}', localization.translate(validatedResultKeys[candidateJourney.view.validatedResult]))
+}
+
+const validatedResultKeys: Readonly<Record<ValidatedResult, Parameters<Localization['translate']>[0]>> = {
+  'tailored-resume': 'candidateJourney.result.tailoredResume',
+  'match-analysis': 'candidateJourney.result.matchAnalysis',
+  'source-profile': 'candidateJourney.result.sourceProfile',
 }
 
 function formatJourneyMessage({ template, token, value }: Readonly<{

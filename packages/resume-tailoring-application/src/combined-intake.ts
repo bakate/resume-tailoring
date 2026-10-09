@@ -1,4 +1,4 @@
-import { settlePublishedPreparation } from '@resume-tailoring/domain/candidate-session'
+import { readPreparationInputs, settlePublishedPreparation } from '@resume-tailoring/domain/candidate-session'
 import type { CandidateSession, ResumePreparation, StoredIntakeDocument, ResumePreparationFailure } from '@resume-tailoring/domain/candidate-session'
 import { hasProcessingConsentForPolicy } from '@resume-tailoring/domain/processing-policy'
 import { createJobMatch, maximumJobPostingBytes } from './job-match'
@@ -77,7 +77,7 @@ function createPreparation({ dependencies, request, session }: Readonly<{
     sourceDocument: request.sourceDocument === undefined ? previous?.sourceDocument ?? null : storeDocument(request.sourceDocument),
     jobPosting: request.jobPosting === undefined ? previous?.jobPosting ?? null : storeDocument(request.jobPosting),
     locale, purpose, sourceIntake: correctSource({ sourceIntake, correction: request.correction }),
-    jobMatch: reusesInputs ? previous?.jobMatch ?? session.jobMatch : null,
+    jobMatch: reusesInputs ? readPreparationInputs({ session }).jobMatch : null,
     ...(reusesInputs && previous !== undefined && canResumeSections({ previous, locale, purpose })
       ? { sections: previous.sections } : {}),
   }
