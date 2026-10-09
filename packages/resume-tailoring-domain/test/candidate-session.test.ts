@@ -45,38 +45,35 @@ const preparedJobMatch = { label: 'Job Match in preparation' } as unknown as Job
 const published = { sourceIntake: publishedSourceIntake, jobMatch: publishedJobMatch }
 
 describe('Candidate Session inputs', () => {
-  it('reads the session\'s own inputs when no preparation exists', () => {
-    const session = published
+  it.each([
+    { state: 'no preparation exists', session: published, expected: published },
+    { state: 'a new preparation started while a Tailored Resume is already published',
+      session: { ...published, preparation: { sourceIntake: correctedSourceIntake, jobMatch: preparedJobMatch } },
+      expected: { sourceIntake: correctedSourceIntake, jobMatch: preparedJobMatch } },
+    { state: 'a preparation without a Job Match yet, which keeps the published one',
+      session: { ...published, preparation: { sourceIntake: correctedSourceIntake, jobMatch: null } },
+      expected: { sourceIntake: correctedSourceIntake, jobMatch: publishedJobMatch } },
+    { state: 'a settled preparation, which keeps no copy of the published inputs',
+      session: { ...published, preparation: { sourceIntake: null, jobMatch: null } }, expected: published },
+  ])('reads the inputs of the Tailored Resume Preparation for $state', ({ session, expected }) => {
+    const inputs = readPreparationInputs({ session })
 
-    expect(readPreparationInputs({ session })).toEqual(published)
-    expect(readPublishedInputs({ session })).toEqual(published)
+    expect(inputs).toEqual(expected)
   })
 
-  it('reads the inputs of a new preparation started while a Tailored Resume is already published', () => {
-    const session = { ...published, preparation: { sourceIntake: correctedSourceIntake, jobMatch: preparedJobMatch } }
+  it.each([
+    { state: 'no preparation exists', session: published, expected: published },
+    { state: 'a new preparation started while a Tailored Resume is already published',
+      session: { ...published, preparation: { sourceIntake: correctedSourceIntake, jobMatch: preparedJobMatch } },
+      expected: published },
+    { state: 'a settled preparation', session: { ...published, preparation: { sourceIntake: null, jobMatch: null } },
+      expected: published },
+    { state: 'a first preparation, before any Tailored Resume is published',
+      session: { sourceIntake: null, jobMatch: null, preparation: { sourceIntake: correctedSourceIntake, jobMatch: preparedJobMatch } },
+      expected: { sourceIntake: null, jobMatch: null } },
+  ])('reads the published inputs for $state', ({ session, expected }) => {
+    const inputs = readPublishedInputs({ session })
 
-    expect(readPreparationInputs({ session })).toEqual({ sourceIntake: correctedSourceIntake, jobMatch: preparedJobMatch })
-    expect(readPublishedInputs({ session })).toEqual(published)
-  })
-
-  it('completes a preparation that has no Job Match yet with the published one', () => {
-    const session = { ...published, preparation: { sourceIntake: correctedSourceIntake, jobMatch: null } }
-
-    expect(readPreparationInputs({ session })).toEqual({ sourceIntake: correctedSourceIntake, jobMatch: publishedJobMatch })
-  })
-
-  it('reads the published inputs for a settled preparation, which keeps no copy of them', () => {
-    const session = { ...published, preparation: { sourceIntake: null, jobMatch: null } }
-
-    expect(readPreparationInputs({ session })).toEqual(published)
-    expect(readPublishedInputs({ session })).toEqual(published)
-  })
-
-  it('reads no published inputs before any Tailored Resume is published, even while a preparation holds some', () => {
-    const session = { sourceIntake: null, jobMatch: null,
-      preparation: { sourceIntake: correctedSourceIntake, jobMatch: preparedJobMatch } }
-
-    expect(readPublishedInputs({ session })).toEqual({ sourceIntake: null, jobMatch: null })
-    expect(readPreparationInputs({ session })).toEqual({ sourceIntake: correctedSourceIntake, jobMatch: preparedJobMatch })
+    expect(inputs).toEqual(expected)
   })
 })

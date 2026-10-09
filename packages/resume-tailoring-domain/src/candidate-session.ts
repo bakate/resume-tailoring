@@ -77,12 +77,15 @@ export function readPreparationInputs({ session }: Readonly<{ session: SessionWi
     jobMatch: session.preparation?.jobMatch ?? session.jobMatch }
 }
 
-/** The inputs the published Tailored Resume was prepared from, whatever preparation has started since. */
+/**
+ * The Candidate Session's own inputs, which a preparation in progress never changes: the ones the published Tailored
+ * Resume was prepared from, unless a correction or a new Job Posting has since made that resume outdated.
+ */
 export function readPublishedInputs({ session }: Readonly<{ session: SessionWithInputs }>): CandidateSessionInputs {
   return { sourceIntake: session.sourceIntake, jobMatch: session.jobMatch }
 }
 
-export type StoredIntakeDocument =Readonly<{ data: string; mediaType: string; name: string }>
+export type StoredIntakeDocument = Readonly<{ data: string; mediaType: string; name: string }>
 
 export type ResumePreparation = Readonly<{
   revision: string
