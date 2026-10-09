@@ -20,6 +20,7 @@ import { IconArrowRight, IconLoader2, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 
+import { BrandMark } from '../brand-mark'
 import {
   LocalizationFailure,
   useLocalization,
@@ -125,7 +126,7 @@ function SourceEvidenceDisclosure({ candidateJourney, localization }: CandidateJ
 function CandidateJourneyHeader({ localization }: LocalizationProps) {
   return (
     <AppShell.Header><Container h="100%" size="xl"><Group className="candidate-journey-header" h="100%" justify="space-between" wrap="wrap">
-      <Text className="candidate-journey-brand" component={Link} to="/" fw={700} size="lg">{localization.translate('brand.name')}</Text>
+      <Text className="candidate-journey-brand" component={Link} to="/" fw={700} size="lg"><BrandMark size={28} />{localization.translate('brand.name')}</Text>
       <LocaleControl localization={localization} />
     </Group></Container></AppShell.Header>
   )

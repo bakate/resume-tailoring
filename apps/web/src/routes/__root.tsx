@@ -9,6 +9,7 @@ import { MantineProvider } from '@mantine/core'
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 
+import { BrandMark } from '../brand-mark'
 import { candidateJourneyCssVariablesResolver, candidateJourneyTheme } from '../candidate-journey/candidate-journey-theme'
 import { listenForUncaughtBrowserErrors } from '../composition-root'
 import { GlobalErrorFallback } from '../global-error-fallback'
@@ -37,6 +38,13 @@ export const Route = createRootRoute({
         name: 'viewport',
         content: 'width=device-width, initial-scale=1',
       },
+      { name: 'theme-color', content: '#164f3d' },
+    ],
+    // The SVG serves current browsers; the ICO serves those that ask for /favicon.ico or ignore SVG icons.
+    links: [
+      { rel: 'icon', href: '/favicon.ico', sizes: '32x32' },
+      { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
+      { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
     ],
   }),
   component: RootComponent,
@@ -82,7 +90,7 @@ function NotFound() {
   const { translate } = localizationResult.value
   return (
     <main className="standalone-page">
-      <p className="standalone-page-brand">{translate('brand.name')}</p>
+      <p className="standalone-page-brand"><BrandMark size={28} />{translate('brand.name')}</p>
       <h1>{translate('notFound.title')}</h1>
       <p>{translate('notFound.description')}</p>
       <Link to="/">{translate('notFound.return')}</Link>

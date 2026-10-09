@@ -30,6 +30,19 @@ body {
   text-decoration: none;
 }
 
+/* Every brand name sits beside its monogram. */
+.candidate-journey-app .candidate-journey-brand,
+.demo-access-brand,
+.standalone-page-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark {
+  flex: none;
+}
+
 .candidate-journey-app .candidate-journey-workspace,
 .candidate-journey-app .candidate-journey-progress {
   width: 100%;

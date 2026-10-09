@@ -1,6 +1,7 @@
 import { Button, Group } from '@mantine/core'
 import { useEffect } from 'react'
 
+import { BrandMark } from './brand-mark'
 import { reportUncaughtRenderError } from './composition-root'
 import { LocalizationFailure, useLocalization } from './localization/localization'
 
@@ -15,7 +16,7 @@ export function GlobalErrorFallback() {
   const { translate } = localizationResult.value
   return (
     <main className="standalone-page">
-      <p className="standalone-page-brand">{translate('brand.name')}</p>
+      <p className="standalone-page-brand"><BrandMark size={28} />{translate('brand.name')}</p>
       <h1>{translate('safetyNet.title')}</h1>
       <p>{translate('safetyNet.explanation')}</p>
       <Group>
