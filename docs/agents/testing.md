@@ -66,6 +66,6 @@ Each case in `apps/web/**/*.contract.test.ts` separates Given, Action, and Then 
 ## Commands
 
 - `pnpm test` runs package-level behavior and contract tests.
-- `pnpm test:e2e` runs the browser smoke test.
+- `pnpm test:e2e` builds the app and runs the browser smoke and integration tests against the production server. It reuses a server already listening on `PLAYWRIGHT_TEST_PORT` (default 3000), such as a running dev server.
 - `pnpm check:test-conventions` rejects detectable behavior-test and contract-test convention violations.
 - `pnpm check` runs architecture, conventions, lint, type checking, tests, and the production build.
