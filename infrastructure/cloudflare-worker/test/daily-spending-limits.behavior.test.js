@@ -57,8 +57,10 @@ describe('Daily spending limits at the edge', () => {
 
   it('shares one Daily Quota across the addresses of one IPv6 /64', async () => {
     const system = createSystemUnderTest()
+    const spellings = ['2001:db8:1:2::1', '2001:0db8:0001:0002:aaaa::', '2001:db8:1:2:ffff:ffff:ffff:ffff']
     await system.givenTailoredResumesFromAddresses({
-      clientIps: ['2001:db8:1:2::1', '2001:db8:1:2::2', '2001:0db8:0001:0002:aaaa::', '2001:db8:1:2:ffff:ffff:ffff:ffff'],
+      clientIps: Array.from({ length: dailyLimits.dailyQuota }, (_, index) =>
+        spellings[index] ?? `2001:db8:1:2::${String(index + 1)}`),
     })
 
     await system.startTailoredResume({ clientIp: '2001:db8:1:2::99' })
