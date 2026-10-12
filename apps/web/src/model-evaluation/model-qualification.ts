@@ -1,12 +1,17 @@
 import type { LanguageModelConfiguration } from '../language-model-configuration'
 
-/** A Qualified Model Configuration candidate, with the prices its evaluated cost is computed from. */
-export type ModelConfiguration = LanguageModelConfiguration & Readonly<{
-  pricing: Readonly<{
-    inputUsdPerMillionTokens: number
-    outputUsdPerMillionTokens: number
-  }>
+/** One rate a provider charges for a model under a stated condition: peak, off-peak, a cache hit… */
+export type ModelPrice = Readonly<{
+  condition: string
+  inputUsdPerMillionTokens: number
+  outputUsdPerMillionTokens: number
 }>
+
+/**
+ * A Qualified Model Configuration candidate, with every rate its provider charges. The evaluated cost reads the highest
+ * input and output rates, so a configuration is never qualified on an off-peak or cache-discounted price.
+ */
+export type ModelConfiguration = LanguageModelConfiguration & Readonly<{ pricing: readonly [ModelPrice, ...ModelPrice[]] }>
 
 export type ModelEvaluationObservation = Readonly<{
   extractionExpectedCount: number
@@ -26,12 +31,15 @@ export type ModelEvaluationBaseline = Readonly<{
   datasetId: string
   observations: readonly ModelEvaluationObservation[]
   recordedAt: string
-  thresholds: Readonly<{
-    costUsd: number
-    extractionRecall: number
-    multilingualFidelity: number
-    p95LatencyMilliseconds: number
-  }>
+  thresholds: ModelEvaluationThresholds
+}>
+
+/** A gate without a threshold is not calibrated yet, and never passes. */
+export type ModelEvaluationThresholds = Readonly<{
+  costUsd?: number
+  extractionRecall?: number
+  multilingualFidelity?: number
+  p95LatencyMilliseconds?: number
 }>
 
 export type CalibratedGate = Readonly<{ passed: boolean; threshold: number; value: number }>
@@ -172,8 +180,9 @@ function calculateCostUsd({
 }>) {
   const inputTokens = sum({ values: observations.map(({ inputTokens }) => inputTokens) })
   const outputTokens = sum({ values: observations.map(({ outputTokens }) => outputTokens) })
-  const cost = inputTokens * configuration.pricing.inputUsdPerMillionTokens / 1_000_000
-    + outputTokens * configuration.pricing.outputUsdPerMillionTokens / 1_000_000
+  const inputUsdPerMillionTokens = Math.max(...configuration.pricing.map((price) => price.inputUsdPerMillionTokens))
+  const outputUsdPerMillionTokens = Math.max(...configuration.pricing.map((price) => price.outputUsdPerMillionTokens))
+  const cost = inputTokens * inputUsdPerMillionTokens / 1_000_000 + outputTokens * outputUsdPerMillionTokens / 1_000_000
   return Number(cost.toFixed(8))
 }
 

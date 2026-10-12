@@ -4,7 +4,7 @@ import type { LanguageModel, LanguageModelUsage } from 'ai'
 import type { LanguageModelConfiguration, LanguageModelProvider } from '../../language-model-configuration'
 import { openAiLanguageModelProvider } from './openai-language-model-provider'
 
-type ModelOperation =
+export type ModelOperation =
   | 'resume-section-writing'
   | 'resume-section-validation'
   | 'resume-document-coherence'
@@ -38,6 +38,30 @@ type ProviderOptions = NonNullable<Parameters<typeof generateText>[0]['providerO
 
 export type ModelUsage = Readonly<{ inputTokens: number; outputTokens: number }>
 
+/** The Language Model Providers a configuration may name, each by the name it is configured under. */
+export type LanguageModelProviderRegistry = Readonly<Record<string, LanguageModelProviderAdapter<never>>>
+
+/** One call as qualification measures it: which configuration served which operation, how fast, at what usage. */
+export type ModelCallMeasurement = Readonly<{
+  configuration: LanguageModelConfiguration
+  latencyMilliseconds: number
+  operation: ModelOperation
+  outcome: 'answered' | 'failed'
+  usage?: ModelUsage
+}>
+
+/**
+ * What an operation adapter needs to reach a model. Qualification may also hand it the providers to choose from and
+ * an observer of every call; production uses neither and reaches only the providers listed below.
+ */
+export type ModelConnection = Readonly<{
+  apiKey: ModelApiKey
+  configuration: LanguageModelConfiguration
+  observeCall?: (measurement: ModelCallMeasurement) => void
+  providers?: LanguageModelProviderRegistry
+  request?: typeof fetch
+}>
+
 /** A model answer: its raw output text, which the operation adapter parses, and whether the model finished it. */
 export type ModelResponse = Readonly<{ complete: boolean; text?: string; usage?: ModelUsage }>
 
@@ -52,7 +76,7 @@ type ModelRequestDetails = Readonly<{
 
 const languageModelProviderAdapters = {
   openai: openAiLanguageModelProvider,
-} as const satisfies Record<LanguageModelProvider, LanguageModelProviderAdapter<never>>
+} as const satisfies Record<LanguageModelProvider, LanguageModelProviderAdapter<never>> & LanguageModelProviderRegistry
 
 // Provider warnings are not privacy-safe telemetry; only the failure metric below leaves this module.
 ;(globalThis as { AI_SDK_LOG_WARNINGS?: false }).AI_SDK_LOG_WARNINGS = false
@@ -61,14 +85,18 @@ const languageModelProviderAdapters = {
  * The one wrapper around AI SDK calls. It signs with the key it is given, never the SDK's environment lookup; it never
  * retries, so a failed call is retried only as a Recovery the application derives; and it logs only identifiers.
  */
-export function createModelRequester({ apiKey, configuration, request = fetch }: Readonly<{
-  apiKey: ModelApiKey
-  configuration: LanguageModelConfiguration
-  request?: typeof fetch
-}>) {
-  const provider = languageModelProviderAdapters[configuration.provider]
+export function createModelRequester({
+  apiKey, configuration, observeCall, providers = languageModelProviderAdapters, request = fetch,
+}: ModelConnection) {
+  const provider = providers[configuration.provider] as LanguageModelProviderAdapter<LanguageModelConfiguration['providerOptions']>
   return {
-    send: (details: ModelRequestDetails) => sendModelRequest({ apiKey, configuration, details, provider, request }),
+    send: async (details: ModelRequestDetails) => {
+      const startedAtMilliseconds = Date.now()
+      const result = await sendModelRequest({ apiKey, configuration, details, provider, request })
+      observeCall?.({ configuration, latencyMilliseconds: Date.now() - startedAtMilliseconds, operation: details.operation,
+        outcome: result.ok ? 'answered' : 'failed', ...(result.ok && result.value.usage !== undefined ? { usage: result.value.usage } : {}) })
+      return result
+    },
   }
 }
 
@@ -80,7 +108,7 @@ async function sendModelRequest({ apiKey, configuration, details, provider, requ
   apiKey: ModelApiKey
   configuration: LanguageModelConfiguration
   details: ModelRequestDetails
-  provider: (typeof languageModelProviderAdapters)[LanguageModelProvider]
+  provider: LanguageModelProviderAdapter<LanguageModelConfiguration['providerOptions']>
   request: typeof fetch
 }>): Promise<Readonly<{ ok: true; value: ModelResponse }> | Readonly<{ ok: false; error: ModelRequestFailure }>> {
   const startedAtMilliseconds = Date.now()

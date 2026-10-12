@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { createOpenAiModelConfiguration } from '../../language-model-configuration'
+import { createOpenAiModelConfiguration, type LanguageModelConfiguration } from '../../language-model-configuration'
 import { createModelRequester } from './language-model-request'
 import { createRecordedOpenAiError, createRecordedOpenAiResponse } from './recorded-openai-responses'
+import { createScriptedLanguageModelProvider } from './scripted-language-model-provider'
 
 const operatorApiKey = { value: 'test-api-key' } as const
 const echoedApiKey = { value: 'sk-proj-OperatorSecret0123456789abcdef' } as const
@@ -179,7 +180,48 @@ describe('Model request call wrapper', () => {
       expect(JSON.stringify(result)).not.toContain(secret)
     }
   })
+
+  it('reaches a provider registered only by its caller, never branching on the provider', async () => {
+    const providers = { scripted: createScriptedLanguageModelProvider({ answer: ({ model, outputName }) =>
+      ({ text: JSON.stringify({ value: `${model}:${outputName}` }) }) }) }
+    const requester = createModelRequester({ apiKey: operatorApiKey, configuration: scriptedConfiguration, providers })
+
+    const result = await requester.send(modelRequest)
+
+    expect(result).toMatchObject({ ok: true, value: { complete: true, text: '{"value":"scripted-model:value"}' } })
+  })
+
+  it('reports each call\'s configuration, operation, latency and usage to its observer, and nothing it carried', async () => {
+    const measurements: unknown[] = []
+    const requester = createModelRequester({ apiKey: operatorApiKey, configuration,
+      observeCall: (measurement) => { measurements.push(measurement) },
+      request: () => Promise.resolve(createRecordedOpenAiResponse({ outputText: '{"value":"TypeScript"}',
+        usage: { inputTokens: 900, outputTokens: 120 } })) })
+
+    await requester.send(modelRequest)
+
+    expect(measurements).toEqual([{ configuration, latencyMilliseconds: expect.any(Number) as number,
+      operation: 'explainable-match-evidence', outcome: 'answered', usage: { inputTokens: 900, outputTokens: 120 } }])
+    expect(JSON.stringify(measurements)).not.toMatch(/Private Candidate history|TypeScript|test-api-key/u)
+  })
+
+  it('reports a failed call to its observer without usage', async () => {
+    const measurements: unknown[] = []
+    vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const requester = createModelRequester({ apiKey: operatorApiKey, configuration,
+      observeCall: (measurement) => { measurements.push(measurement) },
+      request: () => Promise.resolve(new Response(null, { status: 500 })) })
+
+    await requester.send(modelRequest)
+
+    expect(measurements).toEqual([{ configuration, latencyMilliseconds: expect.any(Number) as number,
+      operation: 'explainable-match-evidence', outcome: 'failed' }])
+  })
 })
+
+// A configuration of a provider production does not know; only the providers handed to the wrapper can serve it.
+const scriptedConfiguration = { provider: 'scripted', model: 'scripted-model', role: 'structured',
+  providerOptions: { temperature: 0 } } as unknown as LanguageModelConfiguration
 
 function recordServerLogs() {
   const lines: string[] = []

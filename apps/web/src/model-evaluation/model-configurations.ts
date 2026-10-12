@@ -3,7 +3,7 @@ import type { ModelConfiguration } from './model-qualification'
 export const structuredModelConfiguration = {
   provider: 'openai',
   model: 'gpt-6-luna',
-  pricing: { inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.5 },
+  pricing: [{ condition: 'standard', inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.5 }],
   providerOptions: { reasoningEffort: 'low', store: false, strictJsonSchema: true },
   role: 'structured',
 } as const satisfies ModelConfiguration
@@ -11,7 +11,7 @@ export const structuredModelConfiguration = {
 export const writingModelConfiguration = {
   provider: 'openai',
   model: 'gpt-6-sol',
-  pricing: { inputUsdPerMillionTokens: 2, outputUsdPerMillionTokens: 10 },
+  pricing: [{ condition: 'standard', inputUsdPerMillionTokens: 2, outputUsdPerMillionTokens: 10 }],
   providerOptions: { reasoningEffort: 'medium', store: false, strictJsonSchema: true },
   role: 'writing',
 } as const satisfies ModelConfiguration

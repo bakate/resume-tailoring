@@ -1,6 +1,5 @@
-import type { LanguageModelConfiguration } from '../../language-model-configuration'
 import { createModelRequester } from './language-model-request'
-import type { ModelApiKey } from './language-model-request'
+import type { ModelConnection } from './language-model-request'
 import { readModelApiFailure } from './model-api-failure'
 import {
   structuredSourceProfileExtractionSchema,
@@ -9,37 +8,16 @@ import {
 import type { StructuredSourceProfileExtractor } from '@resume-tailoring/application/ports'
 import { delimitUntrustedContent, untrustedContentInstruction } from './untrusted-model-input'
 
-export function createOpenAiStructuredSourceProfileExtractor({
-  apiKey,
-  configuration,
-  request = fetch,
-}: Readonly<{
-  apiKey: ModelApiKey
-  configuration: LanguageModelConfiguration
-  request?: typeof fetch
-}>): StructuredSourceProfileExtractor {
+export function createOpenAiStructuredSourceProfileExtractor(connection: ModelConnection): StructuredSourceProfileExtractor {
   return {
-    extract: ({ professionalContent }) => requestExtraction({
-      apiKey,
-      configuration,
-      professionalContent,
-      request,
-    }),
+    extract: ({ professionalContent }) => requestExtraction({ ...connection, professionalContent }),
   }
 }
 
-async function requestExtraction({
-  apiKey,
-  configuration,
-  professionalContent,
-  request,
-}: Readonly<{
-  apiKey: ModelApiKey
-  configuration: LanguageModelConfiguration
+async function requestExtraction({ professionalContent, ...connection }: ModelConnection & Readonly<{
   professionalContent: string
-  request: typeof fetch
 }>) {
-  const requester = createModelRequester({ apiKey, configuration, request })
+  const requester = createModelRequester(connection)
   const response = await requester.send({
     instructions: extractionInstructions,
     maxOutputTokens: 16_000,

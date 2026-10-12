@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   qualifyModelConfiguration,
+  type ModelConfiguration,
   type ModelEvaluationBaseline,
   type ModelEvaluationObservation,
 } from './model-qualification'
@@ -63,6 +64,30 @@ describe('model configuration qualification', () => {
     })
     expect(report.qualified).toBe(false)
   })
+
+  it('prices every token at the configuration\'s upper-bound rates, never an off-peak or cache-hit rate', () => {
+    const configuration = { ...baseline.configuration, pricing: [
+      { condition: 'off-peak', inputUsdPerMillionTokens: 0.05, outputUsdPerMillionTokens: 0.25 },
+      { condition: 'cache-hit', inputUsdPerMillionTokens: 0.01, outputUsdPerMillionTokens: 0.5 },
+      { condition: 'peak', inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.4 },
+    ] } satisfies ModelConfiguration
+
+    const report = qualifyModelConfiguration({ baseline, configuration, datasetId: baseline.datasetId, observations })
+
+    // 1,200 input tokens at $0.10 and 1,200 output tokens at $0.50 per million.
+    expect(report.gates.costUsd.value).toBe(0.00072)
+  })
+
+  it('leaves a gate without a calibrated threshold unpassed, whatever its value', () => {
+    const report = qualifyModelConfiguration({
+      baseline: { ...baseline, thresholds: { ...baseline.thresholds, costUsd: undefined } },
+      configuration: baseline.configuration, datasetId: baseline.datasetId, observations,
+    })
+
+    expect(report.gates.costUsd).toEqual({ passed: false, status: 'not-calibrated', value: 0.00072 })
+    expect(report.gates.p95LatencyMilliseconds.passed).toBe(true)
+    expect(report.qualified).toBe(false)
+  })
 })
 
 const baseline = {
@@ -71,7 +96,7 @@ const baseline = {
     model: 'gpt-6-luna',
     providerOptions: { reasoningEffort: 'low', store: false, strictJsonSchema: true },
     role: 'structured',
-    pricing: { inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.5 },
+    pricing: [{ condition: 'standard', inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.5 }],
   },
   datasetId: 'resume-tailoring-reference-v1',
   observations: [{

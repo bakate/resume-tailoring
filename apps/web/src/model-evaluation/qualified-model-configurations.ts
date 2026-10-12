@@ -1,15 +1,19 @@
 import type { LanguageModelConfiguration } from '../language-model-configuration'
-import { qualifyModelConfiguration } from './model-qualification'
+import { qualifyModelConfiguration, type ModelQualificationReport } from './model-qualification'
 import {
+  liveModelEvaluationDatasetId,
+  liveModelEvaluationThresholds,
   structuredModelEvaluationBaseline,
   writingModelEvaluationBaseline,
 } from './model-evaluation-baselines'
+import type { RecordedModelEvaluationRun } from './model-qualification-runner'
+import { recordedLiveModelEvaluationRuns } from './recorded-live-model-evaluation-runs'
 import {
   recordedStructuredModelEvaluation,
   recordedWritingModelEvaluation,
 } from './recorded-model-evaluation-runs'
 
-export const recordedModelQualificationReports = [
+export const recordedModelQualificationReports: readonly ModelQualificationReport[] = [
   qualifyRecordedConfiguration({
     baseline: structuredModelEvaluationBaseline,
     recordedEvaluation: recordedStructuredModelEvaluation,
@@ -18,28 +22,32 @@ export const recordedModelQualificationReports = [
     baseline: writingModelEvaluationBaseline,
     recordedEvaluation: recordedWritingModelEvaluation,
   }),
-] as const
+  ...recordedLiveModelEvaluationRuns.map(qualifyLiveRun),
+]
 
 /** A configuration is qualified only as a whole: the same provider, model, role and every provider option. */
-export function isQualifiedModelConfiguration({ configuration }: Readonly<{
+export function isQualifiedModelConfiguration({ configuration, reports = recordedModelQualificationReports }: Readonly<{
   configuration: LanguageModelConfiguration
+  reports?: readonly ModelQualificationReport[]
 }>) {
-  return recordedModelQualificationReports.some((report) => report.qualified
+  return reports.some((report) => report.qualified
     // Only one provider exists yet; the comparison keeps a second one from reusing another provider's baseline.
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     && report.configuration.provider === configuration.provider
     && report.configuration.role === configuration.role
     && report.configuration.model === configuration.model
-    && hasSameProviderOptions({ qualified: report.configuration.providerOptions, requested: configuration.providerOptions }))
+    && hasSameValue({ qualified: report.configuration.providerOptions, requested: configuration.providerOptions }))
 }
 
-function hasSameProviderOptions({ qualified, requested }: Readonly<{
-  qualified: LanguageModelConfiguration['providerOptions']
-  requested: LanguageModelConfiguration['providerOptions']
-}>) {
+/** Options may nest, such as output token budgets per operation; every value, at any depth, must be the recorded one. */
+function hasSameValue({ qualified, requested }: Readonly<{ qualified: unknown; requested: unknown }>): boolean {
+  if (typeof qualified !== 'object' || qualified === null || typeof requested !== 'object' || requested === null) {
+    return qualified === requested
+  }
   const qualifiedEntries = Object.entries(qualified)
   return qualifiedEntries.length === Object.keys(requested).length
-    && qualifiedEntries.every(([name, value]) => (requested as Readonly<Record<string, unknown>>)[name] === value)
+    && qualifiedEntries.every(([name, value]) => Object.hasOwn(requested, name)
+      && hasSameValue({ qualified: value, requested: (requested as Readonly<Record<string, unknown>>)[name] }))
 }
 
 function qualifyRecordedConfiguration({
@@ -55,4 +63,11 @@ function qualifyRecordedConfiguration({
     datasetId: recordedEvaluation.datasetId,
     observations: recordedEvaluation.observations,
   })
+}
+
+/** A run recorded on another dataset than the live one has no calibrated threshold, so it qualifies nothing. */
+function qualifyLiveRun(run: RecordedModelEvaluationRun) {
+  const thresholds = run.datasetId === liveModelEvaluationDatasetId ? liveModelEvaluationThresholds[run.configuration.role] : {}
+  return qualifyModelConfiguration({ baseline: { ...run, thresholds },
+    configuration: run.configuration, datasetId: run.datasetId, observations: run.observations })
 }

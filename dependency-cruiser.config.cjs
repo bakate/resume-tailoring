@@ -51,13 +51,22 @@ module.exports = {
     },
     {
       name: 'only-the-composition-root-wires-adapters',
-      comment: 'UI modules reach adapters through apps/web/src/composition-root.ts; API routes and evaluation tests use them directly.',
+      comment: 'UI modules reach adapters through apps/web/src/composition-root.ts; API routes and model evaluation use them directly.',
       severity: 'error',
       from: {
         path: '^apps/web/src',
-        pathNot: '^apps/web/src/(composition-root[.]ts$|adapters/|routes/(api[.]|-)[^/]*[.]ts$)|[.]evaluation[.]test[.]ts$',
+        pathNot: '^apps/web/src/(composition-root[.]ts$|adapters/|model-evaluation/|routes/(api[.]|-)[^/]*[.]ts$)|[.]evaluation[.]test[.]ts$',
       },
       to: { path: '^apps/web/src/adapters/' },
+    },
+    {
+      name: 'model-qualification-is-provider-neutral',
+      comment: 'Qualification reaches models only through the call wrapper: it never names a provider adapter or package.',
+      severity: 'error',
+      from: { path: '^apps/web/src/model-evaluation/', pathNot: '[.]test[.]ts$' },
+      to: {
+        path: '^apps/web/src/adapters/server/[^/]*-language-model-provider[.]ts$|(^|/)node_modules/(openai|@ai-sdk/[^/]+)/|^(openai|@ai-sdk/[^/]+)$',
+      },
     },
   ],
   options: {

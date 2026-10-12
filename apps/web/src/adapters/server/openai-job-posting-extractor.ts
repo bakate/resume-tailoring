@@ -3,10 +3,9 @@ import type { z } from 'zod'
 import type {
   ExtractedJobPosting,
 } from '@resume-tailoring/application/job-match'
-import type { LanguageModelConfiguration } from '../../language-model-configuration'
 import {
   createModelRequester,
-  type ModelApiKey,
+  type ModelConnection,
   type ModelRequestFailure,
 } from './language-model-request'
 import {
@@ -16,17 +15,9 @@ import {
 import type { JobPostingExtractor } from '@resume-tailoring/application/ports'
 import { delimitUntrustedContent, untrustedContentInstruction } from './untrusted-model-input'
 
-export function createOpenAiJobPostingExtractor({
-  apiKey, configuration, request = fetch,
-}: Readonly<{
-  apiKey: ModelApiKey
-  configuration: LanguageModelConfiguration
-  request?: typeof fetch
-}>): JobPostingExtractor {
+export function createOpenAiJobPostingExtractor(connection: ModelConnection): JobPostingExtractor {
   return { extract: async ({ jobPostingContent }) => {
-    const result = await requestOpenAiJobPostingExtraction({
-      apiKey, configuration, jobPostingContent, request,
-    })
+    const result = await requestOpenAiJobPostingExtraction({ ...connection, jobPostingContent })
     return result.ok ? result : unavailableResult
   } }
 }
@@ -35,18 +26,13 @@ export type OpenAiJobPostingExtractionFailure = Readonly<{
   type: 'invalid-model-output'
 }> | ModelRequestFailure
 
-export async function requestOpenAiJobPostingExtraction({
-  apiKey, configuration, jobPostingContent, request = fetch,
-}: Readonly<{
-  apiKey: ModelApiKey
-  configuration: LanguageModelConfiguration
+export async function requestOpenAiJobPostingExtraction({ jobPostingContent, ...connection }: ModelConnection & Readonly<{
   jobPostingContent: string
-  request?: typeof fetch
 }>): Promise<Readonly<{ ok: true; value: ExtractedJobPosting }> | Readonly<{
   ok: false
   error: OpenAiJobPostingExtractionFailure
 }>> {
-  const requester = createModelRequester({ apiKey, configuration, request })
+  const requester = createModelRequester(connection)
   const response = await requester.send({
     instructions: extractionInstructions,
     maxOutputTokens: 20_000,

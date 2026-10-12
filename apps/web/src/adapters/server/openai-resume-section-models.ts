@@ -2,20 +2,16 @@ import type { z } from 'zod'
 import type { ResumeSectionContent, ResumeSectionKind, ResumeSectionModelResult,
 } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeCoherenceChecker, ResumeFieldValidator, ResumeSectionWriter } from '@resume-tailoring/application/ports'
-import type { LanguageModelConfiguration } from '../../language-model-configuration'
 import { createModelRequester } from './language-model-request'
-import type { ModelApiKey, ModelResponse } from './language-model-request'
+import type { ModelConnection, ModelResponse } from './language-model-request'
 import { readModelApiFailure } from './model-api-failure'
 import { delimitSuppliedData, untrustedContentInstruction } from './untrusted-model-input'
 import { resumeDocumentCoherenceSchema, resumeFieldValidationSchema, resumeSectionOutputSchemas,
   resumeStructuredOutputFormat } from '../../candidate-journey/resume-document-schemas'
 
-type ModelConfiguration = Readonly<{
-  apiKey: ModelApiKey; configuration: LanguageModelConfiguration; request?: typeof fetch
-}>
 type ResumeSectionOperation = 'resume-section-writing' | 'resume-section-validation' | 'resume-document-coherence'
 
-export function createOpenAiResumeSectionWriter(configuration: ModelConfiguration): ResumeSectionWriter {
+export function createOpenAiResumeSectionWriter(configuration: ModelConnection): ResumeSectionWriter {
   return { write: async (input) => {
     const kind = input.section.kind
     const result = await processResumeModel<unknown>({ configuration, input, maximumOutputTokens: 16_000,
@@ -29,7 +25,7 @@ export function createOpenAiResumeSectionWriter(configuration: ModelConfiguratio
  * A browser tab loaded before validation named unsupported propositions rejects the key, so only a request that
  * asks for them receives them, and a supported field never carries one.
  */
-export function createOpenAiResumeFieldValidator(configuration: ModelConfiguration): Readonly<{
+export function createOpenAiResumeFieldValidator(configuration: ModelConnection): Readonly<{
   validate: (input: Parameters<ResumeFieldValidator['validate']>[0] & Readonly<{ namesUnsupportedPropositions?: true }>)
     => ReturnType<ResumeFieldValidator['validate']>
 }> {
@@ -43,7 +39,7 @@ export function createOpenAiResumeFieldValidator(configuration: ModelConfigurati
   } }
 }
 
-export function createOpenAiResumeCoherenceChecker(configuration: ModelConfiguration): ResumeCoherenceChecker {
+export function createOpenAiResumeCoherenceChecker(configuration: ModelConnection): ResumeCoherenceChecker {
   return { check: (input) => processResumeModel({ configuration, input, maximumOutputTokens: 8_000,
     instructions: coherenceInstructions, operation: 'resume-document-coherence',
     outputName: 'resume_document_coherence', schema: resumeDocumentCoherenceSchema }) }
@@ -57,7 +53,7 @@ function toSectionContent({ kind, value }: Readonly<{ kind: ResumeSectionKind; v
 }
 
 async function processResumeModel<TValue>({ configuration, input, instructions, maximumOutputTokens, operation, outputName, schema }: Readonly<{
-  configuration: ModelConfiguration; input: unknown; instructions: string; maximumOutputTokens: number
+  configuration: ModelConnection; input: unknown; instructions: string; maximumOutputTokens: number
   operation: ResumeSectionOperation; outputName: string; schema: z.ZodType<TValue>
 }>): Promise<ResumeSectionModelResult<TValue>> {
   const response = await createModelRequester(configuration).send({ operation, instructions,
