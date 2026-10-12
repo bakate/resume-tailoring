@@ -10,11 +10,11 @@ describe('sales and commercial qualification corpus', () => {
   it('contains twenty reviewed French and English commercial scenarios', () => {
     const { fixtures } = salesCommercialQualificationCorpus
 
-    const composition = { roleFamilies: new Set(fixtures.map(({ roleFamily }) => roleFamily)), ids: fixtures.map(({ id }) => id),
+    const composition = { fixtureCount: fixtures.length, roleFamilies: new Set(fixtures.map(({ roleFamily }) => roleFamily)), ids: fixtures.map(({ id }) => id),
       french: fixtures.filter(({ jobPosting }) => jobPosting.includes('[FR]')),
       english: fixtures.filter(({ jobPosting }) => jobPosting.includes('[EN]')) }
 
-    expect(fixtures).toHaveLength(20)
+    expect(composition.fixtureCount).toBe(20)
     expect(composition.roleFamilies).toEqual(new Set(['sales']))
     expect(composition.ids).toEqual([
       'sales-01', 'sales-02', 'sales-03', 'sales-04', 'sales-05',

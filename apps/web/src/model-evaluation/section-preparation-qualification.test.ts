@@ -85,9 +85,10 @@ describe('section preparation qualification on a real-sized resume', () => {
     const { candidateFacts } = realSizedResumeFixture.request
 
     const sectionKeys = new Set(candidateFacts.map(({ path }) => /^\w+\.\d+/u.exec(path)?.[0]))
+    const sections = new Set([...sectionKeys].map((key) => key?.split('.')[0]))
 
     expect([...sectionKeys].filter((key) => key?.startsWith('experiences.')).length).toBeGreaterThanOrEqual(6)
-    expect([...sectionKeys].map((key) => key?.split('.')[0])).toEqual(expect.arrayContaining(['skills', 'education', 'languages', 'projects', 'certifications']))
+    expect([...sections]).toEqual(expect.arrayContaining(['skills', 'education', 'languages', 'projects', 'certifications']))
   })
 })
 

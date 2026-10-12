@@ -61,7 +61,7 @@ Generic harness action names such as `act`, `execute`, `perform`, `run`, and `su
 
 ## Test-case phase structure
 
-Each case in every `apps/web/**/*.test.ts(x)` separates Given, Action, and Then with blank lines. This covers unit, contract and Playwright tests. It excludes `.behavior.test.ts`, which follows the behavior-test rules, and `.evaluation.test.ts`, because a live evaluation shares one model run across its cases. Assertions appear only in the Then phase, and the Action's result is held in a variable before the Then asserts it. Playwright journeys assert through their harness's `expect…()` helpers. A case whose Given is its `it.each` row may open on a single-statement Action. These tests do not need a `createSystemUnderTest()` harness. `pnpm check:test-conventions` enforces this structure.
+Each case in every `apps/web/**/*.test.ts(x)` separates Given, Action, and Then with blank lines. This covers unit, contract and Playwright tests. It excludes `.behavior.test.ts`, which follows the behavior-test rules, and `.evaluation.test.ts`, because a live evaluation shares one model run across its cases. Assertions appear only in the Then phase, and the case's one Action holds its result in a variable before the Then asserts it. Playwright journeys assert through their harness's `expect…()` helpers. A case whose Given is its `it.each` row may open on a single-statement Action. These tests do not need a `createSystemUnderTest()` harness. `pnpm check:test-conventions` enforces the blank-line phases and that no assertion precedes the Then; review holds each case to one Action that its Then asserts.
 
 ## Commands
 

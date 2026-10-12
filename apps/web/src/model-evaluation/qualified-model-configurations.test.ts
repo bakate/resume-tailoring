@@ -9,12 +9,19 @@ import {
 } from './qualified-model-configurations'
 
 describe('qualified model configurations', () => {
+  it('records only passing qualification reports', () => {
+    const reports = recordedModelQualificationReports
+
+    const failingReports = reports.filter(({ qualified }) => !qualified)
+
+    expect(failingReports).toEqual([])
+  })
+
   it('derives fallback eligibility from passing recorded reports', () => {
     const configuration = createOpenAiModelConfiguration({ model: 'gpt-6-luna', reasoningEffort: 'low', role: 'structured' })
 
     const qualified = isQualifiedModelConfiguration({ configuration })
 
-    expect(recordedModelQualificationReports.every(({ qualified: reportQualified }) => reportQualified)).toBe(true)
     expect(qualified).toBe(true)
   })
 

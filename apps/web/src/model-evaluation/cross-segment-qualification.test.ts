@@ -21,11 +21,11 @@ describe('cross-segment qualification harness', () => {
   it('covers technology individual contributors, leadership, and hybrid roles in both languages', () => {
     const technologyFixtures = crossSegmentQualificationCorpus.fixtures.filter(({ roleFamily }) => roleFamily === 'technology')
 
-    const coverage = { languages: new Set(technologyFixtures.map(({ language }) => language)),
+    const coverage = { fixtureCount: technologyFixtures.length, languages: new Set(technologyFixtures.map(({ language }) => language)),
       roleTitles: [...new Set(technologyFixtures.map(({ roleTitle }) => roleTitle))],
       tags: [...new Set(technologyFixtures.flatMap(({ scenarioTags }) => scenarioTags))] }
 
-    expect(technologyFixtures).toHaveLength(30)
+    expect(coverage.fixtureCount).toBe(30)
     expect(coverage.languages).toEqual(new Set(['en', 'fr']))
     expect(coverage.roleTitles).toEqual(expect.arrayContaining([
       'Senior Software Engineer', 'Data Engineer', 'Security Engineer', 'DevOps Engineer',

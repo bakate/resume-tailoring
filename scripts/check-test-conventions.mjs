@@ -7,10 +7,10 @@ const webTestSuffixes = ['.test.ts', '.test.tsx']
 const phaseRuleExemptSuffixes = ['.behavior.test.ts', '.evaluation.test.ts']
 const forbiddenHarnessActions = /system\.(act|execute|perform|run|submit)\s*\(/
 // `test.describe` and `test.use` open a Playwright suite or its options, not a case.
-const testCaseStart = /^(\s*)(it|test)(\.each)?\s*[(`]/
+const testCaseStart = /^(\s*)(it|test)(\.(each|only|skip|fails|fixme|concurrent))*\s*[(`]/
 const testCaseBodyOpener = /=>\s*\{\s*$/
-// Playwright journeys assert through their harness's `expect…()` helpers.
-const assertion = /\bexpect\w*\s*[(.]/
+// Playwright journeys assert through their harness's `expect…()` helpers; `expectedIds` and the like do not assert.
+const assertion = /\bexpect(\s*[(.]|[A-Z]\w*\s*\()/
 
 const behaviorTests = (await Promise.all(['packages', 'infrastructure'].map((directoryPath) =>
   findTests({ directoryPath, suffixes: behaviorTestSuffixes })))).flat()
