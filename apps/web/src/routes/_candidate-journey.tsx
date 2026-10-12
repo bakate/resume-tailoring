@@ -1,11 +1,9 @@
 import { Outlet, createFileRoute, useMatch } from '@tanstack/react-router'
 
-import { CandidateApiKeyWall } from '../candidate-api-key/candidate-api-key-wall'
 import { CandidateJourneyLanding, CandidateJourneyShell, CandidateJourneyStatus } from '../candidate-journey/candidate-journey-shell'
 import { CandidateJourneyControllerProvider, useCandidateJourneyController } from '../candidate-journey/use-candidate-journey'
 import { DemoAccessGate } from '../demo-access/demo-access-gate'
 import { readInitialDemoAccess } from '../demo-access/demo-access-initial-state'
-import { useLocalization } from '../localization/localization'
 
 /** Both Candidate Journey routes share this layout, so navigating between them keeps one Candidate Journey actor. */
 export const Route = createFileRoute('/_candidate-journey')({
@@ -34,12 +32,10 @@ function CandidateJourneyLayout() {
 
 function CandidateJourney() {
   const candidateJourney = useCandidateJourneyController()
-  const localization = useLocalization()
   return (
     <CandidateJourneyControllerProvider value={candidateJourney}>
       <CandidateJourneyStatus />
       <Outlet />
-      {localization.ok ? <CandidateApiKeyWall localization={localization.value} /> : null}
     </CandidateJourneyControllerProvider>
   )
 }

@@ -7,15 +7,13 @@
  */
 export const dailyLimits = {
   /** The Daily Quota: Tailored Resumes one client network may start per day. */
-  dailyQuota: 6,
+  dailyQuota: 8,
   /** Tailored Resumes all Candidates together may start per day: 45 at $0.10 stay near $135 a month. */
   preparationsOverall: 45,
-  /** Model-backed requests per client network: six journeys with edits stay under 375, so it only stops loops. */
-  modelRequestsPerClient: 400,
-  /** PDF renders per client network: one per saved edit. Rendering spends the operator's compute whatever the key. */
+  /** Model-backed requests per client network: eight journeys with edits stay under 500, so it only stops loops. */
+  modelRequestsPerClient: 530,
+  /** PDF renders per client network: one per saved edit. */
   rendersPerClient: 200,
-  /** Candidate API Key validations per client network: enough to fix a typo, too few to test stolen keys. */
-  keyValidationsPerClient: 20,
 }
 
 /** The Job Posting extraction starts a Tailored Resume, so it uses one unit of the Daily Quota. */
@@ -31,22 +29,11 @@ const modelBackedPaths = new Set([
   '/api/resume-document-coherence',
 ])
 const renderPath = '/api/resume-document'
-const keyValidationPath = '/api/candidate-api-key'
 
-/** Whether a route may receive a Candidate API Key; every other route never sees it. */
-export function acceptsCandidateApiKey({ pathname }) {
-  return modelBackedPaths.has(pathname) || pathname === keyValidationPath
-}
-
-/**
- * The counters a request consumes, or none when its route is not limited. A model-backed request that carries a
- * Candidate API Key spends the Candidate's provider account, not the operator's, so no model limit applies to it.
- */
-export function readLimitedCounters({ method, pathname, carriesCandidateApiKey = false }) {
+/** The counters a request consumes, or none when its route is not limited. */
+export function readLimitedCounters({ method, pathname }) {
   if (method !== 'POST') return []
-  if (pathname === keyValidationPath) return ['key-validations']
   if (pathname === renderPath) return ['renders']
-  if (carriesCandidateApiKey) return []
   if (pathname === preparationPath) return ['model-requests', 'preparations']
   if (modelBackedPaths.has(pathname)) return ['model-requests']
   return []
@@ -56,7 +43,6 @@ const clientLimits = {
   preparations: dailyLimits.dailyQuota,
   'model-requests': dailyLimits.modelRequestsPerClient,
   renders: dailyLimits.rendersPerClient,
-  'key-validations': dailyLimits.keyValidationsPerClient,
 }
 const dayKey = 'day'
 

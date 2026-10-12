@@ -43,23 +43,19 @@ The disclosed external processor selected to perform model-backed operations und
 _Avoid_: OpenAI in domain language, AI session, fallback provider
 
 **Daily Quota**:
-The number of Tailored Resumes one client network (an IPv4 address or an IPv6 /64) may start for free each day. Each Job Posting extracted for a Job Match uses one, and all reset at 00:00 Europe/Paris. A global daily ceiling across all Candidates bounds it too; past either, the preparation is refused as Daily Quota reached until the reset, unless the Candidate brings a Candidate API Key.
+The number of Tailored Resumes one client network (an IPv4 address or an IPv6 /64) may start for free each day. Each Job Posting extracted for a Job Match uses one, and all reset at 00:00 Europe/Paris. A global daily ceiling across all Candidates bounds it too; past either, the preparation is refused as Daily Quota reached until the reset.
 _Avoid_: Credits, per-session limit, per-cookie limit
-
-**Candidate API Key**:
-A Language Model Provider key the Candidate supplies to keep preparing Tailored Resumes beyond the Daily Quota. It replaces the operator's key for the Candidate's model-backed requests only, transits the server without being stored or logged, lives in this browser tab only, and never falls back to the operator's key when it fails.
-_Avoid_: BYOK, user token, paywall, OpenAI key in domain language
 
 **API Failure**:
 The type, from one closed catalogue, with which a server route answers a failed request, together with its HTTP status; it names what went wrong, never the operation.
 _Avoid_: Error code, operation-prefixed failure
 
 **Failure Cause**:
-The provider-neutral reason a model-backed operation failed, read from its API Failure: access required, rate limited (with the delay to wait), Daily Quota reached, timeout, input too large, service unavailable, network, unexpected, or, for a Candidate API Key, key invalid, model not available to the key, or provider credit exhausted. Exhausted credit is never read as rate limited: waiting does not restore it. It is kept with a failed preparation so it survives a reload.
+The provider-neutral reason a model-backed operation failed, read from its API Failure: access required, rate limited (with the delay to wait), Daily Quota reached, timeout, input too large, service unavailable, network, or unexpected. Exhausted provider credit is read as service unavailable, never as rate limited: waiting does not restore it. It is kept with a failed preparation so it survives a reload.
 _Avoid_: Error type, transient or permanent failure
 
 **Recovery**:
-The one action the application derives from a Failure Cause to let the Candidate continue: renew access, retry after a delay, use a Candidate API Key, change the Candidate API Key, shorten the input, retry, or reload. The interface offers it; it never decides it.
+The one action the application derives from a Failure Cause to let the Candidate continue: renew access, retry after a delay, shorten the input, retry, or reload. The interface offers it; it never decides it.
 _Avoid_: Error handling, fallback, retry policy
 
 ## Candidate evidence

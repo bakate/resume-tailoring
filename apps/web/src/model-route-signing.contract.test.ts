@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { groupedResumeDocument, structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 
 import { createDemoAccessCookie } from './demo-access/demo-access-session'
-import { Route as CandidateApiKeyRoute } from './routes/api.candidate-api-key'
 import { Route as JobPostingExtractionRoute } from './routes/api.explainable-job-posting-extraction'
 import { Route as MatchEvidenceRoute } from './routes/api.explainable-match-evidence'
 import { Route as ResumeClaimValidationRoute } from './routes/api.resume-claim-validation'
@@ -18,14 +17,13 @@ const environment = {
   DEMO_ORIGIN_SECRET: 'an-origin-secret-with-at-least-32-characters',
   DEMO_PUBLIC_HOSTNAME: 'resume-studio.example.workers.dev',
   DEMO_SESSION_SECRET: 'a-session-secret-with-at-least-32-characters',
-  OPENAI_API_KEY: 'sk-operator-key-that-must-never-sign-candidate-requests',
+  OPENAI_API_KEY: 'sk-operator-key-that-signs-every-model-request',
   TURNSTILE_SECRET_KEY: 'turnstile-secret',
   TURNSTILE_SITE_KEY: 'turnstile-site-key',
 } as const
-const candidateApiKey = 'sk-proj-CandidateSecret0123456789abcdef'
 const proposedClaim = { segments: [{ text: 'Used React', factIds: ['source-fact-react'] }] }
 const verifiedFacts = [{ id: 'source-fact-react', kind: 'skill', value: 'Used React' }]
-/** Every model-backed route, each with a valid body, so a rejected key is the only reason it can fail. */
+/** Every model-backed route, each with a valid body, so only the provider's answer decides how it fails. */
 const modelRoutes = [
   { name: 'Job Posting extraction', route: JobPostingExtractionRoute, body: { jobPostingContent: 'Senior engineer' } },
   { name: 'Source Profile extraction', route: SourceProfileExtractionRoute,
@@ -56,7 +54,7 @@ const modelRoutes = [
   } } },
 ] as const
 
-describe('Candidate API Key on model-backed routes', () => {
+describe('Signing model-backed routes', () => {
   beforeEach(() => {
     Object.entries(environment).forEach(([name, value]) => vi.stubEnv(name, value))
   })
@@ -65,7 +63,7 @@ describe('Candidate API Key on model-backed routes', () => {
     vi.restoreAllMocks()
   })
 
-  it.each(modelRoutes)('$name signs a call with the operator key when no Candidate API Key is sent', async ({ body, route }) => {
+  it.each(modelRoutes)('$name signs a call with the operator key', async ({ body, route }) => {
     const provider = stubProvider(() => Response.json({ error: { code: 'server_error' } }, { status: 500 }))
 
     await postTo(route, createRequest({ body }))
@@ -73,96 +71,38 @@ describe('Candidate API Key on model-backed routes', () => {
     expect(provider.authorizations).toEqual([`Bearer ${environment.OPENAI_API_KEY}`])
   })
 
-  it.each(modelRoutes)(
-    '$name never signs a call with the operator key when the Candidate API Key is rejected', async ({ body, route }) => {
-      const provider = stubProvider(() => Response.json({ error: { code: 'invalid_api_key',
-        message: `Incorrect API key provided: ${candidateApiKey}` } }, { status: 401 }))
+  it.each(modelRoutes)('$name signs a call that carries a Candidate API Key header with the operator key, as without it',
+    async ({ body, route }) => {
+      const provider = stubProvider(() => Response.json({ error: { code: 'server_error' } }, { status: 500 }))
+      const withoutHeader = await postTo(route, createRequest({ body }))
 
-      const response = await postTo(route, createRequest({ body, candidateApiKey }))
+      const withHeader = await postTo(route, createRequest({ body, candidateApiKeyHeader: 'sk-proj-LeftBehind0123456789abcdef' }))
 
-      expect(response.status).toBe(401)
-      await expect(response.json()).resolves.toEqual({ ok: false, error: { type: 'candidate-api-key-invalid' } })
-      expect(provider.authorizations.length).toBeGreaterThan(0)
-      expect(provider.authorizations.every((authorization) => authorization === `Bearer ${candidateApiKey}`)).toBe(true)
+      expect(withHeader.status).toBe(withoutHeader.status)
+      await expect(withHeader.json()).resolves.toEqual(await withoutHeader.json())
+      expect(provider.authorizations).toEqual([`Bearer ${environment.OPENAI_API_KEY}`, `Bearer ${environment.OPENAI_API_KEY}`])
     })
 
-  it.each(modelRoutes)('$name refuses a malformed Candidate API Key without calling the provider', async ({ body, route }) => {
-    const provider = stubProvider(() => Response.json({ output: [] }))
-
-    const response = await postTo(route, createRequest({ body, candidateApiKey: 'not-a-provider-key' }))
-
-    expect(response.status).toBe(401)
-    await expect(response.json()).resolves.toEqual({ ok: false, error: { type: 'candidate-api-key-invalid' } })
-    expect(provider.authorizations).toEqual([])
-  })
-
-  it('reads exhausted credit on the Candidate API Key as its own failure, not a rate limit', async () => {
+  it('reads exhausted operator credit as an unavailable service, not a rate limit', async () => {
     stubProvider(() => Response.json({ error: { code: 'insufficient_quota' } }, { status: 429 }))
 
-    const response = await postTo(JobPostingExtractionRoute, createRequest({
-      body: { jobPostingContent: 'Senior engineer' }, candidateApiKey,
-    }))
+    const response = await postTo(JobPostingExtractionRoute, createRequest({ body: { jobPostingContent: 'Senior engineer' } }))
 
-    expect(response.status).toBe(402)
-    await expect(response.json()).resolves.toEqual({ ok: false, error: { type: 'provider-credit-exhausted' } })
+    expect(response.status).toBe(502)
+    await expect(response.json()).resolves.toEqual({ ok: false, error: { type: 'provider-unavailable' } })
   })
 
-  it('never writes the Candidate API Key in server logs or metrics, even when the provider echoes it', async () => {
+  it('never writes the operator key in server logs or metrics, even when the provider echoes it', async () => {
     const logs = recordServerLogs()
-    stubProvider(() => Response.json({ error: { code: candidateApiKey, param: candidateApiKey.slice(3, 30),
-      message: `Incorrect API key provided: ${candidateApiKey}` } }, { status: 401 }))
+    stubProvider(() => Response.json({ error: { code: environment.OPENAI_API_KEY,
+      param: environment.OPENAI_API_KEY.slice(3, 30), message: `Incorrect API key provided: ${environment.OPENAI_API_KEY}` } },
+    { status: 401 }))
 
-    const response = await postTo(SourceProfileExtractionRoute, createRequest({
-      body: { professionalContent: 'Engineer at Example' }, candidateApiKey,
-    }))
+    await postTo(SourceProfileExtractionRoute, createRequest({ body: { professionalContent: 'Engineer at Example' } }))
 
-    expect(response.status).toBe(401)
     expect(logs.read()).toContain('privacy-safe-openai-request')
-    expect(logs.read()).not.toContain('CandidateSecret')
-    expect(logs.read()).not.toContain('sk-proj')
-  })
-
-  it('signs a request without the header with the operator key', async () => {
-    const provider = stubProvider(() => Response.json({ error: { code: 'server_error' } }, { status: 500 }))
-
-    await postTo(JobPostingExtractionRoute, createRequest({ body: { jobPostingContent: 'Senior engineer' } }))
-
-    expect(provider.authorizations).toEqual([`Bearer ${environment.OPENAI_API_KEY}`])
-  })
-
-  it('validates a Candidate API Key by reading both model roles at no cost', async () => {
-    const provider = stubProvider(() => Response.json({ id: 'model', object: 'model' }))
-
-    const response = await postTo(CandidateApiKeyRoute, createRequest({ candidateApiKey }))
-
-    expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({ ok: true })
-    expect(provider.calls).toEqual([
-      { method: 'GET', url: 'https://api.openai.com/v1/models/gpt-6-luna' },
-      { method: 'GET', url: 'https://api.openai.com/v1/models/gpt-6-sol' },
-    ])
-    expect(provider.authorizations.every((authorization) => authorization === `Bearer ${candidateApiKey}`)).toBe(true)
-  })
-
-  it.each([
-    { status: 401, code: 'invalid_api_key', type: 'candidate-api-key-invalid' },
-    { status: 404, code: 'model_not_found', type: 'candidate-api-key-model-unavailable' },
-    { status: 429, code: 'insufficient_quota', type: 'provider-credit-exhausted' },
-  ] as const)('reports $type when validating a key the provider answers with $code', async ({ code, status, type }) => {
-    stubProvider(() => Response.json({ error: { code } }, { status }))
-
-    const response = await postTo(CandidateApiKeyRoute, createRequest({ candidateApiKey }))
-
-    await expect(response.json()).resolves.toEqual({ ok: false, error: { type } })
-  })
-
-  it('never validates the operator key', async () => {
-    const provider = stubProvider(() => Response.json({ id: 'model', object: 'model' }))
-
-    const response = await postTo(CandidateApiKeyRoute, createRequest({}))
-
-    expect(response.status).toBe(401)
-    expect(provider.authorizations).toEqual([])
+    expect(logs.read()).not.toContain(environment.OPENAI_API_KEY.slice(3, 20))
+    expect(logs.read()).not.toContain('sk-operator')
   })
 })
 
@@ -174,14 +114,15 @@ function postTo(route: ServerRoute, request: Request) {
   return Promise.resolve(handlers.POST({ request }))
 }
 
-function createRequest({ body, candidateApiKey: key }: Readonly<{ body?: unknown; candidateApiKey?: string }>) {
+/** An earlier version of the interface sent a Candidate API Key in `x-candidate-api-key`; the server ignores it. */
+function createRequest({ body, candidateApiKeyHeader }: Readonly<{ body?: unknown; candidateApiKeyHeader?: string }>) {
   return new Request('https://resume-studio.example/api', {
     body: JSON.stringify(body ?? {}),
     headers: {
       'content-type': 'application/json',
       'x-resume-studio-origin': environment.DEMO_ORIGIN_SECRET,
       cookie: createDemoAccessCookie({ issuedAtMilliseconds: Date.now(), sessionSecret: environment.DEMO_SESSION_SECRET }),
-      ...(key === undefined ? {} : { 'x-candidate-api-key': key }),
+      ...(candidateApiKeyHeader === undefined ? {} : { 'x-candidate-api-key': candidateApiKeyHeader }),
     },
     method: 'POST',
   })
@@ -190,13 +131,11 @@ function createRequest({ body, candidateApiKey: key }: Readonly<{ body?: unknown
 /** Answers every provider call and records how each one was signed. */
 function stubProvider(answer: () => Response) {
   const authorizations: (string | null)[] = []
-  const calls: Readonly<{ method: string; url: string }>[] = []
-  vi.spyOn(globalThis, 'fetch').mockImplementation((input, init) => {
+  vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
     authorizations.push(new Headers(init?.headers).get('authorization'))
-    calls.push({ method: init?.method ?? 'GET', url: input instanceof Request ? input.url : String(input) })
     return Promise.resolve(answer())
   })
-  return { authorizations, calls }
+  return { authorizations }
 }
 
 function recordServerLogs() {

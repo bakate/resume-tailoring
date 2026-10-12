@@ -11,9 +11,6 @@ export const apiFailureTypes = [
   'provider-unavailable',
   'invalid-provider-response',
   'service-misconfigured',
-  'candidate-api-key-invalid',
-  'candidate-api-key-model-unavailable',
-  'provider-credit-exhausted',
 ] as const
 export type ApiFailureType = typeof apiFailureTypes[number]
 

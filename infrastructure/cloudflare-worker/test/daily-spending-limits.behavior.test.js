@@ -7,6 +7,8 @@ import worker, { DailySpendingLimits, dailyLimits } from '@resume-tailoring/clou
 const tenInTheMorningInParis = '2026-10-08T08:00:00.000Z'
 const nextMidnightInParis = '2026-10-08T22:00:00.000Z'
 const secondsUntilMidnight = 14 * 60 * 60
+/** Six measured journeys with edits stayed under 375 model-backed requests, so about 63 each. */
+const modelRequestsPerJourneyWithEdits = 63
 
 describe('Daily spending limits at the edge', () => {
   beforeEach(() => {
@@ -27,9 +29,9 @@ describe('Daily spending limits at the edge', () => {
     system.expectRemainingDailyQuota({ remaining: dailyLimits.dailyQuota - 1, resetAt: nextMidnightInParis })
   })
 
-  it('refuses the fifth Tailored Resume from the same IP as past the Daily Quota until the reset', async () => {
+  it('refuses the ninth Tailored Resume from the same IP as past the Daily Quota until the reset', async () => {
     const system = createSystemUnderTest()
-    await system.givenTailoredResumesStarted({ clientIp: '198.51.100.1', count: dailyLimits.dailyQuota })
+    await system.givenTailoredResumesStarted({ clientIp: '198.51.100.1', count: 8 })
 
     await system.startTailoredResume({ clientIp: '198.51.100.1' })
 
@@ -150,68 +152,56 @@ describe('Daily spending limits at the edge', () => {
     await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
   })
 
-  it('lifts the Daily Quota for a Tailored Resume that carries a Candidate API Key', async () => {
+  it('serves every model request of eight journeys with edits under the technical ceiling', async () => {
+    const system = createSystemUnderTest()
+    await system.givenModelRequestsSent({
+      clientIp: '198.51.100.1', count: dailyLimits.dailyQuota * modelRequestsPerJourneyWithEdits - 1,
+    })
+
+    await system.sendModelRequest({ clientIp: '198.51.100.1' })
+
+    await system.expectServedByOrigin()
+  })
+
+  it('refuses a Tailored Resume past the Daily Quota whatever Candidate API Key header it carries', async () => {
     const system = createSystemUnderTest()
     await system.givenTailoredResumesStarted({ clientIp: '198.51.100.1', count: dailyLimits.dailyQuota })
 
-    await system.startTailoredResume({ clientIp: '198.51.100.1', candidateApiKey: 'sk-candidate' })
+    await system.startTailoredResume({ clientIp: '198.51.100.1', candidateApiKeyHeader: 'sk-candidate' })
 
-    await system.expectServedByOrigin()
-    system.expectNoDailyQuotaAnnounced()
+    await system.expectDailyQuotaReachedUntilReset({ retryAfterSeconds: secondsUntilMidnight, scope: 'daily-quota' })
+    system.expectRemainingDailyQuota({ remaining: 0, resetAt: nextMidnightInParis })
   })
 
-  it('lifts the technical ceiling for model-backed requests that carry a Candidate API Key', async () => {
+  it('refuses a model-backed request past the technical ceiling whatever Candidate API Key header it carries', async () => {
     const system = createSystemUnderTest()
     await system.givenModelRequestsSent({ clientIp: '198.51.100.1', count: dailyLimits.modelRequestsPerClient })
 
-    await system.sendModelRequest({ clientIp: '198.51.100.1', candidateApiKey: 'sk-candidate' })
+    await system.sendModelRequest({ clientIp: '198.51.100.1', candidateApiKeyHeader: 'sk-candidate' })
 
-    await system.expectServedByOrigin()
+    await system.expectDailyQuotaReachedUntilReset({ retryAfterSeconds: secondsUntilMidnight, scope: 'model-requests' })
   })
 
-  it('never counts a Tailored Resume started with a Candidate API Key against the Daily Quota', async () => {
+  it('counts a Tailored Resume that carries a Candidate API Key header against the Daily Quota', async () => {
     const system = createSystemUnderTest()
-    await system.givenTailoredResumesStarted({ clientIp: '198.51.100.1', count: 2, candidateApiKey: 'sk-candidate' })
+    await system.givenTailoredResumesStarted({ clientIp: '198.51.100.1', count: 2, candidateApiKeyHeader: 'sk-candidate' })
 
     await system.startTailoredResume({ clientIp: '198.51.100.1' })
 
-    system.expectRemainingDailyQuota({ remaining: dailyLimits.dailyQuota - 1, resetAt: nextMidnightInParis })
+    system.expectRemainingDailyQuota({ remaining: dailyLimits.dailyQuota - 3, resetAt: nextMidnightInParis })
   })
 
-  it('keeps the PDF render limit for a Candidate using their own key', async () => {
-    const system = createSystemUnderTest()
-    await system.givenRendersRequested({ clientIp: '198.51.100.1', count: dailyLimits.rendersPerClient })
-
-    await system.requestRender({ clientIp: '198.51.100.1', candidateApiKey: 'sk-candidate' })
-
-    await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
-  })
-
-  it('forwards a Candidate API Key to model-backed routes only', async () => {
+  it.each([
+    ['a model-backed route', '/api/resume-section-writing'],
+    ['the PDF render', '/api/resume-document'],
+    ['a page', '/'],
+  ])('strips a Candidate API Key header before it reaches %s', async (_route, path) => {
     const system = createSystemUnderTest()
 
-    await system.requestRender({ clientIp: '198.51.100.1', candidateApiKey: 'sk-candidate' })
+    await system.sendWithCandidateApiKeyHeader({ clientIp: '198.51.100.1', path, candidateApiKeyHeader: 'sk-candidate' })
 
     await system.expectServedByOrigin()
-    system.expectOriginReceivedNoCandidateApiKey()
-  })
-
-  it('forwards a Candidate API Key to a model-backed route', async () => {
-    const system = createSystemUnderTest()
-
-    await system.sendModelRequest({ clientIp: '198.51.100.1', candidateApiKey: 'sk-candidate' })
-
-    await system.expectServedByOrigin()
-    system.expectOriginReceivedCandidateApiKey('sk-candidate')
-  })
-
-  it('stops Candidate API Key validations from one IP at their own limit', async () => {
-    const system = createSystemUnderTest()
-    await system.givenCandidateApiKeysValidated({ clientIp: '198.51.100.1', count: dailyLimits.keyValidationsPerClient })
-
-    await system.validateCandidateApiKey({ clientIp: '198.51.100.1' })
-
-    await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
+    system.expectOriginReceivedNoCandidateApiKeyHeader()
   })
 
   it('tells how many Tailored Resumes remain today without spending one', async () => {
@@ -246,10 +236,10 @@ describe('Daily spending limits at the edge', () => {
 
 function createSystemUnderTest({ originStatus = 200 } = {}) {
   const originPaths = []
-  const originCandidateApiKeys = []
+  const originCandidateApiKeyHeaders = []
   vi.stubGlobal('fetch', vi.fn(async (request) => {
     originPaths.push(new URL(request.url).pathname)
-    originCandidateApiKeys.push(request.headers.get('x-candidate-api-key'))
+    originCandidateApiKeyHeaders.push(request.headers.get('x-candidate-api-key'))
     return Response.json({ ok: originStatus < 400 }, { status: originStatus })
   }))
   const limits = new DailySpendingLimits({ storage: createInMemoryStorage() })
@@ -261,18 +251,20 @@ function createSystemUnderTest({ originStatus = 200 } = {}) {
       get: () => ({ fetch: async (url, init) => limits.fetch(new Request(url, init)) }),
     },
   }
-  const send = ({ path, clientIp, method = 'POST', cookie, candidateApiKey }) => worker.fetch(new Request(`https://demo.example${path}`, {
+  // An earlier version of the interface sent a Candidate API Key in this header; the edge must ignore and strip it.
+  const send = ({ path, clientIp, method = 'POST', cookie, candidateApiKeyHeader }) => worker.fetch(new Request(`https://demo.example${path}`, {
     method,
     headers: { 'cf-connecting-ip': clientIp, ...(cookie === undefined ? {} : { cookie }),
-      ...(candidateApiKey === undefined ? {} : { 'x-candidate-api-key': candidateApiKey }) },
+      ...(candidateApiKeyHeader === undefined ? {} : { 'x-candidate-api-key': candidateApiKeyHeader }) },
     ...(method === 'POST' ? { body: '{}' } : {}),
   }), environment)
-  const preparation = ({ clientIp, cookie, candidateApiKey }) => send({
-    path: '/api/explainable-job-posting-extraction', clientIp, cookie, candidateApiKey,
+  const preparation = ({ clientIp, cookie, candidateApiKeyHeader }) => send({
+    path: '/api/explainable-job-posting-extraction', clientIp, cookie, candidateApiKeyHeader,
   })
-  const modelRequest = ({ clientIp, candidateApiKey }) => send({ path: '/api/resume-section-writing', clientIp, candidateApiKey })
-  const render = ({ clientIp, candidateApiKey }) => send({ path: '/api/resume-document', clientIp, candidateApiKey })
-  const keyValidation = ({ clientIp }) => send({ path: '/api/candidate-api-key', clientIp, candidateApiKey: 'sk-candidate' })
+  const modelRequest = ({ clientIp, candidateApiKeyHeader }) => send({
+    path: '/api/resume-section-writing', clientIp, candidateApiKeyHeader,
+  })
+  const render = ({ clientIp }) => send({ path: '/api/resume-document', clientIp })
   const repeat = async ({ count, sendOne }) => {
     for (let index = 0; index < count; index += 1) await sendOne()
   }
@@ -290,32 +282,31 @@ function createSystemUnderTest({ originStatus = 200 } = {}) {
 
   return {
     givenTimeIs: (instant) => { vi.setSystemTime(instant) },
-    givenTailoredResumesStarted: ({ clientIp, count, candidateApiKey }) => repeat({
-      count, sendOne: () => preparation({ clientIp, candidateApiKey }),
+    givenTailoredResumesStarted: ({ clientIp, count, candidateApiKeyHeader }) => repeat({
+      count, sendOne: () => preparation({ clientIp, candidateApiKeyHeader }),
     }),
     givenTailoredResumesFromAddresses: async ({ clientIps }) => {
       for (const clientIp of clientIps) await preparation({ clientIp })
     },
     givenModelRequestsSent: ({ clientIp, count }) => repeat({ count, sendOne: () => modelRequest({ clientIp }) }),
     givenRendersRequested: ({ clientIp, count }) => repeat({ count, sendOne: () => render({ clientIp }) }),
-    givenCandidateApiKeysValidated: ({ clientIp, count }) => repeat({ count, sendOne: () => keyValidation({ clientIp }) }),
 
-    startTailoredResume: ({ clientIp, cookie, candidateApiKey }) => recordAction(() => preparation({
-      clientIp, cookie, candidateApiKey,
+    startTailoredResume: ({ clientIp, cookie, candidateApiKeyHeader }) => recordAction(() => preparation({
+      clientIp, cookie, candidateApiKeyHeader,
     })),
-    sendModelRequest: ({ clientIp, candidateApiKey }) => recordAction(() => modelRequest({ clientIp, candidateApiKey })),
-    requestRender: ({ clientIp, candidateApiKey }) => recordAction(() => render({ clientIp, candidateApiKey })),
-    validateCandidateApiKey: ({ clientIp }) => recordAction(() => keyValidation({ clientIp })),
+    sendModelRequest: ({ clientIp, candidateApiKeyHeader }) => recordAction(() => modelRequest({
+      clientIp, candidateApiKeyHeader,
+    })),
+    requestRender: ({ clientIp }) => recordAction(() => render({ clientIp })),
+    sendWithCandidateApiKeyHeader: ({ clientIp, path, candidateApiKeyHeader }) => recordAction(() => send({
+      path, clientIp, method: path.startsWith('/api/') ? 'POST' : 'GET', candidateApiKeyHeader,
+    })),
     readDailyQuota: ({ clientIp }) => recordAction(() => send({ path: '/api/daily-quota', clientIp, method: 'GET' })),
     openPage: ({ clientIp }) => recordAction(() => send({ path: '/', clientIp, method: 'GET' })),
 
-    expectOriginReceivedNoCandidateApiKey() {
+    expectOriginReceivedNoCandidateApiKeyHeader() {
       readResponse()
-      expect(originCandidateApiKeys.at(-1)).toBeNull()
-    },
-    expectOriginReceivedCandidateApiKey(candidateApiKey) {
-      readResponse()
-      expect(originCandidateApiKeys.at(-1)).toBe(candidateApiKey)
+      expect(originCandidateApiKeyHeaders.at(-1)).toBeNull()
     },
     async expectServedByOrigin() {
       const served = readResponse()

@@ -7,7 +7,6 @@ import { failureResponse, readRouteApiFailure } from '../api-failure'
 import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
-import { readModelApiKey } from './-model-api-key'
 
 export const Route = createFileRoute('/api/structured-source-profile-extraction')({
   server: {
@@ -25,10 +24,8 @@ async function extractStructuredSourceProfile({ request }: Readonly<{ request: R
   if (!contentResult.ok) return failureResponse({ type: contentResult.type })
   const environmentResult = validateServerEnvironment({ environment: process.env })
   if (!environmentResult.ok) return failureResponse({ type: 'service-misconfigured' })
-  const apiKey = readModelApiKey({ environment: environmentResult.value, request })
-  if (!apiKey.ok) return failureResponse({ type: apiKey.type })
   const extractor = createOpenAiStructuredSourceProfileExtractor({
-    apiKey: apiKey.value,
+    apiKey: { value: environmentResult.value.openAiApiKey },
     model: environmentResult.value.openAiStructuredModel,
     reasoningEffort: environmentResult.value.openAiStructuredReasoningEffort,
   })

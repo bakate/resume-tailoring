@@ -169,7 +169,7 @@ async function requestOpenAi({
   return response.ok ? parseOpenAiResponse(response.value) : { ok: false, requestFailure: response.error } as const
 }
 
-/** Keeps why a provider call failed, so a rejected Candidate API Key reaches the Candidate as such. */
+/** Keeps why a provider call failed, so the Candidate reads the Failure Cause the provider's answer implies. */
 function withRequestFailure<TType extends string>({ result, response }: Readonly<{
   result: Readonly<{ ok: false; error: Readonly<{ type: TType }> }>
   response: Readonly<{ ok: false; requestFailure?: OpenAiRequestFailure }>

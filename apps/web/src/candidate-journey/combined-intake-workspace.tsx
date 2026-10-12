@@ -14,7 +14,7 @@ import type { useCandidateJourney } from './use-candidate-journey'
 import { CriticalAmbiguityQuestions, sourceIntakeFailureKeys } from './source-intake-workspace'
 import { jobMatchFailureKeys } from './job-match-workspace'
 import { ProcessingPolicyNotice, processingPolicyNoticeId } from './processing-policy-notice'
-import { DailyQuotaStatus } from '../candidate-api-key/candidate-api-key-wall'
+import { DailyQuotaStatus } from '../daily-quota/daily-quota-status'
 import { FailureExplanation, RecoveryAction } from './failure-recovery'
 
 type IntakeProps = Readonly<{ candidateJourney: ReturnType<typeof useCandidateJourney>; localization: Localization }>

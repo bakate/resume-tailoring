@@ -123,13 +123,17 @@ export const resumePreparationFailures = [
 ] as const
 export type ResumePreparationFailure = typeof resumePreparationFailures[number]
 
-/**
- * The provider-neutral reasons a model-backed operation fails, from which the application derives the Recovery. The
- * Daily Quota and the Candidate API Key causes name why the Candidate's own choice, not waiting, lets them continue.
- */
+/** The provider-neutral reasons a model-backed operation fails, from which the application derives the Recovery. */
 export const failureCauseTypes = [
   'access-required', 'rate-limited', 'daily-quota-reached', 'timeout', 'input-too-large', 'service-unavailable',
-  'network', 'unexpected', 'candidate-api-key-invalid', 'candidate-api-key-model-unavailable', 'provider-credit-exhausted',
+  'network', 'unexpected',
+] as const
+/**
+ * Causes an earlier version could save with a failed preparation. They left the catalogue, so a saved one is read as
+ * service unavailable: the Candidate retries.
+ */
+export const removedFailureCauseTypes = [
+  'candidate-api-key-invalid', 'candidate-api-key-model-unavailable', 'provider-credit-exhausted',
 ] as const
 /** The causes that end after a delay, which they carry. */
 export const delayedFailureCauseTypes = ['rate-limited', 'daily-quota-reached'] as const

@@ -7,7 +7,7 @@ describe('OpenAI structured Source Profile extractor contract', () => {
   it('uses a stateless Structured Output request for minimized professional content', async () => {
     const requests: Request[] = []
     const extractor = createOpenAiStructuredSourceProfileExtractor({
-      apiKey: { source: 'operator', value: 'test-api-key' },
+      apiKey: { value: 'test-api-key' },
       model: 'structured-model',
       reasoningEffort: 'low',
       request: (input, init) => {
@@ -37,7 +37,7 @@ describe('OpenAI structured Source Profile extractor contract', () => {
     const profile = { ...structuredSourceProfile, education: [{ institution: 'Université de Lille',
       qualification: 'Licence professionnelle Développement Web', dates: '2018' }] }
     const extractor = createOpenAiStructuredSourceProfileExtractor({
-      apiKey: { source: 'operator', value: 'test-api-key' },
+      apiKey: { value: 'test-api-key' },
       model: 'structured-model',
       reasoningEffort: 'low',
       request: (input, init) => {
@@ -56,7 +56,7 @@ describe('OpenAI structured Source Profile extractor contract', () => {
 
   it('rejects malformed structured evidence', async () => {
     const extractor = createOpenAiStructuredSourceProfileExtractor({
-      apiKey: { source: 'operator', value: 'test-api-key' },
+      apiKey: { value: 'test-api-key' },
       model: 'structured-model',
       reasoningEffort: 'low',
       request: () => Promise.resolve(Response.json(createOpenAiResponse({

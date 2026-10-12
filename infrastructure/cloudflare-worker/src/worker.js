@@ -1,6 +1,6 @@
 /* global Headers, Request, Response, TextEncoder, URL, crypto, fetch */
 
-import { DailySpendingLimits, acceptsCandidateApiKey, dailyLimits, readLimitedCounters } from './daily-spending-limits.js'
+import { DailySpendingLimits, dailyLimits, readLimitedCounters } from './daily-spending-limits.js'
 
 export { DailySpendingLimits, dailyLimits }
 
@@ -9,9 +9,10 @@ const originHeaderName = 'x-resume-studio-origin'
 const limitsInstanceName = 'daily-spending-limits'
 /** Statuses the application answers before any model call: missing access, invalid or oversized input. */
 const unservedStatuses = new Set([400, 401, 403, 413])
-const candidateApiKeyHeaderName = 'x-candidate-api-key'
+/** An earlier version of the interface sent a Candidate API Key in this header; no route may receive it any more. */
+const retiredCandidateApiKeyHeaderName = 'x-candidate-api-key'
 const dailyQuotaPath = '/api/daily-quota'
-/** Limits a Candidate API Key lifts: past them, the Candidate may continue with their own key. */
+/** Limits that bound model spending: past them, the Candidate comes back after the reset. */
 const modelLimitScopes = new Set(['daily-quota', 'overall', 'model-requests'])
 
 export default {
@@ -25,10 +26,7 @@ export default {
     if (request.method === 'GET' && incomingUrl.pathname === dailyQuotaPath) {
       return readDailyQuota({ limits, clientKey: await readClientKey({ request, environment }) })
     }
-    const counters = readLimitedCounters({
-      method: request.method, pathname: incomingUrl.pathname,
-      carriesCandidateApiKey: request.headers.has(candidateApiKeyHeaderName),
-    })
+    const counters = readLimitedCounters({ method: request.method, pathname: incomingUrl.pathname })
     if (counters.length === 0) return forwardToOrigin({ request, environment, incomingUrl })
 
     const clientKey = await readClientKey({ request, environment })
@@ -51,7 +49,7 @@ function forwardToOrigin({ request, environment, incomingUrl }) {
   const headers = new Headers(request.headers)
   headers.delete('host')
   headers.delete(originHeaderName)
-  if (!acceptsCandidateApiKey({ pathname: incomingUrl.pathname })) headers.delete(candidateApiKeyHeaderName)
+  headers.delete(retiredCandidateApiKeyHeaderName)
   headers.set(originHeaderName, environment.ORIGIN_SECRET)
 
   const originRequest = new Request(originUrl, {
@@ -109,17 +107,17 @@ function readClientNetwork(clientIp) {
 
 /**
  * Past a model limit, the request fails as past the Daily Quota, and names which limit refused it, so the Candidate
- * can continue with a Candidate API Key or come back after the reset. Past a limit no key lifts, it is rate limited.
+ * knows to come back after the reset. Past the render limit, it is rate limited.
  */
 function rateLimitedResponse({ exhaustedLimit, resetAt }) {
   const retryAfterSeconds = Math.max(0, Math.ceil((Date.parse(resetAt) - Date.now()) / 1000))
-  const liftedByCandidateApiKey = modelLimitScopes.has(exhaustedLimit)
-  const type = liftedByCandidateApiKey ? 'daily-quota-reached' : 'rate-limited'
+  const boundsModelSpending = modelLimitScopes.has(exhaustedLimit)
+  const type = boundsModelSpending ? 'daily-quota-reached' : 'rate-limited'
   return Response.json({ ok: false, error: { type, retryAfterSeconds } }, {
     status: 429,
     headers: {
       ...privateHeaders, 'Retry-After': String(retryAfterSeconds),
-      ...(liftedByCandidateApiKey ? { 'x-resume-quota-scope': exhaustedLimit, 'x-resume-quota-reset': resetAt } : {}),
+      ...(boundsModelSpending ? { 'x-resume-quota-scope': exhaustedLimit, 'x-resume-quota-reset': resetAt } : {}),
     },
   })
 }

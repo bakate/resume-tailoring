@@ -1,4 +1,5 @@
-import { delayedFailureCauseTypes, failureCauseTypes, hiddenContentOrigins, resumePreparationFailures, resumeSectionKinds } from '@resume-tailoring/application/candidate-journey'
+import { delayedFailureCauseTypes, failureCauseTypes, hiddenContentOrigins, removedFailureCauseTypes, resumePreparationFailures,
+  resumeSectionKinds } from '@resume-tailoring/application/candidate-journey'
 import { z } from 'zod'
 
 import {
@@ -175,9 +176,10 @@ const resumeSectionSnapshotSchema = z.discriminatedUnion('status', [
   z.strictObject({ key: z.string().min(1), kind: z.enum(resumeSectionKinds), attempt: z.number().int().nonnegative(),
     status: z.literal('validated'), content: resumeSectionContentSchema }),
 ])
-const failureCauseSchema = z.discriminatedUnion('type', [
+const failureCauseSchema = z.union([
   z.strictObject({ type: z.enum(delayedFailureCauseTypes), retryAfterSeconds: z.number().int().nonnegative() }),
   z.strictObject({ type: z.enum(failureCauseTypes).exclude([...delayedFailureCauseTypes]) }),
+  z.strictObject({ type: z.enum(removedFailureCauseTypes) }).transform(() => ({ type: 'service-unavailable' as const })),
 ])
 const storedIntakeDocumentSchema = z.strictObject({ data: z.string(), mediaType: z.string(), name: z.string() })
 const resumePreparationSchema = z.strictObject({

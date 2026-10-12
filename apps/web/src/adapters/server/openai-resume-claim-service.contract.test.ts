@@ -11,7 +11,7 @@ describe('OpenAI Resume Claim service contract', () => {
   it('reformulates a claim through a strict stateless writing-model request', async () => {
     const requests: Request[] = []
     const reformulator = createOpenAiResumeClaimReformulator({
-      apiKey: { source: 'operator', value: 'test-api-key' },
+      apiKey: { value: 'test-api-key' },
       model: 'writing-model',
       reasoningEffort: 'medium',
       request: createRequestSpy({ requests, value: { claims: [proposedClaim] } }),
@@ -41,7 +41,7 @@ describe('OpenAI Resume Claim service contract', () => {
 
   it('rejects a reformulation that references facts outside the minimized writing input', async () => {
     const reformulator = createOpenAiResumeClaimReformulator({
-      apiKey: { source: 'operator', value: 'test-api-key' },
+      apiKey: { value: 'test-api-key' },
       model: 'writing-model',
       reasoningEffort: 'medium',
       request: createRequestSpy({
@@ -60,7 +60,7 @@ describe('OpenAI Resume Claim service contract', () => {
   it('semantically rejects inexact fact references with the structured model', async () => {
     const requests: Request[] = []
     const validator = createOpenAiResumeClaimSemanticValidator({
-      apiKey: { source: 'operator', value: 'test-api-key' },
+      apiKey: { value: 'test-api-key' },
       model: 'structured-model',
       reasoningEffort: 'low',
       request: createRequestSpy({
@@ -101,7 +101,7 @@ describe('OpenAI Resume Claim service contract', () => {
     const signals: (AbortSignal | null)[] = []
     const deadlineSignal = new AbortController().signal
     const validator = createOpenAiResumeClaimSemanticValidator({
-      apiKey: { source: 'operator', value: 'test-api-key' },
+      apiKey: { value: 'test-api-key' },
       deadlineSignal,
       model: 'structured-model',
       reasoningEffort: 'low',

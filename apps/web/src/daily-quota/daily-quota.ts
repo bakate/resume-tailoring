@@ -37,6 +37,20 @@ export function createDailyQuotaStore(): DailyQuotaStore {
   }
 }
 
+/** Reads the Daily Quota the edge announces on every response; the response itself goes back untouched. */
+export function createDailyQuotaObservingRequest({ dailyQuota, request }: Readonly<{
+  dailyQuota: DailyQuotaStore; request: typeof fetch
+}>): typeof fetch {
+  return async (input, init) => {
+    const response = await request(input, init)
+    dailyQuota.observe(response)
+    return response
+  }
+}
+
+/** One per page: the Candidate Journey adapters and the Daily Quota status must share it. */
+export const dailyQuota = createDailyQuotaStore()
+
 function readAnnouncedQuota(headers: Headers): DailyQuota | null {
   const remaining = headers.get('x-resume-quota-remaining')
   const resetAt = headers.get('x-resume-quota-reset')
