@@ -1,4 +1,4 @@
-import type { ModelRole } from './model-qualification'
+import type { LanguageModelConfiguration } from '../language-model-configuration'
 import { qualifyModelConfiguration } from './model-qualification'
 import {
   structuredModelEvaluationBaseline,
@@ -20,19 +20,26 @@ export const recordedModelQualificationReports = [
   }),
 ] as const
 
-export function isQualifiedModelConfiguration({
-  model,
-  reasoningEffort,
-  role,
-}: Readonly<{
-  model: string
-  reasoningEffort: string
-  role: ModelRole
+/** A configuration is qualified only as a whole: the same provider, model, role and every provider option. */
+export function isQualifiedModelConfiguration({ configuration }: Readonly<{
+  configuration: LanguageModelConfiguration
 }>) {
   return recordedModelQualificationReports.some((report) => report.qualified
-    && report.configuration.role === role
-    && report.configuration.model === model
-    && report.configuration.reasoningEffort === reasoningEffort)
+    // Only one provider exists yet; the comparison keeps a second one from reusing another provider's baseline.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    && report.configuration.provider === configuration.provider
+    && report.configuration.role === configuration.role
+    && report.configuration.model === configuration.model
+    && hasSameProviderOptions({ qualified: report.configuration.providerOptions, requested: configuration.providerOptions }))
+}
+
+function hasSameProviderOptions({ qualified, requested }: Readonly<{
+  qualified: LanguageModelConfiguration['providerOptions']
+  requested: LanguageModelConfiguration['providerOptions']
+}>) {
+  const qualifiedEntries = Object.entries(qualified)
+  return qualifiedEntries.length === Object.keys(requested).length
+    && qualifiedEntries.every(([name, value]) => (requested as Readonly<Record<string, unknown>>)[name] === value)
 }
 
 function qualifyRecordedConfiguration({

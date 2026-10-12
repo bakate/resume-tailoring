@@ -1,16 +1,18 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createOpenAiModelConfiguration } from '../../language-model-configuration'
 
 import {
   createOpenAiJobMatchEvidenceMatcher,
   requestOpenAiJobMatchEvidence,
 } from './openai-job-match-evidence-matcher'
 import { createOpenAiJobPostingExtractor } from './openai-job-posting-extractor'
+import { createRecordedOpenAiResponse } from './recorded-openai-responses'
 
 describe('OpenAI explainable Job Match adapters', () => {
   it('extracts source-backed requirements through a stateless Structured Output request', async () => {
     const requests: Request[] = []
     const extractor = createOpenAiJobPostingExtractor({
-      apiKey: { value: 'test-api-key' }, model: 'structured-model', reasoningEffort: 'low',
+      apiKey: { value: 'test-api-key' }, configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRecordedRequest({ output: extractedJobPosting, requests }),
     })
 
@@ -25,19 +27,8 @@ describe('OpenAI explainable Job Match adapters', () => {
 
   it('reads the proposal from Responses API output items', async () => {
     const matcher = createOpenAiJobMatchEvidenceMatcher({
-      apiKey: { value: 'test-api-key' }, model: 'structured-model', reasoningEffort: 'low',
+      apiKey: { value: 'test-api-key' }, configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRecordedRequest({ output: evidenceProposal, requests: [] }),
-    })
-
-    const result = await matcher.match(matchRequest)
-
-    expect(result).toEqual({ ok: true, value: evidenceProposal })
-  })
-
-  it('accepts the aggregated Responses API output_text field', async () => {
-    const matcher = createOpenAiJobMatchEvidenceMatcher({
-      apiKey: { value: 'test-api-key' }, model: 'structured-model', reasoningEffort: 'low',
-      request: createRecordedRequest({ output: evidenceProposal, requests: [], response: 'output-text' }),
     })
 
     const result = await matcher.match(matchRequest)
@@ -48,7 +39,7 @@ describe('OpenAI explainable Job Match adapters', () => {
   it('requests evidence excerpts per side without an exact-versus-controlled relationship', async () => {
     const requests: Request[] = []
     const matcher = createOpenAiJobMatchEvidenceMatcher({
-      apiKey: { value: 'test-api-key' }, model: 'structured-model', reasoningEffort: 'low',
+      apiKey: { value: 'test-api-key' }, configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRecordedRequest({ output: evidenceProposal, requests }),
     })
 
@@ -64,14 +55,14 @@ describe('OpenAI explainable Job Match adapters', () => {
   it('requests Adjacent Evidence with one verbatim excerpt per Candidate Fact', async () => {
     const requests: Request[] = []
     const matcher = createOpenAiJobMatchEvidenceMatcher({
-      apiKey: { value: 'test-api-key' }, model: 'structured-model', reasoningEffort: 'low',
+      apiKey: { value: 'test-api-key' }, configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRecordedRequest({ output: adjacentStackProposal, requests }),
     })
 
     await matcher.match(adjacentStackMatchRequest)
 
     const body = await requests[0]?.json() as {
-      input: { content: { text: string }[] }[]
+      input: { content: string }[]
       text: { format: { schema: { properties: Record<string, unknown> } } }
     }
     expect(body.text.format.schema.properties.adjacentEvidence).toMatchObject({
@@ -80,12 +71,12 @@ describe('OpenAI explainable Job Match adapters', () => {
         required: ['factExcerpt', 'factId'],
       } }, requirementId: { type: 'string' } } },
     })
-    expect(body.input[0]?.content[0]?.text).toContain('adjacentEvidence')
+    expect(body.input[0]?.content).toContain('adjacentEvidence')
   })
 
   it('returns unverified proposals for the matching engine to judge', async () => {
     const matcher = createOpenAiJobMatchEvidenceMatcher({
-      apiKey: { value: 'test-api-key' }, model: 'structured-model', reasoningEffort: 'low',
+      apiKey: { value: 'test-api-key' }, configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRecordedRequest({ output: fabricatedProposal, requests: [] }),
     })
 
@@ -97,7 +88,7 @@ describe('OpenAI explainable Job Match adapters', () => {
   it('records how many links the model proposed without Candidate content', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
     const matcher = createOpenAiJobMatchEvidenceMatcher({
-      apiKey: { value: 'test-api-key' }, model: 'structured-model', reasoningEffort: 'low',
+      apiKey: { value: 'test-api-key' }, configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRecordedRequest({ output: fabricatedProposal, requests: [] }),
     })
 
@@ -106,8 +97,8 @@ describe('OpenAI explainable Job Match adapters', () => {
     const lines = info.mock.calls.map(([line]) => String(line))
     info.mockRestore()
     expect(lines.map((line) => JSON.parse(line) as Record<string, unknown>)).toContainEqual({
-      category: 'privacy-safe-openai-request', metric: 'accepted', value: 1,
-      dimensions: { operation: 'explainable-match-evidence', proposedRelevance: 1, proposedEvidence: 0,
+      category: 'privacy-safe-model-request', metric: 'accepted', value: 1,
+      dimensions: { operation: 'explainable-match-evidence', provider: 'openai', proposedRelevance: 1, proposedEvidence: 0,
         proposedAdjacentEvidence: 2 },
     })
     expect(lines.join('\n')).not.toMatch(/React|TypeScript|Java|Angular/u)
@@ -124,8 +115,7 @@ describe('OpenAI explainable Job Match adapters', () => {
         })),
         requirements: matchRequest.requirements,
       },
-      model: 'structured-model',
-      reasoningEffort: 'low',
+      configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: () => Promise.reject(new Error('Request should not be sent')),
     })
 
@@ -135,19 +125,13 @@ describe('OpenAI explainable Job Match adapters', () => {
   })
 })
 
-function createRecordedRequest({ output, requests, response = 'output-items' }: Readonly<{
+function createRecordedRequest({ output, requests }: Readonly<{
   output: unknown
   requests: Request[]
-  response?: 'output-items' | 'output-text'
 }>) {
   return (input: string | URL | Request, init?: RequestInit) => {
     requests.push(new Request(input, init))
-    return Promise.resolve(Response.json({
-      id: 'response-1',
-      ...(response === 'output-text'
-        ? { output_text: JSON.stringify(output) }
-        : { output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(output) }] }] }),
-    }))
+    return Promise.resolve(createRecordedOpenAiResponse({ outputText: JSON.stringify(output) }))
   }
 }
 

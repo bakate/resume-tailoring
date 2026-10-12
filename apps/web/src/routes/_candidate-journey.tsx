@@ -4,11 +4,16 @@ import { CandidateJourneyLanding, CandidateJourneyShell, CandidateJourneyStatus 
 import { CandidateJourneyControllerProvider, useCandidateJourneyController } from '../candidate-journey/use-candidate-journey'
 import { DemoAccessGate } from '../demo-access/demo-access-gate'
 import { readInitialDemoAccess } from '../demo-access/demo-access-initial-state'
+import { readServedProcessingPolicy } from '../served-processing-policy'
+import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
 
 /** Both Candidate Journey routes share this layout, so navigating between them keeps one Candidate Journey actor. */
 export const Route = createFileRoute('/_candidate-journey')({
-  // Demo access is decided once per page load; moving between the two routes never asks for it again.
-  loader: () => readInitialDemoAccess(),
+  // Demo access and the Processing Policy are decided once per page load; moving between the two routes keeps them.
+  loader: async () => {
+    const [initialAccess, processingPolicy] = await Promise.all([readInitialDemoAccess(), readServedProcessingPolicy()])
+    return { initialAccess, processingPolicy }
+  },
   shouldReload: false,
   component: CandidateJourneyLayout,
 })
@@ -18,20 +23,20 @@ export const Route = createFileRoute('/_candidate-journey')({
  * every model call, waits behind demo access.
  */
 function CandidateJourneyLayout() {
-  const initialAccess = Route.useLoaderData()
+  const { initialAccess, processingPolicy } = Route.useLoaderData()
   const isIntake = useMatch({ from: '/_candidate-journey/', shouldThrow: false }) !== undefined
   return (
     <CandidateJourneyShell>
-      {isIntake ? <CandidateJourneyLanding /> : null}
+      {isIntake ? <CandidateJourneyLanding processingPolicy={processingPolicy} /> : null}
       <DemoAccessGate initialAccess={initialAccess}>
-        <CandidateJourney />
+        <CandidateJourney processingPolicy={processingPolicy} />
       </DemoAccessGate>
     </CandidateJourneyShell>
   )
 }
 
-function CandidateJourney() {
-  const candidateJourney = useCandidateJourneyController()
+function CandidateJourney({ processingPolicy }: Readonly<{ processingPolicy: ProcessingPolicy }>) {
+  const candidateJourney = useCandidateJourneyController({ processingPolicy })
   return (
     <CandidateJourneyControllerProvider value={candidateJourney}>
       <CandidateJourneyStatus />

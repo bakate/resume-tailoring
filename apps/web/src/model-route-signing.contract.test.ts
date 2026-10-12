@@ -100,7 +100,7 @@ describe('Signing model-backed routes', () => {
 
     await postTo(SourceProfileExtractionRoute, createRequest({ body: { professionalContent: 'Engineer at Example' } }))
 
-    expect(logs.read()).toContain('privacy-safe-openai-request')
+    expect(logs.read()).toContain('privacy-safe-model-request')
     expect(logs.read()).not.toContain(environment.OPENAI_API_KEY.slice(3, 20))
     expect(logs.read()).not.toContain('sk-operator')
   })

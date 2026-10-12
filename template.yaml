@@ -64,6 +64,7 @@ Resources:
           DEMO_ORIGIN_SECRET: !Ref DemoOriginSecret
           DEMO_PUBLIC_HOSTNAME: !Ref DemoPublicHostname
           DEMO_SESSION_SECRET: !Ref DemoSessionSecret
+          LANGUAGE_MODEL_PROVIDER: openai
           OPENAI_API_KEY: !Ref OpenAiApiKey
           OPENAI_STRUCTURED_MODEL: gpt-6-luna
           OPENAI_STRUCTURED_REASONING_EFFORT: low

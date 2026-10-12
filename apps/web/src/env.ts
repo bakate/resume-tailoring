@@ -1,120 +1,115 @@
 import { z } from 'zod'
 
 import { isQualifiedModelConfiguration } from './model-evaluation/qualified-model-configurations'
-import { openAiReasoningEfforts } from './openai-model-configuration'
+import { structuredModelConfiguration, writingModelConfiguration } from './model-evaluation/model-configurations'
+import { createOpenAiModelConfiguration, languageModelProviders, openAiReasoningEfforts } from './language-model-configuration'
+import type { ActiveLanguageModel, ModelRole, OpenAiReasoningEffort } from './language-model-configuration'
 
-const defaultOpenAiStructuredModel = 'gpt-6-luna'
-const defaultOpenAiStructuredReasoningEffort = 'low'
-const defaultOpenAiWritingModel = 'gpt-6-sol'
-const defaultOpenAiWritingReasoningEffort = 'medium'
+const providerEnvironmentSchema = z.object({
+  LANGUAGE_MODEL_PROVIDER: z.enum(languageModelProviders).default('openai'),
+})
 
-const serverEnvironmentSchema = z.object({
+const openAiEnvironmentSchema = z.object({
   OPENAI_API_KEY: z.string().trim().min(1),
   OPENAI_STRUCTURED_FALLBACK_MODEL: z.string().trim().min(1).optional(),
   OPENAI_STRUCTURED_FALLBACK_REASONING_EFFORT: z.enum(openAiReasoningEfforts).optional(),
-  OPENAI_STRUCTURED_MODEL: z.literal(defaultOpenAiStructuredModel)
-    .default(defaultOpenAiStructuredModel),
-  OPENAI_STRUCTURED_REASONING_EFFORT: z.literal(defaultOpenAiStructuredReasoningEffort)
-    .default(defaultOpenAiStructuredReasoningEffort),
-  OPENAI_WRITING_MODEL: z.literal(defaultOpenAiWritingModel).default(defaultOpenAiWritingModel),
+  OPENAI_STRUCTURED_MODEL: z.string().trim().min(1).default(structuredModelConfiguration.model),
+  OPENAI_STRUCTURED_REASONING_EFFORT: z.enum(openAiReasoningEfforts)
+    .default(structuredModelConfiguration.providerOptions.reasoningEffort),
   OPENAI_WRITING_FALLBACK_MODEL: z.string().trim().min(1).optional(),
   OPENAI_WRITING_FALLBACK_REASONING_EFFORT: z.enum(openAiReasoningEfforts).optional(),
-  OPENAI_WRITING_REASONING_EFFORT: z.literal(defaultOpenAiWritingReasoningEffort)
-    .default(defaultOpenAiWritingReasoningEffort),
+  OPENAI_WRITING_MODEL: z.string().trim().min(1).default(writingModelConfiguration.model),
+  OPENAI_WRITING_REASONING_EFFORT: z.enum(openAiReasoningEfforts)
+    .default(writingModelConfiguration.providerOptions.reasoningEffort),
 }).superRefine((environment, context) => {
-  validateFallback({
-    context,
-    model: environment.OPENAI_STRUCTURED_FALLBACK_MODEL,
-    modelPath: 'OPENAI_STRUCTURED_FALLBACK_MODEL',
-    reasoningEffort: environment.OPENAI_STRUCTURED_FALLBACK_REASONING_EFFORT,
-    role: 'structured',
-  })
-  validateFallback({
-    context,
-    model: environment.OPENAI_WRITING_FALLBACK_MODEL,
-    modelPath: 'OPENAI_WRITING_FALLBACK_MODEL',
-    reasoningEffort: environment.OPENAI_WRITING_FALLBACK_REASONING_EFFORT,
-    role: 'writing',
-  })
+  for (const role of modelRoles) {
+    const settings = readOpenAiRoleSettings({ environment, role })
+    validateConfiguration({ context, path: settings.modelPath, role, ...settings.active })
+    if (settings.fallback.model === undefined && settings.fallback.reasoningEffort === undefined) continue
+    validateConfiguration({ context, path: settings.fallbackModelPath, role, ...settings.fallback })
+  }
 })
 
-export type ServerEnvironment = Readonly<{
-  openAiApiKey: string
-  openAiStructuredFallback?: Readonly<{ model: string; reasoningEffort: string }>
-  openAiStructuredModel: string
-  openAiStructuredReasoningEffort: typeof defaultOpenAiStructuredReasoningEffort
-  openAiWritingModel: string
-  openAiWritingFallback?: Readonly<{ model: string; reasoningEffort: string }>
-  openAiWritingReasoningEffort: typeof defaultOpenAiWritingReasoningEffort
-}>
+export type ServerEnvironment = Readonly<{ languageModel: ActiveLanguageModel }>
 
-type FallbackValidation = Readonly<{
-  context: z.core.$RefinementCtx
-  model?: string
-  modelPath: string
-  reasoningEffort?: string
-  role: 'structured' | 'writing'
-}>
-
+/**
+ * Exactly one Language Model Provider is active, chosen by `LANGUAGE_MODEL_PROVIDER`. The server refuses a provider, a
+ * model or a reasoning effort that no Qualified Model Configuration backs.
+ */
 export function validateServerEnvironment({
   environment,
 }: Readonly<{ environment: Record<string, unknown> }>) {
-  const result = serverEnvironmentSchema.safeParse(environment)
+  const provider = readLanguageModelProvider({ environment })
+  if (!provider.ok) return provider
+  const result = openAiEnvironmentSchema.safeParse(environment)
   if (!result.success) return createInvalidEnvironmentResult({ issues: result.error.issues })
-  return { ok: true, value: createServerEnvironment({ environment: result.data }) } as const
+  return { ok: true, value: { languageModel: createOpenAiLanguageModel({ environment: result.data }) } } as const
 }
 
-function createServerEnvironment({
-  environment,
-}: Readonly<{ environment: z.infer<typeof serverEnvironmentSchema> }>): ServerEnvironment {
+/** The active provider alone, which the Processing Policy depends on; its key and model settings are not needed. */
+export function readLanguageModelProvider({ environment }: Readonly<{ environment: Record<string, unknown> }>) {
+  const result = providerEnvironmentSchema.safeParse(environment)
+  return result.success
+    ? { ok: true, value: result.data.LANGUAGE_MODEL_PROVIDER } as const
+    : createInvalidEnvironmentResult({ issues: result.error.issues })
+}
+
+type OpenAiEnvironment = z.infer<typeof openAiEnvironmentSchema>
+type ModelSettings = Readonly<{ model?: string; reasoningEffort?: OpenAiReasoningEffort }>
+
+function createOpenAiLanguageModel({ environment }: Readonly<{ environment: OpenAiEnvironment }>): ActiveLanguageModel {
   return {
-    openAiApiKey: environment.OPENAI_API_KEY,
-    ...createFallbacks({ environment }),
-    openAiStructuredModel: environment.OPENAI_STRUCTURED_MODEL,
-    openAiStructuredReasoningEffort: environment.OPENAI_STRUCTURED_REASONING_EFFORT,
-    openAiWritingModel: environment.OPENAI_WRITING_MODEL,
-    openAiWritingReasoningEffort: environment.OPENAI_WRITING_REASONING_EFFORT,
+    apiKey: environment.OPENAI_API_KEY,
+    provider: 'openai',
+    structured: createRoleConfigurations({ environment, role: 'structured' }),
+    writing: createRoleConfigurations({ environment, role: 'writing' }),
   }
 }
 
-function createFallbacks({
-  environment,
-}: Readonly<{ environment: z.infer<typeof serverEnvironmentSchema> }>) {
+function createRoleConfigurations({ environment, role }: Readonly<{ environment: OpenAiEnvironment; role: ModelRole }>) {
+  const { active, fallback } = readOpenAiRoleSettings({ environment, role })
+  const fallbackConfiguration = createConfiguration({ role, ...fallback })
   return {
-    openAiStructuredFallback: createFallback({
-      model: environment.OPENAI_STRUCTURED_FALLBACK_MODEL,
-      reasoningEffort: environment.OPENAI_STRUCTURED_FALLBACK_REASONING_EFFORT,
-    }),
-    openAiWritingFallback: createFallback({
-      model: environment.OPENAI_WRITING_FALLBACK_MODEL,
-      reasoningEffort: environment.OPENAI_WRITING_FALLBACK_REASONING_EFFORT,
-    }),
+    active: createOpenAiModelConfiguration({ role, ...active }),
+    ...(fallbackConfiguration === undefined ? {} : { fallback: fallbackConfiguration }),
   }
 }
 
-function validateFallback({
-  context,
-  model,
-  modelPath,
-  reasoningEffort,
-  role,
-}: FallbackValidation) {
-  if (model === undefined && reasoningEffort === undefined) return
-  if (model !== undefined && reasoningEffort !== undefined
-    && isQualifiedModelConfiguration({ model, reasoningEffort, role })) return
+function readOpenAiRoleSettings({ environment, role }: Readonly<{ environment: OpenAiEnvironment; role: ModelRole }>) {
+  return role === 'structured'
+    ? {
+        active: { model: environment.OPENAI_STRUCTURED_MODEL, reasoningEffort: environment.OPENAI_STRUCTURED_REASONING_EFFORT },
+        fallback: { model: environment.OPENAI_STRUCTURED_FALLBACK_MODEL,
+          reasoningEffort: environment.OPENAI_STRUCTURED_FALLBACK_REASONING_EFFORT },
+        fallbackModelPath: 'OPENAI_STRUCTURED_FALLBACK_MODEL',
+        modelPath: 'OPENAI_STRUCTURED_MODEL',
+      }
+    : {
+        active: { model: environment.OPENAI_WRITING_MODEL, reasoningEffort: environment.OPENAI_WRITING_REASONING_EFFORT },
+        fallback: { model: environment.OPENAI_WRITING_FALLBACK_MODEL,
+          reasoningEffort: environment.OPENAI_WRITING_FALLBACK_REASONING_EFFORT },
+        fallbackModelPath: 'OPENAI_WRITING_FALLBACK_MODEL',
+        modelPath: 'OPENAI_WRITING_MODEL',
+      }
+}
+
+function createConfiguration({ model, reasoningEffort, role }: ModelSettings & Readonly<{ role: ModelRole }>) {
+  if (model === undefined || reasoningEffort === undefined) return undefined
+  return createOpenAiModelConfiguration({ model, reasoningEffort, role })
+}
+
+function validateConfiguration({ context, path, ...settings }: ModelSettings & Readonly<{
+  context: z.core.$RefinementCtx
+  path: string
+  role: ModelRole
+}>) {
+  const configuration = createConfiguration(settings)
+  if (configuration !== undefined && isQualifiedModelConfiguration({ configuration })) return
   context.addIssue({
     code: 'custom',
-    message: 'Fallback model configuration has not passed the reference evaluation suite',
-    path: [modelPath],
+    message: 'Model configuration has not passed the reference evaluation suite',
+    path: [path],
   })
-}
-
-function createFallback({
-  model,
-  reasoningEffort,
-}: Readonly<{ model?: string; reasoningEffort?: string }>) {
-  if (model === undefined || reasoningEffort === undefined) return undefined
-  return { model, reasoningEffort }
 }
 
 function createInvalidEnvironmentResult({
@@ -128,3 +123,5 @@ function createInvalidEnvironmentResult({
     },
   } as const
 }
+
+const modelRoles = ['structured', 'writing'] as const satisfies readonly ModelRole[]

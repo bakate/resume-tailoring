@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react'
+import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
 import { createBrowserCandidateJourneySystem } from '../composition-root'
 import type { CandidateSessionRetention } from '../composition-root'
 
@@ -15,8 +16,9 @@ export function useCandidateJourney(): CandidateJourneyController {
   return controller
 }
 
-export function useCandidateJourneyController() {
-  const [candidateJourneySystem] = useState(createBrowserCandidateJourneySystem)
+/** The Processing Policy is the one the server served with the page: that of the provider it calls. */
+export function useCandidateJourneyController({ processingPolicy }: Readonly<{ processingPolicy: ProcessingPolicy }>) {
+  const [candidateJourneySystem] = useState(() => createBrowserCandidateJourneySystem({ processingPolicy }))
   const { candidateJourney } = candidateJourneySystem
   useEffect(() => {
     candidateJourney.start()

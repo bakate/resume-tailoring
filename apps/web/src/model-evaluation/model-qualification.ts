@@ -1,15 +1,11 @@
-import type { OpenAiReasoningEffort } from '../openai-model-configuration'
+import type { LanguageModelConfiguration } from '../language-model-configuration'
 
-export type ModelRole = 'structured' | 'writing'
-
-export type ModelConfiguration = Readonly<{
-  model: string
+/** A Qualified Model Configuration candidate, with the prices its evaluated cost is computed from. */
+export type ModelConfiguration = LanguageModelConfiguration & Readonly<{
   pricing: Readonly<{
     inputUsdPerMillionTokens: number
     outputUsdPerMillionTokens: number
   }>
-  reasoningEffort: OpenAiReasoningEffort
-  role: ModelRole
 }>
 
 export type ModelEvaluationObservation = Readonly<{

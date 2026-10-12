@@ -3,6 +3,7 @@ import type { JobMatch } from '@resume-tailoring/application/job-match'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
+import { createOpenAiModelConfiguration } from '../../language-model-configuration'
 import { createOpenAiJobPostingExtractor } from './openai-job-posting-extractor'
 
 describe('OpenAI Job Posting extraction representative evaluation', () => {
@@ -60,8 +61,9 @@ async function evaluateJobPosting({ jobPostingContent }: Readonly<{
     }) },
     jobPostingExtractor: createOpenAiJobPostingExtractor({
       apiKey: { value: readEnvironmentValue({ name: 'OPENAI_API_KEY' }) },
-      model: readEnvironmentValue({ name: 'OPENAI_STRUCTURED_MODEL' }),
-      reasoningEffort: 'low',
+      configuration: createOpenAiModelConfiguration({
+        model: readEnvironmentValue({ name: 'OPENAI_STRUCTURED_MODEL' }), reasoningEffort: 'low', role: 'structured',
+      }),
       request: createMeasuredRequest({ metrics }),
     }),
     matchEvidenceMatcher: { match: () => Promise.resolve({

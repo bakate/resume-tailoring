@@ -7,6 +7,7 @@ import {
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
+import { createOpenAiModelConfiguration } from '../../language-model-configuration'
 import { createOpenAiJobMatchEvidenceMatcher } from './openai-job-match-evidence-matcher'
 
 // Live evaluation of Requirement Coverage judged by the model and verified by the engine.
@@ -32,8 +33,9 @@ async function evaluateCase({ evaluationCase }: Readonly<{ evaluationCase: Evalu
   const metrics: EvaluationMetric[] = []
   const matcher = createOpenAiJobMatchEvidenceMatcher({
     apiKey: { value: readEnvironmentValue({ name: 'OPENAI_API_KEY' }) },
-    model: readEnvironmentValue({ name: 'OPENAI_STRUCTURED_MODEL' }),
-    reasoningEffort: 'low',
+    configuration: createOpenAiModelConfiguration({
+      model: readEnvironmentValue({ name: 'OPENAI_STRUCTURED_MODEL' }), reasoningEffort: 'low', role: 'structured',
+    }),
     request: createMeasuredRequest({ metrics }),
   })
   const requirements = evaluationCase.requirements.map(createRequirement)

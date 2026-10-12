@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { readOpenAiApiFailure } from './openai-api-failure'
+import { readModelApiFailure } from './model-api-failure'
 
-describe('OpenAI failures as API failures', () => {
+describe('Model request failures as API failures', () => {
   it.each([
     [{ type: 'timeout' }, { type: 'timeout' }],
     [{ type: 'request-too-large', characterCount: 60_001, maximumCharacterCount: 60_000 }, { type: 'input-too-large' }],
@@ -14,6 +14,6 @@ describe('OpenAI failures as API failures', () => {
     [{ type: 'upstream-failure', status: 503 }, { type: 'provider-unavailable' }],
     [{ type: 'transport' }, { type: 'provider-unavailable' }],
   ] as const)('reads %o as %o without naming the operation', (failure, apiFailure) => {
-    expect(readOpenAiApiFailure(failure)).toEqual(apiFailure)
+    expect(readModelApiFailure(failure)).toEqual(apiFailure)
   })
 })

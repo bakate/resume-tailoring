@@ -5,7 +5,7 @@ import { requestOpenAiJobPostingExtraction } from '../adapters/server/openai-job
 import { jobPostingExtractionRequestSchema } from '../candidate-journey/job-match-schemas'
 import { failureResponse } from '../api-failure'
 import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
-import { readOpenAiApiFailure } from '../adapters/server/openai-api-failure'
+import { readModelApiFailure } from '../adapters/server/model-api-failure'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
 
@@ -23,14 +23,13 @@ async function extractJobPosting({ request }: Readonly<{ request: Request }>) {
   const environmentResult = validateServerEnvironment({ environment: process.env })
   if (!environmentResult.ok) return failureResponse({ type: 'service-misconfigured' })
   const result = await requestOpenAiJobPostingExtraction({
-    apiKey: { value: environmentResult.value.openAiApiKey },
+    apiKey: { value: environmentResult.value.languageModel.apiKey },
     jobPostingContent: bodyResult.value.jobPostingContent,
-    model: environmentResult.value.openAiStructuredModel,
-    reasoningEffort: environmentResult.value.openAiStructuredReasoningEffort,
+    configuration: environmentResult.value.languageModel.structured.active,
   })
   return result.ok
     ? Response.json(result, { headers: privateHeaders })
-    : failureResponse(readOpenAiApiFailure(result.error))
+    : failureResponse(readModelApiFailure(result.error))
 }
 
 async function readRequestBody({ request }: Readonly<{ request: Request }>) {

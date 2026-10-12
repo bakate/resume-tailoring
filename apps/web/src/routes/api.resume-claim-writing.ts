@@ -24,9 +24,8 @@ async function writeResumeClaims({ request }: Readonly<{ request: Request }>) {
   const environment = validateServerEnvironment({ environment: process.env })
   if (!environment.ok) return failureResponse({ type: 'service-misconfigured' })
   const reformulator = createOpenAiResumeClaimReformulator({
-    apiKey: { value: environment.value.openAiApiKey },
-    model: environment.value.openAiWritingModel,
-    reasoningEffort: environment.value.openAiWritingReasoningEffort,
+    apiKey: { value: environment.value.languageModel.apiKey },
+    configuration: environment.value.languageModel.writing.active,
   })
   const result = await reformulateResumeClaim({ request: writingRequest.value, reformulator })
   return result.ok

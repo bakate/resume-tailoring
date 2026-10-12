@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
+
+import { createOpenAiModelConfiguration } from '../../language-model-configuration'
 import { resumeSectionKinds } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeSectionContent, ResumeSectionKind, ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
 import { readResumeSection, groupedResumeDocument, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createOpenAiResumeCoherenceChecker, createOpenAiResumeFieldValidator, createOpenAiResumeSectionWriter } from './openai-resume-section-models'
 import { resumeSectionWritingInputSchema } from '../../candidate-journey/resume-document-schemas'
+import { createRecordedOpenAiResponse } from './recorded-openai-responses'
 
 describe('Resume section model adapters', () => {
   it.each(resumeSectionKinds)('writes the %s section under its own strict structured-output schema', async (kind) => {
@@ -11,7 +14,7 @@ describe('Resume section model adapters', () => {
     const content = readResumeSection({ document: groupedResumeDocument, section: sectionFor(kind) })
     const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
       body = readBody(options)
-      return Promise.resolve(Response.json(modelResponse(sectionOutput(content))))
+      return Promise.resolve(modelResponse(sectionOutput(content)))
     } })
 
     const outcome = await writer.write(writingInput(kind))
@@ -32,7 +35,7 @@ describe('Resume section model adapters', () => {
       paragraphs: groupedResumeDocument.valueProposition.paragraphs } as const satisfies ResumeSectionContent
     const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
       body = readBody(options)
-      return Promise.resolve(Response.json(modelResponse(sectionOutput(content))))
+      return Promise.resolve(modelResponse(sectionOutput(content)))
     } })
 
     const outcome = await writer.write(writingInput('value-proposition'))
@@ -47,7 +50,7 @@ describe('Resume section model adapters', () => {
     const previousContent = readResumeSection({ document: groupedResumeDocument, section: sectionFor('skills') })
     const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
       body = readBody(options)
-      return Promise.resolve(Response.json(modelResponse(sectionOutput(previousContent))))
+      return Promise.resolve(modelResponse(sectionOutput(previousContent)))
     } })
     const input = resumeSectionWritingInputSchema.parse({ ...writingInput('skills'), previousContent,
       rejectedFields: [{ fieldId: 'skills-0', text: 'Languages', reason: 'skill-category' },
@@ -65,7 +68,7 @@ describe('Resume section model adapters', () => {
     const content = readResumeSection({ document: groupedResumeDocument, section: sectionFor('experience') })
     const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
       body = readBody(options)
-      return Promise.resolve(Response.json(modelResponse(sectionOutput(content))))
+      return Promise.resolve(modelResponse(sectionOutput(content)))
     } })
     const rejectedFields = [{ fieldId: 'experiences.0.role', text: 'Frontend Engineer building accessible screens', reason: 'misplaced-fact' },
       { fieldId: 'experiences.0.organization', text: '', reason: 'missing-field' }]
@@ -81,7 +84,7 @@ describe('Resume section model adapters', () => {
     const content = readResumeSection({ document: groupedResumeDocument, section: sectionFor('experience') })
     const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
       body = readBody(options)
-      return Promise.resolve(Response.json(modelResponse(sectionOutput(content))))
+      return Promise.resolve(modelResponse(sectionOutput(content)))
     } })
     const experienceShape = { chronology: 'relevant', achievementBudget: 6 } as const
     const input = resumeSectionWritingInputSchema.parse({ ...writingInput('experience'),
@@ -98,7 +101,7 @@ describe('Resume section model adapters', () => {
     let body: RequestBody | null = null
     const validator = createOpenAiResumeFieldValidator({ ...structuredRole, request: (_url, options) => {
       body = readBody(options)
-      return Promise.resolve(Response.json(modelResponse(validation)))
+      return Promise.resolve(modelResponse(validation))
     } })
 
     const outcome = await validator.validate({ ...validationInput(), namesUnsupportedPropositions: true })
@@ -113,7 +116,7 @@ describe('Resume section model adapters', () => {
   it('withholds the unsupported proposition from a browser loaded before it could read one', async () => {
     const validation = { fields: [{ fieldId: 'degree', supported: false, unsupportedProposition: 'The cited facts name no degree' }] }
     const validator = createOpenAiResumeFieldValidator({ ...structuredRole,
-      request: () => Promise.resolve(Response.json(modelResponse(validation))) })
+      request: () => Promise.resolve(modelResponse(validation)) })
 
     const outcome = await validator.validate(validationInput())
 
@@ -124,7 +127,7 @@ describe('Resume section model adapters', () => {
   it('checks the assembled document for coherence and language and names the fields to rewrite', async () => {
     const coherence = { coherent: false, languageMatches: true, issues: [{ fieldId: 'summary-0', kind: 'redundant' }] }
     const checker = createOpenAiResumeCoherenceChecker({ ...structuredRole,
-      request: () => Promise.resolve(Response.json(modelResponse(coherence))) })
+      request: () => Promise.resolve(modelResponse(coherence)) })
 
     const { purpose, locale, targetRole, valueProposition, experiences, sections } = groupedResumeDocument
     const outcome = await checker.check({ document: { purpose, locale, targetRole, valueProposition, experiences, sections } })
@@ -132,9 +135,9 @@ describe('Resume section model adapters', () => {
     expect(outcome).toMatchObject({ ok: true, value: coherence })
   })
 
-  it.each([['malformed', { output: [{ content: [{ type: 'output_text', text: '{}' }] }] }],
-    ['incomplete', { status: 'incomplete', output: [] }]])('reports an invalid provider response on %s output', async (_label, response) => {
-    const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: () => Promise.resolve(Response.json(response)) })
+  it.each([['malformed', { outputText: '{}', usage: null }],
+    ['incomplete', { incompleteReason: 'max_output_tokens', usage: null }]] as const)('reports an invalid provider response on %s output', async (_label, response) => {
+    const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: () => Promise.resolve(createRecordedOpenAiResponse(response)) })
 
     const outcome = await writer.write(writingInput('skills'))
 
@@ -175,8 +178,10 @@ describe('Resume section model adapters', () => {
 
 type RequestBody = Record<string, unknown>
 
-const writingRole = { apiKey: { value: 'test-key' }, model: 'writing-role', reasoningEffort: 'medium' } as const
-const structuredRole = { apiKey: { value: 'test-key' }, model: 'structured-role', reasoningEffort: 'low' } as const
+const writingRole = { apiKey: { value: 'test-key' },
+  configuration: createOpenAiModelConfiguration({ model: 'writing-role', reasoningEffort: 'medium', role: 'writing' }) } as const
+const structuredRole = { apiKey: { value: 'test-key' },
+  configuration: createOpenAiModelConfiguration({ model: 'structured-role', reasoningEffort: 'low', role: 'structured' }) } as const
 
 function sectionFor(kind: ResumeSectionKind) {
   return { key: kind === 'experience' ? 'experiences.0' : kind, kind }
@@ -208,8 +213,7 @@ function readModelInput(body: RequestBody | null): unknown {
 }
 
 function modelResponse(value: unknown) {
-  return { output: [{ content: [{ type: 'output_text', text: JSON.stringify(value) }] }],
-    usage: { input_tokens: 900, output_tokens: 120 } }
+  return createRecordedOpenAiResponse({ outputText: JSON.stringify(value), usage: { inputTokens: 900, outputTokens: 120 } })
 }
 
 function readBody(options: RequestInit | undefined): RequestBody {

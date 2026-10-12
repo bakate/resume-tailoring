@@ -72,44 +72,31 @@ type OpenAiModelAdapters = Readonly<{
   structuredSourceProfileExtractor: StructuredSourceProfileExtractor
 }>
 
-export const openAiProcessingPolicy = {
-  provider: 'OpenAI',
-  purposes: [
-    'Extract and structure professional evidence',
-    'Compare Candidate evidence with Job Posting requirements',
-    'Write and validate supported Tailored Resume content',
-  ],
-  retentionPolicy: 'API inputs and outputs may be retained for abuse monitoring for up to 30 days, or longer when legally required.',
-  storageBehavior: 'Candidate content remains browser-local; model requests are stateless with application storage disabled.',
-  transmittedDataCategories: [
-    'Minimized professional content',
-    'Job Posting content',
-    'Candidate Facts needed for matching, writing, and validation',
-  ],
-  version: '2026-09-29',
-} as const satisfies ProcessingPolicy
-
+/** The Processing Policy is the server's, the one of the provider it calls; the browser never decides it. */
 export function createOpenAiLanguageModelGateway({
+  processingPolicy,
   readProcessingConsent,
   request = fetch,
 }: Readonly<{
+  processingPolicy: ProcessingPolicy
   readProcessingConsent: () => ProcessingConsent | null
   request?: typeof fetch
 }>): OpenAiLanguageModelGateway {
   return createLanguageModelGateway({
-    adapter: createOpenAiLanguageModelGatewayAdapter({ request }),
+    adapter: createOpenAiLanguageModelGatewayAdapter({ processingPolicy, request }),
     readProcessingConsent,
   })
 }
 
-function createOpenAiLanguageModelGatewayAdapter({ request }: Readonly<{
+function createOpenAiLanguageModelGatewayAdapter({ processingPolicy, request }: Readonly<{
+  processingPolicy: ProcessingPolicy
   request: typeof fetch
 }>): LanguageModelGatewayAdapter<
   StructuredModelRequest, StructuredModelValue, WritingModelRequest, WritingModelValue
 > {
   const modelAdapters = createOpenAiModelAdapters({ request })
   return {
-    processingPolicy: openAiProcessingPolicy,
+    processingPolicy,
     structured: { process: (modelRequest) => processStructured({ modelAdapters, modelRequest }) },
     writing: { process: (modelRequest) => processWriting({ modelAdapters, modelRequest }) },
   }

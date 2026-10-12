@@ -1,9 +1,7 @@
-import { z } from 'zod'
-
-import type { OpenAiReasoningEffort } from '../../openai-model-configuration'
-import { createOpenAiRequester } from './openai-request'
-import type { ModelApiKey } from './openai-request'
-import { readOpenAiApiFailure } from './openai-api-failure'
+import type { LanguageModelConfiguration } from '../../language-model-configuration'
+import { createModelRequester } from './language-model-request'
+import type { ModelApiKey } from './language-model-request'
+import { readModelApiFailure } from './model-api-failure'
 import {
   structuredSourceProfileExtractionSchema,
   structuredSourceProfileResponseFormat,
@@ -13,21 +11,18 @@ import { delimitUntrustedContent, untrustedContentInstruction } from './untruste
 
 export function createOpenAiStructuredSourceProfileExtractor({
   apiKey,
-  model,
-  reasoningEffort,
+  configuration,
   request = fetch,
 }: Readonly<{
   apiKey: ModelApiKey
-  model: string
-  reasoningEffort: OpenAiReasoningEffort
+  configuration: LanguageModelConfiguration
   request?: typeof fetch
 }>): StructuredSourceProfileExtractor {
   return {
     extract: ({ professionalContent }) => requestExtraction({
       apiKey,
-      model,
+      configuration,
       professionalContent,
-      reasoningEffort,
       request,
     }),
   }
@@ -35,40 +30,28 @@ export function createOpenAiStructuredSourceProfileExtractor({
 
 async function requestExtraction({
   apiKey,
-  model,
+  configuration,
   professionalContent,
-  reasoningEffort,
   request,
 }: Readonly<{
   apiKey: ModelApiKey
-  model: string
+  configuration: LanguageModelConfiguration
   professionalContent: string
-  reasoningEffort: OpenAiReasoningEffort
   request: typeof fetch
 }>) {
-  const requester = createOpenAiRequester({ apiKey, request })
+  const requester = createModelRequester({ apiKey, configuration, request })
   const response = await requester.send({
-    body: {
-      input: [
-        { role: 'developer', content: [{ type: 'input_text', text: extractionInstructions }] },
-        { role: 'user', content: [{ type: 'input_text', text: delimitUntrustedContent({ kind: 'source-document', content: professionalContent }) }] },
-      ],
-      max_output_tokens: 16_000,
-      model,
-      reasoning: { effort: reasoningEffort },
-      store: false,
-      text: { format: structuredSourceProfileResponseFormat },
-    },
+    instructions: extractionInstructions,
+    maxOutputTokens: 16_000,
     operation: 'structured-source-profile-extraction',
+    output: structuredSourceProfileResponseFormat,
+    userText: delimitUntrustedContent({ kind: 'source-document', content: professionalContent }),
   })
-  return response.ok ? parseOpenAiResponse({ value: response.value })
-    : { ...unavailableResult, apiFailure: readOpenAiApiFailure(response.error) }
+  return response.ok ? parseModelOutput({ outputText: response.value.text })
+    : { ...unavailableResult, apiFailure: readModelApiFailure(response.error) }
 }
 
-function parseOpenAiResponse({ value }: Readonly<{ value: unknown }>) {
-  const response = openAiResponseSchema.safeParse(value)
-  if (!response.success) return unavailableResult
-  const outputText = readOutputText({ output: response.data.output })
+function parseModelOutput({ outputText }: Readonly<{ outputText?: string }>) {
   if (outputText === undefined) return unavailableResult
   try {
     const extraction = structuredSourceProfileExtractionSchema.safeParse(JSON.parse(outputText))
@@ -76,18 +59,6 @@ function parseOpenAiResponse({ value }: Readonly<{ value: unknown }>) {
   } catch {
     return unavailableResult
   }
-}
-
-function readOutputText({ output }: Readonly<{ output: readonly unknown[] }>) {
-  for (const item of output) {
-    const parsedItem = openAiOutputItemSchema.safeParse(item)
-    if (!parsedItem.success) continue
-    for (const content of parsedItem.data.content) {
-      const parsedContent = openAiOutputTextSchema.safeParse(content)
-      if (parsedContent.success) return parsedContent.data.text
-    }
-  }
-  return undefined
 }
 
 const extractionInstructions = [
@@ -102,13 +73,6 @@ const extractionInstructions = [
   'Each ambiguity path must identify one scalar fact as section.entryIndex.field.valueIndex.',
   'Ask one concise targeted question for that fact; do not withhold unrelated evidence.',
 ].join(' ')
-
-const openAiResponseSchema = z.object({
-  output: z.array(z.unknown()),
-})
-
-const openAiOutputItemSchema = z.object({ content: z.array(z.unknown()) })
-const openAiOutputTextSchema = z.object({ type: z.literal('output_text'), text: z.string() })
 
 const unavailableResult = {
   ok: false,

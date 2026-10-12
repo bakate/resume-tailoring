@@ -8,8 +8,7 @@ export const Route = createFileRoute('/api/resume-document-coherence')({ server:
   middleware: [createCsrfMiddleware()], handlers: { POST: ({ request }) => processResumeModel({
     request, schema: resumeCoherenceInputSchema,
     processInput: (input, environment, apiKey) => createOpenAiResumeCoherenceChecker({
-      apiKey, model: environment.openAiStructuredModel,
-      reasoningEffort: environment.openAiStructuredReasoningEffort,
+      apiKey, configuration: environment.languageModel.structured.active,
     }).check(input),
   }) },
 } })
