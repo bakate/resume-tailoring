@@ -26,14 +26,31 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Chrome for PDF integration tests
         run: pnpm --filter @resume-tailoring/web exec puppeteer browsers install chrome
-      - name: Install Chromium for the E2E smoke test
-        run: pnpm --filter @resume-tailoring/web exec playwright install --with-deps chromium
       - run: pnpm check
+
+  # Runs beside check: the dev server reads workspace packages from source, so it needs no build.
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chrome for the PDF preview the dev server renders
+        run: pnpm --filter @resume-tailoring/web exec puppeteer browsers install chrome
+      - name: Install Chromium for the E2E smoke test
+        run: pnpm --filter @resume-tailoring/web exec playwright install --with-deps --only-shell chromium
       - name: Run the Chromium E2E smoke test
         run: pnpm test:e2e
 
   deploy:
-    needs: check
+    needs: [check, e2e]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30

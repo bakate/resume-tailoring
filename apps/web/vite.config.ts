@@ -7,7 +7,6 @@ import { sourceDocumentBrowserSupportPolicy } from './src/resume-tailoring/sourc
 
 export default defineConfig(({ mode }) => {
   Object.assign(process.env, loadEnv(mode, '../..', 'OPENAI_'))
-  const isEndToEndTestServer = process.env.VITE_E2E === '1'
 
   return {
     build: {
@@ -28,7 +27,6 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [tanstackStart(), viteReact(), nitro()],
     server: {
-      hmr: isEndToEndTestServer ? { overlay: false } : undefined,
       port: 3000,
     },
     worker: {
