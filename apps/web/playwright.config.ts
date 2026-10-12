@@ -5,6 +5,8 @@ const testBaseUrl = `http://127.0.0.1:${testPort}`
 
 export default defineConfig({
   testDir: './test',
+  // Each test opens its own browser context, so tests of one file can share the workers.
+  fullyParallel: true,
   use: {
     baseURL: testBaseUrl,
     trace: 'on-first-retry',
