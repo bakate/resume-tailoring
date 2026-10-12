@@ -63,10 +63,17 @@ included, against the passing reports in `qualified-model-configurations.ts`.
 
 `LANGUAGE_MODEL_PROVIDER` selects the one active Language Model Provider (only `openai` exists; it is
 the default when unset). Environment validation rejects a provider, a model or a reasoning effort that
-no Qualified Model Configuration backs: every model route answers `service-misconfigured`, and the
-landing fails to render for an unknown provider. The per-role `OPENAI_*` settings therefore stay
-frozen at their qualified values. The active provider also determines the Processing Policy the
-landing serves.
+no Qualified Model Configuration backs, so the per-role `OPENAI_*` settings stay frozen at their
+qualified values. The active provider also determines the Processing Policy the landing serves.
+
+A refused selection never reaches production:
+
+- `deployment-environment.test.ts` validates the environment `template.yaml` deploys. It runs in
+  `pnpm check`, which gates the production deployment.
+- `scripts/check-production.sh` fails the deployment when the deployed landing states no Processing
+  Policy.
+- At runtime, a refused selection disables the Candidate Journey: the landing renders without a
+  Processing Policy, and every model route answers `service-misconfigured`.
 
 ## Fallback policy
 

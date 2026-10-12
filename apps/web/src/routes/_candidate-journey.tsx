@@ -1,6 +1,7 @@
 import { Outlet, createFileRoute, useMatch } from '@tanstack/react-router'
 
-import { CandidateJourneyLanding, CandidateJourneyShell, CandidateJourneyStatus } from '../candidate-journey/candidate-journey-shell'
+import { CandidateJourneyLanding, CandidateJourneyShell, CandidateJourneyStatus, CandidateJourneyUnavailable,
+} from '../candidate-journey/candidate-journey-shell'
 import { CandidateJourneyControllerProvider, useCandidateJourneyController } from '../candidate-journey/use-candidate-journey'
 import { DemoAccessGate } from '../demo-access/demo-access-gate'
 import { readInitialDemoAccess } from '../demo-access/demo-access-initial-state'
@@ -20,7 +21,7 @@ export const Route = createFileRoute('/_candidate-journey')({
 
 /**
  * The shell and, on `/`, the landing are public and rendered by the server; only the Candidate Journey, and with it
- * every model call, waits behind demo access.
+ * every model call, waits behind demo access. A server without a Processing Policy to serve disables the journey.
  */
 function CandidateJourneyLayout() {
   const { initialAccess, processingPolicy } = Route.useLoaderData()
@@ -28,9 +29,11 @@ function CandidateJourneyLayout() {
   return (
     <CandidateJourneyShell>
       {isIntake ? <CandidateJourneyLanding processingPolicy={processingPolicy} /> : null}
-      <DemoAccessGate initialAccess={initialAccess}>
-        <CandidateJourney processingPolicy={processingPolicy} />
-      </DemoAccessGate>
+      {processingPolicy === null ? <CandidateJourneyUnavailable /> : (
+        <DemoAccessGate initialAccess={initialAccess}>
+          <CandidateJourney processingPolicy={processingPolicy} />
+        </DemoAccessGate>
+      )}
     </CandidateJourneyShell>
   )
 }

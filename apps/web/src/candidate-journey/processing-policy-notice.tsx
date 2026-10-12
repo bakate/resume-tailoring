@@ -14,7 +14,7 @@ export const processingPolicyNoticeId = 'processing-policy-notice'
 export function PrivacyStatement({ localization, processingPolicy }: LocalizationProps & Readonly<{
   processingPolicy: ProcessingPolicy
 }>) {
-  return <Box className="privacy-statement" mt="lg">
+  return <Box className="privacy-statement" data-processing-policy-version={processingPolicy.version} mt="lg">
     <Group gap="xs" wrap="nowrap" align="flex-start">
       <IconLock aria-hidden="true" className="privacy-statement-icon" size={20} stroke={2} />
       <Text>{localization.translate('candidateJourney.privacyStatement')}</Text>

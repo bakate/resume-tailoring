@@ -44,15 +44,17 @@ export type RoleModelConfigurations<TProvider extends LanguageModelProvider> = R
   fallback?: ProviderModelConfiguration<TProvider>
 }>
 
-/** The one Language Model Provider every model role uses, with the key that signs its requests. */
-export type ActiveLanguageModel = {
+/** The one Language Model Provider every model role uses, with each role's Qualified Model Configurations. */
+export type LanguageModelSelection = {
   [TProvider in LanguageModelProvider]: Readonly<{
-    apiKey: string
     provider: TProvider
     structured: RoleModelConfigurations<TProvider>
     writing: RoleModelConfigurations<TProvider>
   }>
 }[LanguageModelProvider]
+
+/** The selection with the key that signs its requests. */
+export type ActiveLanguageModel = LanguageModelSelection & Readonly<{ apiKey: string }>
 
 export function createOpenAiModelConfiguration({ model, reasoningEffort, role }: Readonly<{
   model: string

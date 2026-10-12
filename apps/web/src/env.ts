@@ -3,14 +3,15 @@ import { z } from 'zod'
 import { isQualifiedModelConfiguration } from './model-evaluation/qualified-model-configurations'
 import { structuredModelConfiguration, writingModelConfiguration } from './model-evaluation/model-configurations'
 import { createOpenAiModelConfiguration, languageModelProviders, openAiReasoningEfforts } from './language-model-configuration'
-import type { ActiveLanguageModel, ModelRole, OpenAiReasoningEffort } from './language-model-configuration'
+import type { ActiveLanguageModel, LanguageModelSelection, ModelRole, OpenAiReasoningEffort } from './language-model-configuration'
 
 const providerEnvironmentSchema = z.object({
   LANGUAGE_MODEL_PROVIDER: z.enum(languageModelProviders).default('openai'),
 })
 
-const openAiEnvironmentSchema = z.object({
-  OPENAI_API_KEY: z.string().trim().min(1),
+const openAiKeySchema = z.object({ OPENAI_API_KEY: z.string().trim().min(1) })
+
+const openAiModelSettingsSchema = z.object({
   OPENAI_STRUCTURED_FALLBACK_MODEL: z.string().trim().min(1).optional(),
   OPENAI_STRUCTURED_FALLBACK_REASONING_EFFORT: z.enum(openAiReasoningEfforts).optional(),
   OPENAI_STRUCTURED_MODEL: z.string().trim().min(1).default(structuredModelConfiguration.model),
@@ -39,27 +40,35 @@ export type ServerEnvironment = Readonly<{ languageModel: ActiveLanguageModel }>
 export function validateServerEnvironment({
   environment,
 }: Readonly<{ environment: Record<string, unknown> }>) {
-  const provider = readLanguageModelProvider({ environment })
-  if (!provider.ok) return provider
-  const result = openAiEnvironmentSchema.safeParse(environment)
-  if (!result.success) return createInvalidEnvironmentResult({ issues: result.error.issues })
-  return { ok: true, value: { languageModel: createOpenAiLanguageModel({ environment: result.data }) } } as const
+  const selection = readLanguageModelSelection({ environment })
+  const key = openAiKeySchema.safeParse(environment)
+  if (!selection.ok || !key.success) {
+    return createInvalidEnvironmentResult({ issues: [
+      ...(selection.ok ? [] : selection.error.issues),
+      ...(key.success ? [] : readIssues({ issues: key.error.issues })),
+    ] })
+  }
+  const languageModel: ActiveLanguageModel = { apiKey: key.data.OPENAI_API_KEY, ...selection.value }
+  return { ok: true, value: { languageModel } } as const
 }
 
-/** The active provider alone, which the Processing Policy depends on; its key and model settings are not needed. */
-export function readLanguageModelProvider({ environment }: Readonly<{ environment: Record<string, unknown> }>) {
-  const result = providerEnvironmentSchema.safeParse(environment)
-  return result.success
-    ? { ok: true, value: result.data.LANGUAGE_MODEL_PROVIDER } as const
-    : createInvalidEnvironmentResult({ issues: result.error.issues })
+/**
+ * The active provider and its per-role model settings, without the provider key: what the Processing Policy and the
+ * deployment check depend on.
+ */
+export function readLanguageModelSelection({ environment }: Readonly<{ environment: Record<string, unknown> }>) {
+  const provider = providerEnvironmentSchema.safeParse(environment)
+  if (!provider.success) return createInvalidEnvironmentResult({ issues: readIssues({ issues: provider.error.issues }) })
+  const settings = openAiModelSettingsSchema.safeParse(environment)
+  if (!settings.success) return createInvalidEnvironmentResult({ issues: readIssues({ issues: settings.error.issues }) })
+  return { ok: true, value: createOpenAiSelection({ environment: settings.data }) } as const
 }
 
-type OpenAiEnvironment = z.infer<typeof openAiEnvironmentSchema>
+type OpenAiEnvironment = z.infer<typeof openAiModelSettingsSchema>
 type ModelSettings = Readonly<{ model?: string; reasoningEffort?: OpenAiReasoningEffort }>
 
-function createOpenAiLanguageModel({ environment }: Readonly<{ environment: OpenAiEnvironment }>): ActiveLanguageModel {
+function createOpenAiSelection({ environment }: Readonly<{ environment: OpenAiEnvironment }>): LanguageModelSelection {
   return {
-    apiKey: environment.OPENAI_API_KEY,
     provider: 'openai',
     structured: createRoleConfigurations({ environment, role: 'structured' }),
     writing: createRoleConfigurations({ environment, role: 'writing' }),
@@ -112,16 +121,13 @@ function validateConfiguration({ context, path, ...settings }: ModelSettings & R
   })
 }
 
-function createInvalidEnvironmentResult({
-  issues,
-}: Readonly<{ issues: readonly z.core.$ZodIssue[] }>) {
-  return {
-    ok: false,
-    error: {
-      type: 'invalid-server-environment',
-      issues: issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`),
-    },
-  } as const
+/** An issue names the setting and the rule it breaks, never the value it holds. */
+function readIssues({ issues }: Readonly<{ issues: readonly z.core.$ZodIssue[] }>) {
+  return issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+}
+
+function createInvalidEnvironmentResult({ issues }: Readonly<{ issues: readonly string[] }>) {
+  return { ok: false, error: { type: 'invalid-server-environment', issues } } as const
 }
 
 const modelRoles = ['structured', 'writing'] as const satisfies readonly ModelRole[]

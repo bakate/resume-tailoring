@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createOpenAiModelConfiguration } from './language-model-configuration'
-import { readLanguageModelProvider, validateServerEnvironment } from './env'
+import { readLanguageModelSelection, validateServerEnvironment } from './env'
 
 const qualifiedStructured = createOpenAiModelConfiguration({ model: 'gpt-6-luna', reasoningEffort: 'low', role: 'structured' })
 const qualifiedWriting = createOpenAiModelConfiguration({ model: 'gpt-6-sol', reasoningEffort: 'medium', role: 'writing' })
@@ -115,10 +115,18 @@ describe('server environment validation', () => {
   })
 })
 
-describe('active Language Model Provider', () => {
-  it('reads the provider alone, so the landing states its Processing Policy without the provider key', () => {
-    expect(readLanguageModelProvider({ environment: {} })).toEqual({ ok: true, value: 'openai' })
-    expect(readLanguageModelProvider({ environment: { LANGUAGE_MODEL_PROVIDER: 'openai' } })).toEqual({ ok: true, value: 'openai' })
-    expect(readLanguageModelProvider({ environment: { LANGUAGE_MODEL_PROVIDER: 'another-provider' } }).ok).toBe(false)
+describe('Language Model selection', () => {
+  it('validates the provider and its model settings without the provider key, so the landing never needs it', () => {
+    expect(readLanguageModelSelection({ environment: {} })).toEqual({ ok: true, value: {
+      provider: 'openai', structured: { active: qualifiedStructured }, writing: { active: qualifiedWriting },
+    } })
+  })
+
+  it.each([
+    { LANGUAGE_MODEL_PROVIDER: 'another-provider' },
+    { OPENAI_STRUCTURED_MODEL: 'unqualified-model' },
+    { OPENAI_WRITING_REASONING_EFFORT: 'high' },
+  ])('refuses a selection without a Qualified Model Configuration: %o', (environment) => {
+    expect(readLanguageModelSelection({ environment }).ok).toBe(false)
   })
 })

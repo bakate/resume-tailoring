@@ -1,6 +1,6 @@
 import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
 
-import { readLanguageModelProvider } from './env'
+import { readLanguageModelSelection } from './env'
 import type { LanguageModelProvider } from './language-model-configuration'
 
 /**
@@ -28,11 +28,17 @@ export function createProcessingPolicy({ provider }: Readonly<{ provider: Langua
   }
 }
 
-/** The policy of the provider the server environment selects, so the Candidate consents to the processor it calls. */
-export function readActiveProcessingPolicy({ environment }: Readonly<{ environment: Record<string, unknown> }>) {
-  const provider = readLanguageModelProvider({ environment })
-  if (!provider.ok) throw new Error(provider.error.type)
-  return createProcessingPolicy({ provider: provider.value })
+/**
+ * The policy of the provider the server environment selects, so the Candidate consents to the processor it calls.
+ * A selection the server refuses has no policy: no model operation can run, so there is nothing to consent to.
+ */
+export function readActiveProcessingPolicy({ environment }: Readonly<{
+  environment: Record<string, unknown>
+}>): ProcessingPolicy | null {
+  const selection = readLanguageModelSelection({ environment })
+  if (selection.ok) return createProcessingPolicy({ provider: selection.value.provider })
+  console.error(JSON.stringify({ category: 'invalid-server-environment', issues: selection.error.issues }))
+  return null
 }
 
 const processingPurposes = [

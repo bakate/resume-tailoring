@@ -126,7 +126,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFARE_ACCOUNT_ID }}
           ORIGIN_URL: ${{ steps.origin.outputs.url }}
         run: pnpm dlx wrangler@4.142.0 deploy --var "ORIGIN_URL:$ORIGIN_URL"
-      - name: Check availability and access protection without calling OpenAI
+      - name: Check availability, the Processing Policy and access protection without calling a model
         env:
           ORIGIN_URL: ${{ steps.origin.outputs.url }}
         run: bash scripts/check-production.sh https://resume-studio.bakateba.workers.dev "$ORIGIN_URL"

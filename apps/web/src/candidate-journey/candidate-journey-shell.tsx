@@ -60,9 +60,10 @@ export function CandidateJourneyShell({ children }: Readonly<{ children: ReactNo
 
 /**
  * What `/` says before anything else: what the product does and how it treats the Candidate's documents. It is public,
- * rendered by the server and readable without JavaScript, so search engines and link previews read it too.
+ * rendered by the server and readable without JavaScript, so search engines and link previews read it too. Without a
+ * Processing Policy no processor is disclosed, since none can be called.
  */
-export function CandidateJourneyLanding({ processingPolicy }: Readonly<{ processingPolicy: ProcessingPolicy }>) {
+export function CandidateJourneyLanding({ processingPolicy }: Readonly<{ processingPolicy: ProcessingPolicy | null }>) {
   const localizationResult = useLocalization()
   if (!localizationResult.ok) return <LocalizationFailure />
   const localization = localizationResult.value
@@ -77,9 +78,19 @@ export function CandidateJourneyLanding({ processingPolicy }: Readonly<{ process
       <Text c="dimmed" mt="lg" size="xl">
         {localization.translate('candidateJourney.description')}
       </Text>
-      <PrivacyStatement localization={localization} processingPolicy={processingPolicy} />
+      {processingPolicy === null ? null : <PrivacyStatement localization={localization} processingPolicy={processingPolicy} />}
     </Box>
   )
+}
+
+/** Stands in for the Candidate Journey when the server has no Processing Policy to serve: no document is accepted. */
+export function CandidateJourneyUnavailable() {
+  const localizationResult = useLocalization()
+  if (!localizationResult.ok) return <LocalizationFailure />
+  const localization = localizationResult.value
+  return <Alert color="caution" role="alert" title={localization.translate('candidateJourney.unavailableTitle')}>
+    <Text>{localization.translate('candidateJourney.unavailableExplanation')}</Text>
+  </Alert>
 }
 
 /** Live announcements of the Candidate Journey's progress, for assistive technology. */
