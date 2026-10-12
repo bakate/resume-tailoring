@@ -6,43 +6,38 @@ import {
   proposedResumeClaimsSchema,
   resumeClaimSemanticValidationSchema,
 } from '../../resume-tailoring/resume-claim-schemas'
-import { createOpenAiRequester } from './openai-request'
-import type { ModelApiKey, OpenAiRequestFailure } from './openai-request'
-import { readOpenAiApiFailure } from './openai-api-failure'
+import type { LanguageModelConfiguration } from '../../language-model-configuration'
+import { createModelRequester } from './language-model-request'
+import type { ModelApiKey, ModelRequestFailure } from './language-model-request'
+import { readModelApiFailure } from './model-api-failure'
 import type { ResumeClaimReformulator, ResumeClaimSemanticValidator } from '@resume-tailoring/application/ports'
 import { delimitSuppliedData, untrustedContentInstruction } from './untrusted-model-input'
 
-type OpenAiModelConfiguration = Readonly<{
+type ResumeClaimModelSettings = Readonly<{
   apiKey: ModelApiKey
-  model: string
-  reasoningEffort: 'low' | 'medium'
+  configuration: LanguageModelConfiguration
   request?: typeof fetch
 }>
 
-type OpenAiValidationConfiguration = OpenAiModelConfiguration & Readonly<{
+type ResumeClaimValidationSettings = ResumeClaimModelSettings & Readonly<{
   deadlineSignal?: AbortSignal
   operation?: 'resume-claim-validation'
 }>
 
-type ActiveOpenAiModelConfiguration = Readonly<{
+type ActiveResumeClaimModel = Readonly<{
   deadlineSignal?: AbortSignal
-  model: string
   operation: 'resume-claim-validation' | 'resume-claim-writing'
-  reasoningEffort: 'low' | 'medium'
-  requester: ReturnType<typeof createOpenAiRequester>
+  requester: ReturnType<typeof createModelRequester>
 }>
 
 export function createOpenAiResumeClaimReformulator({
   apiKey,
-  model,
-  reasoningEffort,
+  configuration: modelConfiguration,
   request = fetch,
-}: OpenAiModelConfiguration): ResumeClaimReformulator {
+}: ResumeClaimModelSettings): ResumeClaimReformulator {
   const configuration = {
-    model,
     operation: 'resume-claim-writing' as const,
-    reasoningEffort,
-    requester: createOpenAiRequester({ apiKey, request }),
+    requester: createModelRequester({ apiKey, configuration: modelConfiguration, request }),
   }
   return {
     reformulate: (reformulation) => reformulateResumeClaim({ configuration, reformulation }),
@@ -51,18 +46,15 @@ export function createOpenAiResumeClaimReformulator({
 
 export function createOpenAiResumeClaimSemanticValidator({
   apiKey,
+  configuration: modelConfiguration,
   deadlineSignal,
-  model,
   operation = 'resume-claim-validation',
-  reasoningEffort,
   request = fetch,
-}: OpenAiValidationConfiguration): ResumeClaimSemanticValidator {
+}: ResumeClaimValidationSettings): ResumeClaimSemanticValidator {
   const configuration = {
     deadlineSignal,
-    model,
     operation,
-    reasoningEffort,
-    requester: createOpenAiRequester({ apiKey, request }),
+    requester: createModelRequester({ apiKey, configuration: modelConfiguration, request }),
   }
   return {
     validate: (validationRequest) => validateResumeClaim({ configuration, validationRequest }),
@@ -70,7 +62,7 @@ export function createOpenAiResumeClaimSemanticValidator({
 }
 
 async function reformulateResumeClaim({ configuration, reformulation }: Readonly<{
-  configuration: ActiveOpenAiModelConfiguration
+  configuration: ActiveResumeClaimModel
   reformulation: Parameters<ResumeClaimReformulator['reformulate']>[0]
 }>) {
   const { claim, feedback, request: candidateRequest, ...writingInputs } = reformulation
@@ -90,7 +82,7 @@ async function writeResumeClaims({
   revision,
   writingInputs,
 }: Readonly<{
-  configuration: ActiveOpenAiModelConfiguration
+  configuration: ActiveResumeClaimModel
   revision?: Readonly<{
     candidateRequest?: string
     claim: unknown
@@ -98,10 +90,10 @@ async function writeResumeClaims({
   }>
   writingInputs: ResumeClaimWritingInputs
 }>) {
-  const response = await requestOpenAi({
+  const response = await requestModel({
     ...configuration,
-    developerText: writingInstructions,
-    responseFormat: resumeClaimResponseFormat,
+    instructions: writingInstructions,
+    output: resumeClaimResponseFormat,
     userValue: revision === undefined ? writingInputs : { ...writingInputs, revision },
   })
   if (!response.ok) return withRequestFailure({ result: resumeClaimWritingUnavailableResult, response })
@@ -126,13 +118,13 @@ async function validateResumeClaim({
   configuration,
   validationRequest,
 }: Readonly<{
-  configuration: ActiveOpenAiModelConfiguration
+  configuration: ActiveResumeClaimModel
   validationRequest: Parameters<ResumeClaimSemanticValidator['validate']>[0]
 }>) {
-  const response = await requestOpenAi({
+  const response = await requestModel({
     ...configuration,
-    developerText: validationInstructions,
-    responseFormat: resumeClaimValidationResponseFormat,
+    instructions: validationInstructions,
+    output: resumeClaimValidationResponseFormat,
     userValue: validationRequest,
   })
   if (!response.ok) return withRequestFailure({ result: resumeClaimValidationUnavailableResult, response })
@@ -142,87 +134,48 @@ async function validateResumeClaim({
     : resumeClaimValidationUnavailableResult
 }
 
-async function requestOpenAi({
+async function requestModel({
   deadlineSignal,
-  developerText,
-  model,
+  instructions,
   operation,
-  reasoningEffort,
+  output,
   requester,
-  responseFormat,
   userValue,
-}: Readonly<{
-  deadlineSignal?: AbortSignal
-  developerText: string
-  model: string
-  operation: ActiveOpenAiModelConfiguration['operation']
-  reasoningEffort: 'low' | 'medium'
-  requester: ReturnType<typeof createOpenAiRequester>
-  responseFormat: Readonly<Record<string, unknown>>
+}: ActiveResumeClaimModel & Readonly<{
+  instructions: string
+  output: Readonly<{ name: string; schema: Readonly<Record<string, unknown>> }>
   userValue: unknown
 }>) {
   const response = await requester.send({
-    body: createOpenAiRequestBody({ developerText, model, reasoningEffort, responseFormat, userValue }),
     deadlineSignal,
+    instructions,
+    maxOutputTokens: maximumOutputTokens,
     operation,
+    output,
+    userText: delimitSuppliedData(userValue),
   })
-  return response.ok ? parseOpenAiResponse(response.value) : { ok: false, requestFailure: response.error } as const
+  return response.ok ? parseModelOutput({ outputText: response.value.text })
+    : { ok: false, requestFailure: response.error } as const
 }
 
 /** Keeps why a provider call failed, so the Candidate reads the Failure Cause the provider's answer implies. */
 function withRequestFailure<TType extends string>({ result, response }: Readonly<{
   result: Readonly<{ ok: false; error: Readonly<{ type: TType }> }>
-  response: Readonly<{ ok: false; requestFailure?: OpenAiRequestFailure }>
+  response: Readonly<{ ok: false; requestFailure?: ModelRequestFailure }>
 }>) {
   return response.requestFailure === undefined ? result
-    : { ok: false, error: { ...result.error, apiFailure: readOpenAiApiFailure(response.requestFailure) } } as const
-}
-
-function createOpenAiRequestBody({
-  developerText, model, reasoningEffort, responseFormat, userValue,
-}: Omit<Parameters<typeof requestOpenAi>[0], 'deadlineSignal' | 'operation' | 'requester'>) {
-  return {
-    model, max_output_tokens: maximumOutputTokens,
-    reasoning: { effort: reasoningEffort }, store: false,
-    input: createOpenAiInput({ developerText, userValue }),
-    text: { format: responseFormat },
-  } as const
+    : { ok: false, error: { ...result.error, apiFailure: readModelApiFailure(response.requestFailure) } } as const
 }
 
 const maximumOutputTokens = 12_000
 
-function createOpenAiInput({ developerText, userValue }: Readonly<{
-  developerText: string
-  userValue: unknown
-}>) {
-  return [
-    { role: 'developer', content: [{ type: 'input_text', text: developerText }] },
-    { role: 'user', content: [{ type: 'input_text', text: delimitSuppliedData(userValue) }] },
-  ]
-}
-
-function parseOpenAiResponse(value: unknown) {
-  const parsedResponse = openAiResponseSchema.safeParse(value)
-  if (!parsedResponse.success) return unavailableOpenAiResult
-  const outputText = readOutputText({ output: parsedResponse.data.output })
-  if (outputText === undefined) return unavailableOpenAiResult
+function parseModelOutput({ outputText }: Readonly<{ outputText?: string }>) {
+  if (outputText === undefined) return unavailableModelResult
   try {
     return { ok: true, value: JSON.parse(outputText) as unknown } as const
   } catch {
-    return unavailableOpenAiResult
+    return unavailableModelResult
   }
-}
-
-function readOutputText({ output }: Readonly<{ output: readonly unknown[] }>) {
-  for (const item of output) {
-    const parsedItem = openAiOutputItemSchema.safeParse(item)
-    if (!parsedItem.success) continue
-    for (const content of parsedItem.data.content) {
-      const parsedContent = openAiOutputTextSchema.safeParse(content)
-      if (parsedContent.success) return parsedContent.data.text
-    }
-  }
-  return undefined
 }
 
 const writingInstructions = [
@@ -266,10 +219,7 @@ function createStructuredOutputFormat({ name, schema }: Readonly<{
   return { type: 'json_schema', name, strict: true, schema: schemaWithoutDialect } as const
 }
 
-const openAiResponseSchema = z.object({ output: z.array(z.unknown()) })
-const openAiOutputItemSchema = z.object({ content: z.array(z.unknown()) })
-const openAiOutputTextSchema = z.object({ type: z.literal('output_text'), text: z.string() })
-const unavailableOpenAiResult = { ok: false } as const
+const unavailableModelResult = { ok: false } as const
 const resumeClaimWritingUnavailableResult = {
   ok: false,
   error: { type: 'resume-claim-writing-unavailable' },

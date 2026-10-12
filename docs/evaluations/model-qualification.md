@@ -54,10 +54,38 @@ GPT-6 Luna and $2 input / $10 output for GPT-6 Sol. Sources:
 - <https://developers.openai.com/api/docs/models/gpt-6-luna>
 - <https://developers.openai.com/api/docs/models/gpt-6-sol>
 
+## Qualified Model Configurations
+
+A Qualified Model Configuration is a provider, a model, a model role and frozen provider options:
+`{ provider: 'openai', model, role, providerOptions: { reasoningEffort, store: false, strictJsonSchema: true } }`.
+`isQualifiedModelConfiguration` compares the whole configuration, provider and every provider option
+included, against the passing reports in `qualified-model-configurations.ts`.
+
+`LANGUAGE_MODEL_PROVIDER` selects the one active Language Model Provider (only `openai` exists; it is
+the default when unset). Environment validation rejects a provider, a model or a reasoning effort that
+no Qualified Model Configuration backs, so the per-role `OPENAI_*` settings stay frozen at their
+qualified values. The active provider also determines the Processing Policy the landing serves.
+
+A refused selection never reaches production:
+
+- `deployment-environment.test.ts` validates the environment `template.yaml` deploys. It runs in
+  `pnpm check`, which gates the production deployment.
+- `scripts/check-production.sh` fails the deployment when the deployed landing states no Processing
+  Policy.
+- At runtime, a refused selection disables the Candidate Journey: the landing renders without a
+  Processing Policy, and every model route answers `service-misconfigured`.
+
 ## Fallback policy
 
-Fallback environment variables are fail-closed. A model/effort pair is accepted only when it is
-listed for the same role and `resume-tailoring-reference-v1` in
-`qualified-model-configurations.ts`. Add a fallback to that registry only after its JSON report
-passes the same live suite; a primary-model result is not transferable to a different fallback
-configuration.
+Fallback environment variables are fail-closed. A fallback is accepted only when its whole
+configuration is qualified for the same role and `resume-tailoring-reference-v1`, and it always uses
+the active provider: a fallback from another provider does not type-check. Add a fallback to the
+registry only after its JSON report passes the same live suite; a primary-model result is not
+transferable to a different fallback configuration.
+
+## Transport
+
+Model requests go through the AI SDK (`ai`, `@ai-sdk/openai` on the Responses API) since BAK-157.
+The 2026-09-27 baselines were recorded through the previous hand-written transport. Requalifying both
+roles through the AI SDK and recording new baselines is BAK-160; until then the 2026-09-27 baselines
+remain the recorded qualification.

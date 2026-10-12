@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ProcessingConsent } from '@resume-tailoring/application/language-model-gateway'
+import { testProcessingPolicy } from '@resume-tailoring/application/testing'
 import { groupedResumeDocument } from '@resume-tailoring/application/structured-resume-fixtures'
 
 import { failureResponse } from '../../api-failure'
@@ -83,7 +84,7 @@ describe('API Failures through the OpenAI Language Model Gateway', () => {
 function createGatewayAnswering(answer: () => Response) {
   const request = vi.fn<typeof fetch>(() => Promise.resolve().then(answer))
   let consent: ProcessingConsent | null = null
-  const gateway = createOpenAiLanguageModelGateway({ readProcessingConsent: () => consent, request })
+  const gateway = createOpenAiLanguageModelGateway({ processingPolicy: testProcessingPolicy, readProcessingConsent: () => consent, request })
   consent = { grantedAt: 1, policy: gateway.processingPolicy }
   return gateway
 }

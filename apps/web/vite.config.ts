@@ -6,7 +6,7 @@ import { defineConfig, loadEnv } from 'vite'
 import { sourceDocumentBrowserSupportPolicy } from './src/resume-tailoring/source-document-browser-support.ts'
 
 export default defineConfig(({ mode }) => {
-  Object.assign(process.env, loadEnv(mode, '../..', 'OPENAI_'))
+  Object.assign(process.env, loadEnv(mode, '../..', ['LANGUAGE_MODEL_', 'OPENAI_']))
 
   return {
     build: {

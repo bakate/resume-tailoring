@@ -27,8 +27,8 @@ describe('section-by-section preparation on a real-sized resume', () => {
     const report = qualifySectionPreparation({
       budgets: sectionPreparationBudgets,
       configurations: {
-        structured: { model: environment.openAiStructuredModel, reasoningEffort: environment.openAiStructuredReasoningEffort },
-        writing: { model: environment.openAiWritingModel, reasoningEffort: environment.openAiWritingReasoningEffort },
+        structured: readQualifiedSettings(environment.languageModel.structured.active),
+        writing: readQualifiedSettings(environment.languageModel.writing.active),
       },
       fixtureId: realSizedResumeFixture.id,
       runs,
@@ -38,6 +38,10 @@ describe('section-by-section preparation on a real-sized resume', () => {
     expect(report.qualified).toBe(true)
   }, 900_000)
 })
+
+function readQualifiedSettings({ model, providerOptions }: ServerEnvironment['languageModel']['structured']['active']) {
+  return { model, reasoningEffort: providerOptions.reasoningEffort }
+}
 
 async function prepareRealSizedResume({ environment, runIndex }: Readonly<{
   environment: ServerEnvironment; runIndex: number
@@ -60,11 +64,9 @@ async function prepareRealSizedResume({ environment, runIndex }: Readonly<{
  * The adapters are called directly, so the browser-to-route hop a Candidate also waits for is not measured.
  */
 function createConfiguredSectionModels({ environment }: Readonly<{ environment: ServerEnvironment }>) {
-  const apiKey = { value: environment.openAiApiKey } as const
-  const writer = createOpenAiResumeSectionWriter({ apiKey, model: environment.openAiWritingModel,
-    reasoningEffort: environment.openAiWritingReasoningEffort })
-  const structured = { apiKey, model: environment.openAiStructuredModel,
-    reasoningEffort: environment.openAiStructuredReasoningEffort }
+  const apiKey = { value: environment.languageModel.apiKey } as const
+  const writer = createOpenAiResumeSectionWriter({ apiKey, configuration: environment.languageModel.writing.active })
+  const structured = { apiKey, configuration: environment.languageModel.structured.active }
   const validator = createOpenAiResumeFieldValidator(structured)
   const coherenceChecker = createOpenAiResumeCoherenceChecker(structured)
   return { writeSection: writer.write, validateFields: validator.validate, checkCoherence: coherenceChecker.check }

@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
-import { validateServerEnvironment } from './env'
+import { createOpenAiModelConfiguration } from './language-model-configuration'
+import { readLanguageModelSelection, validateServerEnvironment } from './env'
+
+const qualifiedStructured = createOpenAiModelConfiguration({ model: 'gpt-6-luna', reasoningEffort: 'low', role: 'structured' })
+const qualifiedWriting = createOpenAiModelConfiguration({ model: 'gpt-6-sol', reasoningEffort: 'medium', role: 'writing' })
 
 describe('server environment validation', () => {
   it('accepts the prequalified OpenAI configurations', () => {
     const result = validateServerEnvironment({
       environment: {
+        LANGUAGE_MODEL_PROVIDER: 'openai',
         OPENAI_API_KEY: 'secret-key',
         OPENAI_STRUCTURED_MODEL: 'gpt-6-luna',
         OPENAI_STRUCTURED_REASONING_EFFORT: 'low',
@@ -16,17 +21,16 @@ describe('server environment validation', () => {
 
     expect(result).toEqual({
       ok: true,
-      value: {
-        openAiApiKey: 'secret-key',
-        openAiStructuredModel: 'gpt-6-luna',
-        openAiStructuredReasoningEffort: 'low',
-        openAiWritingModel: 'gpt-6-sol',
-        openAiWritingReasoningEffort: 'medium',
-      },
+      value: { languageModel: {
+        apiKey: 'secret-key',
+        provider: 'openai',
+        structured: { active: qualifiedStructured },
+        writing: { active: qualifiedWriting },
+      } },
     })
   })
 
-  it('uses the evaluated structured defaults', () => {
+  it('uses OpenAI and its evaluated configurations by default', () => {
     const result = validateServerEnvironment({
       environment: {
         OPENAI_API_KEY: 'secret-key',
@@ -35,13 +39,12 @@ describe('server environment validation', () => {
 
     expect(result).toEqual({
       ok: true,
-      value: {
-        openAiApiKey: 'secret-key',
-        openAiStructuredModel: 'gpt-6-luna',
-        openAiStructuredReasoningEffort: 'low',
-        openAiWritingModel: 'gpt-6-sol',
-        openAiWritingReasoningEffort: 'medium',
-      },
+      value: { languageModel: {
+        apiKey: 'secret-key',
+        provider: 'openai',
+        structured: { active: qualifiedStructured },
+        writing: { active: qualifiedWriting },
+      } },
     })
   })
 
@@ -58,10 +61,10 @@ describe('server environment validation', () => {
 
     expect(result).toMatchObject({
       ok: true,
-      value: {
-        openAiStructuredFallback: { model: 'gpt-6-luna', reasoningEffort: 'low' },
-        openAiWritingFallback: { model: 'gpt-6-sol', reasoningEffort: 'medium' },
-      },
+      value: { languageModel: {
+        structured: { fallback: qualifiedStructured },
+        writing: { fallback: qualifiedWriting },
+      } },
     })
   })
 
@@ -92,12 +95,38 @@ describe('server environment validation', () => {
     { OPENAI_API_KEY: 'secret-key', OPENAI_STRUCTURED_REASONING_EFFORT: 'extreme' },
     { OPENAI_API_KEY: 'secret-key', OPENAI_WRITING_MODEL: 'unqualified-model' },
     { OPENAI_API_KEY: 'secret-key', OPENAI_WRITING_REASONING_EFFORT: 'high' },
-  ])('rejects invalid OpenAI configuration: %o', (environment) => {
+    { OPENAI_API_KEY: 'secret-key', LANGUAGE_MODEL_PROVIDER: 'another-provider' },
+    { OPENAI_API_KEY: 'secret-key', LANGUAGE_MODEL_PROVIDER: '' },
+  ])('refuses a provider, model or effort without a Qualified Model Configuration: %o', (environment) => {
     const result = validateServerEnvironment({ environment })
 
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.error.type).toBe('invalid-server-environment')
     expect(result.error.issues.length).toBeGreaterThan(0)
+  })
+
+  it('never names the key in a validation issue', () => {
+    const result = validateServerEnvironment({
+      environment: { OPENAI_API_KEY: 'sk-private-operator-key', OPENAI_WRITING_MODEL: 'sk-private-operator-key' },
+    })
+
+    expect(JSON.stringify(result)).not.toContain('sk-private-operator-key')
+  })
+})
+
+describe('Language Model selection', () => {
+  it('validates the provider and its model settings without the provider key, so the landing never needs it', () => {
+    expect(readLanguageModelSelection({ environment: {} })).toEqual({ ok: true, value: {
+      provider: 'openai', structured: { active: qualifiedStructured }, writing: { active: qualifiedWriting },
+    } })
+  })
+
+  it.each([
+    { LANGUAGE_MODEL_PROVIDER: 'another-provider' },
+    { OPENAI_STRUCTURED_MODEL: 'unqualified-model' },
+    { OPENAI_WRITING_REASONING_EFFORT: 'high' },
+  ])('refuses a selection without a Qualified Model Configuration: %o', (environment) => {
+    expect(readLanguageModelSelection({ environment }).ok).toBe(false)
   })
 })

@@ -1,17 +1,17 @@
-import { z } from 'zod'
+import type { z } from 'zod'
 import type { ResumeSectionContent, ResumeSectionKind, ResumeSectionModelResult,
 } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeCoherenceChecker, ResumeFieldValidator, ResumeSectionWriter } from '@resume-tailoring/application/ports'
-import type { OpenAiReasoningEffort } from '../../openai-model-configuration'
-import { createOpenAiRequester } from './openai-request'
-import type { ModelApiKey } from './openai-request'
-import { readOpenAiApiFailure } from './openai-api-failure'
+import type { LanguageModelConfiguration } from '../../language-model-configuration'
+import { createModelRequester } from './language-model-request'
+import type { ModelApiKey, ModelResponse } from './language-model-request'
+import { readModelApiFailure } from './model-api-failure'
 import { delimitSuppliedData, untrustedContentInstruction } from './untrusted-model-input'
 import { resumeDocumentCoherenceSchema, resumeFieldValidationSchema, resumeSectionOutputSchemas,
   resumeStructuredOutputFormat } from '../../candidate-journey/resume-document-schemas'
 
 type ModelConfiguration = Readonly<{
-  apiKey: ModelApiKey; model: string; reasoningEffort: OpenAiReasoningEffort; request?: typeof fetch
+  apiKey: ModelApiKey; configuration: LanguageModelConfiguration; request?: typeof fetch
 }>
 type ResumeSectionOperation = 'resume-section-writing' | 'resume-section-validation' | 'resume-document-coherence'
 
@@ -60,38 +60,26 @@ async function processResumeModel<TValue>({ configuration, input, instructions, 
   configuration: ModelConfiguration; input: unknown; instructions: string; maximumOutputTokens: number
   operation: ResumeSectionOperation; outputName: string; schema: z.ZodType<TValue>
 }>): Promise<ResumeSectionModelResult<TValue>> {
-  const response = await createOpenAiRequester(configuration).send({ operation, body: {
-    model: configuration.model, reasoning: { effort: configuration.reasoningEffort }, store: false,
-    max_output_tokens: maximumOutputTokens,
-    input: [{ role: 'developer', content: [{ type: 'input_text', text: instructions }] },
-      { role: 'user', content: [{ type: 'input_text', text: delimitSuppliedData(input) }] }],
-    text: { format: resumeStructuredOutputFormat({ name: outputName, schema }) },
-  } })
-  if (!response.ok) return { ok: false, error: readOpenAiApiFailure(response.error) }
-  return parseModelResponse({ value: response.value, schema })
+  const response = await createModelRequester(configuration).send({ operation, instructions,
+    maxOutputTokens: maximumOutputTokens, output: resumeStructuredOutputFormat({ name: outputName, schema }), userText: delimitSuppliedData(input) })
+  if (!response.ok) return { ok: false, error: readModelApiFailure(response.error) }
+  return parseModelResponse({ response: response.value, schema })
 }
 
-function parseModelResponse<TValue>({ value, schema }: Readonly<{ value: unknown; schema: z.ZodType<TValue> }>): ResumeSectionModelResult<TValue> {
-  const envelope = responseSchema.safeParse(value)
-  if (!envelope.success) return invalidProviderResponse()
-  const usage = envelope.data.usage === undefined ? undefined
-    : { inputTokens: envelope.data.usage.input_tokens, outputTokens: envelope.data.usage.output_tokens }
+/** An answer the model did not finish is never read, even when its text happens to parse. */
+function parseModelResponse<TValue>({ response, schema }: Readonly<{
+  response: ModelResponse; schema: z.ZodType<TValue>
+}>): ResumeSectionModelResult<TValue> {
+  const { usage } = response
   const failure = { ...invalidProviderResponse(), ...(usage === undefined ? {} : { usage }) }
-  if (envelope.data.status === 'incomplete') return failure
-  const output = envelope.data.output.flatMap(({ content }) => content ?? [])
-    .find(({ type }) => type === 'output_text')?.text
-  if (output === undefined) return failure
+  if (!response.complete || response.text === undefined) return failure
   try {
-    const parsed = schema.safeParse(JSON.parse(output))
+    const parsed = schema.safeParse(JSON.parse(response.text))
     return parsed.success ? { ok: true, value: parsed.data, ...(usage === undefined ? {} : { usage }) } : failure
   } catch { return failure }
 }
 
 function invalidProviderResponse() { return { ok: false, error: { type: 'invalid-provider-response' } } as const }
-
-const responseSchema = z.object({ status: z.string().optional(), output: z.array(z.object({
-  content: z.array(z.object({ type: z.string(), text: z.string().optional() })).optional(),
-})), usage: z.object({ input_tokens: z.number().int().min(0), output_tokens: z.number().int().min(0) }).optional() })
 
 const sharedWritingInstructions = [
   untrustedContentInstruction,

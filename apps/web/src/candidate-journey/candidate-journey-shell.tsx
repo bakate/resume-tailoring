@@ -21,13 +21,13 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { BrandMark } from '../brand-mark'
-import { processingPolicy } from '../composition-root'
 import {
   LocalizationFailure,
   useLocalization,
 } from '../localization/localization'
 import type { Localization } from '../localization/localization'
 import type { CandidateJourneyView, ValidatedResult } from '@resume-tailoring/application/candidate-journey'
+import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
 import { candidateJourneyPhases } from './candidate-journey-phases'
 import type { CandidateJourneyPhase } from './candidate-journey-phases'
 import { useCandidateJourney } from './use-candidate-journey'
@@ -60,9 +60,10 @@ export function CandidateJourneyShell({ children }: Readonly<{ children: ReactNo
 
 /**
  * What `/` says before anything else: what the product does and how it treats the Candidate's documents. It is public,
- * rendered by the server and readable without JavaScript, so search engines and link previews read it too.
+ * rendered by the server and readable without JavaScript, so search engines and link previews read it too. Without a
+ * Processing Policy no processor is disclosed, since none can be called.
  */
-export function CandidateJourneyLanding() {
+export function CandidateJourneyLanding({ processingPolicy }: Readonly<{ processingPolicy: ProcessingPolicy | null }>) {
   const localizationResult = useLocalization()
   if (!localizationResult.ok) return <LocalizationFailure />
   const localization = localizationResult.value
@@ -77,9 +78,19 @@ export function CandidateJourneyLanding() {
       <Text c="dimmed" mt="lg" size="xl">
         {localization.translate('candidateJourney.description')}
       </Text>
-      <PrivacyStatement localization={localization} processingPolicy={processingPolicy} />
+      {processingPolicy === null ? null : <PrivacyStatement localization={localization} processingPolicy={processingPolicy} />}
     </Box>
   )
+}
+
+/** Stands in for the Candidate Journey when the server has no Processing Policy to serve: no document is accepted. */
+export function CandidateJourneyUnavailable() {
+  const localizationResult = useLocalization()
+  if (!localizationResult.ok) return <LocalizationFailure />
+  const localization = localizationResult.value
+  return <Alert color="caution" role="alert" title={localization.translate('candidateJourney.unavailableTitle')}>
+    <Text>{localization.translate('candidateJourney.unavailableExplanation')}</Text>
+  </Alert>
 }
 
 /** Live announcements of the Candidate Journey's progress, for assistive technology. */

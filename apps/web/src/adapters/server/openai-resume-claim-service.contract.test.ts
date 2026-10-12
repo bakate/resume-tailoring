@@ -1,10 +1,12 @@
 import type { ResumeClaim, ResumeClaimWritingInputs } from '@resume-tailoring/application/resume-claims'
 import { describe, expect, it } from 'vitest'
+import { createOpenAiModelConfiguration } from '../../language-model-configuration'
 
 import {
   createOpenAiResumeClaimSemanticValidator,
   createOpenAiResumeClaimReformulator,
 } from './openai-resume-claim-service'
+import { createRecordedOpenAiResponse } from './recorded-openai-responses'
 import { delimitSuppliedData } from './untrusted-model-input'
 
 describe('OpenAI Resume Claim service contract', () => {
@@ -12,8 +14,7 @@ describe('OpenAI Resume Claim service contract', () => {
     const requests: Request[] = []
     const reformulator = createOpenAiResumeClaimReformulator({
       apiKey: { value: 'test-api-key' },
-      model: 'writing-model',
-      reasoningEffort: 'medium',
+      configuration: createOpenAiModelConfiguration({ model: 'writing-model', reasoningEffort: 'medium', role: 'writing' }),
       request: createRequestSpy({ requests, value: { claims: [proposedClaim] } }),
     })
 
@@ -26,7 +27,7 @@ describe('OpenAI Resume Claim service contract', () => {
       reasoning: { effort: 'medium' },
       store: false,
       input: [
-        { role: 'developer', content: [{ type: 'input_text' }] },
+        { role: 'developer', content: expect.stringMatching(/Tailored Resume claims/u) as unknown },
         {
           role: 'user',
           content: [{ type: 'input_text', text: delimitSuppliedData({ ...writingInputs,
@@ -42,8 +43,7 @@ describe('OpenAI Resume Claim service contract', () => {
   it('rejects a reformulation that references facts outside the minimized writing input', async () => {
     const reformulator = createOpenAiResumeClaimReformulator({
       apiKey: { value: 'test-api-key' },
-      model: 'writing-model',
-      reasoningEffort: 'medium',
+      configuration: createOpenAiModelConfiguration({ model: 'writing-model', reasoningEffort: 'medium', role: 'writing' }),
       request: createRequestSpy({
         requests: [],
         value: { claims: [{
@@ -61,8 +61,7 @@ describe('OpenAI Resume Claim service contract', () => {
     const requests: Request[] = []
     const validator = createOpenAiResumeClaimSemanticValidator({
       apiKey: { value: 'test-api-key' },
-      model: 'structured-model',
-      reasoningEffort: 'low',
+      configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRequestSpy({
         requests,
         value: {
@@ -103,8 +102,7 @@ describe('OpenAI Resume Claim service contract', () => {
     const validator = createOpenAiResumeClaimSemanticValidator({
       apiKey: { value: 'test-api-key' },
       deadlineSignal,
-      model: 'structured-model',
-      reasoningEffort: 'low',
+      configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRequestSpy({
         requests,
         signals,
@@ -131,12 +129,7 @@ function createRequestSpy({
   return (input, init) => {
     requests.push(new Request(input, init))
     signals?.push(init?.signal ?? null)
-    return Promise.resolve(Response.json({
-      output: [{
-        type: 'message',
-        content: [{ type: 'output_text', text: JSON.stringify(value) }],
-      }],
-    }))
+    return Promise.resolve(createRecordedOpenAiResponse({ outputText: JSON.stringify(value) }))
   }
 }
 

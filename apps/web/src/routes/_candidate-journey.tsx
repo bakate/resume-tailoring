@@ -1,37 +1,45 @@
 import { Outlet, createFileRoute, useMatch } from '@tanstack/react-router'
 
-import { CandidateJourneyLanding, CandidateJourneyShell, CandidateJourneyStatus } from '../candidate-journey/candidate-journey-shell'
+import { CandidateJourneyLanding, CandidateJourneyShell, CandidateJourneyStatus, CandidateJourneyUnavailable,
+} from '../candidate-journey/candidate-journey-shell'
 import { CandidateJourneyControllerProvider, useCandidateJourneyController } from '../candidate-journey/use-candidate-journey'
 import { DemoAccessGate } from '../demo-access/demo-access-gate'
 import { readInitialDemoAccess } from '../demo-access/demo-access-initial-state'
+import { readServedProcessingPolicy } from '../served-processing-policy'
+import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
 
 /** Both Candidate Journey routes share this layout, so navigating between them keeps one Candidate Journey actor. */
 export const Route = createFileRoute('/_candidate-journey')({
-  // Demo access is decided once per page load; moving between the two routes never asks for it again.
-  loader: () => readInitialDemoAccess(),
+  // Demo access and the Processing Policy are decided once per page load; moving between the two routes keeps them.
+  loader: async () => {
+    const [initialAccess, processingPolicy] = await Promise.all([readInitialDemoAccess(), readServedProcessingPolicy()])
+    return { initialAccess, processingPolicy }
+  },
   shouldReload: false,
   component: CandidateJourneyLayout,
 })
 
 /**
  * The shell and, on `/`, the landing are public and rendered by the server; only the Candidate Journey, and with it
- * every model call, waits behind demo access.
+ * every model call, waits behind demo access. A server without a Processing Policy to serve disables the journey.
  */
 function CandidateJourneyLayout() {
-  const initialAccess = Route.useLoaderData()
+  const { initialAccess, processingPolicy } = Route.useLoaderData()
   const isIntake = useMatch({ from: '/_candidate-journey/', shouldThrow: false }) !== undefined
   return (
     <CandidateJourneyShell>
-      {isIntake ? <CandidateJourneyLanding /> : null}
-      <DemoAccessGate initialAccess={initialAccess}>
-        <CandidateJourney />
-      </DemoAccessGate>
+      {isIntake ? <CandidateJourneyLanding processingPolicy={processingPolicy} /> : null}
+      {processingPolicy === null ? <CandidateJourneyUnavailable /> : (
+        <DemoAccessGate initialAccess={initialAccess}>
+          <CandidateJourney processingPolicy={processingPolicy} />
+        </DemoAccessGate>
+      )}
     </CandidateJourneyShell>
   )
 }
 
-function CandidateJourney() {
-  const candidateJourney = useCandidateJourneyController()
+function CandidateJourney({ processingPolicy }: Readonly<{ processingPolicy: ProcessingPolicy }>) {
+  const candidateJourney = useCandidateJourneyController({ processingPolicy })
   return (
     <CandidateJourneyControllerProvider value={candidateJourney}>
       <CandidateJourneyStatus />

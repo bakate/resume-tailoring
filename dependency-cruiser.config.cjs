@@ -36,7 +36,17 @@ module.exports = {
       },
       to: {
         dependencyTypes: ['npm'],
-        path: '(@tanstack|react|puppeteer|openai|idb)',
+        path: '(@tanstack|react|puppeteer|openai|idb|node_modules/ai/|@ai-sdk)',
+      },
+    },
+    {
+      name: 'ai-sdk-stays-in-server-adapters',
+      comment: 'The AI SDK is infrastructure: only server adapters reach language models, and no port ever sees its types.',
+      severity: 'error',
+      from: { pathNot: '^apps/web/src/adapters/server/' },
+      to: {
+        // A resolved import lands under node_modules; one a package does not declare stays its bare name.
+        path: '(^|/)node_modules/(ai|@ai-sdk/[^/]+)/|^(ai|@ai-sdk/[^/]+)$',
       },
     },
     {

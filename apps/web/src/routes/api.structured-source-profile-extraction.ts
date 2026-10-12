@@ -25,9 +25,8 @@ async function extractStructuredSourceProfile({ request }: Readonly<{ request: R
   const environmentResult = validateServerEnvironment({ environment: process.env })
   if (!environmentResult.ok) return failureResponse({ type: 'service-misconfigured' })
   const extractor = createOpenAiStructuredSourceProfileExtractor({
-    apiKey: { value: environmentResult.value.openAiApiKey },
-    model: environmentResult.value.openAiStructuredModel,
-    reasoningEffort: environmentResult.value.openAiStructuredReasoningEffort,
+    apiKey: { value: environmentResult.value.languageModel.apiKey },
+    configuration: environmentResult.value.languageModel.structured.active,
   })
   const result = await extractor.extract({ professionalContent: contentResult.value })
   return result.ok

@@ -7,6 +7,7 @@ import {
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
+import { validateServerEnvironment } from '../../env'
 import { createOpenAiJobMatchEvidenceMatcher } from './openai-job-match-evidence-matcher'
 
 // Live evaluation of Requirement Coverage judged by the model and verified by the engine.
@@ -30,10 +31,10 @@ describe('OpenAI Job Match evidence live evaluation', () => {
 
 async function evaluateCase({ evaluationCase }: Readonly<{ evaluationCase: EvaluationCase }>) {
   const metrics: EvaluationMetric[] = []
+  const { languageModel } = readServerEnvironment()
   const matcher = createOpenAiJobMatchEvidenceMatcher({
-    apiKey: { value: readEnvironmentValue({ name: 'OPENAI_API_KEY' }) },
-    model: readEnvironmentValue({ name: 'OPENAI_STRUCTURED_MODEL' }),
-    reasoningEffort: 'low',
+    apiKey: { value: languageModel.apiKey },
+    configuration: languageModel.structured.active,
     request: createMeasuredRequest({ metrics }),
   })
   const requirements = evaluationCase.requirements.map(createRequirement)
@@ -92,10 +93,11 @@ function createMeasuredRequest({ metrics }: Readonly<{ metrics: EvaluationMetric
   }
 }
 
-function readEnvironmentValue({ name }: Readonly<{ name: string }>) {
-  const value = process.env[name]
-  expect(value, `${name} must be configured for live evaluation`).toBeTruthy()
-  return value ?? ''
+/** The structured role the Match Evidence route uses, validated as the server validates it. */
+function readServerEnvironment() {
+  const environment = validateServerEnvironment({ environment: process.env })
+  if (!environment.ok) throw new Error('OPENAI_API_KEY must be configured for live evaluation')
+  return environment.value
 }
 
 function createRequirement({ capabilityName, id, value }: EvaluationRequirement) {

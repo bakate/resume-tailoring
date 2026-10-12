@@ -1,14 +1,14 @@
-import { z } from 'zod'
+import type { z } from 'zod'
 
 import type {
   ExtractedJobPosting,
 } from '@resume-tailoring/application/job-match'
-import type { OpenAiReasoningEffort } from '../../openai-model-configuration'
+import type { LanguageModelConfiguration } from '../../language-model-configuration'
 import {
-  createOpenAiRequester,
+  createModelRequester,
   type ModelApiKey,
-  type OpenAiRequestFailure,
-} from './openai-request'
+  type ModelRequestFailure,
+} from './language-model-request'
 import {
   jobPostingExtractionResponseFormat,
   jobPostingExtractionSchema,
@@ -17,16 +17,15 @@ import type { JobPostingExtractor } from '@resume-tailoring/application/ports'
 import { delimitUntrustedContent, untrustedContentInstruction } from './untrusted-model-input'
 
 export function createOpenAiJobPostingExtractor({
-  apiKey, model, reasoningEffort, request = fetch,
+  apiKey, configuration, request = fetch,
 }: Readonly<{
   apiKey: ModelApiKey
-  model: string
-  reasoningEffort: OpenAiReasoningEffort
+  configuration: LanguageModelConfiguration
   request?: typeof fetch
 }>): JobPostingExtractor {
   return { extract: async ({ jobPostingContent }) => {
     const result = await requestOpenAiJobPostingExtraction({
-      apiKey, jobPostingContent, model, reasoningEffort, request,
+      apiKey, configuration, jobPostingContent, request,
     })
     return result.ok ? result : unavailableResult
   } }
@@ -34,50 +33,33 @@ export function createOpenAiJobPostingExtractor({
 
 export type OpenAiJobPostingExtractionFailure = Readonly<{
   type: 'invalid-model-output'
-}> | OpenAiRequestFailure
+}> | ModelRequestFailure
 
 export async function requestOpenAiJobPostingExtraction({
-  apiKey, jobPostingContent, model, reasoningEffort, request = fetch,
+  apiKey, configuration, jobPostingContent, request = fetch,
 }: Readonly<{
   apiKey: ModelApiKey
+  configuration: LanguageModelConfiguration
   jobPostingContent: string
-  model: string
-  reasoningEffort: OpenAiReasoningEffort
   request?: typeof fetch
 }>): Promise<Readonly<{ ok: true; value: ExtractedJobPosting }> | Readonly<{
   ok: false
   error: OpenAiJobPostingExtractionFailure
 }>> {
-  const requester = createOpenAiRequester({ apiKey, request })
+  const requester = createModelRequester({ apiKey, configuration, request })
   const response = await requester.send({
-    body: createRequestBody({ jobPostingContent, model, reasoningEffort }),
+    instructions: extractionInstructions,
+    maxOutputTokens: 20_000,
     operation: 'explainable-job-posting-extraction',
+    output: jobPostingExtractionResponseFormat,
+    userText: delimitUntrustedContent({ kind: 'job-posting', content: jobPostingContent }),
   })
   if (!response.ok) return response
-  return parseResponse({ value: response.value })
+  return parseModelOutput({ outputText: response.value.text })
 }
 
-function createRequestBody({ jobPostingContent, model, reasoningEffort }: Readonly<{
-  jobPostingContent: string
-  model: string
-  reasoningEffort: OpenAiReasoningEffort
-}>) {
-  return {
-    input: [
-      { role: 'developer', content: [{ type: 'input_text', text: extractionInstructions }] },
-      { role: 'user', content: [{ type: 'input_text', text: delimitUntrustedContent({ kind: 'job-posting', content: jobPostingContent }) }] },
-    ],
-    max_output_tokens: 20_000,
-    model,
-    reasoning: { effort: reasoningEffort },
-    store: false,
-    text: { format: jobPostingExtractionResponseFormat },
-  }
-}
-
-function parseResponse({ value }: Readonly<{ value: unknown }>) {
-  const outputText = readOutputText({ value })
-  if (outputText === null) return invalidModelOutputResult
+function parseModelOutput({ outputText }: Readonly<{ outputText?: string }>) {
+  if (outputText === undefined) return invalidModelOutputResult
   try {
     const parsed = jobPostingExtractionSchema.safeParse(JSON.parse(outputText))
     return parsed.success ? createSuccessResult({ extraction: parsed.data }) : invalidModelOutputResult
@@ -99,20 +81,6 @@ function createSuccessResult({ extraction }: Readonly<{
   } } as const
 }
 
-function readOutputText({ value }: Readonly<{ value: unknown }>) {
-  const response = openAiResponseSchema.safeParse(value)
-  if (!response.success) return null
-  for (const item of response.data.output) {
-    const parsedItem = openAiOutputItemSchema.safeParse(item)
-    if (!parsedItem.success) continue
-    for (const content of parsedItem.data.content) {
-      const parsedContent = openAiOutputTextSchema.safeParse(content)
-      if (parsedContent.success) return parsedContent.data.text
-    }
-  }
-  return null
-}
-
 const extractionInstructions = [
   untrustedContentInstruction,
   'Analyze exactly one Job Posting and ignore navigation, employer branding, benefits marketing, equal-opportunity boilerplate, and legal boilerplate.',
@@ -131,8 +99,5 @@ const extractionInstructions = [
   'Never infer hidden criteria, requirements, constraints, or a role title.',
 ].join(' ')
 
-const openAiResponseSchema = z.object({ output: z.array(z.unknown()) })
-const openAiOutputItemSchema = z.object({ content: z.array(z.unknown()) })
-const openAiOutputTextSchema = z.object({ type: z.literal('output_text'), text: z.string() })
 const unavailableResult = { ok: false, error: 'job-posting-extraction-unavailable' } as const
 const invalidModelOutputResult = { ok: false, error: { type: 'invalid-model-output' } } as const

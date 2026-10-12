@@ -1,13 +1,13 @@
 import type { ApiFailure } from '../../api-failure'
-import type { OpenAiRequestFailure } from './openai-request'
+import type { ModelRequestFailure } from './language-model-request'
 
-type OpenAiRouteFailure = OpenAiRequestFailure | Readonly<{
+type ModelRouteFailure = ModelRequestFailure | Readonly<{
   type: 'invalid-model-output' | 'request-too-large'
   characterCount?: number
   maximumCharacterCount?: number
 }>
 
-export function readOpenAiApiFailure(failure: OpenAiRouteFailure): ApiFailure {
+export function readModelApiFailure(failure: ModelRouteFailure): ApiFailure {
   if (failure.type === 'request-too-large') return { type: 'input-too-large' }
   if (failure.type === 'timeout') return { type: 'timeout' }
   if (failure.type === 'rate-limited') return readRateLimit(failure)
@@ -19,7 +19,7 @@ export function readOpenAiApiFailure(failure: OpenAiRouteFailure): ApiFailure {
 }
 
 /** Retry-After may also be an HTTP date; only a delay in seconds is forwarded. */
-function readRateLimit({ retryAfter }: OpenAiRequestFailure): ApiFailure {
+function readRateLimit({ retryAfter }: ModelRequestFailure): ApiFailure {
   return retryAfter !== undefined && /^\d+$/.test(retryAfter)
     ? { type: 'rate-limited', retryAfterSeconds: Number(retryAfter) }
     : { type: 'rate-limited' }

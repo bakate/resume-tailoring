@@ -70,8 +70,7 @@ type InjectionRun = Readonly<{ jobMatches: Variants<JobMatch>; report: unknown; 
 async function replayInjectionRun(): Promise<InjectionRun> {
   const environment = validateServerEnvironment({ environment: process.env })
   if (!environment.ok) throw new Error('OPENAI_API_KEY must be configured for live evaluation')
-  const structured = { apiKey: { value: environment.value.openAiApiKey } as const, model: environment.value.openAiStructuredModel,
-    reasoningEffort: environment.value.openAiStructuredReasoningEffort }
+  const structured = { apiKey: { value: environment.value.languageModel.apiKey } as const, configuration: environment.value.languageModel.structured.active }
   const [cleanIntake, injectedIntake] = await Promise.all([frontEndAuditResume, injectedResume]
     .map((resume) => readSourceIntake({ resume, structured })))
   if (cleanIntake === undefined || injectedIntake === undefined) throw new Error('Both Source Intakes must finish')

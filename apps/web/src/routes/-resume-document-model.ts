@@ -6,7 +6,7 @@ import type { ApiFailure } from '../api-failure'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
 import type { ServerEnvironment } from '../env'
-import type { ModelApiKey } from '../adapters/server/openai-request'
+import type { ModelApiKey } from '../adapters/server/language-model-request'
 
 export async function processResumeModel<TInput>({ request, schema, processInput }: Readonly<{
   request: Request; schema: z.ZodType<TInput>
@@ -19,7 +19,7 @@ export async function processResumeModel<TInput>({ request, schema, processInput
   const input = await readInput({ request, schema })
   if (!input.ok) return failureResponse({ type: input.type })
   try {
-    const result = await processInput(input.value, environment.value, { value: environment.value.openAiApiKey })
+    const result = await processInput(input.value, environment.value, { value: environment.value.languageModel.apiKey })
     return result.ok
       ? Response.json(result, { headers: privateHeaders })
       : failureResponse({ ...readSectionModelApiFailure(result.error), ...(result.usage === undefined ? {} : { usage: result.usage }) })

@@ -4,6 +4,7 @@
 import { createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourneyDependencies } from '@resume-tailoring/application/ports'
+import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
 import { createPrivacySafeBrowserTelemetry } from './adapters/browser/browser-adapters'
 import { createBrowserCandidateSessionPersistence } from './adapters/browser/browser-candidate-session-persistence'
 import type { BrowserCandidateSessionPersistence, CandidateSessionRetention } from './adapters/browser/browser-candidate-session-persistence'
@@ -15,7 +16,7 @@ import {
   createGatewayResumeSectionModels,
   createGatewaySourceProfileExtractor,
 } from './adapters/browser/language-model-gateway-ports'
-import { createOpenAiLanguageModelGateway, openAiProcessingPolicy } from './adapters/browser/openai-language-model-gateway'
+import { createOpenAiLanguageModelGateway } from './adapters/browser/openai-language-model-gateway'
 import type { OpenAiLanguageModelGateway } from './adapters/browser/openai-language-model-gateway'
 import { createResumeDocumentModelAdapters } from './adapters/browser/resume-document-model-adapters'
 import { createBrowserSourceIntakeDocumentReader } from './adapters/browser/source-intake-document-reader'
@@ -32,15 +33,16 @@ export type BrowserCandidateJourneySystem = Readonly<{
   chooseCandidateSessionRetention: (retention: CandidateSessionRetention) => void
 }>
 
-/** The Processing Policy the landing page states before any Candidate Journey, and so any gateway, exists. */
-export const processingPolicy = openAiProcessingPolicy
-
-export function createBrowserCandidateJourneySystem(): BrowserCandidateJourneySystem {
+/** The Processing Policy is the one the server served, so consent always names the processor the server calls. */
+export function createBrowserCandidateJourneySystem({ processingPolicy }: Readonly<{
+  processingPolicy: ProcessingPolicy
+}>): BrowserCandidateJourneySystem {
   let candidateJourney: CandidateJourney | null = null
   eraseRetiredCandidateApiKey({ readStorage: () => sessionStorage })
   const request = createAccessRecoveringRequest({ recovery: demoAccessRecovery,
     request: createDailyQuotaObservingRequest({ dailyQuota, request: fetch }) })
   const languageModelGateway = createOpenAiLanguageModelGateway({
+    processingPolicy,
     readProcessingConsent: () => readProcessingConsent({ candidateJourney }),
     request,
   })

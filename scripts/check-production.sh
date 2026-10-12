@@ -9,6 +9,11 @@ trap 'rm -f "$response_file"' EXIT
 curl --fail --silent --show-error --retry 4 --retry-delay 5 --max-time 90 \
   "${public_url%/}/" --output "$response_file"
 grep -qi '<!doctype html' "$response_file"
+# The landing states a Processing Policy only when the deployed server accepts its Language Model selection.
+if ! grep -q 'data-processing-policy-version=' "$response_file"; then
+  printf 'The landing states no Processing Policy: the deployed Language Model selection is refused\n' >&2
+  exit 1
+fi
 
 check_protection() {
   local target_url="$1" expected_status="$2" expected_error="$3" actual_status
@@ -27,4 +32,4 @@ check_protection() {
 
 check_protection "$public_url" 401 demo-access-required
 check_protection "$origin_url" 403 demo-origin-required
-printf 'Production is available; public and direct-origin API guards are active.\n'
+printf 'Production is available, states its Processing Policy, and public and direct-origin API guards are active.\n'

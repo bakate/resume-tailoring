@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ProcessingConsent } from '@resume-tailoring/application/language-model-gateway'
+import { testProcessingPolicy } from '@resume-tailoring/application/testing'
 import { createOpenAiLanguageModelGateway } from './openai-language-model-gateway'
 import { createResumeDocumentModelAdapters } from './resume-document-model-adapters'
 
@@ -40,7 +41,7 @@ describe('resume document professional model boundary', () => {
   it('requires current processing consent before transmitting a claim', async () => {
     const request = vi.fn<typeof fetch>()
     const adapters = createResumeDocumentModelAdapters({
-      gateway: createOpenAiLanguageModelGateway({ request, readProcessingConsent: () => null }),
+      gateway: createOpenAiLanguageModelGateway({ processingPolicy: testProcessingPolicy, request, readProcessingConsent: () => null }),
     })
 
     const outcomes = await Promise.all([adapters.validateClaim({ claim, verifiedFacts }),
@@ -65,7 +66,7 @@ describe('resume document professional model boundary', () => {
 
 function createConsentedGateway({ request }: Readonly<{ request: typeof fetch }>) {
   let consent: ProcessingConsent | null = null
-  const gateway = createOpenAiLanguageModelGateway({ readProcessingConsent: () => consent, request })
+  const gateway = createOpenAiLanguageModelGateway({ processingPolicy: testProcessingPolicy, readProcessingConsent: () => consent, request })
   consent = { grantedAt: 1, policy: gateway.processingPolicy }
   return gateway
 }

@@ -23,9 +23,8 @@ async function validateResumeClaim({ request }: Readonly<{ request: Request }>) 
   const environment = validateServerEnvironment({ environment: process.env })
   if (!environment.ok) return failureResponse({ type: 'service-misconfigured' })
   const validator = createOpenAiResumeClaimSemanticValidator({
-    apiKey: { value: environment.value.openAiApiKey },
-    model: environment.value.openAiStructuredModel,
-    reasoningEffort: environment.value.openAiStructuredReasoningEffort,
+    apiKey: { value: environment.value.languageModel.apiKey },
+    configuration: environment.value.languageModel.structured.active,
   })
   const result = await validator.validate(validationRequest.value)
   return result.ok

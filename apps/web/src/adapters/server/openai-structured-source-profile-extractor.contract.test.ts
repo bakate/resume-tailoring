@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { createOpenAiModelConfiguration } from '../../language-model-configuration'
 
 import { createOpenAiStructuredSourceProfileExtractor } from './openai-structured-source-profile-extractor'
+import { createRecordedOpenAiResponse } from './recorded-openai-responses'
 import { delimitUntrustedContent } from './untrusted-model-input'
 
 describe('OpenAI structured Source Profile extractor contract', () => {
@@ -8,11 +10,10 @@ describe('OpenAI structured Source Profile extractor contract', () => {
     const requests: Request[] = []
     const extractor = createOpenAiStructuredSourceProfileExtractor({
       apiKey: { value: 'test-api-key' },
-      model: 'structured-model',
-      reasoningEffort: 'low',
+      configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: (input, init) => {
         requests.push(new Request(input, init))
-        return Promise.resolve(Response.json(createOpenAiResponse()))
+        return Promise.resolve(createOpenAiResponse())
       },
     })
 
@@ -38,11 +39,10 @@ describe('OpenAI structured Source Profile extractor contract', () => {
       qualification: 'Licence professionnelle Développement Web', dates: '2018' }] }
     const extractor = createOpenAiStructuredSourceProfileExtractor({
       apiKey: { value: 'test-api-key' },
-      model: 'structured-model',
-      reasoningEffort: 'low',
+      configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: (input, init) => {
         requests.push(new Request(input, init))
-        return Promise.resolve(Response.json(createOpenAiResponse({ profile })))
+        return Promise.resolve(createOpenAiResponse({ profile }))
       },
     })
 
@@ -57,11 +57,10 @@ describe('OpenAI structured Source Profile extractor contract', () => {
   it('rejects malformed structured evidence', async () => {
     const extractor = createOpenAiStructuredSourceProfileExtractor({
       apiKey: { value: 'test-api-key' },
-      model: 'structured-model',
-      reasoningEffort: 'low',
-      request: () => Promise.resolve(Response.json(createOpenAiResponse({
+      configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
+      request: () => Promise.resolve(createOpenAiResponse({
         profile: { ...structuredSourceProfile, skills: [{ name: '' }] },
-      }))),
+      })),
     })
 
     const result = await extractor.extract({ professionalContent: 'TypeScript' })
@@ -76,12 +75,7 @@ type EducationSchemaRequest = Readonly<{ text: { format: { schema: { properties:
 function createOpenAiResponse({
   profile = structuredSourceProfile,
 }: Readonly<{ profile?: unknown }> = {}) {
-  return {
-    output: [{
-      type: 'message',
-      content: [{ type: 'output_text', text: JSON.stringify(profile) }],
-    }],
-  }
+  return createRecordedOpenAiResponse({ outputText: JSON.stringify(profile) })
 }
 
 const structuredSourceProfile = {

@@ -67,8 +67,9 @@ describe('model configuration qualification', () => {
 
 const baseline = {
   configuration: {
+    provider: 'openai',
     model: 'gpt-6-luna',
-    reasoningEffort: 'low',
+    providerOptions: { reasoningEffort: 'low', store: false, strictJsonSchema: true },
     role: 'structured',
     pricing: { inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.5 },
   },
