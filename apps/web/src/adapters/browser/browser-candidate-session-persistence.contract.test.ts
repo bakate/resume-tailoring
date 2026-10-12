@@ -289,17 +289,18 @@ describe('browser Candidate Session persistence', () => {
   })
 
   it.each(['candidate-api-key-invalid', 'candidate-api-key-model-unavailable', 'provider-credit-exhausted'])(
-    'reopens a preparation that failed with the removed cause %s as service unavailable, to retry', (removedCause) => {
+    'reopens a preparation that failed with the retired cause %s as service unavailable, to retry', (retiredCause) => {
       const failed = { ...preparingCandidateSession, preparation: { ...preparingCandidateSession.preparation,
         status: 'failed', failure: 'unavailable' } } as const satisfies CandidateSession
       const persistence = createBrowserCandidateSessionPersistence({ storages: createBrowserStorages({
-        initialValue: JSON.stringify({ ...failed, preparation: { ...failed.preparation, failureCause: { type: removedCause } } }) }) })
+        initialValue: JSON.stringify({ ...failed, preparation: { ...failed.preparation, failureCause: { type: retiredCause } } }) }) })
 
       const restored = persistence.restore()
 
       expect(restored).toEqual({ ok: true, value: { notice: null, session: { ...failed,
         preparation: { ...failed.preparation, failureCause: { type: 'service-unavailable' } } } } })
-      expect(readRecovery({ type: 'service-unavailable' })).toBe('retry')
+      const restoredCause = restored.ok ? restored.value.session?.preparation?.failureCause : undefined
+      expect(restoredCause === undefined ? undefined : readRecovery(restoredCause)).toBe('retry')
     })
 
   it('restores a preparation stored before section-by-section preparation', () => {

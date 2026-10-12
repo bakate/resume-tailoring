@@ -1,7 +1,7 @@
 import type { FailureCause } from '@resume-tailoring/domain/candidate-session'
 import type { ReadApiFailure } from './api-failure'
 
-export { delayedFailureCauseTypes, failureCauseTypes, removedFailureCauseTypes } from '@resume-tailoring/domain/candidate-session'
+export { delayedFailureCauseTypes, failureCauseTypes, retiredFailureCauseTypes } from '@resume-tailoring/domain/candidate-session'
 export type { FailureCause }
 
 /**

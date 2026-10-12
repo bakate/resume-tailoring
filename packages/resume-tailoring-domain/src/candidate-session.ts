@@ -132,7 +132,7 @@ export const failureCauseTypes = [
  * Causes an earlier version could save with a failed preparation. They left the catalogue, so a saved one is read as
  * service unavailable: the Candidate retries.
  */
-export const removedFailureCauseTypes = [
+export const retiredFailureCauseTypes = [
   'candidate-api-key-invalid', 'candidate-api-key-model-unavailable', 'provider-credit-exhausted',
 ] as const
 /** The causes that end after a delay, which they carry. */

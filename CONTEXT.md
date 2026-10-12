@@ -55,7 +55,7 @@ The provider-neutral reason a model-backed operation failed, read from its API F
 _Avoid_: Error type, transient or permanent failure
 
 **Recovery**:
-The one action the application derives from a Failure Cause to let the Candidate continue: renew access, retry after a delay, shorten the input, retry, or reload. The interface offers it; it never decides it.
+The one action the application derives from a Failure Cause to let the Candidate continue: renew access, retry after a delay (past the Daily Quota, after the reset), shorten the input, retry, or reload. The interface offers it; it never decides it.
 _Avoid_: Error handling, fallback, retry policy
 
 ## Candidate evidence

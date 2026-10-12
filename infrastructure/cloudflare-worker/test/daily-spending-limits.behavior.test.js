@@ -7,8 +7,8 @@ import worker, { DailySpendingLimits, dailyLimits } from '@resume-tailoring/clou
 const tenInTheMorningInParis = '2026-10-08T08:00:00.000Z'
 const nextMidnightInParis = '2026-10-08T22:00:00.000Z'
 const secondsUntilMidnight = 14 * 60 * 60
-/** Six measured journeys with edits stayed under 375 model-backed requests, so about 63 each. */
-const modelRequestsPerJourneyWithEdits = 63
+/** Six measured journeys with edits stayed under 375 model-backed requests, so eight stay under 500. */
+const modelRequestsOfEightJourneysWithEdits = 375 * 8 / 6
 
 describe('Daily spending limits at the edge', () => {
   beforeEach(() => {
@@ -155,7 +155,7 @@ describe('Daily spending limits at the edge', () => {
   it('serves every model request of eight journeys with edits under the technical ceiling', async () => {
     const system = createSystemUnderTest()
     await system.givenModelRequestsSent({
-      clientIp: '198.51.100.1', count: dailyLimits.dailyQuota * modelRequestsPerJourneyWithEdits - 1,
+      clientIp: '198.51.100.1', count: modelRequestsOfEightJourneysWithEdits - 1,
     })
 
     await system.sendModelRequest({ clientIp: '198.51.100.1' })
