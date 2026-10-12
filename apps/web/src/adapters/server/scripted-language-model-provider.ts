@@ -13,14 +13,16 @@ export type ScriptedModelAnswer = Readonly<{
  * provider. It answers through the AI SDK's model interface, so the call wrapper runs exactly as for a real provider.
  */
 export function createScriptedLanguageModelProvider({ answer }: Readonly<{
-  answer: (call: Readonly<{ model: string; outputName: string }>) => ScriptedModelAnswer
+  answer: (call: Readonly<{ model: string; outputName: string; userText: string }>) => ScriptedModelAnswer
 }>): LanguageModelProviderAdapter<Readonly<Record<string, unknown>>> {
   return {
     createLanguageModel: ({ model }) => new MockLanguageModelV4({
       provider: 'scripted', modelId: model,
-      doGenerate: ({ responseFormat }) => {
+      doGenerate: ({ prompt, responseFormat }) => {
         const outputName = responseFormat?.type === 'json' ? responseFormat.name ?? '' : ''
-        const { text, usage = { inputTokens: 100, outputTokens: 20 } } = answer({ model, outputName })
+        const userText = prompt.flatMap((message) => message.role === 'user'
+          ? message.content.flatMap((part) => part.type === 'text' ? [part.text] : []) : []).join('\n')
+        const { text, usage = { inputTokens: 100, outputTokens: 20 } } = answer({ model, outputName, userText })
         return Promise.resolve({
           content: [{ type: 'text', text }],
           finishReason: { unified: 'stop', raw: 'stop' },
