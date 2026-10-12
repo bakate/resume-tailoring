@@ -1,14 +1,14 @@
 import type { FailureCause } from '@resume-tailoring/domain/candidate-session'
 import type { ReadApiFailure } from './api-failure'
 
-export { delayedFailureCauseTypes, failureCauseTypes } from '@resume-tailoring/domain/candidate-session'
+export { delayedFailureCauseTypes, failureCauseTypes, retiredFailureCauseTypes } from '@resume-tailoring/domain/candidate-session'
 export type { FailureCause }
 
 /**
  * The one action that lets the Candidate continue after a failure; the application decides it, never the UI. Past the
- * Daily Quota the Candidate may use their own Candidate API Key; a Candidate API Key that fails must be changed.
+ * Daily Quota the Candidate comes back after the reset.
  */
-export type Recovery = 'renew-access' | 'retry-after' | 'use-own-key' | 'change-key' | 'shorten-input' | 'retry' | 'reload'
+export type Recovery = 'renew-access' | 'retry-after' | 'shorten-input' | 'retry' | 'reload'
 
 /** A failure explained to the Candidate: why it happened and what to do next. */
 export type ExplainedFailure = Readonly<{ cause: FailureCause; recovery: Recovery }>
@@ -26,9 +26,6 @@ export function readFailureCause(apiFailure: ReadApiFailure | undefined): Failur
     case 'demo-access-required': return { type: 'access-required' }
     case 'rate-limited': return { type: 'rate-limited', retryAfterSeconds: apiFailure.retryAfterSeconds ?? defaultRetryAfterSeconds }
     case 'daily-quota-reached': return { type: 'daily-quota-reached', retryAfterSeconds: apiFailure.retryAfterSeconds ?? 0 }
-    case 'candidate-api-key-invalid':
-    case 'candidate-api-key-model-unavailable':
-    case 'provider-credit-exhausted': return { type: apiFailure.type }
     case 'timeout': return { type: 'timeout' }
     case 'input-too-large': return { type: 'input-too-large' }
     case 'demo-access-unavailable':
@@ -46,11 +43,8 @@ export function readFailureCause(apiFailure: ReadApiFailure | undefined): Failur
 export function readRecovery(cause: FailureCause): Recovery {
   switch (cause.type) {
     case 'access-required': return 'renew-access'
-    case 'rate-limited': return 'retry-after'
-    case 'daily-quota-reached': return 'use-own-key'
-    case 'candidate-api-key-invalid':
-    case 'candidate-api-key-model-unavailable':
-    case 'provider-credit-exhausted': return 'change-key'
+    case 'rate-limited':
+    case 'daily-quota-reached': return 'retry-after'
     case 'input-too-large': return 'shorten-input'
     case 'timeout':
     case 'service-unavailable':

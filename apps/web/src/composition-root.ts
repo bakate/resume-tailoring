@@ -20,8 +20,9 @@ import type { OpenAiLanguageModelGateway } from './adapters/browser/openai-langu
 import { createResumeDocumentModelAdapters } from './adapters/browser/resume-document-model-adapters'
 import { createBrowserSourceIntakeDocumentReader } from './adapters/browser/source-intake-document-reader'
 import { listenForUncaughtErrors, reportUncaughtError } from './adapters/browser/uncaught-error-reporting'
+import { eraseRetiredCandidateApiKey } from './adapters/browser/retired-candidate-api-key'
+import { createDailyQuotaObservingRequest, dailyQuota } from './daily-quota/daily-quota'
 import { createAccessRecoveringRequest, demoAccessRecovery } from './demo-access/demo-access-recovery'
-import { candidateApiKeyRecovery, candidateApiKeys, createCandidateApiKeyRequest, dailyQuota } from './candidate-api-key/candidate-api-key-recovery'
 
 export type { CandidateSessionRetention }
 
@@ -36,10 +37,9 @@ export const processingPolicy = openAiProcessingPolicy
 
 export function createBrowserCandidateJourneySystem(): BrowserCandidateJourneySystem {
   let candidateJourney: CandidateJourney | null = null
-  // A request replayed after renewing demo access signs itself again with the Candidate API Key of this tab, if any.
-  const request = createAccessRecoveringRequest({ recovery: demoAccessRecovery, request: createCandidateApiKeyRequest({
-    dailyQuota, keys: candidateApiKeys, recovery: candidateApiKeyRecovery, request: fetch,
-  }) })
+  eraseRetiredCandidateApiKey({ readStorage: () => sessionStorage })
+  const request = createAccessRecoveringRequest({ recovery: demoAccessRecovery,
+    request: createDailyQuotaObservingRequest({ dailyQuota, request: fetch }) })
   const languageModelGateway = createOpenAiLanguageModelGateway({
     readProcessingConsent: () => readProcessingConsent({ candidateJourney }),
     request,

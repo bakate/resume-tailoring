@@ -24,11 +24,7 @@ describe('Failure Cause and Recovery', () => {
     { apiFailure: { type: 'unexpected-response' }, cause: { type: 'unexpected' }, recovery: 'reload' },
     { apiFailure: { type: 'invalid-input' }, cause: { type: 'unexpected' }, recovery: 'reload' },
     { apiFailure: { type: 'daily-quota-reached', retryAfterSeconds: 3600 },
-      cause: { type: 'daily-quota-reached', retryAfterSeconds: 3600 }, recovery: 'use-own-key' },
-    { apiFailure: { type: 'candidate-api-key-invalid' }, cause: { type: 'candidate-api-key-invalid' }, recovery: 'change-key' },
-    { apiFailure: { type: 'candidate-api-key-model-unavailable' }, cause: { type: 'candidate-api-key-model-unavailable' },
-      recovery: 'change-key' },
-    { apiFailure: { type: 'provider-credit-exhausted' }, cause: { type: 'provider-credit-exhausted' }, recovery: 'change-key' },
+      cause: { type: 'daily-quota-reached', retryAfterSeconds: 3600 }, recovery: 'retry-after' },
   ])('offers $recovery when a Resume Section fails with $apiFailure.type', async ({ apiFailure, cause, recovery }) => {
     const system = createSystemUnderTest({ skillsWriting: { failure: apiFailure, on: 'every-write' } })
     await system.givenCandidateSession()
@@ -69,8 +65,7 @@ describe('Failure Cause and Recovery', () => {
     })
 
   it.each<ReadApiFailure['type']>(['provider-unavailable', 'rate-limited', 'network', 'demo-access-required',
-    'input-too-large', 'unexpected-response', 'daily-quota-reached', 'candidate-api-key-invalid',
-    'provider-credit-exhausted'])('never rewrites a Resume Section whose writing fails with %s', async (type) => {
+    'input-too-large', 'unexpected-response', 'daily-quota-reached'])('never rewrites a Resume Section whose writing fails with %s', async (type) => {
     const system = createSystemUnderTest({ skillsWriting: { failure: { type }, on: 'first-write' } })
     await system.givenCandidateSession()
 

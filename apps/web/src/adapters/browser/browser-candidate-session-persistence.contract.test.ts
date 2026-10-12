@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   candidateSessionDurationMilliseconds,
   candidateSessionStorageVersion,
+  readRecovery,
 } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateSession } from '@resume-tailoring/application/candidate-journey'
 import { describeCandidateSessionPersistenceContract } from '@resume-tailoring/application/testing'
@@ -286,6 +287,21 @@ describe('browser Candidate Session persistence', () => {
 
     expect(restored).toEqual({ ok: true, value: { notice: null, session } })
   })
+
+  it.each(['candidate-api-key-invalid', 'candidate-api-key-model-unavailable', 'provider-credit-exhausted'])(
+    'reopens a preparation that failed with the retired cause %s as service unavailable, to retry', (retiredCause) => {
+      const failed = { ...preparingCandidateSession, preparation: { ...preparingCandidateSession.preparation,
+        status: 'failed', failure: 'unavailable' } } as const satisfies CandidateSession
+      const persistence = createBrowserCandidateSessionPersistence({ storages: createBrowserStorages({
+        initialValue: JSON.stringify({ ...failed, preparation: { ...failed.preparation, failureCause: { type: retiredCause } } }) }) })
+
+      const restored = persistence.restore()
+
+      expect(restored).toEqual({ ok: true, value: { notice: null, session: { ...failed,
+        preparation: { ...failed.preparation, failureCause: { type: 'service-unavailable' } } } } })
+      const restoredCause = restored.ok ? restored.value.session?.preparation?.failureCause : undefined
+      expect(restoredCause === undefined ? undefined : readRecovery(restoredCause)).toBe('retry')
+    })
 
   it('restores a preparation stored before section-by-section preparation', () => {
     const persistence = createBrowserCandidateSessionPersistence({ storages: createBrowserStorages({

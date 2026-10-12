@@ -19,9 +19,6 @@ export const apiFailureStatuses = {
   'provider-unavailable': 502,
   'invalid-provider-response': 502,
   'service-misconfigured': 503,
-  'candidate-api-key-invalid': 401,
-  'candidate-api-key-model-unavailable': 403,
-  'provider-credit-exhausted': 402,
 } as const satisfies Record<ApiFailureType, number>
 
 export type { ApiFailureType }

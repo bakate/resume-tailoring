@@ -40,17 +40,15 @@ when the object deletes everything it holds.
 
 | Limit | Per day | Keyed by | Counted on |
 | -- | -- | -- | -- |
-| Daily Quota | 6 | client network | `POST /api/explainable-job-posting-extraction` |
+| Daily Quota | 8 | client network | `POST /api/explainable-job-posting-extraction` |
 | Global ceiling | 45 | all clients | the same request |
-| Technical ceiling | 400 | client network | every model-backed API route |
+| Technical ceiling | 530 | client network | every model-backed API route |
 | PDF renders | 200 | client network | `POST /api/resume-document` |
-| Candidate API Key validations | 20 | client network | `POST /api/candidate-api-key` |
 
 Over the Daily Quota, the global ceiling or the technical ceiling, the Worker answers `429` with the
 `daily-quota-reached` API Failure, `retryAfterSeconds` until the reset, and `x-resume-quota-scope`
-(`daily-quota`, `overall` or `model-requests`), so the interface can offer the Candidate API Key.
-Over the PDF render or key validation limit, which no key lifts, it answers the `rate-limited` API
-Failure instead. Neither reaches the Lambda. A request the application refuses before any model
+(`daily-quota`, `overall` or `model-requests`), so the Candidate comes back after the reset. Over
+the PDF render limit, it answers the `rate-limited` API Failure instead. Neither reaches the Lambda. A request the application refuses before any model
 call (`400`, `401`, `403` or `413`), such as a demo access renewal, gives back what it counted. A
 provider failure keeps it counted, so a loop of failing model calls still reaches the technical
 ceiling. Responses to a Job Posting extraction carry `x-resume-quota-remaining` (Tailored Resumes
@@ -59,11 +57,9 @@ and `x-resume-quota-reset` (the ISO 8601 reset instant). `GET /api/daily-quota`,
 Worker itself, returns the same two values without counting anything, so the interface shows them
 before the Candidate starts a preparation.
 
-A model-backed request that carries the `x-candidate-api-key` header counts against none of the model
-limits: it spends the Candidate's provider account. The application signs it with that key or refuses
-it and never falls back to `OPENAI_API_KEY`, which is what keeps this bypass from spending the operator
-key. PDF renders, key validations and Turnstile still apply. The Worker forwards that header to the
-model-backed routes and `POST /api/candidate-api-key` only, and strips it from every other request.
+Every model-backed request is signed with `OPENAI_API_KEY`. Eight journeys with edits stay under 500
+model-backed requests, so the technical ceiling only stops loops. The Worker strips the
+`x-candidate-api-key` header an earlier version of the interface sent; it lifts no limit.
 
 ### Alarms
 
