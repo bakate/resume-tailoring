@@ -150,7 +150,7 @@ function supportsNumericExpression({
 function readNumericExpressions({ value }: Readonly<{ value: string }>): NumericExpression[] {
   return [...value.toLocaleLowerCase('en-US').matchAll(numericExpressionPattern)]
     .map((match) => ({
-      amount: match.groups?.amount ?? '',
+      amount: normalizeAmount(match.groups?.amount ?? ''),
       prefix: match.groups?.prefix ?? '',
       suffix: match.groups?.suffix ?? '',
     }))
@@ -162,7 +162,12 @@ function readDateTokens({ value }: Readonly<{ value: string }>) {
 }
 
 function normalizeNumericSuffix(suffix: string) {
-  return numericSuffixTranslations[suffix] ?? suffix
+  return numericSuffixTranslations[suffix.replaceAll(/\s+/gu, ' ')] ?? suffix
+}
+
+/** A grouped amount loses its separators, so "2,000" and "2 000" are one number; a decimal comma becomes a point. */
+function normalizeAmount(amount: string) {
+  return groupedAmountPattern.test(amount) ? amount.replaceAll(/\D/gu, '') : amount.replace(',', '.')
 }
 
 function normalizeDateToken(token: string) {
@@ -171,9 +176,12 @@ function normalizeDateToken(token: string) {
     ?? normalizedToken
 }
 
-const numericExpressionPattern = /(?<prefix>[-+$€£])?\s*(?<amount>\d+(?:[.,]\d+)?)\s*(?<suffix>%|years?|ans?|months?|mois|days?|jours?|hours?|heures?|usd|eur|gbp|k|m|millions?)?/giu
+// Thousands are grouped by a comma in English and by a space, often a no-break one, in French.
+const groupedAmountPattern = /^\d{1,3}(?:[, \u00A0\u202F]\d{3})+$/u
+const numericExpressionPattern = /(?<prefix>[-+$€£])?\s*(?<amount>\d{1,3}(?:[, \u00A0\u202F]\d{3})+(?!\d)|\d+(?:[.,]\d+)?)\s*(?<suffix>%|percent|pour\s+cent|years?|ans?|months?|mois|days?|jours?|hours?|heures?|usd|eur|gbp|k|m|millions?)?/giu
 const dateTokenPattern = /\b(?:jan(?:uary|vier)?|feb(?:ruary)?|f[eé]v(?:rier)?|mar(?:ch|s)?|apr(?:il)?|avr(?:il)?|may|mai|jun(?:e)?|juin|jul(?:y)?|juil(?:let)?|aug(?:ust)?|ao[uû]t|sep(?:tember|tembre)?|oct(?:ober|obre)?|nov(?:ember|embre)?|dec(?:ember)?|d[eé]c(?:embre)?)\b/giu
 const numericSuffixTranslations: Readonly<Record<string, string>> = {
+  percent: '%', 'pour cent': '%',
   year: 'year', years: 'year', an: 'year', ans: 'year',
   month: 'month', months: 'month', mois: 'month',
   day: 'day', days: 'day', jour: 'day', jours: 'day',
