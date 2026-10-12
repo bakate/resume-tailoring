@@ -1,4 +1,5 @@
 import type { ModelConfiguration } from './model-qualification'
+import type { QualificationCandidate } from './model-qualification-runner'
 
 export const structuredModelConfiguration = {
   provider: 'openai',
@@ -15,3 +16,9 @@ export const writingModelConfiguration = {
   providerOptions: { reasoningEffort: 'medium', store: false, strictJsonSchema: true },
   role: 'writing',
 } as const satisfies ModelConfiguration
+
+/** Every configuration `pnpm test:evaluation:record <candidate>` records, with the same provider's other role. */
+export const modelConfigurationCandidates = {
+  'openai-structured': { configuration: structuredModelConfiguration, companion: writingModelConfiguration },
+  'openai-writing': { configuration: writingModelConfiguration, companion: structuredModelConfiguration },
+} as const satisfies Readonly<Record<string, QualificationCandidate>>
