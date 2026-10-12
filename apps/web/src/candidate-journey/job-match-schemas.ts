@@ -62,14 +62,16 @@ const candidateFactSchema = z.strictObject({
   value: z.string().min(1).max(1_000),
 })
 
+// Job-match normalization may fall back to the requirement value for the capability name
+// and to the source excerpt for the rationale, so their bounds follow those fields.
 const matchingRequirementSchema = z.strictObject({
   capability: z.strictObject({
     dimension: z.enum(capabilityDimensions),
-    name: z.string().min(1).max(200),
+    name: requirementValueSchema,
   }),
   id: requirementIdSchema,
   importance: z.enum(requirementImportances),
-  importanceRationale: z.string().min(1).max(300),
+  importanceRationale: sourceExcerptSchema,
   sourceExcerpt: sourceExcerptSchema,
   substitutableGroup: z.string().min(1).max(200).optional(),
   value: requirementValueSchema,
