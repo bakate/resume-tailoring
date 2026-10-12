@@ -39,8 +39,12 @@ describe('API failure responses', () => {
   })
 
   it('accepts every envelope the builder writes and rejects any other failure body', async () => {
-    expect(apiFailureSchema.safeParse(await failureResponse({ type: 'rate-limited', retryAfterSeconds: 3 }).json()).success).toBe(true)
-    expect(apiFailureSchema.safeParse({ ok: false, error: 'match-evidence-timeout', retryable: true }).success).toBe(false)
-    expect(apiFailureSchema.safeParse({ ok: false, error: { type: 'permanent' } }).success).toBe(false)
+    const builtEnvelope: unknown = await failureResponse({ type: 'rate-limited', retryAfterSeconds: 3 }).json()
+    const bodies = [builtEnvelope, { ok: false, error: 'match-evidence-timeout', retryable: true },
+      { ok: false, error: { type: 'permanent' } }]
+
+    const accepted = bodies.map((body) => apiFailureSchema.safeParse(body).success)
+
+    expect(accepted).toEqual([true, false, false])
   })
 })

@@ -4,7 +4,9 @@ import { validateDemoAccessEnvironment } from './demo-access-environment'
 
 describe('demo access environment', () => {
   it('keeps local development open by default', () => {
-    expect(validateDemoAccessEnvironment({ environment: {} })).toEqual({
+    const result = validateDemoAccessEnvironment({ environment: {} })
+
+    expect(result).toEqual({
       ok: true,
       value: { mode: 'disabled' },
     })

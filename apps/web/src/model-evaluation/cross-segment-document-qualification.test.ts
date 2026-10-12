@@ -23,15 +23,20 @@ describe('cross-segment document qualification harness', () => {
     const inflated = { ...document, valueProposition: { ...document.valueProposition,
       paragraphs: document.valueProposition.paragraphs.map((paragraph) => ({ ...paragraph, text: `${paragraph.text} Led 40 people.` })) } }
 
-    expect(findUnsupportedFields({ document, fixture })).toEqual([])
-    expect(findUnsupportedFields({ document: inflated, fixture })).toEqual(['summary'])
+    const unsupportedFields = { original: findUnsupportedFields({ document, fixture }),
+      inflated: findUnsupportedFields({ document: inflated, fixture }) }
+
+    expect(unsupportedFields.original).toEqual([])
+    expect(unsupportedFields.inflated).toEqual(['summary'])
   })
 
   it('writes a non-tailored reference document when a scenario has no relevant evidence', () => {
     const fixture = crossSegmentQualificationCorpus.fixtures.find(({ relevantFactIds }) => relevantFactIds.length === 0)
     if (fixture === undefined) throw new Error('The corpus needs a scenario without relevant evidence')
 
-    expect(createQualificationResume({ fixture })).toMatchObject({ purpose: 'normalized', targetRole: null,
+    const document = createQualificationResume({ fixture })
+
+    expect(document).toMatchObject({ purpose: 'normalized', targetRole: null,
       valueProposition: { kind: 'evidence-excerpts', paragraphs: [] } })
   })
 })

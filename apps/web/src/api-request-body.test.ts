@@ -32,7 +32,9 @@ describe('bounded JSON request body', () => {
     })
     const request = createRequest({ body })
 
-    await expect(readJsonRequestBody({ request, maxBytes: 64 })).resolves.toEqual({
+    const result = await readJsonRequestBody({ request, maxBytes: 64 })
+
+    expect(result).toEqual({
       ok: false,
       type: 'input-too-large',
     })

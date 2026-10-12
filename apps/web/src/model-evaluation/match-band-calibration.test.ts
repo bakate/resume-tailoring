@@ -11,6 +11,7 @@ describe('Match Band calibration', () => {
   it('calibrates boundaries from development anchors and verifies held-out anchors', () => {
     const developmentObservations = createObservations({ split: 'development' })
     const heldOutObservations = createObservations({ split: 'held-out' })
+
     const calibration = calibrateMatchBands({ observations: developmentObservations })
 
     expect(calibration.thresholds).toEqual(matchBandThresholds)

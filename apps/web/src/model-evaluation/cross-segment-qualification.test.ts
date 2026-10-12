@@ -20,16 +20,18 @@ describe('cross-segment qualification harness', () => {
 
   it('covers technology individual contributors, leadership, and hybrid roles in both languages', () => {
     const technologyFixtures = crossSegmentQualificationCorpus.fixtures.filter(({ roleFamily }) => roleFamily === 'technology')
-    const coveredRoleTitles = new Set(technologyFixtures.map(({ roleTitle }) => roleTitle))
-    const coveredTags = new Set(technologyFixtures.flatMap(({ scenarioTags }) => scenarioTags))
+
+    const coverage = { languages: new Set(technologyFixtures.map(({ language }) => language)),
+      roleTitles: [...new Set(technologyFixtures.map(({ roleTitle }) => roleTitle))],
+      tags: [...new Set(technologyFixtures.flatMap(({ scenarioTags }) => scenarioTags))] }
 
     expect(technologyFixtures).toHaveLength(30)
-    expect(new Set(technologyFixtures.map(({ language }) => language))).toEqual(new Set(['en', 'fr']))
-    expect([...coveredRoleTitles]).toEqual(expect.arrayContaining([
+    expect(coverage.languages).toEqual(new Set(['en', 'fr']))
+    expect(coverage.roleTitles).toEqual(expect.arrayContaining([
       'Senior Software Engineer', 'Data Engineer', 'Security Engineer', 'DevOps Engineer',
       'Tech Lead', 'Engineering Manager', 'Head of Engineering', 'CTO', 'Sales Engineer',
     ]))
-    expect([...coveredTags]).toEqual(expect.arrayContaining([
+    expect(coverage.tags).toEqual(expect.arrayContaining([
       'short-posting', 'long-posting', 'overloaded-wishlist', 'duplicate-requirements',
       'strong-match', 'partial-match', 'unsuitable-profile', 'ambiguity', 'critical-gap',
       'hybrid',

@@ -22,6 +22,7 @@ describe('section preparation qualification on a real-sized resume', () => {
 
   it('fails when one experience exceeds the budget even though the other experiences are fast', () => {
     const fastRuns = Array.from({ length: 3 }, () => run({ slowExperienceMilliseconds: 2_000, wallTimeMilliseconds: 20_000 }))
+
     const report = qualify({ runs: [...fastRuns, run({ slowExperienceMilliseconds: 12_000, wallTimeMilliseconds: 20_000 })] })
 
     expect(report.gates.sectionP95Latency.bySection['experiences.0']?.passed).toBe(false)
@@ -41,6 +42,7 @@ describe('section preparation qualification on a real-sized resume', () => {
 
   it('fails a fast preparation that did not prepare the Tailored Resume', () => {
     const fast = run({ slowExperienceMilliseconds: 1_000, wallTimeMilliseconds: 2_000 })
+
     const report = qualify({ runs: [{ ...fast, outcome: 'failed' }] })
 
     expect(report.gates.outcomes).toEqual({ passed: false, failedPreparationCount: 1 })
@@ -48,7 +50,11 @@ describe('section preparation qualification on a real-sized resume', () => {
   })
 
   it('does not qualify without any measured run', () => {
-    expect(qualify({ runs: [] }).qualified).toBe(false)
+    const runs: readonly SectionPreparationRun[] = []
+
+    const report = qualify({ runs })
+
+    expect(report.qualified).toBe(false)
   })
 
   it('reports writing and structured token usage separately, coherence included', () => {
@@ -76,11 +82,12 @@ describe('section preparation qualification on a real-sized resume', () => {
   })
 
   it('supplies at least six experiences and every supporting section in the real-sized fixture', () => {
-    const sectionKeys = new Set(realSizedResumeFixture.request.candidateFacts.map(({ path }) => /^\w+\.\d+/u.exec(path)?.[0]))
-    const sections = new Set([...sectionKeys].map((key) => key?.split('.')[0]))
+    const { candidateFacts } = realSizedResumeFixture.request
+
+    const sectionKeys = new Set(candidateFacts.map(({ path }) => /^\w+\.\d+/u.exec(path)?.[0]))
 
     expect([...sectionKeys].filter((key) => key?.startsWith('experiences.')).length).toBeGreaterThanOrEqual(6)
-    expect([...sections]).toEqual(expect.arrayContaining(['skills', 'education', 'languages', 'projects', 'certifications']))
+    expect([...sectionKeys].map((key) => key?.split('.')[0])).toEqual(expect.arrayContaining(['skills', 'education', 'languages', 'projects', 'certifications']))
   })
 })
 

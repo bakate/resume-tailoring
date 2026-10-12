@@ -10,6 +10,7 @@ describe('general-management qualification corpus', () => {
   it('contains twenty reviewed French and English scenarios across the supported subdomains', () => {
     const fixtures = crossSegmentQualificationCorpus.fixtures.filter(({ roleFamily }) =>
       roleFamily === 'general-management')
+
     const scenarios = fixtures.flatMap(({ generalManagement }) => generalManagement === undefined ? [] : [generalManagement])
 
     expect(fixtures).toHaveLength(20)

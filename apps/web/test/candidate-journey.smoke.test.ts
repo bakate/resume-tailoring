@@ -97,7 +97,8 @@ test.describe('Candidate Journey preview-first preparation', () => {
 
   test('prepares a grouped semantic preview with a readable mobile order', async ({ page }) => {
     const system = createSystemUnderTest({ page })
-    await system.givenStablePreview()
+
+    await system.prepareStablePreview()
 
     await system.expectPreviewFirstReview()
     await system.expectGroupedPreview()
@@ -737,6 +738,10 @@ class CandidateJourneyTestSystem {
   }
 
   async givenStablePreview() {
+    await this.prepareStablePreview()
+  }
+
+  async prepareStablePreview() {
     await this.givenCombinedIntake()
     await this.generateResume()
     await this.#showDocumentText()

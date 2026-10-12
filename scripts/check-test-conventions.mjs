@@ -2,18 +2,23 @@ import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const behaviorTestSuffixes = ['.behavior.test.ts', '.behavior.test.js']
-const contractTestSuffixes = ['.contract.test.ts']
+const webTestSuffixes = ['.test.ts', '.test.tsx']
+// Behavior tests follow their own rules; a live evaluation shares one model run across its cases, so no case holds an Action.
+const phaseRuleExemptSuffixes = ['.behavior.test.ts', '.evaluation.test.ts']
 const forbiddenHarnessActions = /system\.(act|execute|perform|run|submit)\s*\(/
-const testCaseStart = /^(\s*)(it|test)(\.each)?\b/
+// `test.describe` and `test.use` open a Playwright suite or its options, not a case.
+const testCaseStart = /^(\s*)(it|test)(\.each)?\s*[(`]/
 const testCaseBodyOpener = /=>\s*\{\s*$/
-const assertion = /\bexpect\b/
+// Playwright journeys assert through their harness's `expect…()` helpers.
+const assertion = /\bexpect\w*\s*[(.]/
 
 const behaviorTests = (await Promise.all(['packages', 'infrastructure'].map((directoryPath) =>
   findTests({ directoryPath, suffixes: behaviorTestSuffixes })))).flat()
-const contractTests = await findTests({ directoryPath: 'apps/web', suffixes: contractTestSuffixes })
+const webTests = (await findTests({ directoryPath: 'apps/web', suffixes: webTestSuffixes }))
+  .filter((testFile) => !phaseRuleExemptSuffixes.some((suffix) => testFile.endsWith(suffix)))
 const violations = (await Promise.all([
   ...behaviorTests.map((testFile) => inspectBehaviorTest(testFile)),
-  ...contractTests.map((testFile) => inspectContractTest(testFile)),
+  ...webTests.map((testFile) => inspectWebTest(testFile)),
 ])).flat()
 
 if (violations.length > 0) {
@@ -66,17 +71,17 @@ async function inspectBehaviorTest(testFile) {
 }
 
 /**
- * A contract-test case separates its Given, Action, and Then phases with blank lines: assertion-free Given and
+ * An apps/web test case separates its Given, Action, and Then phases with blank lines: assertion-free Given and
  * Action blocks precede the first block that asserts. A case whose Given is its `it.each` row may open on a
  * single-statement Action.
  */
-async function inspectContractTest(testFile) {
+async function inspectWebTest(testFile) {
   const lines = (await readFile(testFile, 'utf8')).split('\n')
   return readTestCases({ lines }).flatMap(({ line, body }) => {
     if (body === null) return [`${testFile}:${String(line)}: cannot read the case body; end its signature with \`=> {\``]
     const blocks = splitIntoBlocks({ lines: body })
     const thenPosition = blocks.findIndex((block) => block.some((bodyLine) => assertion.test(bodyLine)))
-    if (thenPosition === -1) return [`${testFile}:${String(line)}: contract test has no Then phase`]
+    if (thenPosition === -1) return [`${testFile}:${String(line)}: test case has no Then phase`]
     if (thenPosition === 0 || (thenPosition === 1 && countStatements({ block: blocks[0] }) > 1)) {
       return [`${testFile}:${String(line)}: separate Given, Action, and Then phases with blank lines`]
     }

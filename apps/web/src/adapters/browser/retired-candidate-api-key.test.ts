@@ -14,8 +14,11 @@ describe('Retired Candidate API Key', () => {
   })
 
   it('starts even when tab storage is unavailable', () => {
-    expect(() => { eraseRetiredCandidateApiKey({ readStorage: () => { throw new Error('Storage is disabled') } }) })
-      .not.toThrow()
+    const readStorage = () => { throw new Error('Storage is disabled') }
+
+    const erase = () => { eraseRetiredCandidateApiKey({ readStorage }) }
+
+    expect(erase).not.toThrow()
   })
 })
 
