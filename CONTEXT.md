@@ -39,8 +39,8 @@ The Candidate's confirmation of the current Processing Policy before the first m
 _Avoid_: Per-document consent, per-action consent
 
 **Language Model Provider**:
-The disclosed external processor selected to perform model-backed operations under the current Processing Policy.
-_Avoid_: OpenAI in domain language, AI session
+The disclosed external processor selected to perform model-backed operations under the current Processing Policy. Exactly one is active at a time, and every model-backed operation uses it: a failing operation never moves to another processor the Candidate has not consented to, so changing it is a material change of the Processing Policy.
+_Avoid_: OpenAI in domain language, AI session, fallback provider
 
 **Daily Quota**:
 The number of Tailored Resumes one client network (an IPv4 address or an IPv6 /64) may start for free each day. Each Job Posting extracted for a Job Match uses one, and all reset at 00:00 Europe/Paris. A global daily ceiling across all Candidates bounds it too; past either, the preparation is refused as Daily Quota reached until the reset, unless the Candidate brings a Candidate API Key.
