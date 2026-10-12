@@ -19,20 +19,26 @@ describe('recording a Qualified Model Configuration candidate', () => {
   })
 
   it('refuses a candidate nobody declared', async () => {
-    await expect(recordModelQualification({ ...recording, candidateId: 'unknown' }))
-      .rejects.toThrow('Unknown candidate "unknown"; record one of: scripted-structured')
+    const recorded = recordModelQualification({ ...recording, candidateId: 'unknown' })
+
+    await expect(recorded).rejects.toThrow('Unknown candidate "unknown"; record one of: scripted-structured')
   })
 
   it('refuses to run without the key of the candidate\'s provider', async () => {
-    await expect(recordModelQualification({ ...recording, candidateId: 'scripted-structured', environment: {} }))
-      .rejects.toThrow('SCRIPTED_API_KEY must be set to record "scripted-structured"')
+    const environment = {}
+
+    const recorded = recordModelQualification({ ...recording, candidateId: 'scripted-structured', environment })
+
+    await expect(recorded).rejects.toThrow('SCRIPTED_API_KEY must be set to record "scripted-structured"')
   })
 
   it('replaces the run of the same configuration and keeps every other', () => {
     const other = { ...run, configuration: { ...structured, model: 'another-model' } as ModelConfiguration }
     const rerun = { ...run, recordedAt: '2026-10-13T10:00:00.000Z' }
 
-    expect(mergeRecordedRuns({ recordedRun: rerun, runs: [run, other] })).toEqual([other, rerun])
+    const runs = mergeRecordedRuns({ recordedRun: rerun, runs: [run, other] })
+
+    expect(runs).toEqual([other, rerun])
   })
 
   it('writes the runs as the module qualification reads', () => {

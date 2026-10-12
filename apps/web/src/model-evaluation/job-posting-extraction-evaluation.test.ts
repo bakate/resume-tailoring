@@ -20,24 +20,28 @@ describe('Job Posting extraction observations', () => {
   })
 
   it('fails multilingual fidelity when a French posting comes back translated', async () => {
-    const { report } = await qualifyExtraction({ answers: { ...faithfulAnswers, 'Nous recrutons': [
+    const answers = { ...faithfulAnswers, 'Nous recrutons': [
       requirement({ excerpt: 'Your core mission is to design our payment platform.', importance: 'central', value: 'payment platform' }),
       requirement({ excerpt: 'You will define features, ensure quality and collaborate with product managers.',
         importance: 'complementary', value: 'Generic duties' }),
       requirement({ excerpt: 'React is mandatory.', importance: 'critical', value: 'React' }),
-    ] } })
+    ] }
+
+    const { report } = await qualifyExtraction({ answers })
 
     expect(report.gates.multilingualFidelity).toEqual({ passed: false, threshold: 1, value: 0 })
     expect(report.qualified).toBe(false)
   })
 
   it('counts a check the extraction breaks, such as one requirement per generic duty', async () => {
-    const { recordedRun } = await qualifyExtraction({ answers: { ...faithfulAnswers, 'Senior Product Engineer': [
+    const answers = { ...faithfulAnswers, 'Senior Product Engineer': [
       requirement({ excerpt: 'own the architecture of our payments platform', importance: 'central', value: 'Architecture' }),
       requirement({ excerpt: 'define features', importance: 'complementary', value: 'Define features' }),
       requirement({ excerpt: 'ensure quality', importance: 'complementary', value: 'Ensure quality' }),
       requirement({ excerpt: 'Strong TypeScript experience is required.', importance: 'critical', value: 'TypeScript' }),
-    ] } })
+    ] }
+
+    const { recordedRun } = await qualifyExtraction({ answers })
 
     expect(recordedRun.observations[0]).toMatchObject({ extractionExpectedCount: 5, extractionMatchedCount: 3,
       observedValues: ['failed:generic duties form one requirement', 'failed:that requirement cites every generic duty'] })

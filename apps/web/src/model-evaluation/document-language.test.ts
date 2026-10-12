@@ -10,28 +10,34 @@ describe('the language a prepared document is written in', () => {
       'Mise en place des tests de bout en bout dans la chaîne d\'intégration continue',
     ] })
 
-    expect(checkDocumentLanguage({ document, locale: 'fr' })).toEqual([
+    const checks = checkDocumentLanguage({ document, locale: 'fr' })
+
+    expect(checks).toEqual([
       { name: 'achievement-0 is written in fr', passed: true },
       { name: 'achievement-1 is written in fr', passed: true },
     ])
   })
 
-  it('fails a prose field left in another language', () => {
+  it.each([
+    { locale: 'fr', failed: { name: 'achievement-1 is written in fr', passed: false } },
+    { locale: 'en', failed: { name: 'achievement-0 is written in en', passed: false } },
+  ] as const)('fails a prose field left in another language than $locale', ({ failed, locale }) => {
     const document = createDocument({ achievements: [
       'Conception et développement d\'une plateforme de paiement avec TypeScript pour les équipes produit',
       'Built the end-to-end test suite for the payments platform and ran it in the CI pipeline',
     ] })
 
-    expect(checkDocumentLanguage({ document, locale: 'fr' }).filter(({ passed }) => !passed))
-      .toEqual([{ name: 'achievement-1 is written in fr', passed: false }])
-    expect(checkDocumentLanguage({ document, locale: 'en' }).filter(({ passed }) => !passed))
-      .toEqual([{ name: 'achievement-0 is written in en', passed: false }])
+    const checks = checkDocumentLanguage({ document, locale })
+
+    expect(checks.filter(({ passed }) => !passed)).toEqual([failed])
   })
 
   it('skips fields too short or too neutral to tell, such as a list of tools', () => {
     const document = createDocument({ achievements: ['TypeScript, React, Node.js', 'Kubernetes Terraform AWS GitHub Actions Datadog'] })
 
-    expect(checkDocumentLanguage({ document, locale: 'fr' })).toEqual([])
+    const checks = checkDocumentLanguage({ document, locale: 'fr' })
+
+    expect(checks).toEqual([])
   })
 })
 

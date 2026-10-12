@@ -5,7 +5,11 @@ import { countUnsupportedResumeClaims } from './unsupported-resume-claims'
 
 describe('unsupported Resume Claims of a prepared document', () => {
   it('counts nothing when every professional field cites a known Candidate Fact', () => {
-    expect(countUnsupportedResumeClaims({ candidateFacts, document: createDocument({}) })).toBe(0)
+    const document = createDocument({})
+
+    const count = countUnsupportedResumeClaims({ candidateFacts, document })
+
+    expect(count).toBe(0)
   })
 
   it('counts a field citing no Candidate Fact and a field citing an unknown one', () => {
@@ -14,12 +18,18 @@ describe('unsupported Resume Claims of a prepared document', () => {
       { id: 'unknown', text: 'Built a billing platform', factIds: ['source-fact-invented'] },
     ] })
 
-    expect(countUnsupportedResumeClaims({ candidateFacts, document })).toBe(2)
+    const count = countUnsupportedResumeClaims({ candidateFacts, document })
+
+    expect(count).toBe(2)
   })
 
   it('counts a field the field validator rejected that still reached the document, once', () => {
-    expect(countUnsupportedResumeClaims({ candidateFacts, document: createDocument({}),
-      rejectedFieldIds: ['achievement', 'achievement', 'field-not-in-the-document'] })).toBe(1)
+    const document = createDocument({})
+    const rejectedFieldIds = ['achievement', 'achievement', 'field-not-in-the-document']
+
+    const count = countUnsupportedResumeClaims({ candidateFacts, document, rejectedFieldIds })
+
+    expect(count).toBe(1)
   })
 })
 

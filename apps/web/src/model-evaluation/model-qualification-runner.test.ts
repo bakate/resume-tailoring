@@ -79,16 +79,17 @@ describe('provider-neutral qualification runner', () => {
   })
 
   it('refuses a companion from another provider, since exactly one provider is active', async () => {
-    const run = runModelQualification({ ...qualification, candidate: { configuration: scriptedConfiguration,
-      companion: { ...scriptedCompanion, provider: 'openai' } as never }, sources: [extractionSource] })
+    const companion = { ...scriptedCompanion, provider: 'openai' } as never
+
+    const run = runModelQualification({ ...qualification, candidate: { configuration: scriptedConfiguration, companion },
+      sources: [extractionSource] })
 
     await expect(run).rejects.toThrow('The companion configuration must use the provider under qualification')
   })
 
   it('records neither the key nor the content a source sends', async () => {
-    const result = await runModelQualification({ ...qualification, sources: [extractionSource] })
+    const recorded = JSON.stringify(await runModelQualification({ ...qualification, sources: [extractionSource] }))
 
-    const recorded = JSON.stringify(result)
     expect(recorded).not.toContain(qualification.apiKey.value)
     expect(recorded).not.toContain(typescriptPosting)
   })

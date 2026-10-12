@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createOpenAiModelConfiguration } from '../language-model-configuration'
 import { qualifyModelConfiguration, type ModelConfiguration } from './model-qualification'
+import { createModelEvaluationObservation } from './model-qualification-runner'
 import {
   isQualifiedModelConfiguration,
   recordedModelQualificationReports,
@@ -39,21 +40,26 @@ describe('qualified model configurations', () => {
 
   describe('once a configuration is recorded', () => {
     it('qualifies exactly the recorded configuration', () => {
-      expect(isQualifiedModelConfiguration({ configuration: recordedConfiguration, reports: [recordedReport] })).toBe(true)
+      const qualified = isQualifiedModelConfiguration({ configuration: recordedConfiguration, reports: [recordedReport] })
+
+      expect(qualified).toBe(true)
     })
 
-    it.each([
-      { label: 'a reasoning effort', providerOptions: { ...recordedConfiguration.providerOptions, thinking: 'high' } },
-      { label: 'an output token budget', providerOptions: { ...recordedConfiguration.providerOptions,
-        outputTokenBudgets: { 'explainable-match-evidence': 32_000, 'resume-section-writing': 8_000 } } },
-      { label: 'an added option', providerOptions: { ...recordedConfiguration.providerOptions, temperature: 0 } },
-      { label: 'a removed option', providerOptions: { thinking: 'low' } },
-    ])('makes the configuration unqualified when $label changes, until it is recorded again', ({ providerOptions }) => {
+    it.each(optionChanges)('makes the configuration unqualified when $label changes', ({ providerOptions }) => {
       const changed = { ...recordedConfiguration, providerOptions } as unknown as ModelConfiguration
 
-      expect(isQualifiedModelConfiguration({ configuration: changed, reports: [recordedReport] })).toBe(false)
-      expect(isQualifiedModelConfiguration({ configuration: changed, reports: [recordedReport, recordReport(changed)] }))
-        .toBe(true)
+      const qualified = isQualifiedModelConfiguration({ configuration: changed, reports: [recordedReport] })
+
+      expect(qualified).toBe(false)
+    })
+
+    it.each(optionChanges)('qualifies the configuration again once it is recorded with $label changed', ({ providerOptions }) => {
+      const changed = { ...recordedConfiguration, providerOptions } as unknown as ModelConfiguration
+      const reports = [recordedReport, recordReport(changed)]
+
+      const qualified = isQualifiedModelConfiguration({ configuration: changed, reports })
+
+      expect(qualified).toBe(true)
     })
   })
 })
@@ -68,10 +74,18 @@ const recordedConfiguration = {
 
 const recordedReport = recordReport(recordedConfiguration)
 
+const optionChanges = [
+  { label: 'a reasoning effort', providerOptions: { ...recordedConfiguration.providerOptions, thinking: 'high' } },
+  { label: 'an output token budget', providerOptions: { ...recordedConfiguration.providerOptions,
+    outputTokenBudgets: { 'explainable-match-evidence': 32_000, 'resume-section-writing': 8_000 } } },
+  { label: 'an added option', providerOptions: { ...recordedConfiguration.providerOptions, temperature: 0 } },
+  { label: 'a removed option', providerOptions: { thinking: 'low' } },
+]
+
 function recordReport(configuration: ModelConfiguration) {
-  const observations = [{ extractionExpectedCount: 1, extractionMatchedCount: 1, fixtureId: 'recorded', inputTokens: 10,
-    latencyMilliseconds: 10, multilingualCheckCount: 1, multilingualPassedCount: 1, observedValues: [], outputTokens: 10,
-    unsupportedResumeClaimCount: 0 }]
+  const observations = [createModelEvaluationObservation({ fixtureId: 'recorded', extractionExpectedCount: 1,
+    extractionMatchedCount: 1, inputTokens: 10, latencyMilliseconds: 10, multilingualCheckCount: 1, multilingualPassedCount: 1,
+    outputTokens: 10 })]
   return qualifyModelConfiguration({ configuration, datasetId: 'recorded-v1', observations, baseline: {
     configuration, datasetId: 'recorded-v1', observations, recordedAt: '2026-10-12T10:00:00.000Z',
     thresholds: { costUsd: 1, extractionRecall: 1, multilingualFidelity: 1, p95LatencyMilliseconds: 1_000 } } })

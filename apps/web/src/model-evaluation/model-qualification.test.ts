@@ -119,12 +119,12 @@ describe('multilingual fidelity', () => {
 
 describe('cost per Tailored Resume', () => {
   it('prices the most expensive Tailored Resume, each role at its own upper-bound rates, against the ceiling', () => {
+    const observed = [...observations,
+      tailoredResume({ structured: [10_000, 2_000], writing: [20_000, 5_000] }),
+      tailoredResume({ structured: [10_000, 2_000], writing: [30_000, 6_000] })]
+
     const report = qualifyModelConfiguration({ baseline: perResumeBaseline, companion: writing,
-      configuration: baseline.configuration, costUnit: 'tailored-resume', datasetId: baseline.datasetId, observations: [
-        ...observations,
-        tailoredResume({ structured: [10_000, 2_000], writing: [20_000, 5_000] }),
-        tailoredResume({ structured: [10_000, 2_000], writing: [30_000, 6_000] }),
-      ] })
+      configuration: baseline.configuration, costUnit: 'tailored-resume', datasetId: baseline.datasetId, observations: observed })
 
     // Structured: 10,000 × $0.10 + 2,000 × $0.50; writing: 30,000 × $2 + 6,000 × $10, per million tokens.
     expect(report.gates.costUsd).toEqual({ passed: false, threshold: 0.12, unit: 'tailored-resume', value: 0.122 })
@@ -138,9 +138,10 @@ describe('cost per Tailored Resume', () => {
   })
 
   it('is not measured when the other role\'s tokens have no price to be read at', () => {
+    const observed = [tailoredResume({ structured: [10_000, 2_000], writing: [20_000, 5_000] })]
+
     const report = qualifyModelConfiguration({ baseline: perResumeBaseline, configuration: baseline.configuration,
-      costUnit: 'tailored-resume', datasetId: baseline.datasetId,
-      observations: [tailoredResume({ structured: [10_000, 2_000], writing: [20_000, 5_000] })] })
+      costUnit: 'tailored-resume', datasetId: baseline.datasetId, observations: observed })
 
     expect(report.gates.costUsd).toEqual({ passed: false, status: 'not-measured', unit: 'tailored-resume' })
   })
