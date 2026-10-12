@@ -30,7 +30,7 @@ export function findUnsupportedResumeFieldIds({ candidateFacts, document }: Read
   }).ok).map(({ id }) => id)
 }
 
-function readProfessionalFields({ document }: Readonly<{ document: ProfessionalResumeDocument }>): readonly TailoredResumeField[] {
+export function readProfessionalFields({ document }: Readonly<{ document: ProfessionalResumeDocument }>): readonly TailoredResumeField[] {
   return [...document.valueProposition.paragraphs,
     ...document.experiences.flatMap((experience) => readExperienceFields({ experience })),
     ...document.sections.flatMap((section) => readSectionFields({ section }))]

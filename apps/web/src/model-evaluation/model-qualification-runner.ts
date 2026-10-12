@@ -1,11 +1,12 @@
 import type { ModelCallMeasurement, ModelConnection } from '../adapters/server/language-model-request'
-import type { LanguageModelConfiguration, ModelRole } from '../language-model-configuration'
+import type { ModelRole } from '../language-model-configuration'
 import {
   qualifyModelConfiguration,
   type ModelConfiguration,
   type ModelEvaluationObservation,
   type ModelEvaluationThresholds,
   type ModelQualificationReport,
+  type ModelTokenUsage,
 } from './model-qualification'
 
 /**
@@ -23,15 +24,24 @@ export type ModelObservationContext = Readonly<{
   /** The connection a role's operations use: the configuration under test for its role, its companion otherwise. */
   connect: (role: ModelRole) => ModelConnection
   role: ModelRole
+  /** Connections that also add up the tokens each role spends through them, such as on one whole Tailored Resume. */
+  trackUsage: () => ModelUsageTracker
+}>
+
+export type ModelUsageTracker = Readonly<{
+  connect: (role: ModelRole) => ModelConnection
+  readUsage: () => Readonly<Record<ModelRole, ModelTokenUsage>>
 }>
 
 /** A Qualified Model Configuration candidate, and the same provider's configuration for the other role. */
 export type QualificationCandidate = Readonly<{
   configuration: ModelConfiguration
-  companion?: LanguageModelConfiguration
+  companion?: ModelConfiguration
 }>
 
+/** The companion is recorded for its rates: a Tailored Resume's cost includes the other role's tokens. */
 export type RecordedModelEvaluationRun = Readonly<{
+  companion?: ModelConfiguration
   configuration: ModelConfiguration
   datasetId: string
   observations: readonly ModelEvaluationObservation[]
@@ -58,28 +68,44 @@ export async function runModelQualification({
   const observations: ModelEvaluationObservation[] = []
   for (const source of sources.filter(({ roles }) => roles.includes(configuration.role))) {
     const calls: ModelCallMeasurement[] = []
-    const connect = (role: ModelRole): ModelConnection => ({
+    const connectObserved = ({ observeCall, role }: Readonly<{
+      observeCall?: (measurement: ModelCallMeasurement) => void
+      role: ModelRole
+    }>): ModelConnection => ({
       apiKey, configuration: readRoleConfiguration({ companion, configuration, role }),
-      observeCall: (measurement) => { calls.push(measurement) },
+      observeCall: (measurement) => { calls.push(measurement); observeCall?.(measurement) },
       ...(providers === undefined ? {} : { providers }),
     })
-    const sourceObservations = await source.observe({ connect, role: configuration.role })
+    const trackUsage = (): ModelUsageTracker => {
+      const usage = { structured: { inputTokens: 0, outputTokens: 0 }, writing: { inputTokens: 0, outputTokens: 0 } }
+      return {
+        connect: (role) => connectObserved({ role, observeCall: ({ configuration: { role: callRole }, usage: callUsage }) => {
+          usage[callRole] = { inputTokens: usage[callRole].inputTokens + (callUsage?.inputTokens ?? 0),
+            outputTokens: usage[callRole].outputTokens + (callUsage?.outputTokens ?? 0) }
+        } }),
+        readUsage: () => ({ structured: usage.structured, writing: usage.writing }),
+      }
+    }
+    const sourceObservations = await source.observe({ connect: (role) => connectObserved({ role }), role: configuration.role,
+      trackUsage })
     observations.push(...sourceObservations.map((observation) => ({ ...observation,
       fixtureId: `${source.id}:${observation.fixtureId}` })))
     observations.push(...readCallObservations({ calls: calls.filter((call) => call.configuration === configuration),
       sourceId: source.id }))
   }
-  const recordedRun = { configuration, datasetId, observations, recordedAt: now().toISOString() }
+  const recordedRun = { ...(companion === undefined ? {} : { companion }), configuration, datasetId, observations,
+    recordedAt: now().toISOString() }
   return { recordedRun, report: qualifyRecordedRun({ recordedRun, thresholds }) }
 }
 
-/** A recorded run qualified against thresholds: the run is its own baseline. */
+/** A recorded run qualified against thresholds: the run is its own baseline, and cost is per Tailored Resume. */
 export function qualifyRecordedRun({ recordedRun, thresholds }: Readonly<{
   recordedRun: RecordedModelEvaluationRun
   thresholds: ModelEvaluationThresholds
 }>) {
-  const { configuration, datasetId, observations } = recordedRun
-  return qualifyModelConfiguration({ baseline: { ...recordedRun, thresholds }, configuration, datasetId, observations })
+  const { companion, configuration, datasetId, observations } = recordedRun
+  return qualifyModelConfiguration({ baseline: { ...recordedRun, thresholds }, configuration, costUnit: 'tailored-resume',
+    datasetId, observations, ...(companion === undefined ? {} : { companion }) })
 }
 
 /** An observation that checks only what it names; every count it leaves out is zero. */
@@ -104,7 +130,7 @@ function assertCompanion({ candidate: { companion, configuration } }: Readonly<{
 }
 
 function readRoleConfiguration({ companion, configuration, role }: Readonly<{
-  companion?: LanguageModelConfiguration
+  companion?: ModelConfiguration
   configuration: ModelConfiguration
   role: ModelRole
 }>) {

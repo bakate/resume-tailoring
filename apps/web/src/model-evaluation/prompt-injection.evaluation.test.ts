@@ -50,7 +50,7 @@ describe('instructions inside supplied documents, replayed live', () => {
   })
 
   function readCheck(name: string) {
-    return assessment.checks.find((check) => check.name === name)?.passed
+    return assessment.injectionChecks.find((check) => check.name === name)?.passed
   }
 })
 

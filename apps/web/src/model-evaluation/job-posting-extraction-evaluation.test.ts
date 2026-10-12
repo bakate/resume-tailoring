@@ -16,7 +16,7 @@ describe('Job Posting extraction observations', () => {
       { fixtureId: 'job-posting-extraction:generic-duties-fr', extraction: [5, 5], multilingual: [3, 3] },
       { fixtureId: 'job-posting-extraction:distinct-capabilities-en', extraction: [6, 6], multilingual: [0, 0] },
     ])
-    expect(report.qualified).toBe(true)
+    expect([report.gates.extractionRecall.passed, report.gates.multilingualFidelity.passed]).toEqual([true, true])
   })
 
   it('fails multilingual fidelity when a French posting comes back translated', async () => {

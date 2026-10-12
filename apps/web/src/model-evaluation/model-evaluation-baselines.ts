@@ -44,6 +44,10 @@ export const liveModelEvaluationDatasetId = 'resume-tailoring-live-v1'
  * The reference-v1 thresholds, carried to the live evaluations. Recall and multilingual fidelity are ratios whose meaning
  * does not change with the sources. Latency and cost were measured on ~200-token fixtures, so they are recalibrated.
  */
+// Cost is per Tailored Resume, both roles at their upper-bound rates: OpenAI's ~$0.10 in production
+// (daily-spending-limits.js) plus 20%, the most a Tailored Resume may cost. Tighten it once BAK-168 sets the budget.
+const maximumUsdPerTailoredResume = 0.12
+
 export const liveModelEvaluationThresholds = {
   structured: {
     extractionRecall: structuredModelEvaluationBaseline.thresholds.extractionRecall,
@@ -51,15 +55,14 @@ export const liveModelEvaluationThresholds = {
     // A production-sized extraction answers within the 45 seconds the Job Posting evaluation always allowed one call:
     // half the per-request timeout. The reference 10 seconds bounded ~200-token fixtures.
     p95LatencyMilliseconds: 45_000,
-    // Not calibrated: the reference cost was one pass over ~200-token fixtures. The first live recording (BAK-160)
-    // calibrates it against the ~$0.10 a Tailored Resume costs in production (daily-spending-limits.js).
+    costUsd: maximumUsdPerTailoredResume,
   },
   writing: {
     extractionRecall: writingModelEvaluationBaseline.thresholds.extractionRecall,
     multilingualFidelity: writingModelEvaluationBaseline.thresholds.multilingualFidelity,
     // Writing is now measured per Resume Section, retries included, so it shares the section budget.
     p95LatencyMilliseconds: sectionPreparationBudgets.sectionP95LatencyMilliseconds,
-    // Not calibrated, as for the structured role.
+    costUsd: maximumUsdPerTailoredResume,
   },
 } as const satisfies Record<ModelRole, ModelEvaluationThresholds>
 

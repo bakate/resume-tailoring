@@ -68,8 +68,9 @@ export function summarizeMatchEvidenceOutcomes({ outcomes }: Readonly<{ outcomes
 }
 
 /**
- * Each case checks its expected coverage, its expected Adjacent Evidence and that no trap is covered; a case pairing
- * languages also counts each of its requirements as a multilingual check.
+ * Each case checks that the matcher answered, its expected coverage and its expected Adjacent Evidence; a case pairing
+ * languages also counts those checks as multilingual. A covered trap claims the Candidate meets a requirement without
+ * proof, so it counts against provenance safety, never recall.
  */
 export const matchEvidenceSource: ModelObservationSource = {
   id: 'match-evidence',
@@ -79,17 +80,21 @@ export const matchEvidenceSource: ModelObservationSource = {
     const observations = []
     for (const [caseIndex, evaluationCase] of matchEvidenceEvaluationCases.entries()) {
       const outcome = await evaluateMatchEvidenceCase({ connection, evaluationCase })
-      const checks = assessMatchEvidenceOutcomes({ outcomes: [outcome] }).flatMap((assessment) => [
-        { id: assessment.id, passed: assessment.expectation === 'covered' ? assessment.coverage === 'covered' : !assessment.trapViolated },
+      const assessments = assessMatchEvidenceOutcomes({ outcomes: [outcome] })
+      const checks = [{ id: 'answered', passed: outcome.ok }, ...assessments.flatMap((assessment) => [
+        ...assessment.expectation === 'covered' ? [{ id: assessment.id, passed: assessment.coverage === 'covered' }] : [],
         ...assessment.expectsAdjacentEvidence ? [{ id: `${assessment.id}:adjacent`, passed: assessment.hasAdjacentEvidence }] : [],
-      ])
+      ])]
       const passedCount = checks.filter(({ passed }) => passed).length
       const multilingual = evaluationCase.multilingual === true
+      const coveredTraps = assessments.filter(({ trapViolated }) => trapViolated)
       observations.push(createModelEvaluationObservation({ fixtureId: `case-${String(caseIndex + 1).padStart(2, '0')}`,
-        extractionExpectedCount: checks.length, extractionMatchedCount: outcome.ok ? passedCount : 0,
+        coveredTrapCount: coveredTraps.length,
+        extractionExpectedCount: checks.length, extractionMatchedCount: passedCount,
         multilingualCheckCount: multilingual ? checks.length : 0,
-        multilingualPassedCount: multilingual && outcome.ok ? passedCount : 0,
-        observedValues: checks.filter(({ passed }) => !outcome.ok || !passed).map(({ id }) => `failed:${id}`) }))
+        multilingualPassedCount: multilingual ? passedCount : 0,
+        observedValues: [...checks.filter(({ passed }) => !passed).map(({ id }) => `failed:${id}`),
+          ...coveredTraps.map(({ id }) => `covered-trap:${id}`)] }))
     }
     return observations
   },

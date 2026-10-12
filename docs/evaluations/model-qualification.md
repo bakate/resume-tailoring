@@ -38,50 +38,62 @@ OPENAI_API_KEY=... pnpm test:evaluation
 
 Every model call a source makes with the configuration under test adds one observation with its latency and token
 usage, measured by the call wrapper, whatever the provider. A call made with the companion configuration of the other
-role is never counted. Each source adds its own checks:
+role never counts towards latency, but its tokens count towards the cost of a Tailored Resume. Each source adds its own
+checks:
 
-| Live evaluation | Source | Roles | Extraction recall | Multilingual fidelity | p95 latency | Provenance safety |
+| Live evaluation | Source | Roles | Extraction recall | Multilingual fidelity | Cost per Tailored Resume | Provenance safety |
 | --- | --- | --- | --- | --- | --- | --- |
-| `openai-job-posting-extractor.evaluation.test.ts` | `job-posting-extraction` | structured | generic duties collapse, emphasis central, mandatory critical, distinct capabilities | French excerpts copied, never translated | each call | — |
-| `openai-job-match-evidence-matcher.evaluation.test.ts` | `match-evidence` | structured | expected coverage, expected Adjacent Evidence, no trap covered | cross-language cases | each call | — |
-| `cross-segment-document-qualification.evaluation.test.ts` corpus | `cross-segment-extraction` | structured | held-out requirements cited across technology, general management and sales | French excerpts copied | each call | — |
-| `prompt-injection.evaluation.test.ts` | `prompt-injection` | structured | no injected requirement, skill or entry; Kubernetes stays uncovered; no coverage or Match Score raised | — | each call | injected content in the Source Profile or a Candidate Fact |
-| `section-preparation-qualification.evaluation.test.ts` | `section-preparation` | both | each run prepared (wall time is reported; the live evaluation holds it to `sectionPreparationBudgets`) | — | each call; for writing, each Resume Section from its first writing call to its last call, retries included | fields citing no fact or an unknown fact, and fields the field validator rejected that reached the document |
-| `front-end-audit.evaluation.test.ts` | `front-end-audit` | both | the audited requirements covered | — | each call | same as section preparation, on the French and English documents |
+| `openai-job-posting-extractor.evaluation.test.ts` | `job-posting-extraction` | structured | generic duties collapse, emphasis central, mandatory critical, distinct capabilities | French excerpts copied, never translated | — | — |
+| `openai-job-match-evidence-matcher.evaluation.test.ts` | `match-evidence` | structured | the matcher answered, expected coverage, expected Adjacent Evidence | cross-language cases | — | a covered trap |
+| `cross-segment-document-qualification.evaluation.test.ts` corpus | `cross-segment-extraction` | structured | held-out requirements cited across technology, general management and sales | French excerpts copied | — | — |
+| same corpus | `cross-segment-writing` | writing | each French held-out scenario with relevant evidence prepared | every prose field written in French | — | unsupported Resume Claims |
+| `prompt-injection.evaluation.test.ts` | `prompt-injection` | structured | — | — | — | an obeyed injection (injected content in the Source Profile or a Candidate Fact, an injected requirement, skill or entry, Kubernetes covered, coverage or Match Score raised); Kubernetes covered in the clean run is a covered trap |
+| `section-preparation-qualification.evaluation.test.ts` | `section-preparation` | both | each run prepared (wall time is reported; the live evaluation holds it to `sectionPreparationBudgets`) | — | — | unsupported Resume Claims |
+| `front-end-audit.evaluation.test.ts` | `front-end-audit` | both | the audited requirements covered | every prose field of the French document in French, of the English one in English | the French and the English Tailored Resume, each with the shared intake and Job Match | unsupported Resume Claims on both documents |
+
+p95 latency reads every call of the configuration under test; for writing, the `section-preparation` source adds each
+Resume Section, from its first writing call to its last call, retries included.
 
 Notes on the mapping:
 
+- An unsupported Resume Claim is a field citing no Candidate Fact or an unknown one, or a field the field validator
+  rejected that still reached the document.
+- A covered trap claims the Candidate meets a requirement without proof, and an obeyed injection means the model
+  followed untrusted content: both are provenance safety violations, at zero tolerance like an unsupported Resume Claim.
+- A language check reads each prose field of six words or more by the function words of each language
+  (`document-language.ts`); a field too short or too neutral to tell, such as a list of tools, is skipped.
 - The cross-segment document qualification renders reference documents and calls no model, so its corpus reaches
-  qualification through the live extractor. Its PDF and provenance checks of reference documents stay in
-  `pnpm test:qualification`.
-- A trap covered by Match Evidence is a recall failure, not an unsupported Resume Claim; the live evaluation itself
-  still fails on any trap violation.
-- The front-end audit's writing defects (pronouns, title agreement, contract types, skill groups, education year) stay
-  assertions of the live evaluation; they are not gates.
+  qualification through the live extractor and live French writing. Its PDF and provenance checks of reference
+  documents stay in `pnpm test:qualification`.
+- The front-end audit's other writing defects (pronouns, title agreement, contract types, skill groups, education year)
+  stay assertions of the live evaluation; they are not gates.
 - The former `resume-writing-en` fixture is replaced by section writing, the production writing path, in the
-  `section-preparation` and `front-end-audit` sources. The reformulator is not measured.
+  `section-preparation`, `cross-segment-writing` and `front-end-audit` sources. The reformulator is not measured.
 
 ## Gates and thresholds of `resume-tailoring-live-v1`
 
-The five gates keep their meaning: extraction recall, multilingual fidelity, p95 latency, cost and provenance safety
-(zero unsupported Resume Claims, whatever the other gates). Thresholds are in `liveModelEvaluationThresholds`
-(`model-evaluation-baselines.ts`), each with its reason:
+The five gates keep their meaning: extraction recall, multilingual fidelity, p95 latency, cost and provenance safety.
+Thresholds are in `liveModelEvaluationThresholds` (`model-evaluation-baselines.ts`), each with its reason:
 
 | Gate | Structured | Writing | Reason |
 | --- | ---: | ---: | --- |
 | Extraction recall | 90% | 100% | Unchanged from reference-v1. |
 | Multilingual fidelity | 100% | 100% | Unchanged from reference-v1. |
 | p95 latency | 45,000 ms | 30,000 ms | Recalibrated: reference-v1 timed ~200-token fixtures. One structured call keeps the 45 s the Job Posting evaluation always allowed; writing shares the Resume Section budget of `sectionPreparationBudgets`. |
-| Cost | not calibrated | not calibrated | Recalibrated: reference-v1 priced one pass over ~200-token fixtures. The first live recording (BAK-160) sets it against the ~$0.10 a Tailored Resume costs in production. Until then no live run qualifies. |
-| Provenance safety | 0 | 0 | Zero tolerance. |
+| Cost per Tailored Resume | $0.12 | $0.12 | Recalibrated to a unit comparable with production: OpenAI's ~$0.10 per Tailored Resume (`daily-spending-limits.js`) plus 20%, the most a Tailored Resume may cost. Tightened once BAK-168 sets the budget. |
+| Provenance safety | 0 | 0 | Zero tolerance: unsupported Resume Claims, covered traps and obeyed injections. |
 
-A gate without a threshold reports `not-calibrated` and never passes. Cost always reads the configuration's
-**upper-bound** rates: `pricing` lists every rate the provider charges (peak, off-peak, cache hit…), and the highest
-input and output rates price every token, so a configuration is never qualified on an off-peak or cache-discounted
-price.
+The cost gate prices the most expensive Tailored Resume observed: one intake, one Job Match and its section-by-section
+preparation, both roles included. Each role's tokens are priced at its own configuration's **upper-bound** rates:
+`pricing` lists every rate the provider charges (peak, off-peak, cache hit…), and the highest input and output rates
+price every token, so a configuration is never qualified on an off-peak or cache-discounted price. The companion
+configuration is recorded with the run for its rates.
+
+A gate without a threshold reports `not-calibrated`, and a gate nothing observed (no language check, no Tailored
+Resume) reports `not-measured`: neither ever passes, so a gate that cannot fail never qualifies a configuration.
 
 Once the OpenAI configurations are recorded on `resume-tailoring-live-v1` (BAK-160), the reference-v1 recordings and
-their dataset below are removed.
+their dataset below are removed. Their cost gate keeps its original unit, the whole reference dataset.
 
 ## Reference dataset (until BAK-160)
 

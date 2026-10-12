@@ -1,4 +1,5 @@
 import { crossSegmentExtractionSource } from './cross-segment-extraction-evaluation'
+import { crossSegmentWritingSource } from './cross-segment-writing-evaluation'
 import { frontEndAuditSource } from './front-end-audit-evaluation'
 import { jobPostingExtractionSource } from './job-posting-extraction-evaluation'
 import { matchEvidenceSource } from './match-evidence-evaluation'
@@ -11,6 +12,7 @@ export const liveModelObservationSources: readonly ModelObservationSource[] = [
   jobPostingExtractionSource,
   matchEvidenceSource,
   crossSegmentExtractionSource,
+  crossSegmentWritingSource,
   promptInjectionSource,
   sectionPreparationSource,
   frontEndAuditSource,

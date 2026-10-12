@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import type { JobMatch } from '@resume-tailoring/application/job-match'
 
 import { validateServerEnvironment } from '../env'
+import { checkDocumentLanguage } from './document-language'
 import { readAuditedCoverage, replayAuditRun, type AuditRun } from './front-end-audit-evaluation'
 import { countUnsupportedResumeClaims } from './unsupported-resume-claims'
 
@@ -14,8 +15,9 @@ describe('audited front-end run, replayed live', () => {
   beforeAll(async () => {
     const { languageModel } = readServerEnvironment()
     const apiKey = { value: languageModel.apiKey } as const
-    run = await replayAuditRun({ structured: { apiKey, configuration: languageModel.structured.active },
-      writing: { apiKey, configuration: languageModel.writing.active } })
+    const roles = { structured: { apiKey, configuration: languageModel.structured.active },
+      writing: { apiKey, configuration: languageModel.writing.active } }
+    run = await replayAuditRun({ intake: roles.structured, preparations: { fr: roles, en: roles } })
     console.info(JSON.stringify(run.report))
   }, 900_000)
 
@@ -60,6 +62,10 @@ describe('audited front-end run, replayed live', () => {
 
   it.each(['fr', 'en'] as const)('writes the %s document without an unsupported Resume Claim', (locale) => {
     expect(countUnsupportedResumeClaims({ candidateFacts: run.candidateFacts, document: run.documents[locale] })).toBe(0)
+  })
+
+  it.each(['fr', 'en'] as const)('writes every prose field of the %s document in its language', (locale) => {
+    expect(checkDocumentLanguage({ document: run.documents[locale], locale }).filter(({ passed }) => !passed)).toEqual([])
   })
 
   it('keeps the education year the Source Document gives', () => {

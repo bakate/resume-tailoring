@@ -4,8 +4,11 @@ import { prepareResumeSections } from '@resume-tailoring/application/resume-prep
 import type { SourceIntake } from '@resume-tailoring/application/source-intake'
 
 import type { ModelConnection } from '../adapters/server/language-model-request'
+import type { ModelRole } from '../language-model-configuration'
+import { checkDocumentLanguage } from './document-language'
 import { frontEndAuditJobPosting, frontEndAuditResume } from './front-end-audit-corpus'
 import { readLiveJobMatch, readLiveSourceIntake } from './live-candidate-journey'
+import type { ModelTokenUsage } from './model-qualification'
 import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
 import { createSectionModels } from './section-preparation-evaluation'
 import { countUnsupportedResumeClaims } from './unsupported-resume-claims'
@@ -23,19 +26,23 @@ export const auditedCoverage = [
   { name: 'three years of React', requirement: /3 ans/iu },
 ] as const
 
+type AuditLocale = 'fr' | 'en'
+type RoleConnections = Readonly<{ structured: ModelConnection; writing: ModelConnection }>
+
 /**
  * Replays the audited front-end run (BAK-139): the Source Document and Job Posting go through the production
- * extraction, Match Analysis and section-by-section preparation, in French and in English.
+ * extraction and Match Analysis once, then section-by-section preparation in French and in English, each on the
+ * connections given for it.
  */
-export async function replayAuditRun({ structured, writing }: Readonly<{
-  structured: ModelConnection
-  writing: ModelConnection
+export async function replayAuditRun({ intake, preparations }: Readonly<{
+  intake: ModelConnection
+  preparations: Readonly<Record<AuditLocale, RoleConnections>>
 }>): Promise<AuditRun> {
-  const sourceIntake = await readLiveSourceIntake({ resume: frontEndAuditResume, structured })
+  const sourceIntake = await readLiveSourceIntake({ resume: frontEndAuditResume, structured: intake })
   const jobMatch = await readLiveJobMatch({ candidateFacts: sourceIntake.candidateFacts, jobPosting: frontEndAuditJobPosting,
-    structured })
+    structured: intake })
   const [fr, en] = await Promise.all((['fr', 'en'] as const).map(async (locale) => {
-    const models = createSectionModels({ structured, writing })
+    const models = createSectionModels(preparations[locale])
     // The last coherence verdict and the document it judged explain a failed preparation.
     let lastCoherence: unknown = null
     const output = await prepareResumeSections({ now: Date.now, recordTelemetry: () => undefined,
@@ -75,25 +82,44 @@ export function readAuditedCoverage({ jobMatch, requirement }: Readonly<{ jobMat
 }
 
 /**
- * Coverage recall across the audited requirements, and the unsupported Resume Claims of both documents against the
- * Candidate Facts the run extracted. A preparation that fails throws, which fails the recording.
+ * The one whole Tailored Resume the dataset measures, twice: the French and the English document each cost the shared
+ * intake and Job Match plus their own preparation. Each document must be written in its language, with no unsupported
+ * Resume Claim against the Candidate Facts the run extracted; the audited requirements must be covered. A preparation
+ * that fails throws, which fails the recording.
  */
 export const frontEndAuditSource: ModelObservationSource = {
   id: 'front-end-audit',
   roles: ['structured', 'writing'],
-  observe: async ({ connect }) => {
-    const run = await replayAuditRun({ structured: connect('structured'), writing: connect('writing') })
+  observe: async ({ trackUsage }) => {
+    const intake = trackUsage()
+    const preparations = { fr: trackUsage(), en: trackUsage() }
+    const run = await replayAuditRun({ intake: intake.connect('structured'), preparations: {
+      fr: { structured: preparations.fr.connect('structured'), writing: preparations.fr.connect('writing') },
+      en: { structured: preparations.en.connect('structured'), writing: preparations.en.connect('writing') },
+    } })
     const covered = auditedCoverage.filter(({ requirement }) =>
       readAuditedCoverage({ jobMatch: run.jobMatch, requirement }) === 'covered')
     return [
       createModelEvaluationObservation({ fixtureId: 'audited-coverage', extractionExpectedCount: auditedCoverage.length,
         extractionMatchedCount: covered.length, observedValues: auditedCoverage.filter((audited) => !covered.includes(audited))
           .map(({ name }) => `uncovered:${name}`) }),
-      ...(['fr', 'en'] as const).map((locale) => createModelEvaluationObservation({ fixtureId: `document-${locale}`,
-        unsupportedResumeClaimCount: countUnsupportedResumeClaims({ candidateFacts: run.candidateFacts,
-          document: run.documents[locale] }) })),
+      ...(['fr', 'en'] as const).map((locale) => {
+        const language = checkDocumentLanguage({ document: run.documents[locale], locale })
+        return createModelEvaluationObservation({ fixtureId: `tailored-resume-${locale}`,
+          multilingualCheckCount: language.length, multilingualPassedCount: language.filter(({ passed }) => passed).length,
+          observedValues: language.filter(({ passed }) => !passed).map(({ name }) => `failed:${name}`),
+          tailoredResumeUsage: addUsage(intake.readUsage(), preparations[locale].readUsage()),
+          unsupportedResumeClaimCount: countUnsupportedResumeClaims({ candidateFacts: run.candidateFacts,
+            document: run.documents[locale] }) })
+      }),
     ]
   },
+}
+
+function addUsage(...usages: readonly Readonly<Record<ModelRole, ModelTokenUsage>>[]) {
+  const add = (role: ModelRole) => ({ inputTokens: usages.reduce((total, usage) => total + usage[role].inputTokens, 0),
+    outputTokens: usages.reduce((total, usage) => total + usage[role].outputTokens, 0) })
+  return { structured: add('structured'), writing: add('writing') }
 }
 
 function escapeRegExp(value: string) {
