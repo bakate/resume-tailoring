@@ -6,7 +6,7 @@ import {
   structuredModelEvaluationBaseline,
   writingModelEvaluationBaseline,
 } from './model-evaluation-baselines'
-import type { RecordedModelEvaluationRun } from './model-qualification-runner'
+import { qualifyRecordedRun, type RecordedModelEvaluationRun } from './model-qualification-runner'
 import { recordedLiveModelEvaluationRuns } from './recorded-live-model-evaluation-runs'
 import {
   recordedStructuredModelEvaluation,
@@ -68,6 +68,5 @@ function qualifyRecordedConfiguration({
 /** A run recorded on another dataset than the live one has no calibrated threshold, so it qualifies nothing. */
 function qualifyLiveRun(run: RecordedModelEvaluationRun) {
   const thresholds = run.datasetId === liveModelEvaluationDatasetId ? liveModelEvaluationThresholds[run.configuration.role] : {}
-  return qualifyModelConfiguration({ baseline: { ...run, thresholds },
-    configuration: run.configuration, datasetId: run.datasetId, observations: run.observations })
+  return qualifyRecordedRun({ recordedRun: run, thresholds })
 }

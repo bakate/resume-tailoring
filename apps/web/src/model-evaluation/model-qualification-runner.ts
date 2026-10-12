@@ -70,8 +70,16 @@ export async function runModelQualification({
       sourceId: source.id }))
   }
   const recordedRun = { configuration, datasetId, observations, recordedAt: now().toISOString() }
-  return { recordedRun, report: qualifyModelConfiguration({ baseline: { ...recordedRun, thresholds }, configuration,
-    datasetId, observations }) }
+  return { recordedRun, report: qualifyRecordedRun({ recordedRun, thresholds }) }
+}
+
+/** A recorded run qualified against thresholds: the run is its own baseline. */
+export function qualifyRecordedRun({ recordedRun, thresholds }: Readonly<{
+  recordedRun: RecordedModelEvaluationRun
+  thresholds: ModelEvaluationThresholds
+}>) {
+  const { configuration, datasetId, observations } = recordedRun
+  return qualifyModelConfiguration({ baseline: { ...recordedRun, thresholds }, configuration, datasetId, observations })
 }
 
 /** An observation that checks only what it names; every count it leaves out is zero. */

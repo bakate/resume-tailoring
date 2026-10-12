@@ -3,14 +3,14 @@ import { validateProposedResumeClaim } from '@resume-tailoring/application/resum
 import { readExperienceFields, readSectionFields } from '@resume-tailoring/application/tailored-resume'
 import type { TailoredResumeField } from '@resume-tailoring/application/tailored-resume'
 
-type VerifiedFact = Readonly<{ id: string; value: string }>
+type CandidateFact = Readonly<{ id: string; value: string }>
 
 /**
  * Unsupported Resume Claims of a document: professional fields citing no Candidate Fact or an unknown one, and fields
  * the field validator rejected that still reached the document. Each field counts once, whatever made it unsupported.
  */
 export function countUnsupportedResumeClaims({ candidateFacts, document, rejectedFieldIds = [] }: Readonly<{
-  candidateFacts: readonly VerifiedFact[]
+  candidateFacts: readonly CandidateFact[]
   document: ProfessionalResumeDocument
   rejectedFieldIds?: readonly string[]
 }>) {
@@ -19,9 +19,9 @@ export function countUnsupportedResumeClaims({ candidateFacts, document, rejecte
   return readProfessionalFields({ document }).filter(({ id }) => unsupported.has(id) || rejected.has(id)).length
 }
 
-/** Fields whose text and cited facts the application claim validator refuses against the Candidate Facts. */
+/** Fields whose text and cited Candidate Facts the application claim validator refuses. */
 export function findUnsupportedResumeFieldIds({ candidateFacts, document }: Readonly<{
-  candidateFacts: readonly VerifiedFact[]
+  candidateFacts: readonly CandidateFact[]
   document: ProfessionalResumeDocument
 }>) {
   const verifiedFacts = candidateFacts.map(({ id, value }) => ({ id: toCandidateFactId(id), value }))

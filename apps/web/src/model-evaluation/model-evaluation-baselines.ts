@@ -26,6 +26,17 @@ export const writingModelEvaluationBaseline = {
   },
 } as const satisfies ModelEvaluationBaseline
 
+/**
+ * Latency budgets for section-by-section preparation of the real-sized resume. A section is measured
+ * from its first writing call to its last call, retries included; the preparation from planning to coherence.
+ */
+export const sectionPreparationBudgets = {
+  // A third of the 90-second per-request timeout: a section near it is one slow retry away from timing out.
+  sectionP95LatencyMilliseconds: 30_000,
+  // The per-request timeout the single writing call hit twice in production (BAK-67); sections together must beat it.
+  preparationWallTimeMilliseconds: 90_000,
+} as const satisfies SectionPreparationBudgets
+
 /** The live evaluations of today's pipeline (BAK-172), which replace the 2026-09-27 reference recordings. */
 export const liveModelEvaluationDatasetId = 'resume-tailoring-live-v1'
 
@@ -46,19 +57,9 @@ export const liveModelEvaluationThresholds = {
   writing: {
     extractionRecall: writingModelEvaluationBaseline.thresholds.extractionRecall,
     multilingualFidelity: writingModelEvaluationBaseline.thresholds.multilingualFidelity,
-    // Writing is now measured per Resume Section, retries included, so it shares the section budget below.
-    p95LatencyMilliseconds: 30_000,
+    // Writing is now measured per Resume Section, retries included, so it shares the section budget.
+    p95LatencyMilliseconds: sectionPreparationBudgets.sectionP95LatencyMilliseconds,
     // Not calibrated, as for the structured role.
   },
 } as const satisfies Record<ModelRole, ModelEvaluationThresholds>
 
-/**
- * Latency budgets for section-by-section preparation of the real-sized resume. A section is measured
- * from its first writing call to its last call, retries included; the preparation from planning to coherence.
- */
-export const sectionPreparationBudgets = {
-  // A third of the 90-second per-request timeout: a section near it is one slow retry away from timing out.
-  sectionP95LatencyMilliseconds: 30_000,
-  // The per-request timeout the single writing call hit twice in production (BAK-67); sections together must beat it.
-  preparationWallTimeMilliseconds: 90_000,
-} as const satisfies SectionPreparationBudgets

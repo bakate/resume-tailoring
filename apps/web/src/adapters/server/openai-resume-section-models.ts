@@ -11,10 +11,10 @@ import { resumeDocumentCoherenceSchema, resumeFieldValidationSchema, resumeSecti
 
 type ResumeSectionOperation = 'resume-section-writing' | 'resume-section-validation' | 'resume-document-coherence'
 
-export function createOpenAiResumeSectionWriter(configuration: ModelConnection): ResumeSectionWriter {
+export function createOpenAiResumeSectionWriter(connection: ModelConnection): ResumeSectionWriter {
   return { write: async (input) => {
     const kind = input.section.kind
-    const result = await processResumeModel<unknown>({ configuration, input, maximumOutputTokens: 16_000,
+    const result = await processResumeModel<unknown>({ connection, input, maximumOutputTokens: 16_000,
       instructions: readSectionWritingInstructions(kind), operation: 'resume-section-writing',
       outputName: `resume_section_${kind.replaceAll('-', '_')}`, schema: resumeSectionOutputSchemas[kind] })
     return result.ok ? { ...result, value: toSectionContent({ kind, value: result.value }) } : result
@@ -25,12 +25,12 @@ export function createOpenAiResumeSectionWriter(configuration: ModelConnection):
  * A browser tab loaded before validation named unsupported propositions rejects the key, so only a request that
  * asks for them receives them, and a supported field never carries one.
  */
-export function createOpenAiResumeFieldValidator(configuration: ModelConnection): Readonly<{
+export function createOpenAiResumeFieldValidator(connection: ModelConnection): Readonly<{
   validate: (input: Parameters<ResumeFieldValidator['validate']>[0] & Readonly<{ namesUnsupportedPropositions?: true }>)
     => ReturnType<ResumeFieldValidator['validate']>
 }> {
   return { validate: async ({ namesUnsupportedPropositions, ...input }) => {
-    const result = await processResumeModel({ configuration, input, maximumOutputTokens: 8_000,
+    const result = await processResumeModel({ connection, input, maximumOutputTokens: 8_000,
       instructions: fieldValidationInstructions, operation: 'resume-section-validation',
       outputName: 'resume_section_validation', schema: resumeFieldValidationSchema })
     return result.ok ? { ...result, value: { fields: result.value.fields.map(({ unsupportedProposition, ...field }) =>
@@ -39,8 +39,8 @@ export function createOpenAiResumeFieldValidator(configuration: ModelConnection)
   } }
 }
 
-export function createOpenAiResumeCoherenceChecker(configuration: ModelConnection): ResumeCoherenceChecker {
-  return { check: (input) => processResumeModel({ configuration, input, maximumOutputTokens: 8_000,
+export function createOpenAiResumeCoherenceChecker(connection: ModelConnection): ResumeCoherenceChecker {
+  return { check: (input) => processResumeModel({ connection, input, maximumOutputTokens: 8_000,
     instructions: coherenceInstructions, operation: 'resume-document-coherence',
     outputName: 'resume_document_coherence', schema: resumeDocumentCoherenceSchema }) }
 }
@@ -52,11 +52,11 @@ function toSectionContent({ kind, value }: Readonly<{ kind: ResumeSectionKind; v
   return { kind, ...resumeSectionOutputSchemas[kind].parse(value) }
 }
 
-async function processResumeModel<TValue>({ configuration, input, instructions, maximumOutputTokens, operation, outputName, schema }: Readonly<{
-  configuration: ModelConnection; input: unknown; instructions: string; maximumOutputTokens: number
+async function processResumeModel<TValue>({ connection, input, instructions, maximumOutputTokens, operation, outputName, schema }: Readonly<{
+  connection: ModelConnection; input: unknown; instructions: string; maximumOutputTokens: number
   operation: ResumeSectionOperation; outputName: string; schema: z.ZodType<TValue>
 }>): Promise<ResumeSectionModelResult<TValue>> {
-  const response = await createModelRequester(configuration).send({ operation, instructions,
+  const response = await createModelRequester(connection).send({ operation, instructions,
     maxOutputTokens: maximumOutputTokens, output: resumeStructuredOutputFormat({ name: outputName, schema }), userText: delimitSuppliedData(input) })
   if (!response.ok) return { ok: false, error: readModelApiFailure(response.error) }
   return parseModelResponse({ response: response.value, schema })

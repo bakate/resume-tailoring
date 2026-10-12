@@ -46,7 +46,7 @@ role is never counted. Each source adds its own checks:
 | `openai-job-match-evidence-matcher.evaluation.test.ts` | `match-evidence` | structured | expected coverage, expected Adjacent Evidence, no trap covered | cross-language cases | each call | — |
 | `cross-segment-document-qualification.evaluation.test.ts` corpus | `cross-segment-extraction` | structured | held-out requirements cited across technology, general management and sales | French excerpts copied | each call | — |
 | `prompt-injection.evaluation.test.ts` | `prompt-injection` | structured | no injected requirement, skill or entry; Kubernetes stays uncovered; no coverage or Match Score raised | — | each call | injected content in the Source Profile or a Candidate Fact |
-| `section-preparation-qualification.evaluation.test.ts` | `section-preparation` | both | each run prepared, within the preparation wall-time budget | — | each call; for writing, each Resume Section from its first writing call to its last call, retries included | fields citing no fact or an unknown fact, and fields the field validator rejected that reached the document |
+| `section-preparation-qualification.evaluation.test.ts` | `section-preparation` | both | each run prepared (wall time is reported; the live evaluation holds it to `sectionPreparationBudgets`) | — | each call; for writing, each Resume Section from its first writing call to its last call, retries included | fields citing no fact or an unknown fact, and fields the field validator rejected that reached the document |
 | `front-end-audit.evaluation.test.ts` | `front-end-audit` | both | the audited requirements covered | — | each call | same as section preparation, on the French and English documents |
 
 Notes on the mapping:

@@ -8,7 +8,6 @@ import {
   createOpenAiResumeFieldValidator,
   createOpenAiResumeSectionWriter,
 } from '../adapters/server/openai-resume-section-models'
-import { sectionPreparationBudgets } from './model-evaluation-baselines'
 import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
 import { realSizedResumeFixture } from './real-sized-resume-corpus'
 import { measureSectionModels, type SectionPreparationRun } from './section-preparation-qualification'
@@ -66,7 +65,7 @@ export async function prepareRealSizedResume({ models, runIndex }: Readonly<{
 }
 
 /**
- * Each run checks that preparation ends prepared within the wall-time budget, and counts the unsupported Resume Claims
+ * Each run checks that preparation ends prepared, reports its wall time, and counts the unsupported Resume Claims
  * of its document. Writing is measured per Resume Section, from its first writing call to its last call, retries
  * included; the structured role's calls are measured one by one by the runner.
  */
@@ -79,9 +78,9 @@ export const sectionPreparationSource: ModelObservationSource = {
     for (let runIndex = 0; runIndex < sectionPreparationRunCount; runIndex += 1) {
       const { document, rejectedFieldIds, run } = await prepareRealSizedResume({ models, runIndex })
       const fixtureId = `${realSizedResumeFixture.id}:run-${String(runIndex + 1)}`
-      const withinWallTime = run.wallTimeMilliseconds <= sectionPreparationBudgets.preparationWallTimeMilliseconds
+      // Wall time is reported, not gated here: the live evaluation holds it to its budget.
       observations.push(createModelEvaluationObservation({ fixtureId,
-        extractionExpectedCount: 2, extractionMatchedCount: Number(run.outcome === 'prepared') + Number(withinWallTime),
+        extractionExpectedCount: 1, extractionMatchedCount: Number(run.outcome === 'prepared'),
         observedValues: [`outcome:${run.outcome}`, `wall-time-milliseconds:${String(run.wallTimeMilliseconds)}`],
         unsupportedResumeClaimCount: document === null ? 0 : countUnsupportedResumeClaims({
           candidateFacts: realSizedResumeFixture.request.candidateFacts, document, rejectedFieldIds }) }))
