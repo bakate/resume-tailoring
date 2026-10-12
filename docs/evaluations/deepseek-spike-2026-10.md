@@ -12,7 +12,7 @@ DeepSeek offers JSON mode only (`response_format: json_object`). It does not enf
 
 ## Method
 
-- Script: `scripts/spikes/deepseek-conformance.mjs`. It is throwaway and not imported by `apps/web/src`, CI or `pnpm check`. Run it from the repository root:
+- Script: [`scripts/spikes/deepseek-conformance.mjs` at e5b0578](https://github.com/bakate/resume-tailoring/blob/e5b0578f6878b0156ce7cc6585a58d6886a8a63f/scripts/spikes/deepseek-conformance.mjs). It was throwaway and is not kept in the repository: it imports the OpenAI server adapters as they were on that commit, which BAK-159 rewrites. To rerun it, check out that commit and run from the repository root:
   `pnpm dlx tsx@4.20.3 --env-file=.env.local scripts/spikes/deepseek-conformance.mjs <out-dir-outside-the-repo> [runs] [operation]`
 - The production adapters are called unchanged: `requestOpenAiJobPostingExtraction`, `requestOpenAiJobMatchEvidence` and `createOpenAiResumeSectionWriter`. Each accepts an injected `fetch`. The script's `fetch` turns the Responses API body into a DeepSeek `chat/completions` call:
   - the developer instructions become the system message;
