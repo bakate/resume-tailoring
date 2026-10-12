@@ -7,10 +7,10 @@
  */
 export const dailyLimits = {
   /** The Daily Quota: Tailored Resumes one client network may start per day. */
-  dailyQuota: 4,
-  /** Tailored Resumes all Candidates together may start per day: 30 at $0.10 stay near $90 a month. */
-  preparationsOverall: 30,
-  /** Model-backed requests per client network: four journeys with edits stay under 250, so it only stops loops. */
+  dailyQuota: 6,
+  /** Tailored Resumes all Candidates together may start per day: 45 at $0.10 stay near $135 a month. */
+  preparationsOverall: 45,
+  /** Model-backed requests per client network: six journeys with edits stay under 375, so it only stops loops. */
   modelRequestsPerClient: 400,
   /** PDF renders per client network: one per saved edit. Rendering spends the operator's compute whatever the key. */
   rendersPerClient: 200,

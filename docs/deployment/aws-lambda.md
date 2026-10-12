@@ -40,8 +40,8 @@ when the object deletes everything it holds.
 
 | Limit | Per day | Keyed by | Counted on |
 | -- | -- | -- | -- |
-| Daily Quota | 4 | client network | `POST /api/explainable-job-posting-extraction` |
-| Global ceiling | 30 | all clients | the same request |
+| Daily Quota | 6 | client network | `POST /api/explainable-job-posting-extraction` |
+| Global ceiling | 45 | all clients | the same request |
 | Technical ceiling | 400 | client network | every model-backed API route |
 | PDF renders | 200 | client network | `POST /api/resume-document` |
 | Candidate API Key validations | 20 | client network | `POST /api/candidate-api-key` |
