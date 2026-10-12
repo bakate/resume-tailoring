@@ -115,6 +115,39 @@ describe('server environment validation', () => {
   })
 })
 
+describe('server environment validation with DeepSeek', () => {
+  const deepSeekEnvironment = { LANGUAGE_MODEL_PROVIDER: 'deepseek', DEEPSEEK_API_KEY: 'secret-key' }
+
+  it('refuses to start on DeepSeek while no DeepSeek configuration is qualified', () => {
+    const result = validateServerEnvironment({ environment: deepSeekEnvironment })
+
+    expect(result).toEqual({ ok: false, error: { type: 'invalid-server-environment', issues: [
+      'DEEPSEEK_STRUCTURED_MODEL: Model configuration has no passing qualification run',
+      'DEEPSEEK_WRITING_MODEL: Model configuration has no passing qualification run',
+    ] } })
+  })
+
+  it('requires the DeepSeek key, and only it, when DeepSeek is active', () => {
+    const result = validateServerEnvironment({ environment: { LANGUAGE_MODEL_PROVIDER: 'deepseek', OPENAI_API_KEY: 'secret-key' } })
+
+    expect(result.ok).toBe(false)
+    expect(result.ok ? [] : result.error.issues).toContain('DEEPSEEK_API_KEY: Invalid input: expected string, received undefined')
+    expect(JSON.stringify(result)).not.toContain('OPENAI_API_KEY')
+  })
+
+  it('never requires the DeepSeek key when OpenAI is active', () => {
+    const result = validateServerEnvironment({ environment: { LANGUAGE_MODEL_PROVIDER: 'openai', OPENAI_API_KEY: 'secret-key' } })
+
+    expect(result.ok).toBe(true)
+  })
+
+  it('never reads the OpenAI model settings for DeepSeek', () => {
+    const result = readLanguageModelSelection({ environment: { ...deepSeekEnvironment, OPENAI_WRITING_MODEL: 'unqualified-model' } })
+
+    expect(JSON.stringify(result)).not.toContain('OPENAI_WRITING_MODEL')
+  })
+})
+
 describe('Language Model selection', () => {
   it('validates the provider and its model settings without the provider key, so the landing never needs it', () => {
     const selection = readLanguageModelSelection({ environment: {} })

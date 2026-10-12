@@ -61,9 +61,9 @@ export async function requestJobMatchEvidence({ matchRequest, ...connection }: M
   const requester = createModelRequester(connection)
   const response = await requester.send({
     instructions: matchingInstructions,
-    maxOutputTokens: 8_000,
     operation: 'explainable-match-evidence',
     output: matchEvidenceResponseFormat,
+    outputSchema: matchEvidenceProposalSchema,
     userText: delimitSuppliedData(matchRequest),
   })
   if (!response.ok) return response

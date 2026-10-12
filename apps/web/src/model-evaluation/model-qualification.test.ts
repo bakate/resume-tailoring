@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { createOpenAiModelConfiguration } from '../language-model-configuration'
 import {
   qualifyModelConfiguration,
   type ModelConfiguration,
@@ -130,10 +131,7 @@ describe('cost per Tailored Resume', () => {
 })
 
 const structured = {
-  provider: 'openai',
-  model: 'gpt-6-luna',
-  providerOptions: { reasoningEffort: 'low', store: false, strictJsonSchema: true },
-  role: 'structured',
+  ...createOpenAiModelConfiguration({ model: 'gpt-6-luna', reasoningEffort: 'low', role: 'structured' }),
   pricing: [{ condition: 'standard', inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.5 }],
 } as const satisfies ModelConfiguration
 

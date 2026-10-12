@@ -33,7 +33,7 @@ const prompts: readonly Readonly<{ name: string; send: (request: typeof fetch) =
       .match({ injectedLine } as never),
     userText: delimitSuppliedData({ injectedLine }) },
   { name: 'Resume Claim writing',
-    send: (request) => createModelResumeClaimReformulator({ ...configuration, request })
+    send: (request) => createModelResumeClaimReformulator({ ...writingConfiguration, request })
       .reformulate({ claim: injectedLine, feedback: [] } as never),
     userText: delimitSuppliedData({ revision: { claim: injectedLine, feedback: [] } }) },
   { name: 'Resume Claim validation',
@@ -41,7 +41,7 @@ const prompts: readonly Readonly<{ name: string; send: (request: typeof fetch) =
       .validate({ injectedLine } as never),
     userText: delimitSuppliedData({ injectedLine }) },
   { name: 'Resume Section writing',
-    send: (request) => createModelResumeSectionWriter({ ...configuration, request })
+    send: (request) => createModelResumeSectionWriter({ ...writingConfiguration, request })
       .write({ section: { kind: 'skills' }, injectedLine } as never),
     userText: delimitSuppliedData({ section: { kind: 'skills' }, injectedLine }) },
   { name: 'Resume Field validation',
@@ -74,3 +74,5 @@ describe('every model prompt treats supplied documents as untrusted data', () =>
 
 const configuration = { apiKey: { value: 'test-api-key' },
   configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }) } as const
+const writingConfiguration = { apiKey: { value: 'test-api-key' },
+  configuration: createOpenAiModelConfiguration({ model: 'writing-model', reasoningEffort: 'medium', role: 'writing' }) } as const

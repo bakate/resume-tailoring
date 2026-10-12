@@ -98,10 +98,10 @@ describe('Resume Claim service contract', () => {
   it('reuses one deadline across sequential semantic validations', async () => {
     const requests: Request[] = []
     const signals: (AbortSignal | null)[] = []
-    const deadlineSignal = new AbortController().signal
+    const deadline = new AbortController()
     const validator = createModelResumeClaimSemanticValidator({
       apiKey: { value: 'test-api-key' },
-      deadlineSignal,
+      deadlineSignal: deadline.signal,
       configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRequestSpy({
         requests,
@@ -112,8 +112,9 @@ describe('Resume Claim service contract', () => {
 
     await validator.validate({ claim: storedClaim, verifiedFacts: writingInputs.verifiedFacts })
     await validator.validate({ claim: storedClaim, verifiedFacts: writingInputs.verifiedFacts })
+    deadline.abort()
 
-    expect(signals).toEqual([deadlineSignal, deadlineSignal])
+    expect(signals.map((signal) => signal?.aborted)).toEqual([true, true])
   })
 })
 

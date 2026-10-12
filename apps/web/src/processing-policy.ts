@@ -5,7 +5,8 @@ import type { LanguageModelProvider } from './language-model-configuration'
 
 /**
  * What each Language Model Provider does with what it receives. A provider brings its own policy version, so changing
- * provider is always a material change of the Processing Policy.
+ * provider is always a material change of the Processing Policy. A provider without one (DeepSeek until BAK-168 names
+ * its processing country) has no policy to consent to, so no model operation can run on it.
  */
 const providerDescriptions = {
   openai: {
@@ -14,10 +15,12 @@ const providerDescriptions = {
     storageBehavior: 'Candidate content remains browser-local; model requests are stateless with application storage disabled.',
     version: '2026-09-29',
   },
-} as const satisfies Record<LanguageModelProvider, Pick<ProcessingPolicy, 'provider' | 'retentionPolicy' | 'storageBehavior' | 'version'>>
+  deepseek: null,
+} as const satisfies Record<LanguageModelProvider, Pick<ProcessingPolicy, 'provider' | 'retentionPolicy' | 'storageBehavior' | 'version'> | null>
 
-export function createProcessingPolicy({ provider }: Readonly<{ provider: LanguageModelProvider }>): ProcessingPolicy {
+export function createProcessingPolicy({ provider }: Readonly<{ provider: LanguageModelProvider }>): ProcessingPolicy | null {
   const description = providerDescriptions[provider]
+  if (description === null) return null
   return {
     provider: description.provider,
     purposes: processingPurposes,

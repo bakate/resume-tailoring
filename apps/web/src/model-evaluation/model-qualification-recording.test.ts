@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createScriptedLanguageModelProvider } from '../adapters/server/scripted-language-model-provider'
+import { createOpenAiModelConfiguration } from '../language-model-configuration'
 import type { ModelConfiguration } from './model-qualification'
 import type { RecordedModelEvaluationRun } from './model-qualification'
 import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
@@ -65,6 +66,7 @@ const keysUsed: string[] = []
 
 const structured = {
   provider: 'scripted', model: 'scripted-structured', role: 'structured', providerOptions: {},
+  operations: createOpenAiModelConfiguration({ model: 'scripted', reasoningEffort: 'low', role: 'structured' }).operations,
   pricing: [{ condition: 'peak', inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 4 }],
 } as unknown as ModelConfiguration
 

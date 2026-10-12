@@ -1,5 +1,6 @@
 import { MockLanguageModelV4 } from 'ai/test'
 
+import type { LanguageModelProvider } from '../../language-model-configuration'
 import type { LanguageModelProviderAdapter } from './language-model-request'
 
 /** What a scripted model answers one call with, chosen by the structured output the call asks for. */
@@ -14,8 +15,11 @@ export type ScriptedModelAnswer = Readonly<{
  */
 export function createScriptedLanguageModelProvider({ answer }: Readonly<{
   answer: (call: Readonly<{ model: string; outputName: string; userText: string }>) => ScriptedModelAnswer
-}>): LanguageModelProviderAdapter<Readonly<Record<string, unknown>>> {
+}>): LanguageModelProviderAdapter<LanguageModelProvider> {
   return {
+    classifyFailure: () => ({ type: 'transport' }),
+    // The scripted model answers what it is told; nothing checks its answer twice.
+    conformance: 'server-side',
     createLanguageModel: ({ model }) => new MockLanguageModelV4({
       provider: 'scripted', modelId: model,
       doGenerate: ({ prompt, responseFormat }) => {
@@ -34,8 +38,8 @@ export function createScriptedLanguageModelProvider({ answer }: Readonly<{
         })
       },
     }),
+    readInstructions: ({ instructions }) => instructions,
     // The scripted model reads no option; the configuration's options still decide whether it is qualified.
     readProviderOptions: () => ({}),
-    classifyFailure: () => ({ type: 'transport' }),
   }
 }

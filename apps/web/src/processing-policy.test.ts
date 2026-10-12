@@ -34,9 +34,15 @@ describe('Processing Policy derived from the active Language Model Provider', ()
   })
 
   it('gives every provider its own policy version, so a provider change always asks for new consent', () => {
-    const versions = languageModelProviders.map((provider) => createProcessingPolicy({ provider }).version)
+    const versions = languageModelProviders.flatMap((provider) => createProcessingPolicy({ provider })?.version ?? [])
 
-    expect(new Set(versions).size).toBe(languageModelProviders.length)
+    expect(new Set(versions).size).toBe(versions.length)
+  })
+
+  it('states no DeepSeek policy until its processing country is disclosed (BAK-168)', () => {
+    const policy = createProcessingPolicy({ provider: 'deepseek' })
+
+    expect(policy).toBeNull()
   })
 
   it('states on the landing the policy of the provider the server calls', () => {

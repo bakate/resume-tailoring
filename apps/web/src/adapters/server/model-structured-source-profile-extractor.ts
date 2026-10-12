@@ -20,9 +20,9 @@ async function requestExtraction({ professionalContent, ...connection }: ModelCo
   const requester = createModelRequester(connection)
   const response = await requester.send({
     instructions: extractionInstructions,
-    maxOutputTokens: 16_000,
     operation: 'structured-source-profile-extraction',
     output: structuredSourceProfileResponseFormat,
+    outputSchema: structuredSourceProfileExtractionSchema,
     userText: delimitUntrustedContent({ kind: 'source-document', content: professionalContent }),
   })
   return response.ok ? parseModelOutput({ outputText: response.value.text })

@@ -6,6 +6,7 @@
     "npm_lifecycle_event",
     "LANGUAGE_MODEL_PROVIDER",
     "OPENAI_API_KEY",
+    "DEEPSEEK_API_KEY",
     "OPENAI_STRUCTURED_MODEL"
   ],
   "tasks": {

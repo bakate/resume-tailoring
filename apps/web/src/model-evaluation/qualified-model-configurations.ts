@@ -10,29 +10,29 @@ import { recordedLiveModelEvaluationRuns } from './recorded-live-model-evaluatio
 export const recordedModelQualificationReports: readonly ModelQualificationReport[] =
   recordedLiveModelEvaluationRuns.map(qualifyLiveRun)
 
-/** A configuration is qualified only as a whole: the same provider, model, role and every provider option. */
+/** A configuration is qualified only as a whole: the same provider, model, role, provider options and operation settings. */
 export function isQualifiedModelConfiguration({ configuration, reports = recordedModelQualificationReports }: Readonly<{
   configuration: LanguageModelConfiguration
   reports?: readonly ModelQualificationReport[]
 }>) {
   return reports.some((report) => report.qualified
-    // Only one provider exists yet; the comparison keeps a second one from reusing another provider's baseline.
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    && report.configuration.provider === configuration.provider
-    && report.configuration.role === configuration.role
-    && report.configuration.model === configuration.model
-    && hasSameValue({ qualified: report.configuration.providerOptions, requested: configuration.providerOptions }))
+    && isSameSetting({ qualified: readSettings(report.configuration), requested: readSettings(configuration) }))
 }
 
-/** Options may nest, such as output token budgets per operation; every value, at any depth, must be the recorded one. */
-function hasSameValue({ qualified, requested }: Readonly<{ qualified: unknown; requested: unknown }>): boolean {
+/** Prices weigh the evaluated cost; they are no setting of the configuration. */
+function readSettings(configuration: LanguageModelConfiguration) {
+  return Object.fromEntries(Object.entries(configuration).filter(([name]) => name !== 'pricing'))
+}
+
+/** Settings may nest, such as budgets per operation; every value, at any depth, must be the recorded one. */
+function isSameSetting({ qualified, requested }: Readonly<{ qualified: unknown; requested: unknown }>): boolean {
   if (typeof qualified !== 'object' || qualified === null || typeof requested !== 'object' || requested === null) {
     return qualified === requested
   }
   const qualifiedEntries = Object.entries(qualified)
   return qualifiedEntries.length === Object.keys(requested).length
     && qualifiedEntries.every(([name, value]) => Object.hasOwn(requested, name)
-      && hasSameValue({ qualified: value, requested: (requested as Readonly<Record<string, unknown>>)[name] }))
+      && isSameSetting({ qualified: value, requested: (requested as Readonly<Record<string, unknown>>)[name] }))
 }
 
 /** A run recorded on another dataset than the live one has no calibrated threshold, so it qualifies nothing. */

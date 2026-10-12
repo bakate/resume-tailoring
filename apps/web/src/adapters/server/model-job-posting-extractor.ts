@@ -35,9 +35,9 @@ export async function requestJobPostingExtraction({ jobPostingContent, ...connec
   const requester = createModelRequester(connection)
   const response = await requester.send({
     instructions: extractionInstructions,
-    maxOutputTokens: 20_000,
     operation: 'explainable-job-posting-extraction',
     output: jobPostingExtractionResponseFormat,
+    outputSchema: jobPostingExtractionSchema,
     userText: delimitUntrustedContent({ kind: 'job-posting', content: jobPostingContent }),
   })
   if (!response.ok) return response

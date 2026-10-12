@@ -63,8 +63,10 @@ model-backed requests, so the technical ceiling only stops loops. The Worker str
 
 ### Alarms
 
-`template.yaml` defines three CloudWatch alarms on the function: more than 1,000 invocations in an
-hour, five or more errors in 15 minutes, and any throttle at the account concurrency ceiling. They notify
+`template.yaml` defines four CloudWatch alarms on the function: more than 1,000 invocations in an
+hour, five or more errors in 15 minutes, any throttle at the account concurrency ceiling, and any
+request the Language Model Provider refused for exhausted operator credit (OpenAI `insufficient_quota`,
+DeepSeek `402`), counted by a metric filter on the `operator-alert` log line. They notify
 the `honest-resume-demo-abuse-alarms` SNS topic. Pass `AlarmEmail=you@example.com` once in
 `--parameter-overrides` to subscribe an address, then confirm the email AWS sends; later deployments
 keep the value.
@@ -72,6 +74,27 @@ keep the value.
 The GitHub deploy role needs CloudWatch and SNS permissions for these
 resources. Update the `infrastructure/github-actions.yaml` stack before deploying a template that
 adds them.
+
+### Deadline chain
+
+Each layer outlasts the one it waits for, so a slow model call ends as a Failure Cause the Candidate
+can act on, never as a cut connection:
+
+| Layer | Deadline | Where |
+| --- | --- | --- |
+| Provider call, per operation, conformance retry included | 90 s; 110 s for match evidence on DeepSeek (p95 82 s in BAK-171) | `language-model-configuration.ts` |
+| Lambda | 120 s | `template.yaml` `Timeout` |
+| Cloudflare Worker | none of its own; Workers document no limit on a subrequest while the client stays connected | `infrastructure/cloudflare-worker/src/worker.js` |
+| Browser | none on model requests | `adapters/browser/server-language-model-gateway.ts` |
+
+`deployment-environment.test.ts` checks that every operation deadline of every configuration ends at
+least 5 s before the Lambda timeout. A conformance retry is sent only if the time left can hold
+another attempt as long as the first.
+
+The PDF renderer was sized against a 100 s Cloudflare proxy limit. Cloudflare documents that limit
+(error 524) for proxied origins, not for a Worker's `fetch` to the Lambda Function URL, but it has not
+been measured on this deployment. Before production runs on DeepSeek (BAK-168), confirm on the deployed
+Worker that a match evidence request answered after 100 s still reaches the browser.
 
 ## Security headers
 

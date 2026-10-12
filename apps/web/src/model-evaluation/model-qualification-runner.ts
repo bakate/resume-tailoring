@@ -134,8 +134,7 @@ export function readRoleCandidate({ configurations, role }: Readonly<{
 
 function assertCompanion({ candidate: { companion, configuration } }: Readonly<{ candidate: QualificationCandidate }>) {
   if (companion === undefined) return
-  // Only one provider exists yet; the check keeps a second one from pairing with another provider's configuration.
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  // A companion of another provider would send Candidate content to a processor the Candidate never consented to.
   if (companion.provider !== configuration.provider) {
     throw new Error('The companion configuration must use the provider under qualification')
   }

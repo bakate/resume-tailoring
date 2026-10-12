@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createOpenAiModelConfiguration } from '../../language-model-configuration'
 import { resumeSectionKinds } from '@resume-tailoring/application/candidate-journey'
@@ -9,6 +9,10 @@ import { resumeSectionWritingInputSchema } from '../../candidate-journey/resume-
 import { createRecordedOpenAiResponse } from './recorded-openai-responses'
 
 describe('Resume section model adapters', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it.each(resumeSectionKinds)('writes the %s section under its own strict structured-output schema', async (kind) => {
     let body: RequestBody | null = null
     const content = readResumeSection({ document: groupedResumeDocument, section: sectionFor(kind) })
@@ -136,12 +140,22 @@ describe('Resume section model adapters', () => {
   })
 
   it.each([['malformed', { outputText: '{}', usage: null }],
-    ['incomplete', { incompleteReason: 'max_output_tokens', usage: null }]] as const)('reports an invalid provider response on %s output', async (_label, response) => {
+    ['filtered', { incompleteReason: 'content_filter', usage: null }]] as const)('reports an invalid provider response on %s output', async (_label, response) => {
     const writer = createModelResumeSectionWriter({ ...writingRole, request: () => Promise.resolve(createRecordedOpenAiResponse(response)) })
 
     const outcome = await writer.write(writingInput('skills'))
 
     expect(outcome).toEqual({ ok: false, error: { type: 'invalid-provider-response' } })
+  })
+
+  it('reports output cut at its budget as an unavailable provider, never as an invalid response', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const writer = createModelResumeSectionWriter({ ...writingRole,
+      request: () => Promise.resolve(createRecordedOpenAiResponse({ incompleteReason: 'max_output_tokens', usage: null })) })
+
+    const outcome = await writer.write(writingInput('skills'))
+
+    expect(outcome).toEqual({ ok: false, error: { type: 'provider-unavailable' } })
   })
 
   it('reports an upstream outage as an unavailable provider without retrying inside the adapter', async () => {
