@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
-import { requestOpenAiJobMatchEvidence } from '../adapters/server/openai-job-match-evidence-matcher'
+import { requestJobMatchEvidence } from '../adapters/server/model-job-match-evidence-matcher'
 import { matchEvidenceRequestSchema } from '../candidate-journey/job-match-schemas'
 import { failureResponse } from '../api-failure'
 import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
@@ -22,7 +22,7 @@ async function matchEvidence({ request }: Readonly<{ request: Request }>) {
   if (!bodyResult.ok) return failureResponse({ type: bodyResult.type })
   const environmentResult = validateServerEnvironment({ environment: process.env })
   if (!environmentResult.ok) return failureResponse({ type: 'service-misconfigured' })
-  const result = await requestOpenAiJobMatchEvidence({
+  const result = await requestJobMatchEvidence({
     apiKey: { value: environmentResult.value.languageModel.apiKey },
     matchRequest: bodyResult.value,
     configuration: environmentResult.value.languageModel.structured.active,

@@ -10,7 +10,7 @@ import {
   createGatewayResumeSectionModels,
   createGatewaySourceProfileExtractor,
 } from './language-model-gateway-ports'
-import { createOpenAiLanguageModelGateway } from './openai-language-model-gateway'
+import { createServerLanguageModelGateway } from './server-language-model-gateway'
 import { createResumeDocumentModelAdapters } from './resume-document-model-adapters'
 
 const rateLimited = { type: 'rate-limited', retryAfterSeconds: 20 } as const
@@ -84,7 +84,7 @@ describe('API Failures through the OpenAI Language Model Gateway', () => {
 function createGatewayAnswering(answer: () => Response) {
   const request = vi.fn<typeof fetch>(() => Promise.resolve().then(answer))
   let consent: ProcessingConsent | null = null
-  const gateway = createOpenAiLanguageModelGateway({ processingPolicy: testProcessingPolicy, readProcessingConsent: () => consent, request })
+  const gateway = createServerLanguageModelGateway({ processingPolicy: testProcessingPolicy, readProcessingConsent: () => consent, request })
   consent = { grantedAt: 1, policy: gateway.processingPolicy }
   return gateway
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { groupedResumeDocument } from '@resume-tailoring/application/structured-resume-fixtures'
 import { noMatchEvidence, testProcessingPolicy } from '@resume-tailoring/application/testing'
-import type { OpenAiLanguageModelGateway } from './openai-language-model-gateway'
+import type { ServerLanguageModelGateway } from './server-language-model-gateway'
 import {
   createGatewayJobPostingExtractor,
   createGatewayMatchEvidenceMatcher,
@@ -9,7 +9,7 @@ import {
   createGatewaySourceProfileExtractor,
 } from './language-model-gateway-ports'
 
-type StructuredGatewayResult = Awaited<ReturnType<OpenAiLanguageModelGateway['structured']['process']>>
+type StructuredGatewayResult = Awaited<ReturnType<ServerLanguageModelGateway['structured']['process']>>
 
 const coherentDocument = { coherent: true, languageMatches: true, issues: [] }
 const sectionValidationInput = { section: { key: 'skills', kind: 'skills' }, fields: [], candidateFacts: [],
@@ -92,7 +92,7 @@ const otherOperation = {
   ok: true, value: { operation: 'explainable-match-evidence', value: noMatchEvidence },
 } as const satisfies StructuredGatewayResult
 
-function createAnsweringGateway(result: StructuredGatewayResult): OpenAiLanguageModelGateway {
+function createAnsweringGateway(result: StructuredGatewayResult): ServerLanguageModelGateway {
   return {
     processingPolicy: testProcessingPolicy,
     structured: { process: () => Promise.resolve(result) },

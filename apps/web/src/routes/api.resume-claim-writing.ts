@@ -5,7 +5,7 @@ import { failureResponse, readRouteApiFailure } from '../api-failure'
 import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { validateServerEnvironment } from '../env'
-import { createOpenAiResumeClaimReformulator } from '../adapters/server/openai-resume-claim-service'
+import { createModelResumeClaimReformulator } from '../adapters/server/model-resume-claim-service'
 import { resumeClaimWritingRequestSchema } from '../resume-tailoring/resume-claim-schemas'
 import type { ResumeClaimReformulator } from '@resume-tailoring/application/ports'
 
@@ -23,7 +23,7 @@ async function writeResumeClaims({ request }: Readonly<{ request: Request }>) {
   if (!writingRequest.ok) return failureResponse({ type: writingRequest.type })
   const environment = validateServerEnvironment({ environment: process.env })
   if (!environment.ok) return failureResponse({ type: 'service-misconfigured' })
-  const reformulator = createOpenAiResumeClaimReformulator({
+  const reformulator = createModelResumeClaimReformulator({
     apiKey: { value: environment.value.languageModel.apiKey },
     configuration: environment.value.languageModel.writing.active,
   })

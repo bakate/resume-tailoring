@@ -1,9 +1,9 @@
 import type { ResumeSectionModelResult } from '@resume-tailoring/application/candidate-journey'
 import type { JobPostingExtractor, LanguageModelResult, MatchEvidenceMatcher, ResumeSectionModels,
   StructuredSourceProfileExtractor } from '@resume-tailoring/application/ports'
-import type { OpenAiLanguageModelGateway } from './openai-language-model-gateway'
+import type { ServerLanguageModelGateway } from './server-language-model-gateway'
 
-type GatewayDependencies = Readonly<{ languageModelGateway: OpenAiLanguageModelGateway }>
+type GatewayDependencies = Readonly<{ languageModelGateway: ServerLanguageModelGateway }>
 
 export function createGatewayJobPostingExtractor({ languageModelGateway }: GatewayDependencies): JobPostingExtractor {
   return { extract: async (input) => {
@@ -42,7 +42,7 @@ export function createGatewaySourceProfileExtractor({
 }
 
 function readSourceProfileFailure({ result }: Readonly<{
-  result: Awaited<ReturnType<OpenAiLanguageModelGateway['structured']['process']>>
+  result: Awaited<ReturnType<ServerLanguageModelGateway['structured']['process']>>
 }>) {
   return {
     ok: false as const,

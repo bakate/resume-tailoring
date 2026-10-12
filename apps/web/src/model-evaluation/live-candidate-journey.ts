@@ -2,9 +2,9 @@ import { createJobMatch, type JobMatch } from '@resume-tailoring/application/job
 import { createSourceIntake, type SourceIntake } from '@resume-tailoring/application/source-intake'
 
 import type { ModelConnection } from '../adapters/server/language-model-request'
-import { createOpenAiJobMatchEvidenceMatcher } from '../adapters/server/openai-job-match-evidence-matcher'
-import { createOpenAiJobPostingExtractor } from '../adapters/server/openai-job-posting-extractor'
-import { createOpenAiStructuredSourceProfileExtractor } from '../adapters/server/openai-structured-source-profile-extractor'
+import { createModelJobMatchEvidenceMatcher } from '../adapters/server/model-job-match-evidence-matcher'
+import { createModelJobPostingExtractor } from '../adapters/server/model-job-posting-extractor'
+import { createModelStructuredSourceProfileExtractor } from '../adapters/server/model-structured-source-profile-extractor'
 
 /** A pasted resume through the production Source Profile extraction, as the intake route runs it. */
 export async function readLiveSourceIntake({ resume, structured }: Readonly<{
@@ -14,7 +14,7 @@ export async function readLiveSourceIntake({ resume, structured }: Readonly<{
   const result = await createSourceIntake({
     document: { bytes: new TextEncoder().encode(resume), mediaType: 'text/plain', name: 'pasted-resume.txt' },
     sourceDocumentReader: { read: () => Promise.resolve({ ok: true, value: { pageCount: null, text: resume } }) },
-    sourceProfileExtractor: createOpenAiStructuredSourceProfileExtractor(structured),
+    sourceProfileExtractor: createModelStructuredSourceProfileExtractor(structured),
   })
   if (!result.ok) throw new Error(`Source Intake failed: ${result.error}`)
   return result.value
@@ -30,8 +30,8 @@ export async function readLiveJobMatch({ candidateFacts, jobPosting, structured 
     candidateFacts,
     document: { bytes: new TextEncoder().encode(jobPosting), mediaType: 'text/plain', name: 'pasted-job-posting.txt' },
     jobPostingDocumentReader: { read: () => Promise.resolve({ ok: true, value: { text: jobPosting } }) },
-    jobPostingExtractor: createOpenAiJobPostingExtractor(structured),
-    matchEvidenceMatcher: createOpenAiJobMatchEvidenceMatcher(structured),
+    jobPostingExtractor: createModelJobPostingExtractor(structured),
+    matchEvidenceMatcher: createModelJobMatchEvidenceMatcher(structured),
     now: Date.now,
   })
   if (!result.ok) throw new Error(`Job Match failed: ${result.error}`)

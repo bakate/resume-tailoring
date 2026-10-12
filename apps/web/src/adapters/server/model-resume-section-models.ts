@@ -11,7 +11,7 @@ import { resumeDocumentCoherenceSchema, resumeFieldValidationSchema, resumeSecti
 
 type ResumeSectionOperation = 'resume-section-writing' | 'resume-section-validation' | 'resume-document-coherence'
 
-export function createOpenAiResumeSectionWriter(connection: ModelConnection): ResumeSectionWriter {
+export function createModelResumeSectionWriter(connection: ModelConnection): ResumeSectionWriter {
   return { write: async (input) => {
     const kind = input.section.kind
     const result = await processResumeModel<unknown>({ connection, input, maximumOutputTokens: 16_000,
@@ -25,7 +25,7 @@ export function createOpenAiResumeSectionWriter(connection: ModelConnection): Re
  * A browser tab loaded before validation named unsupported propositions rejects the key, so only a request that
  * asks for them receives them, and a supported field never carries one.
  */
-export function createOpenAiResumeFieldValidator(connection: ModelConnection): Readonly<{
+export function createModelResumeFieldValidator(connection: ModelConnection): Readonly<{
   validate: (input: Parameters<ResumeFieldValidator['validate']>[0] & Readonly<{ namesUnsupportedPropositions?: true }>)
     => ReturnType<ResumeFieldValidator['validate']>
 }> {
@@ -39,7 +39,7 @@ export function createOpenAiResumeFieldValidator(connection: ModelConnection): R
   } }
 }
 
-export function createOpenAiResumeCoherenceChecker(connection: ModelConnection): ResumeCoherenceChecker {
+export function createModelResumeCoherenceChecker(connection: ModelConnection): ResumeCoherenceChecker {
   return { check: (input) => processResumeModel({ connection, input, maximumOutputTokens: 8_000,
     instructions: coherenceInstructions, operation: 'resume-document-coherence',
     outputName: 'resume_document_coherence', schema: resumeDocumentCoherenceSchema }) }

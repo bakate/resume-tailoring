@@ -54,14 +54,14 @@ type SuccessfulValue<TResult> = TResult extends Readonly<{ ok: true; value: infe
   ? TValue
   : never
 
-export type OpenAiLanguageModelGateway = LanguageModelGateway<
+export type ServerLanguageModelGateway = LanguageModelGateway<
   StructuredModelRequest,
   StructuredModelValue,
   WritingModelRequest,
   WritingModelValue
 >
 
-type OpenAiModelAdapters = Readonly<{
+type ServerModelAdapters = Readonly<{
   resumeSectionWriter: ResumeSectionWriter
   resumeFieldValidator: ResumeFieldValidator
   resumeCoherenceChecker: ResumeCoherenceChecker
@@ -73,7 +73,7 @@ type OpenAiModelAdapters = Readonly<{
 }>
 
 /** The Processing Policy is the server's, the one of the provider it calls; the browser never decides it. */
-export function createOpenAiLanguageModelGateway({
+export function createServerLanguageModelGateway({
   processingPolicy,
   readProcessingConsent,
   request = fetch,
@@ -81,20 +81,20 @@ export function createOpenAiLanguageModelGateway({
   processingPolicy: ProcessingPolicy
   readProcessingConsent: () => ProcessingConsent | null
   request?: typeof fetch
-}>): OpenAiLanguageModelGateway {
+}>): ServerLanguageModelGateway {
   return createLanguageModelGateway({
-    adapter: createOpenAiLanguageModelGatewayAdapter({ processingPolicy, request }),
+    adapter: createServerLanguageModelGatewayAdapter({ processingPolicy, request }),
     readProcessingConsent,
   })
 }
 
-function createOpenAiLanguageModelGatewayAdapter({ processingPolicy, request }: Readonly<{
+function createServerLanguageModelGatewayAdapter({ processingPolicy, request }: Readonly<{
   processingPolicy: ProcessingPolicy
   request: typeof fetch
 }>): LanguageModelGatewayAdapter<
   StructuredModelRequest, StructuredModelValue, WritingModelRequest, WritingModelValue
 > {
-  const modelAdapters = createOpenAiModelAdapters({ request })
+  const modelAdapters = createServerModelAdapters({ request })
   return {
     processingPolicy,
     structured: { process: (modelRequest) => processStructured({ modelAdapters, modelRequest }) },
@@ -102,9 +102,9 @@ function createOpenAiLanguageModelGatewayAdapter({ processingPolicy, request }: 
   }
 }
 
-function createOpenAiModelAdapters({ request }: Readonly<{
+function createServerModelAdapters({ request }: Readonly<{
   request: typeof fetch
-}>): OpenAiModelAdapters {
+}>): ServerModelAdapters {
   return {
     resumeSectionWriter: createBrowserResumeSectionWriter({ request }),
     resumeFieldValidator: createBrowserResumeFieldValidator({ request }),
@@ -118,7 +118,7 @@ function createOpenAiModelAdapters({ request }: Readonly<{
 }
 
 type ProcessStructuredRequest = Readonly<{
-  modelAdapters: OpenAiModelAdapters
+  modelAdapters: ServerModelAdapters
   modelRequest: StructuredModelRequest
 }>
 
@@ -147,7 +147,7 @@ type StructuredRequest<TOperation extends StructuredModelRequest['operation']> =
   Extract<StructuredModelRequest, { readonly operation: TOperation }>
 
 async function processJobPostingExtraction({ modelAdapters, modelRequest }: Readonly<{
-  modelAdapters: OpenAiModelAdapters
+  modelAdapters: ServerModelAdapters
   modelRequest: StructuredRequest<'explainable-job-posting-extraction'>
 }>) {
   const result = await modelAdapters.explainableJobPostingExtractor.extract(modelRequest.input)
@@ -155,7 +155,7 @@ async function processJobPostingExtraction({ modelAdapters, modelRequest }: Read
 }
 
 async function processExplainableMatchEvidence({ modelAdapters, modelRequest }: Readonly<{
-  modelAdapters: OpenAiModelAdapters
+  modelAdapters: ServerModelAdapters
   modelRequest: StructuredRequest<'explainable-match-evidence'>
 }>) {
   const result = await modelAdapters.explainableMatchEvidenceMatcher.match(modelRequest.input)
@@ -163,7 +163,7 @@ async function processExplainableMatchEvidence({ modelAdapters, modelRequest }: 
 }
 
 async function processStructuredSourceProfileExtraction({ modelAdapters, modelRequest }: Readonly<{
-  modelAdapters: OpenAiModelAdapters
+  modelAdapters: ServerModelAdapters
   modelRequest: StructuredRequest<'structured-source-profile-extraction'>
 }>) {
   const result = await modelAdapters.structuredSourceProfileExtractor.extract(modelRequest.input)
@@ -171,7 +171,7 @@ async function processStructuredSourceProfileExtraction({ modelAdapters, modelRe
 }
 
 async function processResumeClaimValidation({ modelAdapters, modelRequest }: Readonly<{
-  modelAdapters: OpenAiModelAdapters
+  modelAdapters: ServerModelAdapters
   modelRequest: StructuredRequest<'resume-claim-validation'>
 }>): Promise<LanguageModelResult<StructuredModelValue>> {
   const result = await modelAdapters.resumeClaimSemanticValidator.validate(modelRequest.input)
@@ -179,7 +179,7 @@ async function processResumeClaimValidation({ modelAdapters, modelRequest }: Rea
 }
 
 async function processWriting({ modelAdapters, modelRequest }: Readonly<{
-  modelAdapters: OpenAiModelAdapters
+  modelAdapters: ServerModelAdapters
   modelRequest: WritingModelRequest
 }>): Promise<LanguageModelResult<WritingModelValue>> {
   if (modelRequest.operation === 'resume-section-writing') {

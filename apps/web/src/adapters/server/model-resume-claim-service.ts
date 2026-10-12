@@ -30,7 +30,7 @@ type ActiveResumeClaimModel = Readonly<{
   requester: ReturnType<typeof createModelRequester>
 }>
 
-export function createOpenAiResumeClaimReformulator({
+export function createModelResumeClaimReformulator({
   apiKey,
   configuration: modelConfiguration,
   request = fetch,
@@ -44,7 +44,7 @@ export function createOpenAiResumeClaimReformulator({
   }
 }
 
-export function createOpenAiResumeClaimSemanticValidator({
+export function createModelResumeClaimSemanticValidator({
   apiKey,
   configuration: modelConfiguration,
   deadlineSignal,

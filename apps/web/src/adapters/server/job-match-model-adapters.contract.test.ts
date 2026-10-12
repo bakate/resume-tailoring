@@ -2,16 +2,16 @@ import { describe, expect, it, vi } from 'vitest'
 import { createOpenAiModelConfiguration } from '../../language-model-configuration'
 
 import {
-  createOpenAiJobMatchEvidenceMatcher,
-  requestOpenAiJobMatchEvidence,
-} from './openai-job-match-evidence-matcher'
-import { createOpenAiJobPostingExtractor } from './openai-job-posting-extractor'
+  createModelJobMatchEvidenceMatcher,
+  requestJobMatchEvidence,
+} from './model-job-match-evidence-matcher'
+import { createModelJobPostingExtractor } from './model-job-posting-extractor'
 import { createRecordedOpenAiResponse } from './recorded-openai-responses'
 
-describe('OpenAI explainable Job Match adapters', () => {
+describe('explainable Job Match adapters', () => {
   it('extracts source-backed requirements through a stateless Structured Output request', async () => {
     const requests: Request[] = []
-    const extractor = createOpenAiJobPostingExtractor({
+    const extractor = createModelJobPostingExtractor({
       apiKey: { value: 'test-api-key' }, configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRecordedRequest({ output: extractedJobPosting, requests }),
     })
@@ -26,7 +26,7 @@ describe('OpenAI explainable Job Match adapters', () => {
   })
 
   it('reads the proposal from Responses API output items', async () => {
-    const matcher = createOpenAiJobMatchEvidenceMatcher({
+    const matcher = createModelJobMatchEvidenceMatcher({
       apiKey: { value: 'test-api-key' }, configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRecordedRequest({ output: evidenceProposal, requests: [] }),
     })
@@ -38,7 +38,7 @@ describe('OpenAI explainable Job Match adapters', () => {
 
   it('requests evidence excerpts per side without an exact-versus-controlled relationship', async () => {
     const requests: Request[] = []
-    const matcher = createOpenAiJobMatchEvidenceMatcher({
+    const matcher = createModelJobMatchEvidenceMatcher({
       apiKey: { value: 'test-api-key' }, configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRecordedRequest({ output: evidenceProposal, requests }),
     })
@@ -54,7 +54,7 @@ describe('OpenAI explainable Job Match adapters', () => {
 
   it('requests Adjacent Evidence with one verbatim excerpt per Candidate Fact', async () => {
     const requests: Request[] = []
-    const matcher = createOpenAiJobMatchEvidenceMatcher({
+    const matcher = createModelJobMatchEvidenceMatcher({
       apiKey: { value: 'test-api-key' }, configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRecordedRequest({ output: adjacentStackProposal, requests }),
     })
@@ -75,7 +75,7 @@ describe('OpenAI explainable Job Match adapters', () => {
   })
 
   it('returns unverified proposals for the matching engine to judge', async () => {
-    const matcher = createOpenAiJobMatchEvidenceMatcher({
+    const matcher = createModelJobMatchEvidenceMatcher({
       apiKey: { value: 'test-api-key' }, configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRecordedRequest({ output: fabricatedProposal, requests: [] }),
     })
@@ -87,7 +87,7 @@ describe('OpenAI explainable Job Match adapters', () => {
 
   it('records how many links the model proposed without Candidate content', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-    const matcher = createOpenAiJobMatchEvidenceMatcher({
+    const matcher = createModelJobMatchEvidenceMatcher({
       apiKey: { value: 'test-api-key' }, configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRecordedRequest({ output: fabricatedProposal, requests: [] }),
     })
@@ -105,7 +105,7 @@ describe('OpenAI explainable Job Match adapters', () => {
   })
 
   it('returns a typed failure before sending an oversized matching request', async () => {
-    const result = await requestOpenAiJobMatchEvidence({
+    const result = await requestJobMatchEvidence({
       apiKey: { value: 'test-api-key' },
       matchRequest: {
         candidateFacts: Array.from({ length: 70 }, (factIndex) => ({

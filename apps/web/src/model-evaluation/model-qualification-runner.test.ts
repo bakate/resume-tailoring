@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createOpenAiJobPostingExtractor } from '../adapters/server/openai-job-posting-extractor'
+import { createModelJobPostingExtractor } from '../adapters/server/model-job-posting-extractor'
 import { createScriptedLanguageModelProvider } from '../adapters/server/scripted-language-model-provider'
 import type { ModelConfiguration } from './model-qualification'
 import {
@@ -44,7 +44,7 @@ describe('provider-neutral qualification runner', () => {
 
   it('counts only the calls of the configuration under test, never its companion role\'s', async () => {
     const companionSource: ModelObservationSource = { id: 'companion', roles: ['structured'], observe: async ({ connect }) => {
-      await createOpenAiJobPostingExtractor(connect('writing')).extract({ jobPostingContent: typescriptPosting })
+      await createModelJobPostingExtractor(connect('writing')).extract({ jobPostingContent: typescriptPosting })
       return []
     } }
 
@@ -57,8 +57,8 @@ describe('provider-neutral qualification runner', () => {
     const tailoredResumeSource: ModelObservationSource = { id: 'tailored-resume', roles: ['structured'],
       observe: async ({ trackUsage }) => {
         const tracker = trackUsage()
-        await createOpenAiJobPostingExtractor(tracker.connect('structured')).extract({ jobPostingContent: typescriptPosting })
-        await createOpenAiJobPostingExtractor(tracker.connect('writing')).extract({ jobPostingContent: typescriptPosting })
+        await createModelJobPostingExtractor(tracker.connect('structured')).extract({ jobPostingContent: typescriptPosting })
+        await createModelJobPostingExtractor(tracker.connect('writing')).extract({ jobPostingContent: typescriptPosting })
         return [createModelEvaluationObservation({ fixtureId: 'whole', tailoredResumeUsage: tracker.readUsage() })]
       } }
 
@@ -145,7 +145,7 @@ const extractionSource: ModelObservationSource = {
   roles: ['structured'],
   observe: async ({ trackUsage }) => {
     const tracker = trackUsage()
-    const result = await createOpenAiJobPostingExtractor(tracker.connect('structured')).extract({ jobPostingContent: typescriptPosting })
+    const result = await createModelJobPostingExtractor(tracker.connect('structured')).extract({ jobPostingContent: typescriptPosting })
     const recalled = result.ok && result.value.requirements.some(({ sourceExcerpt }) => sourceExcerpt.includes('TypeScript'))
     const copied = result.ok && result.value.requirements.every(({ sourceExcerpt }) => typescriptPosting.includes(sourceExcerpt))
     return [createModelEvaluationObservation({ fixtureId: 'typescript-posting', tailoredResumeUsage: tracker.readUsage(),

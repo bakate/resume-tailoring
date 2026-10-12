@@ -8,7 +8,7 @@ import {
 import type { StructuredSourceProfileExtractor } from '@resume-tailoring/application/ports'
 import { delimitUntrustedContent, untrustedContentInstruction } from './untrusted-model-input'
 
-export function createOpenAiStructuredSourceProfileExtractor(connection: ModelConnection): StructuredSourceProfileExtractor {
+export function createModelStructuredSourceProfileExtractor(connection: ModelConnection): StructuredSourceProfileExtractor {
   return {
     extract: ({ professionalContent }) => requestExtraction({ ...connection, professionalContent }),
   }

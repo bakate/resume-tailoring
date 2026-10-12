@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { createOpenAiModelConfiguration } from '../../language-model-configuration'
 
-import { createOpenAiStructuredSourceProfileExtractor } from './openai-structured-source-profile-extractor'
+import { createModelStructuredSourceProfileExtractor } from './model-structured-source-profile-extractor'
 import { createRecordedOpenAiResponse } from './recorded-openai-responses'
 import { delimitUntrustedContent } from './untrusted-model-input'
 
-describe('OpenAI structured Source Profile extractor contract', () => {
+describe('structured Source Profile extractor contract', () => {
   it('uses a stateless Structured Output request for minimized professional content', async () => {
     const requests: Request[] = []
-    const extractor = createOpenAiStructuredSourceProfileExtractor({
+    const extractor = createModelStructuredSourceProfileExtractor({
       apiKey: { value: 'test-api-key' },
       configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: (input, init) => {
@@ -37,7 +37,7 @@ describe('OpenAI structured Source Profile extractor contract', () => {
     const requests: Request[] = []
     const profile = { ...structuredSourceProfile, education: [{ institution: 'Université de Lille',
       qualification: 'Licence professionnelle Développement Web', dates: '2018' }] }
-    const extractor = createOpenAiStructuredSourceProfileExtractor({
+    const extractor = createModelStructuredSourceProfileExtractor({
       apiKey: { value: 'test-api-key' },
       configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: (input, init) => {
@@ -55,7 +55,7 @@ describe('OpenAI structured Source Profile extractor contract', () => {
   })
 
   it('rejects malformed structured evidence', async () => {
-    const extractor = createOpenAiStructuredSourceProfileExtractor({
+    const extractor = createModelStructuredSourceProfileExtractor({
       apiKey: { value: 'test-api-key' },
       configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: () => Promise.resolve(createOpenAiResponse({
