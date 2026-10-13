@@ -9,10 +9,11 @@ follows the BAK-171 spike (`deepseek-spike-2026-10.md`) and uses the provider-ne
 - **`deepseek-flash` qualifies for the structured role** on `resume-tailoring-live-v1`, on main's pipeline (BAK-174
   to BAK-177 included). All five gates pass, provenance safety and prompt injection included. Report:
   `qualification-reports/deepseek-structured.json`.
-- **`deepseek-flash` does not yet qualify for the writing role.** Every gate passes except recall. In about 21
-  real-sized and audit preparations on main's pipeline, 2 ended unprepared, for two different reasons. Report:
-  `qualification-reports/deepseek-writing.json` (`qualified: false`); BAK-179 makes the next failure explain itself.
-- The server therefore still refuses `LANGUAGE_MODEL_PROVIDER=deepseek`: exactly one provider serves both roles.
+- **`deepseek-flash` qualifies for the writing role since BAK-168.** The first recording failed recall: in about 21
+  real-sized and audit preparations, 2 ended unprepared, for two different reasons. Recorded again at 14:39 UTC after
+  BAK-178 and BAK-179, every gate passes: recall 100%, p95 24,481 ms per Resume Section, no conformance retry in 61
+  writing calls. Report: `qualification-reports/deepseek-writing.json`.
+- The server therefore accepts `LANGUAGE_MODEL_PROVIDER=deepseek`, and production runs on it (BAK-168).
 
 Getting the structured role there took three changes to what BAK-171 recommended. Each was found by a recording that
 failed:
@@ -58,12 +59,13 @@ missed the 30 s section budget.
 
 ## Gates on main's pipeline
 
-Recorded on 2026-10-13, off-peak: structured at 10:27 UTC, writing at 11:41 UTC.
+Recorded on 2026-10-13, off-peak: structured at 10:27 UTC, writing at 11:41 UTC and again at 14:39 UTC (BAK-168).
 
 | Candidate | Recall | Multilingual | Cost per Tailored Resume | p95 latency | Provenance | Qualified |
 | --- | ---: | ---: | ---: | --- | ---: | --- |
 | `deepseek-structured` | 98.6% | 100% | $0.0701 | every operation within its deadline | 0 | yes |
-| `deepseek-writing` | 90% (floor 100%) | 100% | $0.0533 | 16,817 ms per Resume Section (limit 30,000) | 0 | no |
+| `deepseek-writing` (14:39 UTC, BAK-168) | 100% | 100% | $0.0735 | 24,481 ms per Resume Section (limit 30,000) | 0 | yes |
+| `deepseek-writing`, first recording | 90% (floor 100%) | 100% | $0.0533 | 16,817 ms per Resume Section (limit 30,000) | 0 | no |
 | `openai-structured`, for comparison (BAK-176) | 91.3% | 100% | $0.0654 | every operation within its deadline | 0 | yes |
 | `openai-writing`, for comparison | 100% | 100% | $0.0677 | 9,782 ms | 0 | yes |
 
@@ -150,7 +152,8 @@ on the hour, so the same tokens are priced at each of DeepSeek's rates:
 | Recording | Off-peak | Peak (01:00–04:00 and 06:00–10:00 UTC, weekdays) |
 | --- | ---: | ---: |
 | `deepseek-structured` (main, 10:27) | $0.0350 | $0.0701 |
-| `deepseek-writing` (main, 11:41) | $0.0266 | $0.0533 |
+| `deepseek-writing` (main, 14:39, qualified) | $0.0367 | $0.0735 |
+| `deepseek-writing` (main, 11:41, not qualified) | $0.0266 | $0.0533 |
 | `deepseek-structured` (before BAK-174 to BAK-177, 09:30) | $0.0348 | $0.0696 |
 
 A Tailored Resume costs about **$0.035 off-peak and $0.07 at peak**. OpenAI's recordings price one at $0.065–0.068,
@@ -159,7 +162,8 @@ and production at about $0.10. So:
 - DeepSeek is about half OpenAI's cost off-peak.
 - At peak, which covers the French morning, it is on par with OpenAI's recordings: the saving the spike expected there
   is small.
-- BAK-168 sets its budget from these numbers.
+- BAK-168 sets the global daily ceiling from the most expensive qualified recording, $0.0735 at peak: a daily budget
+  of $4.50 allows 61 Tailored Resumes (`daily-spending-limits.js`).
 
 ## Reproduce
 

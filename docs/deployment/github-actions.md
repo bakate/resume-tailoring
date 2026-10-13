@@ -109,7 +109,7 @@ The workflow also accepts `AWS_DEPLOY_ROLE_ARN` as a secret. The Cloudflare secr
 above match the existing GitHub configuration exactly. The workflow maps them to
 `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`, the environment variables required by Wrangler.
 
-The application already has its OpenAI, Turnstile, session, and origin secrets configured.
+The application already has its DeepSeek, Turnstile, session, and origin secrets configured.
 The workflow overrides only `ContainerImageUri`; CloudFormation retains all other existing
 parameter values. Wrangler retains the existing `ORIGIN_SECRET` Worker secret. Do not add
 these application secrets to GitHub or replace them during this setup.
@@ -136,7 +136,7 @@ Optionally require the `check` status in the repository's `main` ruleset.
 Each image has a unique commit/run tag, and CloudFormation deploys its immutable digest.
 The smoke check fetches the HTML page, verifies that anonymous API requests return the
 session-required error, and verifies that direct-origin API requests are rejected. Its
-empty request body cannot trigger a valid OpenAI generation even if a guard regresses.
+empty request body cannot trigger a valid model generation even if a guard regresses.
 It does not test a complete Turnstile challenge, PDF rendering, or model output.
 
 ## Failures and rollback

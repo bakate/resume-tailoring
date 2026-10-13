@@ -1,15 +1,23 @@
 /* global Response */
 
+/** The operator's daily model budget: about $135 a month, the spend production had on OpenAI. */
+const dailyBudgetUsd = 4.5
+/**
+ * The most expensive qualified recording of a Tailored Resume on DeepSeek, at its peak, cache-miss price (BAK-168,
+ * docs/evaluations/deepseek-qualification-2026-10.md); off-peak it costs half. Recordings may under-price production:
+ * OpenAI's priced one at $0.065-0.068 where production measured about $0.10. Measure it again on production.
+ */
+const peakCostPerTailoredResumeUsd = 0.0735
+
 /**
  * The daily limits that bound model spending, each reset at 00:00 Europe/Paris. Measured on 32 real preparations
- * (2026-10): one sends 21 section requests on average, 30 at p90 and 46 at most, plus three for intake and matching,
- * and costs about $0.10.
+ * (2026-10): one sends 21 section requests on average, 30 at p90 and 46 at most, plus three for intake and matching.
  */
 export const dailyLimits = {
   /** The Daily Quota: Tailored Resumes one client network may start per day. */
   dailyQuota: 8,
-  /** Tailored Resumes all Candidates together may start per day: 45 at $0.10 stay near $135 a month. */
-  preparationsOverall: 45,
+  /** Tailored Resumes all Candidates together may start per day: the daily budget at the peak cost. */
+  preparationsOverall: Math.floor(dailyBudgetUsd / peakCostPerTailoredResumeUsd),
   /** Model-backed requests per client network: eight journeys with edits stay under 500, so it only stops loops. */
   modelRequestsPerClient: 530,
   /** PDF renders per client network: one per saved edit. */

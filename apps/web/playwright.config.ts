@@ -14,8 +14,8 @@ export default defineConfig({
   webServer: [
     {
       // The production build serves a few bundles where the dev server transforms every module on each page
-      // load, which nearly halves the suite's run time and tests what is deployed.
-      command: `pnpm exec vite build && HOST=127.0.0.1 PORT=${testPort} node .output/server/index.mjs`,
+      // load, which nearly halves the suite's run time and tests what is deployed, on the provider production runs.
+      command: `pnpm exec vite build && LANGUAGE_MODEL_PROVIDER=deepseek HOST=127.0.0.1 PORT=${testPort} node .output/server/index.mjs`,
       reuseExistingServer: true,
       url: testBaseUrl,
     },

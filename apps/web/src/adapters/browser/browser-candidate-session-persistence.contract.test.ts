@@ -37,6 +37,13 @@ const consentedCandidateSession = {
     },
   },
 } as const satisfies CandidateSession
+const processingCountryConsentedCandidateSession = {
+  ...consentedCandidateSession,
+  processingConsent: {
+    ...consentedCandidateSession.processingConsent,
+    policy: { ...consentedCandidateSession.processingConsent.policy, processingCountry: 'Example country' },
+  },
+} as const satisfies CandidateSession
 
 /** The contract holds whether the Candidate Session stays in local storage or only until its tab closes. */
 for (const [storageName, retention] of [['local storage', 'browser'], ['tab storage', 'tab']] as const) {
@@ -213,6 +220,7 @@ describe('browser Candidate Session persistence', () => {
 
   it.each([
     ['Processing Consent bound to its complete policy', consentedCandidateSession],
+    ['Processing Consent to a policy that states its processing country', processingCountryConsentedCandidateSession],
     ['the browser-local Source Document, contacts, and structured Source Profile', sourceIntakeCandidateSession],
     ['the complete explainable Match Analysis', jobMatchCandidateSession],
   ] as const)('restores %s', (_caseName, session) => {

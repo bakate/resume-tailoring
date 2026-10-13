@@ -31,7 +31,7 @@ _Avoid_: Account, server profile
 ## Processing and privacy
 
 **Processing Policy**:
-The versioned disclosure of the active model provider, processing purposes, transmitted data categories, retention policy, and storage behavior.
+The versioned disclosure of the active model provider, processing purposes, transmitted data categories, retention policy, and storage behavior. It may also state the provider's processing country, where Candidate content is processed and stored; the landing then shows it before any Candidate Journey.
 _Avoid_: OpenAI policy, static consent copy
 
 **Processing Consent**:

@@ -118,12 +118,10 @@ describe('server environment validation', () => {
 describe('server environment validation with DeepSeek', () => {
   const deepSeekEnvironment = { LANGUAGE_MODEL_PROVIDER: 'deepseek', DEEPSEEK_API_KEY: 'secret-key' }
 
-  it('refuses to start on DeepSeek while only its structured configuration is qualified (BAK-167)', () => {
+  it('starts on DeepSeek once deepseek-flash is qualified for both roles (BAK-167, BAK-168)', () => {
     const result = validateServerEnvironment({ environment: deepSeekEnvironment })
 
-    expect(result).toEqual({ ok: false, error: { type: 'invalid-server-environment', issues: [
-      'DEEPSEEK_WRITING_MODEL: Model configuration has no passing qualification run',
-    ] } })
+    expect(result).toMatchObject({ ok: true, value: { languageModel: { apiKey: 'secret-key', provider: 'deepseek' } } })
   })
 
   it('refuses a DeepSeek structured model with no passing qualification run', () => {
