@@ -18,7 +18,7 @@ const providerDescriptions = {
   deepseek: {
     processingCountry: 'China (outside the European Union)',
     provider: 'DeepSeek',
-    retentionPolicy: 'API inputs and outputs are retained as long as needed to provide the service, or longer for legal obligations, safety or legal claims, with no fixed period; they may be used to train DeepSeek models unless opted out.',
+    retentionPolicy: 'API inputs and outputs are retained as long as needed to provide the service, or longer for legal obligations, legitimate interests such as safety and security, or legal claims, with no fixed period; they may be used to train DeepSeek models unless opted out.',
     storageBehavior: 'Candidate content remains browser-local; each model request is written to the provider\'s disk cache, usually cleared within a few hours to a few days.',
     version: '2026-10-13',
   },
