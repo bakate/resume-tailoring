@@ -52,6 +52,6 @@ function toAttestedFacts(facts: typeof frenchScenarios[number]['candidateFacts']
 }
 
 const sourceProfilePaths = {
-  certification: 'certifications.0.name', education: 'education.0.degree', experience: 'experiences.0.achievements',
+  certification: 'certifications.0.name', education: 'education.0.qualification', experience: 'experiences.0.achievements',
   language: 'languages.0.name', project: 'projects.0.description', skill: 'skills.0.name',
 } as const
