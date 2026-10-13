@@ -5,6 +5,7 @@ import { realSizedResumeFixture } from './real-sized-resume-corpus'
 import {
   measureSectionModels,
   qualifySectionPreparation,
+  readSectionPreparationBudgetFailures,
   type MeasuredResumeSection,
   type SectionPreparationRun,
 } from './section-preparation-qualification'
@@ -38,6 +39,14 @@ describe('section preparation qualification on a real-sized resume', () => {
 
     expect(report.gates.preparationWallTime).toEqual({ passed: false, threshold: 40_000, value: 45_000 })
     expect(report.qualified).toBe(false)
+  })
+
+  it('names each broken budget as a failed check a live run reports', () => {
+    const report = qualify({ runs: [run({ slowExperienceMilliseconds: 12_000, wallTimeMilliseconds: 45_000 })] })
+
+    const failures = readSectionPreparationBudgetFailures({ report })
+
+    expect(failures).toEqual(['failed:preparation wall time over budget', 'failed:experiences.0 p95 latency over budget'])
   })
 
   it('fails a fast preparation that did not prepare the Tailored Resume', () => {
@@ -95,8 +104,6 @@ describe('section preparation qualification on a real-sized resume', () => {
 function qualify({ runs }: Readonly<{ runs: readonly SectionPreparationRun[] }>) {
   return qualifySectionPreparation({
     budgets: { sectionP95LatencyMilliseconds: 10_000, preparationWallTimeMilliseconds: 40_000 },
-    configurations: { structured: { model: 'structured-model', reasoningEffort: 'low' },
-      writing: { model: 'writing-model', reasoningEffort: 'medium' } },
     fixtureId: realSizedResumeFixture.id,
     runs,
   })

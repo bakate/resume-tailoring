@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   mergeRecordedRuns,
   recordModelQualification,
+  renderQualificationReport,
   renderRecordedRunsModule,
 } from './model-qualification-recording'
 import { recordedLiveModelEvaluationRuns } from './recorded-live-model-evaluation-runs'
@@ -22,7 +23,7 @@ describe('live qualification recording', () => {
     await writeFile(runsPath, renderRecordedRunsModule({ runs: mergeRecordedRuns({ recordedRun,
       runs: recordedLiveModelEvaluationRuns }) }))
     await mkdir(dirname(reportPath), { recursive: true })
-    await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`)
+    await writeFile(reportPath, renderQualificationReport({ recordedRun, report }))
     console.info(JSON.stringify({ candidateId, gates: report.gates, qualified: report.qualified,
       written: [runsPath, reportPath].map((path) => relative(process.cwd(), path)) }))
 

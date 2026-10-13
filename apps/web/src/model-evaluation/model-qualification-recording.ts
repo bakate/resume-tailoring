@@ -7,8 +7,8 @@ import {
   runModelQualification,
   type ModelObservationSource,
   type QualificationCandidate,
-  type RecordedModelEvaluationRun,
 } from './model-qualification-runner'
+import type { ModelQualificationReport, RecordedModelEvaluationRun } from './model-qualification'
 
 /**
  * Runs every live source for one declared candidate, with the key its provider reads from the local environment. The
@@ -48,12 +48,24 @@ export function mergeRecordedRuns({ recordedRun, runs }: Readonly<{
 
 export function renderRecordedRunsModule({ runs }: Readonly<{ runs: readonly RecordedModelEvaluationRun[] }>) {
   return [
-    "import type { RecordedModelEvaluationRun } from './model-qualification-runner'",
+    "import type { ModelQualificationReport, RecordedModelEvaluationRun } from './model-qualification'",
     '',
     '// Written by `pnpm test:evaluation:record <candidate>`: one run per Qualified Model Configuration candidate.',
     `export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRun[] = ${JSON.stringify(runs, null, 2)}`,
     '',
   ].join('\n')
+}
+
+/**
+ * The JSON report a recording writes: the configuration, its gates and verdict. Its observations stay in the recorded
+ * runs alone, which `recordedAt` points to.
+ */
+export function renderQualificationReport({ recordedRun, report }: Readonly<{
+  recordedRun: RecordedModelEvaluationRun
+  report: ModelQualificationReport
+}>) {
+  const { configuration, datasetId, gates, qualified } = report
+  return `${JSON.stringify({ configuration, datasetId, recordedAt: recordedRun.recordedAt, gates, qualified }, null, 2)}\n`
 }
 
 function readConfigurationIdentity({ configuration: { model, provider, providerOptions, role } }: RecordedModelEvaluationRun) {

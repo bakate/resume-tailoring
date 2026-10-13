@@ -48,7 +48,7 @@ describe('server environment validation', () => {
     })
   })
 
-  it('accepts fallbacks qualified on the reference dataset', () => {
+  it('accepts fallbacks qualified on the live evaluations', () => {
     const result = validateServerEnvironment({
       environment: {
         OPENAI_API_KEY: 'secret-key',

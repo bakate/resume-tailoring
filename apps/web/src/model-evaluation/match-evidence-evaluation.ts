@@ -9,13 +9,13 @@ import type { ModelConnection } from '../adapters/server/language-model-request'
 import { createOpenAiJobMatchEvidenceMatcher } from '../adapters/server/openai-job-match-evidence-matcher'
 import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
 
-/** The coverage recall the live evaluation asserts on its own; qualification gates recall over every source. */
-export const minimumExpectedCoverageRecall = 0.8
+/** The coverage recall a live run must reach on its own; qualification gates recall over every source. */
+const minimumExpectedCoverageRecall = 0.8
 
-export type MatchEvidenceOutcome = Awaited<ReturnType<typeof evaluateMatchEvidenceCase>>
+type MatchEvidenceOutcome = Awaited<ReturnType<typeof evaluateMatchEvidenceCase>>
 
 /** Requirement Coverage judged by the model through the production matcher, then verified by the engine. */
-export async function evaluateMatchEvidenceCase({ connection, evaluationCase }: Readonly<{
+async function evaluateMatchEvidenceCase({ connection, evaluationCase }: Readonly<{
   connection: ModelConnection
   evaluationCase: MatchEvidenceEvaluationCase
 }>) {
@@ -41,7 +41,7 @@ export async function evaluateMatchEvidenceCase({ connection, evaluationCase }: 
 }
 
 /** Every requirement of every case, judged against its expectation. */
-export function assessMatchEvidenceOutcomes({ outcomes }: Readonly<{ outcomes: readonly MatchEvidenceOutcome[] }>) {
+function assessMatchEvidenceOutcomes({ outcomes }: Readonly<{ outcomes: readonly MatchEvidenceOutcome[] }>) {
   return outcomes.flatMap(({ adjacentRequirementIds, coverageByRequirementId, evaluationCase }) =>
     evaluationCase.requirements.map(({ expectation, expectsAdjacentEvidence = false, id }) => {
       const coverage = coverageByRequirementId.get(id) ?? 'not-covered'
@@ -54,23 +54,11 @@ export function assessMatchEvidenceOutcomes({ outcomes }: Readonly<{ outcomes: r
     }))
 }
 
-export function summarizeMatchEvidenceOutcomes({ outcomes }: Readonly<{ outcomes: readonly MatchEvidenceOutcome[] }>) {
-  const assessments = assessMatchEvidenceOutcomes({ outcomes })
-  const expectedCoverage = assessments.filter(({ expectation }) => expectation === 'covered')
-  const foundCoverage = expectedCoverage.filter(({ coverage }) => coverage === 'covered')
-  return {
-    assessments,
-    expectedCoverageRecall: expectedCoverage.length === 0 ? 1 : foundCoverage.length / expectedCoverage.length,
-    missingAdjacentEvidence: assessments.filter(({ expectsAdjacentEvidence, hasAdjacentEvidence }) =>
-      expectsAdjacentEvidence && !hasAdjacentEvidence),
-    trapViolations: assessments.filter(({ trapViolated }) => trapViolated),
-  }
-}
-
 /**
  * Each case checks that the matcher answered, its expected coverage and its expected Adjacent Evidence; a case pairing
  * languages also counts those checks as multilingual. A covered trap claims the Candidate meets a requirement without
- * proof, so it counts against provenance safety, never recall.
+ * proof, so it counts against provenance safety, never recall. One expected coverage missed is counted, not failed: a
+ * live run fails only below the minimum coverage recall, an unanswered case or missing Adjacent Evidence.
  */
 export const matchEvidenceSource: ModelObservationSource = {
   id: 'match-evidence',
@@ -78,13 +66,19 @@ export const matchEvidenceSource: ModelObservationSource = {
   observe: async ({ connect }) => {
     const connection = connect('structured')
     const observations = []
+    const coverage = { expected: 0, found: 0 }
     for (const [caseIndex, evaluationCase] of matchEvidenceEvaluationCases.entries()) {
       const outcome = await evaluateMatchEvidenceCase({ connection, evaluationCase })
       const assessments = assessMatchEvidenceOutcomes({ outcomes: [outcome] })
-      const checks = [{ id: 'answered', passed: outcome.ok }, ...assessments.flatMap((assessment) => [
-        ...assessment.expectation === 'covered' ? [{ id: assessment.id, passed: assessment.coverage === 'covered' }] : [],
-        ...assessment.expectsAdjacentEvidence ? [{ id: `${assessment.id}:adjacent`, passed: assessment.hasAdjacentEvidence }] : [],
+      const checks = [{ id: 'answered', passed: outcome.ok, failure: 'failed' }, ...assessments.flatMap((assessment) => [
+        ...assessment.expectation === 'covered'
+          ? [{ id: assessment.id, passed: assessment.coverage === 'covered', failure: 'missed' }] : [],
+        ...assessment.expectsAdjacentEvidence
+          ? [{ id: `${assessment.id}:adjacent`, passed: assessment.hasAdjacentEvidence, failure: 'failed' }] : [],
       ])]
+      const expectedCoverage = assessments.filter(({ expectation }) => expectation === 'covered')
+      coverage.expected += expectedCoverage.length
+      coverage.found += expectedCoverage.filter((assessment) => assessment.coverage === 'covered').length
       const passedCount = checks.filter(({ passed }) => passed).length
       const multilingual = evaluationCase.multilingual === true
       const coveredTraps = assessments.filter(({ trapViolated }) => trapViolated)
@@ -93,9 +87,14 @@ export const matchEvidenceSource: ModelObservationSource = {
         extractionExpectedCount: checks.length, extractionMatchedCount: passedCount,
         multilingualCheckCount: multilingual ? checks.length : 0,
         multilingualPassedCount: multilingual ? passedCount : 0,
-        observedValues: [...checks.filter(({ passed }) => !passed).map(({ id }) => `failed:${id}`),
+        observedValues: [...checks.filter(({ passed }) => !passed).map(({ failure, id }) => `${failure}:${id}`),
           ...coveredTraps.map(({ id }) => `covered-trap:${id}`)] }))
     }
+    const recall = coverage.expected === 0 ? 1 : coverage.found / coverage.expected
+    // The cases above already count every expected coverage towards recall; this one only states the live minimum.
+    observations.push(createModelEvaluationObservation({ fixtureId: 'coverage-recall',
+      observedValues: [`recall:${recall.toFixed(4)}`,
+        ...recall < minimumExpectedCoverageRecall ? [`failed:coverage recall below ${String(minimumExpectedCoverageRecall)}`] : []] }))
     return observations
   },
 }
@@ -119,7 +118,7 @@ type MatchEvidenceEvaluationRequirement = Readonly<{
   value: string
 }>
 
-export type MatchEvidenceEvaluationCase = Readonly<{
+type MatchEvidenceEvaluationCase = Readonly<{
   candidateFacts: readonly (CandidateFact & Readonly<{ id: `source-fact-${string}` }>)[]
   /** Requirements and Candidate Facts in different languages, or a translated language. */
   multilingual?: true
@@ -127,7 +126,7 @@ export type MatchEvidenceEvaluationCase = Readonly<{
   requirements: readonly MatchEvidenceEvaluationRequirement[]
 }>
 
-export const matchEvidenceEvaluationCases: readonly MatchEvidenceEvaluationCase[] = [
+const matchEvidenceEvaluationCases: readonly MatchEvidenceEvaluationCase[] = [
   {
     name: 'web application development proven by end-to-end Next.js work',
     candidateFacts: [{

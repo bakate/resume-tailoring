@@ -10,12 +10,18 @@ import {
 } from '../adapters/server/openai-resume-section-models'
 import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
 import { realSizedResumeFixture } from './real-sized-resume-corpus'
-import { measureSectionModels, type SectionPreparationRun } from './section-preparation-qualification'
+import { sectionPreparationBudgets } from './model-evaluation-baselines'
+import {
+  measureSectionModels,
+  qualifySectionPreparation,
+  readSectionPreparationBudgetFailures,
+  type SectionPreparationRun,
+} from './section-preparation-qualification'
 import { countUnsupportedResumeClaims } from './unsupported-resume-claims'
 
-export const sectionPreparationRunCount = 3
+const sectionPreparationRunCount = 3
 
-export type PreparedRealSizedResume = Readonly<{
+type PreparedRealSizedResume = Readonly<{
   document: ProfessionalResumeDocument | null
   /** Fields whose last validation the field validator rejected. */
   rejectedFieldIds: readonly string[]
@@ -38,7 +44,7 @@ export function createSectionModels({ structured, writing }: Readonly<{
 }
 
 /** Prepares the real-sized resume section by section, timing each Resume Section and keeping each field's last verdict. */
-export async function prepareRealSizedResume({ models, runIndex }: Readonly<{
+async function prepareRealSizedResume({ models, runIndex }: Readonly<{
   models: ResumeSectionModels
   runIndex: number
 }>): Promise<PreparedRealSizedResume> {
@@ -67,7 +73,8 @@ export async function prepareRealSizedResume({ models, runIndex }: Readonly<{
 /**
  * Each run checks that preparation ends prepared, reports its wall time, and counts the unsupported Resume Claims
  * of its document. Writing is measured per Resume Section, from its first writing call to its last call, retries
- * included; the structured role's calls are measured one by one by the runner.
+ * included; the structured role's calls are measured one by one by the runner. The runs together are held to
+ * `sectionPreparationBudgets`, which a live run fails on and qualification reports without gating.
  */
 export const sectionPreparationSource: ModelObservationSource = {
   id: 'section-preparation',
@@ -75,8 +82,10 @@ export const sectionPreparationSource: ModelObservationSource = {
   observe: async ({ connect, role }) => {
     const models = createSectionModels({ structured: connect('structured'), writing: connect('writing') })
     const observations = []
+    const runs: SectionPreparationRun[] = []
     for (let runIndex = 0; runIndex < sectionPreparationRunCount; runIndex += 1) {
       const { document, rejectedFieldIds, run } = await prepareRealSizedResume({ models, runIndex })
+      runs.push(run)
       const fixtureId = `${realSizedResumeFixture.id}:run-${String(runIndex + 1)}`
       // Wall time is reported, not gated here: the live evaluation holds it to its budget.
       observations.push(createModelEvaluationObservation({ fixtureId,
@@ -89,6 +98,9 @@ export const sectionPreparationSource: ModelObservationSource = {
         fixtureId: `${fixtureId}:${section.key}`, latencyMilliseconds: section.durationMilliseconds,
         observedValues: [`writing-calls:${String(section.writingCallCount)}`] })))
     }
+    observations.push(createModelEvaluationObservation({ fixtureId: `${realSizedResumeFixture.id}:budgets`,
+      observedValues: readSectionPreparationBudgetFailures({ report: qualifySectionPreparation({ budgets: sectionPreparationBudgets,
+        fixtureId: realSizedResumeFixture.id, runs }) }) }))
     return observations
   },
 }

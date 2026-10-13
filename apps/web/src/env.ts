@@ -116,7 +116,7 @@ function validateConfiguration({ context, path, ...settings }: ModelSettings & R
   if (configuration !== undefined && isQualifiedModelConfiguration({ configuration })) return
   context.addIssue({
     code: 'custom',
-    message: 'Model configuration has not passed the reference evaluation suite',
+    message: 'Model configuration has no passing qualification run',
     path: [path],
   })
 }

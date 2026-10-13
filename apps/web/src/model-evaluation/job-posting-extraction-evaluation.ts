@@ -1,13 +1,14 @@
 import { createJobMatch, type JobMatch } from '@resume-tailoring/application/job-match'
 
-import type { ModelConnection } from '../adapters/server/language-model-request'
+import type { ModelCallMeasurement, ModelConnection } from '../adapters/server/language-model-request'
 import { createOpenAiJobPostingExtractor } from '../adapters/server/openai-job-posting-extractor'
+import { liveModelEvaluationThresholds } from './model-evaluation-baselines'
 import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
 
 type JobRequirement = JobMatch['requirements'][number]
 
 /** One named property a Job Posting extraction must hold; what the live evaluation asserts and qualification counts. */
-export type JobPostingCheck = Readonly<{ name: string; passed: boolean }>
+type JobPostingCheck = Readonly<{ name: string; passed: boolean }>
 
 /** Extracts one Job Posting through the production extractor and Job Match, without matching evidence. */
 export async function extractJobPosting({ connection, jobPostingContent }: Readonly<{
@@ -30,7 +31,7 @@ export async function extractJobPosting({ connection, jobPostingContent }: Reado
 }
 
 /** Generic duties collapse into one complementary requirement; emphasis reads central; mandatory wording critical. */
-export function checkGenericDuties({ fixture, requirements }: Readonly<{
+function checkGenericDuties({ fixture, requirements }: Readonly<{
   fixture: GenericDutiesFixture
   requirements: readonly JobRequirement[]
 }>): readonly JobPostingCheck[] {
@@ -49,7 +50,7 @@ export function checkGenericDuties({ fixture, requirements }: Readonly<{
 }
 
 /** Each technical capability listed in one sentence keeps its own critical requirement. */
-export function checkDistinctCapabilities({ fixture, requirements }: Readonly<{
+function checkDistinctCapabilities({ fixture, requirements }: Readonly<{
   fixture: DistinctCapabilityFixture
   requirements: readonly JobRequirement[]
 }>): readonly JobPostingCheck[] {
@@ -82,10 +83,15 @@ export const jobPostingExtractionSource: ModelObservationSource = {
     const connection = connect('structured')
     const observations = []
     for (const fixture of [...genericDutiesFixtures, ...distinctCapabilityFixtures]) {
-      const requirements = await extractJobPosting({ connection, jobPostingContent: fixture.jobPostingContent }) ?? []
+      const calls: ModelCallMeasurement[] = []
+      const requirements = await extractJobPosting({ jobPostingContent: fixture.jobPostingContent, connection: {
+        ...connection, observeCall: (call) => { calls.push(call); connection.observeCall?.(call) } } }) ?? []
       const checks = 'genericDuties' in fixture
         ? checkGenericDuties({ fixture, requirements })
         : checkDistinctCapabilities({ fixture, requirements })
+      // Latency is gated by p95 over every call; a live run still holds each posting to one call within the budget.
+      const answered = [{ name: 'one extraction call answered within the latency budget', passed: calls.length === 1
+        && calls.every(({ latencyMilliseconds }) => latencyMilliseconds < extractionCallBudgetMilliseconds) }]
       const fidelity = fixture.language === 'en' || requirements.length === 0 ? [] : checkExcerptFidelity({
         jobPostingContent: fixture.jobPostingContent, requirements })
       observations.push(createModelEvaluationObservation({ fixtureId: fixture.id,
@@ -93,11 +99,13 @@ export const jobPostingExtractionSource: ModelObservationSource = {
         // A non-English posting that yields nothing has failed fidelity too.
         multilingualCheckCount: fixture.language === 'en' ? 0 : Math.max(1, fidelity.length),
         multilingualPassedCount: countPassed(fidelity),
-        observedValues: checks.filter(({ passed }) => !passed).map(({ name }) => `failed:${name}`) }))
+        observedValues: [...checks, ...answered].filter(({ passed }) => !passed).map(({ name }) => `failed:${name}`) }))
     }
     return observations
   },
 }
+
+const extractionCallBudgetMilliseconds = liveModelEvaluationThresholds.structured.p95LatencyMilliseconds
 
 function countPassed(checks: readonly JobPostingCheck[]) {
   return checks.filter(({ passed }) => passed).length
@@ -127,7 +135,7 @@ function normalize({ value }: Readonly<{ value: string }>) {
 type GenericDutiesFixture = typeof genericDutiesFixtures[number]
 type DistinctCapabilityFixture = typeof distinctCapabilityFixtures[number]
 
-export const genericDutiesFixtures = [
+const genericDutiesFixtures = [
   {
     id: 'generic-duties-en',
     language: 'en',
@@ -159,7 +167,7 @@ export const genericDutiesFixtures = [
   },
 ] as const
 
-export const distinctCapabilityFixtures = [
+const distinctCapabilityFixtures = [
   {
     id: 'distinct-capabilities-en',
     language: 'en',

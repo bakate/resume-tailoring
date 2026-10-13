@@ -13,15 +13,14 @@ import { createModelEvaluationObservation, type ModelObservationSource } from '.
 import { createSectionModels } from './section-preparation-evaluation'
 import { countUnsupportedResumeClaims } from './unsupported-resume-claims'
 
-export type AuditRun = Readonly<{
+type AuditRun = Readonly<{
   candidateFacts: SourceIntake['candidateFacts']
   jobMatch: JobMatch
   documents: Readonly<Record<'fr' | 'en', ProfessionalResumeDocument>>
-  report: unknown
 }>
 
 /** The Job Requirements the audit saw left uncovered although the Candidate's listed tools and dated work cover them. */
-export const auditedCoverage = [
+const auditedCoverage = [
   { name: 'unit and end-to-end testing', requirement: /tests unitaires/iu },
   { name: 'three years of React', requirement: /3 ans/iu },
 ] as const
@@ -34,7 +33,7 @@ type RoleConnections = Readonly<{ structured: ModelConnection; writing: ModelCon
  * extraction and Match Analysis once, then section-by-section preparation in French and in English, each on the
  * connections given for it.
  */
-export async function replayAuditRun({ intake, preparations }: Readonly<{
+async function replayAuditRun({ intake, preparations }: Readonly<{
   intake: ModelConnection
   preparations: Readonly<Record<AuditLocale, RoleConnections>>
 }>): Promise<AuditRun> {
@@ -59,21 +58,11 @@ export async function replayAuditRun({ intake, preparations }: Readonly<{
     return output.document
   }))
   if (fr === undefined || en === undefined) throw new Error('Both preparations must finish')
-  return { candidateFacts: sourceIntake.candidateFacts, jobMatch, documents: { fr, en }, report: {
-    requirements: jobMatch.requirements.map(({ id, value }) => ({ id, value,
-      coverage: readAuditedCoverage({ jobMatch, requirement: new RegExp(escapeRegExp(value), 'u') }) })),
-    headline: fr.headline?.text ?? null, targetRole: jobMatch.targetRole?.value ?? null,
-    valueProposition: { fr: fr.valueProposition.paragraphs.map(({ text }) => text),
-      en: en.valueProposition.paragraphs.map(({ text }) => text) },
-    roles: fr.experiences.map(({ role }) => role?.text ?? null),
-    skills: fr.sections.flatMap((section) => section.section === 'skills' ? section.groups : [])
-      .map(({ category, items }) => [category?.text ?? null, items.map(({ text }) => text)]),
-    education: fr.sections.flatMap((section) => section.section === 'education' ? section.fields : []).map(({ text }) => text),
-  } }
+  return { candidateFacts: sourceIntake.candidateFacts, jobMatch, documents: { fr, en } }
 }
 
 /** The best coverage of the Job Requirements a pattern names, or null when none does. */
-export function readAuditedCoverage({ jobMatch, requirement }: Readonly<{ jobMatch: JobMatch; requirement: RegExp }>) {
+function readAuditedCoverage({ jobMatch, requirement }: Readonly<{ jobMatch: JobMatch; requirement: RegExp }>) {
   const ids = new Set<string>(jobMatch.requirements.filter(({ value }) => requirement.test(value)).map(({ id }) => id))
   if (ids.size === 0) return null
   const coverages = jobMatch.analysis.requirementGroups
@@ -102,7 +91,10 @@ export const frontEndAuditSource: ModelObservationSource = {
     return [
       createModelEvaluationObservation({ fixtureId: 'audited-coverage', extractionExpectedCount: auditedCoverage.length,
         extractionMatchedCount: covered.length, observedValues: auditedCoverage.filter((audited) => !covered.includes(audited))
-          .map(({ name }) => `uncovered:${name}`) }),
+          .map(({ name }) => `failed:${name} covered`) }),
+      // The audit's other writing defects fail a live run without counting towards any gate.
+      createModelEvaluationObservation({ fixtureId: 'writing-defects', observedValues: checkWritingDefects({ run })
+        .filter(({ passed }) => !passed).map(({ name }) => `failed:${name}`) }),
       ...(['fr', 'en'] as const).map((locale) => {
         const language = checkDocumentLanguage({ document: run.documents[locale], locale })
         return createModelEvaluationObservation({ fixtureId: `tailored-resume-${locale}`,
@@ -116,12 +108,42 @@ export const frontEndAuditSource: ModelObservationSource = {
   },
 }
 
+/** The defects the audit saw in the written documents, beyond language and provenance. */
+function checkWritingDefects({ run: { documents } }: Readonly<{ run: AuditRun }>) {
+  const { fr } = documents
+  const headline = fr.headline?.text ?? fr.targetRole?.value ?? ''
+  const roles = fr.experiences.flatMap(({ role }) => role === null ? [] : [role.text])
+  const groups = fr.sections.flatMap((section) => section.section === 'skills' ? section.groups : [])
+  const education = fr.sections.flatMap((section) => section.section === 'education' ? section.fields : [])
+  return [
+    ...(['fr', 'en'] as const).map((locale) => {
+      const paragraphs = documents[locale].valueProposition.paragraphs.map(({ text }) => text).join(' ')
+      // A resume is written without pronouns: neither "elle a développé" nor "j'ai développé".
+      return { name: `the ${locale} Value Proposition is written without a personal pronoun`,
+        passed: paragraphs.length > 0 && !personalPronouns[locale].test(paragraphs) }
+    }),
+    { name: 'the headline agrees with the Candidate\'s own title, never the masculine Target Role',
+      passed: /développeuse/iu.test(headline) && !/développeur\b/iu.test(headline) },
+    { name: 'no job title carries a contract type', passed: roles.length > 0 && !roles.some((role) => contractTypePattern.test(role)) },
+    { name: 'no skills group is named after its only item', passed: groups.length > 0 && !groups.some(({ category, items }) =>
+      category !== null && items.length === 1 && fold(items[0]?.text ?? '').includes(fold(category.text))) },
+    { name: 'the education year the Source Document gives is kept',
+      passed: education.map(({ text }) => text).join(' ').includes('2018') },
+  ]
+}
+
+function fold(value: string) {
+  return value.normalize('NFD').replaceAll(/\p{Diacritic}/gu, '').toLocaleLowerCase('fr')
+}
+
+const personalPronouns = {
+  fr: /(?:^|[^\p{L}])(?:(?:il|elle|ils|elles|je|nous)(?![\p{L}])|j['’])/iu,
+  en: /\b(?:he|she|his|her|hers|him|i|me|my|we|our)\b/iu,
+} as const
+const contractTypePattern = /(?:^|[^\p{L}])(?:cdi|cdd|freelance|free-lance|intérim|interim|alternance|apprentissage|stage|internship)(?![\p{L}])/iu
+
 function addUsage(...usages: readonly Readonly<Record<ModelRole, ModelTokenUsage>>[]) {
   const add = (role: ModelRole) => ({ inputTokens: usages.reduce((total, usage) => total + usage[role].inputTokens, 0),
     outputTokens: usages.reduce((total, usage) => total + usage[role].outputTokens, 0) })
   return { structured: add('structured'), writing: add('writing') }
-}
-
-function escapeRegExp(value: string) {
-  return value.replaceAll(/[.*+?^${}()|[\]\\]/gu, '\\$&')
 }

@@ -34,12 +34,14 @@ export type ModelEvaluationObservation = Readonly<{
   unsupportedResumeClaimCount: number
 }>
 
-export type ModelEvaluationBaseline = Readonly<{
+/** What one recording observed for a configuration; the companion is kept for its rates. */
+export type RecordedModelEvaluationRun = Readonly<{
+  /** The same provider's configuration for the other role, whose rates price its share of a Tailored Resume. */
+  companion?: ModelConfiguration
   configuration: ModelConfiguration
   datasetId: string
   observations: readonly ModelEvaluationObservation[]
   recordedAt: string
-  thresholds: ModelEvaluationThresholds
 }>
 
 /** A gate without a threshold is not calibrated yet, and never passes. */
@@ -49,9 +51,6 @@ export type ModelEvaluationThresholds = Readonly<{
   multilingualFidelity?: number
   p95LatencyMilliseconds?: number
 }>
-
-/** What the cost gate prices: the whole dataset (reference-v1), or the most expensive Tailored Resume observed. */
-export type CostUnit = 'dataset' | 'tailored-resume'
 
 export type CalibratedGate = Readonly<{ passed: boolean; threshold: number; value: number }>
 type UncalibratedGate = Readonly<{
@@ -67,7 +66,8 @@ export type ModelQualificationReport = Readonly<{
   configuration: ModelConfiguration
   datasetId: string
   gates: Readonly<{
-    costUsd: Gate & Readonly<{ unit: CostUnit }>
+    /** The most expensive Tailored Resume observed. */
+    costUsd: Gate
     extractionRecall: CalibratedGate | UncalibratedGate
     multilingualFidelity: Gate
     p95LatencyMilliseconds: CalibratedGate | UncalibratedGate
@@ -82,30 +82,19 @@ export type ModelQualificationReport = Readonly<{
   qualified: boolean
 }>
 
-export function qualifyModelConfiguration({
-  baseline,
-  companion,
-  configuration,
-  costUnit = 'dataset',
-  datasetId,
-  observations,
-}: Readonly<{
-  baseline?: ModelEvaluationBaseline
-  /** The same provider's configuration for the other role, whose rates price its share of a Tailored Resume. */
-  companion?: ModelConfiguration
-  configuration: ModelConfiguration
-  costUnit?: CostUnit
-  datasetId: string
-  observations: readonly ModelEvaluationObservation[]
+/** Qualifies a recorded run against thresholds: each gate passes on its own, and the configuration only if all do. */
+export function qualifyModelConfiguration({ recordedRun, thresholds }: Readonly<{
+  recordedRun: RecordedModelEvaluationRun
+  thresholds: ModelEvaluationThresholds
 }>): ModelQualificationReport {
-  const thresholds = baseline !== undefined && hasRecordedBaseline({ baseline, datasetId }) ? baseline.thresholds : undefined
+  const { companion, configuration, datasetId, observations } = recordedRun
   const gates = {
     provenanceSafety: createProvenanceSafetyGate({ observations }),
-    extractionRecall: createMinimumGate({ threshold: thresholds?.extractionRecall, value: calculateObservationRatio({
+    extractionRecall: createMinimumGate({ threshold: thresholds.extractionRecall, value: calculateObservationRatio({
       observations, matchedProperty: 'extractionMatchedCount', totalProperty: 'extractionExpectedCount' }) }),
-    multilingualFidelity: createMultilingualFidelityGate({ observations, threshold: thresholds?.multilingualFidelity }),
-    costUsd: createCostGate({ companion, configuration, costUnit, observations, threshold: thresholds?.costUsd }),
-    p95LatencyMilliseconds: createMaximumGate({ threshold: thresholds?.p95LatencyMilliseconds,
+    multilingualFidelity: createMultilingualFidelityGate({ observations, threshold: thresholds.multilingualFidelity }),
+    costUsd: createCostGate({ companion, configuration, observations, threshold: thresholds.costUsd }),
+    p95LatencyMilliseconds: createMaximumGate({ threshold: thresholds.p95LatencyMilliseconds,
       value: calculateP95({ values: observations.map(({ latencyMilliseconds }) => latencyMilliseconds) }) }),
   }
   return {
@@ -140,18 +129,15 @@ function createMultilingualFidelityGate({ observations, threshold }: Readonly<{
     observations, matchedProperty: 'multilingualPassedCount', totalProperty: 'multilingualCheckCount' }) })
 }
 
-function createCostGate({ companion, configuration, costUnit, observations, threshold }: Readonly<{
+function createCostGate({ companion, configuration, observations, threshold }: Readonly<{
   companion?: ModelConfiguration
   configuration: ModelConfiguration
-  costUnit: CostUnit
   observations: readonly ModelEvaluationObservation[]
   threshold?: number
-}>) {
-  const value = costUnit === 'dataset'
-    ? priceTokens({ configuration, usage: sumUsage({ usages: observations }) })
-    : calculateTailoredResumeCost({ companion, configuration, observations })
-  if (value === undefined) return { ...unmeasuredGate, unit: costUnit }
-  return { ...createMaximumGate({ threshold, value }), unit: costUnit }
+}>): Gate {
+  const value = calculateTailoredResumeCost({ companion, configuration, observations })
+  if (value === undefined) return unmeasuredGate
+  return createMaximumGate({ threshold, value })
 }
 
 /** The most expensive Tailored Resume observed, each role's tokens at its own configuration's upper-bound rates. */
@@ -178,13 +164,6 @@ function priceTokens({ configuration, usage }: Readonly<{ configuration: ModelCo
   const outputUsdPerMillionTokens = Math.max(...configuration.pricing.map((price) => price.outputUsdPerMillionTokens))
   const cost = usage.inputTokens * inputUsdPerMillionTokens / 1_000_000 + usage.outputTokens * outputUsdPerMillionTokens / 1_000_000
   return Number(cost.toFixed(8))
-}
-
-function sumUsage({ usages }: Readonly<{ usages: readonly ModelTokenUsage[] }>): ModelTokenUsage {
-  return {
-    inputTokens: sum({ values: usages.map(({ inputTokens }) => inputTokens) }),
-    outputTokens: sum({ values: usages.map(({ outputTokens }) => outputTokens) }),
-  }
 }
 
 function createMinimumGate({ threshold, value }: Readonly<{ threshold?: number; value: number }>) {
@@ -221,13 +200,6 @@ function calculateObservationRatio({
     matched: sum({ values: observations.map((observation) => observation[matchedProperty]) }),
     total: sum({ values: observations.map((observation) => observation[totalProperty]) }),
   })
-}
-
-function hasRecordedBaseline({
-  baseline,
-  datasetId,
-}: Readonly<{ baseline?: ModelEvaluationBaseline; datasetId: string }>) {
-  return baseline?.datasetId === datasetId && baseline.observations.length > 0
 }
 
 function calculateP95({ values }: Readonly<{ values: readonly number[] }>) {

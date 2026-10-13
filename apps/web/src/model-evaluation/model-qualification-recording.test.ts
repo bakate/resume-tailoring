@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import { createScriptedLanguageModelProvider } from '../adapters/server/scripted-language-model-provider'
 import type { ModelConfiguration } from './model-qualification'
-import { createModelEvaluationObservation, type ModelObservationSource, type RecordedModelEvaluationRun } from './model-qualification-runner'
+import type { RecordedModelEvaluationRun } from './model-qualification'
+import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
 import {
   mergeRecordedRuns,
   recordModelQualification,
+  renderQualificationReport,
   renderRecordedRunsModule,
 } from './model-qualification-recording'
 
@@ -47,6 +49,15 @@ describe('recording a Qualified Model Configuration candidate', () => {
     expect(module).toContain('export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRun[] = [')
     expect(module).toContain('"recordedAt": "2026-10-12T10:00:00.000Z"')
     expect(module.endsWith('\n')).toBe(true)
+  })
+
+  it('writes the report without the observations the recorded runs already hold', async () => {
+    const { recordedRun, report } = await recordModelQualification({ ...recording, candidateId: 'scripted-structured' })
+
+    const written = JSON.parse(renderQualificationReport({ recordedRun, report })) as Record<string, unknown>
+
+    expect(Object.keys(written)).toEqual(['configuration', 'datasetId', 'recordedAt', 'gates', 'qualified'])
+    expect(written.recordedAt).toBe(recordedRun.recordedAt)
   })
 })
 

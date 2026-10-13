@@ -5,6 +5,8 @@ import { createScriptedLanguageModelProvider } from '../adapters/server/scripted
 import type { ModelConfiguration } from './model-qualification'
 import {
   createModelEvaluationObservation,
+  readFailedObservations,
+  readRoleCandidate,
   runModelQualification,
   type ModelObservationSource,
 } from './model-qualification-runner'
@@ -19,7 +21,7 @@ describe('provider-neutral qualification runner', () => {
       extractionRecall: { passed: true, threshold: 0.9, value: 1 },
       multilingualFidelity: { passed: true, threshold: 1, value: 1 },
       // The Tailored Resume's 900 input tokens at $1 and 120 output tokens at $4 per million, the upper-bound rates.
-      costUsd: { passed: true, threshold: 0.01, unit: 'tailored-resume', value: 0.00138 },
+      costUsd: { passed: true, threshold: 0.01, value: 0.00138 },
       p95LatencyMilliseconds: { passed: true, threshold: 30_000, value: expect.any(Number) as number },
     })
     expect(result.recordedRun).toMatchObject({ configuration: scriptedConfiguration, datasetId: 'scripted-dataset-v1',
@@ -65,7 +67,7 @@ describe('provider-neutral qualification runner', () => {
     expect(result.recordedRun.observations[0]?.tailoredResumeUsage).toEqual({
       structured: { inputTokens: 900, outputTokens: 120 }, writing: { inputTokens: 900, outputTokens: 120 } })
     // Writing's tokens at the companion's $2 and $8 per million: 0.00138 + 0.00276.
-    expect(result.report.gates.costUsd).toMatchObject({ unit: 'tailored-resume', value: 0.00414 })
+    expect(result.report.gates.costUsd).toMatchObject({ value: 0.00414 })
     expect(result.recordedRun.companion).toBe(scriptedCompanion)
   })
 
@@ -92,6 +94,29 @@ describe('provider-neutral qualification runner', () => {
 
     expect(recorded).not.toContain(qualification.apiKey.value)
     expect(recorded).not.toContain(typescriptPosting)
+  })
+
+  it.each([
+    { label: 'a check named as failed', observation: { observedValues: ['failed:Kafka is critical'] } },
+    { label: 'an unsupported Resume Claim', observation: { unsupportedResumeClaimCount: 1 } },
+    { label: 'a covered trap', observation: { coveredTrapCount: 1, observedValues: ['covered-trap:kubernetes'] } },
+    { label: 'an obeyed injection', observation: { obeyedInjectionCount: 1, observedValues: ['obeyed:no skill is added'] } },
+  ])('reads $label as a failure a live evaluation expects none of', ({ observation }) => {
+    const observations = [createModelEvaluationObservation({ fixtureId: 'passed', observedValues: ['missed:job-requirement-tests'] }),
+      createModelEvaluationObservation({ fixtureId: 'failed', ...observation })]
+
+    const failed = readFailedObservations({ observations })
+
+    expect(failed.map(({ fixtureId }) => fixtureId)).toEqual(['failed'])
+  })
+
+  it.each(['structured', 'writing'] as const)('pairs the %s configuration with the other role\'s as its companion', (role) => {
+    const configurations = { structured: scriptedConfiguration, writing: { ...scriptedConfiguration, role: 'writing' } } as const
+
+    const candidate = readRoleCandidate({ configurations, role })
+
+    expect([candidate.configuration.role, candidate.companion.role]).toEqual(
+      role === 'structured' ? ['structured', 'writing'] : ['writing', 'structured'])
   })
 })
 
