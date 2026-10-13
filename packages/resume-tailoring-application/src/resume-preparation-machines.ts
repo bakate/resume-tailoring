@@ -6,9 +6,9 @@ import { assembleResumeDocumentWithOrigins, citedCandidateFacts, copyExperienceF
   hasSupportedSectionStructure, isCopiedFromSource, readStructureRejections, readWritableContent,
   isSectionFullyValidated, normalizeSectionContent, planResumeSections, readRejectedFields,
   readSectionContentFields, removeSectionFields } from './resume-sections'
-import type { ResumeCoherenceIssue, ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput, ResumeModelUsage,
-  ResumeRejectedField, ResumeSectionContent, ResumeSectionModelResult, ResumeSectionPlanEntry, ResumeSectionsRequest,
-  ResumeSectionWritingInput } from './resume-sections'
+import type { ResumeCoherenceIssue, ResumeDocumentCoherence, ResumeFieldRejection, ResumeFieldValidation,
+  ResumeFieldValidationInput, ResumeModelUsage, ResumeRejectedField, ResumeSectionContent, ResumeSectionModelResult,
+  ResumeSectionPlanEntry, ResumeSectionsRequest, ResumeSectionWritingInput } from './resume-sections'
 import type { ReadApiFailure, ResumeSectionModels } from './ports'
 import { explainFailure, isRetryable } from './failure-cause'
 import type { ExplainedFailure } from './failure-cause'
@@ -18,12 +18,26 @@ type ResumeSectionFailure = Readonly<{
   type: Exclude<typeof resumeSectionOutcomes[number], 'validated' | 'copied-from-source'>; retryAfterSeconds?: number
 }>
 
+/** Why one written version of a Resume Section was rejected: a field rejection kind, or the model failure type of its call. */
+export type ResumeAttemptRejection = ResumeFieldRejection | ResumeSectionFailure['type']
+/** The rejection kinds of each rejected version of one Resume Section, in the order they were written. */
+type ResumeAttemptRejections = readonly (readonly ResumeAttemptRejection[])[]
+
+/**
+ * Why a preparation failed, content-free: each failed Resume Section by its plan key with the rejection kinds of each
+ * of its rejected versions, or the coherence check's model failure or language mismatch naming no field.
+ */
+export type ResumePreparationFailureReason =
+  | Readonly<{ step: 'section'; sectionKey: ResumeSectionPlanEntry['key']; attempts: ResumeAttemptRejections }>
+  | Readonly<{ step: 'coherence'; rejection: ResumeAttemptRejection }>
+
 /** A section with content was validated as written, or copied from its Candidate Facts after its rewrite still failed. */
 export type ResumeSectionResult = Readonly<{
   section: ResumeSectionPlanEntry
   attempt: number
   durationMilliseconds: number
   usage: ResumeModelUsage
+  attemptRejections: ResumeAttemptRejections
 }> & (Readonly<{ status: 'validated' | 'copied-from-source'; content: ResumeSectionContent }>
   | Readonly<{ status: 'failed'; failure: ResumeSectionFailure }>)
 
@@ -42,6 +56,8 @@ type ResumeSectionMachineContext = ResumeSectionMachineInput & Readonly<{
   latestContent: ResumeSectionContent | null
   failure: ResumeSectionFailure | null
   rejectedFields: readonly ResumeRejectedField[]
+  /** The rejection kinds of each rejected version, the coherence feedback a rewritten section started from first. */
+  attemptRejections: ResumeAttemptRejections
   startedAt: number
   usage: ResumeModelUsage
 }>
@@ -75,40 +91,45 @@ const validateSectionFields = fromPromise<ResumeSectionModelResult<ResumeFieldVa
   models: ResumeSectionModels; input: ResumeFieldValidationInput
 }>>(({ input }) => callModel(() => input.models.validateFields(input.input)))
 
-type SectionStep = Pick<ResumeSectionMachineContext, 'content' | 'failure' | 'rejectedFields' | 'usage'>
+type SectionStep = Pick<ResumeSectionMachineContext, 'attemptRejections' | 'content' | 'failure' | 'rejectedFields' | 'usage'>
 
 function readWriting({ context, result }: Readonly<{
   context: ResumeSectionMachineContext; result: ResumeSectionModelResult<ResumeSectionContent>
 }>): SectionStep {
   const usage = addUsage(context.usage, result.usage)
   // A failed write rejected no field, so its retry keeps the feedback the attempt was given.
-  if (!result.ok) return { content: null, failure: result.error, rejectedFields: context.rejectedFields, usage }
+  if (!result.ok) return { content: null, failure: result.error, rejectedFields: context.rejectedFields, usage,
+    attemptRejections: [...context.attemptRejections, [result.error.type]] }
   const { section, purpose, relevantFactIds } = context.writingInput
   const content = normalizeSectionContent({ content: result.value, purpose, section, relevantFactIds })
   const rejections = readStructureRejections({ content, input: context.writingInput })
-  return rejections.length === 0 ? { content, failure: null, rejectedFields: [], usage }
+  return rejections.length === 0 ? { content, failure: null, rejectedFields: [], usage, attemptRejections: context.attemptRejections }
     // The coherence feedback a rewritten section started from still applies, next to what its structure broke.
-    : { content: null, failure: unsupported, usage, rejectedFields: [...context.writingInput.rejectedFields, ...rejections] }
+    : { content: null, failure: unsupported, usage, rejectedFields: [...context.writingInput.rejectedFields, ...rejections],
+      attemptRejections: [...context.attemptRejections, readRejectionKinds(rejections)] }
 }
 
 function readValidation({ context, result }: Readonly<{
   context: ResumeSectionMachineContext; result: ResumeSectionModelResult<ResumeFieldValidation>
 }>): SectionStep {
   const usage = addUsage(context.usage, result.usage)
-  if (!result.ok) return { content: context.content, failure: result.error, rejectedFields: [], usage }
-  if (context.content === null) return { content: null, failure: unsupported, rejectedFields: [], usage }
+  const { attemptRejections } = context
+  if (!result.ok) return { content: context.content, failure: result.error, rejectedFields: [], usage,
+    attemptRejections: [...attemptRejections, [result.error.type]] }
+  if (context.content === null) return { content: null, failure: unsupported, rejectedFields: [], usage,
+    attemptRejections: [...attemptRejections, [unsupported.type]] }
   // An unsupported headline is dropped rather than rewritten: the resume is then headed by the latest role held.
   const content = context.content
   const headlineId = content.kind === 'value-proposition' ? content.headline?.id : undefined
   const rejected = readRejectedFields({ content, validation: result.value })
   if (content.kind === 'value-proposition' && rejected.length > 0 && rejected.every(({ fieldId }) => fieldId === headlineId)) {
-    return { content: { ...content, headline: null }, failure: null, rejectedFields: [], usage }
+    return { content: { ...content, headline: null }, failure: null, rejectedFields: [], usage, attemptRejections }
   }
   return isSectionFullyValidated({ content: context.content, validation: result.value })
-    ? { content: context.content, failure: null, rejectedFields: [], usage }
+    ? { content: context.content, failure: null, rejectedFields: [], usage, attemptRejections }
     // The coherence feedback a rewritten section started from still applies to its next rewrite.
-    : { content: context.content, failure: unsupported, usage, rejectedFields: [...context.writingInput.rejectedFields,
-      ...readRejectedFields({ content: context.content, validation: result.value })] }
+    : { content: context.content, failure: unsupported, usage, rejectedFields: [...context.writingInput.rejectedFields, ...rejected],
+      attemptRejections: [...attemptRejections, rejected.length === 0 ? [unsupported.type] : readRejectionKinds(rejected)] }
 }
 
 function canRewrite({ context, step }: Readonly<{ context: ResumeSectionMachineContext; step: SectionStep }>) {
@@ -117,6 +138,11 @@ function canRewrite({ context, step }: Readonly<{ context: ResumeSectionMachineC
 
 const unsupported: ResumeSectionFailure = { type: 'unsupported' }
 
+/** The distinct rejection kinds of one rejected version, never its field ids or texts. */
+function readRejectionKinds(fields: readonly ResumeRejectedField[]): readonly ResumeAttemptRejection[] {
+  return [...new Set(fields.map(({ reason }) => reason))]
+}
+
 function addUsage(total: ResumeModelUsage, usage: ResumeModelUsage | undefined): ResumeModelUsage {
   return usage === undefined ? total
     : { inputTokens: total.inputTokens + usage.inputTokens, outputTokens: total.outputTokens + usage.outputTokens }
@@ -124,7 +150,7 @@ function addUsage(total: ResumeModelUsage, usage: ResumeModelUsage | undefined):
 
 function readSectionResult(context: ResumeSectionMachineContext): ResumeSectionResult {
   const measured = { section: context.writingInput.section, attempt: context.attempt, usage: context.usage,
-    durationMilliseconds: Math.max(0, context.now() - context.startedAt) }
+    durationMilliseconds: Math.max(0, context.now() - context.startedAt), attemptRejections: context.attemptRejections }
   if (context.failure === null && context.content !== null) return { ...measured, status: 'validated', content: context.content }
   const copy = context.failure?.type === 'unsupported' ? readSourceCopy(context.writingInput) : null
   return copy === null ? { ...measured, status: 'failed', failure: context.failure ?? { type: 'unexpected-response' } }
@@ -154,7 +180,8 @@ export const resumeSectionMachine = setup({
   id: 'resume-section',
   // A section sent back by the coherence check starts with the fields it rejected.
   context: ({ input }) => ({ ...input, attempt: 0, content: null, latestContent: input.writingInput.previousContent, failure: null,
-    rejectedFields: input.writingInput.rejectedFields, startedAt: input.now(), usage: noUsage }),
+    rejectedFields: input.writingInput.rejectedFields, startedAt: input.now(), usage: noUsage,
+    attemptRejections: input.writingInput.rejectedFields.length === 0 ? [] : [readRejectionKinds(input.writingInput.rejectedFields)] }),
   initial: 'planned',
   states: {
     planned: { always: { target: 'writing' } },
@@ -411,6 +438,27 @@ function readPreparationFailures(context: ResumePreparationMachineContext): read
 type PreparationStepFailure = ResumeSectionFailure | Readonly<{ type: 'incoherent' }>
 
 /**
+ * Why a preparation that ended failed did, for model qualification: every section still failed, by the rejection
+ * kinds of each version written, or the coherence check that gave no usable answer. A section the coherence check
+ * rejected again after its rewrite lists every verdict its versions got, the last check's included. Field ids and
+ * texts are left out.
+ */
+export function readPreparationFailureReasons(context: ResumePreparationMachineContext): readonly ResumePreparationFailureReason[] {
+  const { coherence } = context
+  if (coherence === null) return context.results.flatMap((result) => result.status !== 'failed' ? []
+    : [{ step: 'section', sectionKey: result.section.key, attempts: result.attemptRejections }])
+  if (!coherence.ok) return [{ step: 'coherence', rejection: coherence.error.type }]
+  const { rewrites } = resolveCoherence({ context, coherence })
+  const sections = context.results.flatMap(({ section, attemptRejections }): ResumePreparationFailureReason[] => {
+    const rejected = rewrites[section.key]
+    return rejected === undefined ? []
+      : [{ step: 'section', sectionKey: section.key, attempts: [...attemptRejections, readRejectionKinds(rejected)] }]
+  })
+  // A language mismatch can name no field, so it is recorded apart from the sections.
+  return coherence.value.languageMatches ? sections : [...sections, { step: 'coherence', rejection: 'language' }]
+}
+
+/**
  * Several sections can fail differently in one preparation (for example one timed out, another is unsupported),
  * but the Candidate sees a single failure with a single recovery action.
  */
@@ -469,7 +517,7 @@ function readRestoredSection({ section, saved }: Readonly<{
 }>): Extract<ResumeSectionResult, { content: ResumeSectionContent }> | null {
   if (saved.status !== 'validated') return null
   return { section, status: isCopiedFromSource(saved.content) ? 'copied-from-source' : 'validated', content: saved.content,
-    attempt: saved.attempt, durationMilliseconds: 0, usage: noUsage }
+    attempt: saved.attempt, durationMilliseconds: 0, usage: noUsage, attemptRejections: [] }
 }
 
 function readSectionSnapshot(result: ResumeSectionResult): ResumeSectionSnapshot {

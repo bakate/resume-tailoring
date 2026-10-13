@@ -5,6 +5,7 @@ import { countDocumentLanguageChecks } from './document-language'
 import { readLiveJobMatch } from './live-candidate-journey'
 import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
 import { createSectionModels } from './section-preparation-evaluation'
+import { readPreparationFailureValues } from './section-preparation-qualification'
 import { countUnsupportedResumeClaims } from './unsupported-resume-claims'
 
 /**
@@ -32,6 +33,7 @@ export const crossSegmentWritingSource: ModelObservationSource = {
         extractionExpectedCount: 1, extractionMatchedCount: Number(document !== null),
         multilingualCheckCount: language.checkCount, multilingualPassedCount: language.passedCount,
         observedValues: [`outcome:${output.status}`, `role-family:${fixture.roleFamily}`,
+          ...readPreparationFailureValues({ output }),
           ...language.failed.map((name) => `failed:${name}`)],
         unsupportedResumeClaimCount: document === null ? 0 : countUnsupportedResumeClaims({ candidateFacts, document }) }))
     }
