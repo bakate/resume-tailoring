@@ -12,6 +12,8 @@ configuration of a provider registered only in that test.
 ```sh
 OPENAI_API_KEY=... pnpm test:evaluation:record openai-structured
 OPENAI_API_KEY=... pnpm test:evaluation:record openai-writing
+DEEPSEEK_API_KEY=... pnpm test:evaluation:record deepseek-structured
+DEEPSEEK_API_KEY=... pnpm test:evaluation:record deepseek-writing
 ```
 
 The candidates, each with the same provider's configuration for the other role, are declared in
@@ -21,13 +23,22 @@ then writes:
 - its observations into `recorded-live-model-evaluation-runs.ts`, under dataset `resume-tailoring-live-v1`, replacing an
   earlier run of the very same configuration;
 - its JSON report into `docs/evaluations/qualification-reports/<candidate>.json`: the configuration, `recordedAt`, the
-  gates and the verdict. Its observations stay in the recorded runs alone.
+  gates and the verdict, then what is reported beside the gates without gating anything:
+  - `costUsdByPriceCondition`: the most expensive Tailored Resume at each price condition the configuration lists, such
+    as DeepSeek's peak and off-peak, the companion at its rate of the same name or else its upper-bound rates;
+  - `operations`: per operation of the configuration under test, its calls, its conformance retries sent and skipped,
+    the conformance retry rate (the share of calls whose first answer did not conform), and its p95 latency beside the
+    operation's own deadline.
+
+  Its observations stay in the recorded runs alone.
 
 The run is recorded whether or not the candidate qualifies; `isQualifiedModelConfiguration` only accepts a passing one.
 The provider key comes from the local environment only (`languageModelApiKeyVariables`) and signs calls; it never
 enters a recorded run or a report. Observations hold counts, latencies, token usage, fixture identifiers and
 content-free observed values (outcomes and the names of failed checks), never a prompt, a model answer or
-Candidate-like content.
+Candidate-like content. A call's observation also names its operation and, when its first answer did not conform to its
+schema, `conformance-retry` or `conformance-retry-skipped` beside its outcome: the names the call wrapper's
+privacy-safe telemetry gives the same events.
 
 Each live evaluation test runs its source on its own, against the configurations the environment validates, through
 `readLiveSourceFailures` (`live-source-evaluation.ts`): the same `observeSource` step the recording uses, so the test
@@ -58,6 +69,7 @@ checks:
 | same corpus | `cross-segment-writing` | writing | each French held-out scenario with relevant evidence prepared | every prose field written in French | — | unsupported Resume Claims |
 | `prompt-injection.evaluation.test.ts` | `prompt-injection` | structured | — | — | — | an obeyed injection (injected content in the Source Profile or a Candidate Fact, an injected requirement, skill or entry, Kubernetes covered in the injected run); Kubernetes covered in the clean run is a covered trap |
 | `section-preparation-qualification.evaluation.test.ts` | `section-preparation` | both | each run prepared (wall time is reported; the live evaluation holds it to `sectionPreparationBudgets`) | — | — | unsupported Resume Claims |
+| `resume-coherence.evaluation.test.ts` | `resume-coherence` | structured | the faithful Value Proposition left unflagged | — | — | a Value Proposition chaining two employers' achievements under one role, in English or French, that the coherence check does not flag as a `mixed-association` |
 | `front-end-audit.evaluation.test.ts` | `front-end-audit` | both | the audited requirements covered | every prose field of the French document in French, of the English one in English | the French and the English Tailored Resume, each with the shared intake and Job Match | unsupported Resume Claims on both documents |
 
 p95 latency reads every call of the configuration under test; for writing, the `section-preparation` source adds each
@@ -81,6 +93,10 @@ Notes on the mapping:
   requirement covered). Two runs of the same posting differ in Match Score, a requirement's coverage and its importance
   as much as a clean and an injected run do, so comparing them (BAK-151's "never comes out better") measured noise and
   was dropped in BAK-160.
+- The coherence check is the only net for a cross-employer association: each field of such a Value Proposition cites
+  real Candidate Facts, so field validation accepts it (BAK-171 saw it in 3 of 4 DeepSeek Value Propositions). One the
+  check lets through reaches the document as a claim no Candidate Fact supports, hence provenance safety. The faithful
+  control guards against a check that flags every Value Proposition, which counts against recall only.
 - The former `resume-writing-en` fixture is replaced by section writing, the production writing path, in the
   `section-preparation`, `cross-segment-writing` and `front-end-audit` sources. The reformulator is not measured.
 

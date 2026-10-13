@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createModelJobPostingExtractor } from '../adapters/server/model-job-posting-extractor'
 import { createScriptedLanguageModelProvider } from '../adapters/server/scripted-language-model-provider'
@@ -13,6 +13,8 @@ import {
 } from './model-qualification-runner'
 
 describe('provider-neutral qualification runner', () => {
+  afterEach(() => { vi.restoreAllMocks() })
+
   it('qualifies a configuration of a provider only this test registers, through the production operation adapters', async () => {
     const result = await runModelQualification({ ...qualification, sources: [extractionSource] })
 
@@ -72,6 +74,24 @@ describe('provider-neutral qualification runner', () => {
     expect(result.recordedRun.companion).toBe(scriptedCompanion)
   })
 
+  it('records each call\'s operation, and a conformance retry beside its outcome', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    let callCount = 0
+    const nonConformingFirst = createScriptedLanguageModelProvider({ conformance: 'client-side', answer: (call) => {
+      callCount += 1
+      return callCount === 1 ? { text: '{"requirements":"not a list"}' } : scriptedAnswer(call)
+    } })
+
+    const result = await runModelQualification({ ...qualification, providers: { scripted: nonConformingFirst },
+      sources: [extractionSource] })
+
+    expect(result.recordedRun.observations.filter(({ operation }) => operation !== undefined)).toEqual([
+      expect.objectContaining({ operation: 'explainable-job-posting-extraction',
+        observedValues: ['answered', 'conformance-retry'] })])
+    expect(result.report.operations['explainable-job-posting-extraction']).toMatchObject({ callCount: 1,
+      conformanceRetryCount: 1, conformanceRetryRate: 1 })
+  })
+
   it('runs only the sources that measure the role under test', async () => {
     const writingSource: ModelObservationSource = { id: 'writing-only', roles: ['writing'],
       observe: () => Promise.reject(new Error('A writing source must not run for the structured role')) }
@@ -123,13 +143,15 @@ describe('provider-neutral qualification runner', () => {
 
 const typescriptPosting = 'We are hiring a Backend Engineer. Strong TypeScript experience is required.'
 
-const scriptedProvider = createScriptedLanguageModelProvider({ answer: ({ outputName }) => {
+const scriptedProvider = createScriptedLanguageModelProvider({ answer: (call) => scriptedAnswer(call) })
+
+function scriptedAnswer({ outputName }: Readonly<{ outputName: string }>) {
   if (outputName !== 'explainable_job_posting') throw new Error(`Unexpected output ${outputName}`)
   return { usage: { inputTokens: 900, outputTokens: 120 }, text: JSON.stringify({ practicalConstraints: [], targetRole: null,
     requirements: [{ capability: { dimension: 'execution', name: 'TypeScript' }, importance: 'critical',
       importanceRationale: 'The posting says required.', sourceExcerpt: 'Strong TypeScript experience is required.',
       substitutableGroup: null, value: 'Strong TypeScript experience' }] }) }
-} })
+}
 
 // A provider production does not know: only the providers handed to the runner can serve it.
 const scriptedConfiguration = {

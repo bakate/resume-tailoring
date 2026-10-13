@@ -64,7 +64,11 @@ export type ModelCallMeasurement = Readonly<{
   operation: ModelOperation
   outcome: 'answered' | 'failed'
   usage?: ModelUsage
+  /** Present only when the first answer did not conform: whether the deadline let it be sent again. */
+  conformance?: ConformanceRetry
 }>
+
+export type ConformanceRetry = 'retried' | 'retry-skipped'
 
 /**
  * What an operation adapter needs to reach a model. Qualification may also hand it the providers to choose from and
@@ -119,9 +123,10 @@ export function createModelRequester({
   return {
     send: async (details: ModelRequestDetails) => {
       const startedAtMilliseconds = now()
-      const result = await sendModelRequest({ apiKey, configuration, details, now, provider, request })
+      const { conformance, result } = await sendModelRequest({ apiKey, configuration, details, now, provider, request })
       observeCall?.({ configuration, latencyMilliseconds: now() - startedAtMilliseconds, operation: details.operation,
-        outcome: result.ok ? 'answered' : 'failed', ...(result.ok && result.value.usage !== undefined ? { usage: result.value.usage } : {}) })
+        outcome: result.ok ? 'answered' : 'failed', ...(result.ok && result.value.usage !== undefined ? { usage: result.value.usage } : {}),
+        ...(conformance === undefined ? {} : { conformance }) })
       return result
     },
   }
@@ -134,7 +139,7 @@ async function sendModelRequest({ apiKey, configuration, details, now, provider,
   now: () => number
   provider: LanguageModelProviderAdapter<LanguageModelProvider>
   request: typeof fetch
-}>): Promise<ModelRequestResult> {
+}>): Promise<ConformingModelRequestResult> {
   const settings = readModelOperationSettings({ configuration, operation: details.operation })
   const deadline = createOperationDeadline({ deadlineMilliseconds: settings.deadlineMilliseconds })
   try {
@@ -156,25 +161,27 @@ function createOperationDeadline({ deadlineMilliseconds }: Readonly<{ deadlineMi
 
 type ModelCall = Parameters<typeof sendAttempt>[0]
 
+type ConformingModelRequestResult = Readonly<{ conformance?: ConformanceRetry; result: ModelRequestResult }>
+
 async function sendConformingModelRequest({ call, deadlineMilliseconds }: Readonly<{
   call: ModelCall
   deadlineMilliseconds: number
-}>): Promise<ModelRequestResult> {
+}>): Promise<ConformingModelRequestResult> {
   const { configuration, details, now, provider } = call
   const startedAtMilliseconds = now()
   const first = await sendAttempt(call)
-  if (!first.ok) return first
+  if (!first.ok) return { result: first }
   const nonConformance = readNonConformance({ answer: first.value, outputSchema: details.outputSchema })
   if (nonConformance === null || provider.conformance === 'server-side') {
-    return { ok: true, value: createModelResponse(first.value) }
+    return { result: { ok: true, value: createModelResponse(first.value) } }
   }
   const elapsedMilliseconds = now() - startedAtMilliseconds
   const canRetry = deadlineMilliseconds - elapsedMilliseconds >= elapsedMilliseconds
   recordConformanceRetry({ cause: nonConformance, configuration, operation: details.operation, retried: canRetry })
-  if (!canRetry) return { ok: true, value: createModelResponse(first.value) }
+  if (!canRetry) return { conformance: 'retry-skipped', result: { ok: true, value: createModelResponse(first.value) } }
   const retry = await sendAttempt(call)
-  return retry.ok ? { ok: true, value: createModelResponse({ ...retry.value,
-    usage: addUsage({ first: first.value.usage, second: retry.value.usage }) }) } : retry
+  return { conformance: 'retried', result: retry.ok ? { ok: true, value: createModelResponse({ ...retry.value,
+    usage: addUsage({ first: first.value.usage, second: retry.value.usage }) }) } : retry }
 }
 
 /** One call to the provider. An answer cut at the output budget fails on its own, since the same request would be cut again. */

@@ -68,7 +68,8 @@ describe('recording a Qualified Model Configuration candidate', () => {
 
     const written = JSON.parse(renderQualificationReport({ recordedRun, report })) as Record<string, unknown>
 
-    expect(Object.keys(written)).toEqual(['configuration', 'datasetId', 'recordedAt', 'gates', 'qualified'])
+    expect(Object.keys(written)).toEqual(['configuration', 'datasetId', 'recordedAt', 'gates', 'qualified',
+      'costUsdByPriceCondition', 'operations'])
     expect(written.recordedAt).toBe(recordedRun.recordedAt)
   })
 })

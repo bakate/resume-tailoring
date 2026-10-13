@@ -151,13 +151,23 @@ function readRoleConfiguration({ companion, configuration, role }: Readonly<{
   return companion
 }
 
-/** One observation per call: its latency and usage, and whether it was answered, never what it carried. */
+/**
+ * One observation per call: its operation, latency and usage, whether it was answered and whether its first answer
+ * needed a conformance retry, never what it carried.
+ */
 function readCallObservations({ calls, sourceId }: Readonly<{
   calls: readonly ModelCallMeasurement[]
   sourceId: string
 }>) {
-  return calls.map(({ latencyMilliseconds, operation, outcome, usage }, callIndex) => createModelEvaluationObservation({
-    fixtureId: `${sourceId}:call-${String(callIndex + 1)}:${operation}`, latencyMilliseconds,
-    inputTokens: usage?.inputTokens ?? 0, outputTokens: usage?.outputTokens ?? 0, observedValues: [outcome],
+  return calls.map(({ conformance, latencyMilliseconds, operation, outcome, usage }, callIndex) => createModelEvaluationObservation({
+    fixtureId: `${sourceId}:call-${String(callIndex + 1)}:${operation}`, latencyMilliseconds, operation,
+    inputTokens: usage?.inputTokens ?? 0, outputTokens: usage?.outputTokens ?? 0,
+    observedValues: [outcome, ...conformance === undefined ? [] : [conformanceObservedValues[conformance]]],
   }))
 }
+
+/** The names the call wrapper's privacy-safe telemetry gives the same events. */
+const conformanceObservedValues = {
+  retried: 'conformance-retry',
+  'retry-skipped': 'conformance-retry-skipped',
+} as const satisfies Record<NonNullable<ModelCallMeasurement['conformance']>, string>
