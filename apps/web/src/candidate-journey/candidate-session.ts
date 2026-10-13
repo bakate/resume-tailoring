@@ -16,6 +16,7 @@ import {
 } from '@resume-tailoring/application/job-match'
 
 const processingPolicySchema = z.strictObject({
+  processingCountry: z.string().min(1).optional(),
   provider: z.string().min(1),
   purposes: z.array(z.string().min(1)).readonly(),
   retentionPolicy: z.string().min(1),

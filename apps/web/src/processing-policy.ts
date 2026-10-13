@@ -5,8 +5,8 @@ import type { LanguageModelProvider } from './language-model-configuration'
 
 /**
  * What each Language Model Provider does with what it receives. A provider brings its own policy version, so changing
- * provider is always a material change of the Processing Policy. A provider without one (DeepSeek until BAK-168 names
- * its processing country) has no policy to consent to, so no model operation can run on it.
+ * provider is always a material change of the Processing Policy. A provider that processes outside the European Union
+ * states its processing country. DeepSeek's wording follows its privacy policy (2026-02-10) and context caching guide.
  */
 const providerDescriptions = {
   openai: {
@@ -15,20 +15,17 @@ const providerDescriptions = {
     storageBehavior: 'Candidate content remains browser-local; model requests are stateless with application storage disabled.',
     version: '2026-09-29',
   },
-  deepseek: null,
-} as const satisfies Record<LanguageModelProvider, Pick<ProcessingPolicy, 'provider' | 'retentionPolicy' | 'storageBehavior' | 'version'> | null>
+  deepseek: {
+    processingCountry: 'China (outside the European Union)',
+    provider: 'DeepSeek',
+    retentionPolicy: 'API inputs and outputs are retained as long as needed to provide the service, or longer for legal obligations, safety or legal claims, with no fixed period; they may be used to train DeepSeek models unless opted out.',
+    storageBehavior: 'Candidate content remains browser-local; each model request is written to the provider\'s disk cache, usually cleared within a few hours to a few days.',
+    version: '2026-10-13',
+  },
+} as const satisfies Record<LanguageModelProvider, Pick<ProcessingPolicy, 'processingCountry' | 'provider' | 'retentionPolicy' | 'storageBehavior' | 'version'>>
 
-export function createProcessingPolicy({ provider }: Readonly<{ provider: LanguageModelProvider }>): ProcessingPolicy | null {
-  const description = providerDescriptions[provider]
-  if (description === null) return null
-  return {
-    provider: description.provider,
-    purposes: processingPurposes,
-    retentionPolicy: description.retentionPolicy,
-    storageBehavior: description.storageBehavior,
-    transmittedDataCategories,
-    version: description.version,
-  }
+export function createProcessingPolicy({ provider }: Readonly<{ provider: LanguageModelProvider }>): ProcessingPolicy {
+  return { ...providerDescriptions[provider], purposes: processingPurposes, transmittedDataCategories }
 }
 
 /**

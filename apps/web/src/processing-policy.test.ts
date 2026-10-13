@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { hasProcessingConsentForPolicy } from '@resume-tailoring/application/language-model-gateway'
+
 import { validateServerEnvironment } from './env'
 import { languageModelProviders } from './language-model-configuration'
 import { createProcessingPolicy, readActiveProcessingPolicy } from './processing-policy'
@@ -34,15 +36,28 @@ describe('Processing Policy derived from the active Language Model Provider', ()
   })
 
   it('gives every provider its own policy version, so a provider change always asks for new consent', () => {
-    const versions = languageModelProviders.flatMap((provider) => createProcessingPolicy({ provider })?.version ?? [])
+    const versions = languageModelProviders.map((provider) => createProcessingPolicy({ provider }).version)
 
     expect(new Set(versions).size).toBe(versions.length)
   })
 
-  it('states no DeepSeek policy until its processing country is disclosed (BAK-168)', () => {
+  it('names DeepSeek as processor and China as its processing country, a transfer outside the European Union', () => {
     const policy = createProcessingPolicy({ provider: 'deepseek' })
 
-    expect(policy).toBeNull()
+    expect(policy).toMatchObject({
+      processingCountry: 'China (outside the European Union)',
+      provider: 'DeepSeek',
+      purposes: consentedOpenAiProcessingPolicy.purposes,
+      transmittedDataCategories: consentedOpenAiProcessingPolicy.transmittedDataCategories,
+    })
+  })
+
+  it('asks a Candidate who consented under the OpenAI policy to consent again before DeepSeek processes anything', () => {
+    const consent = { grantedAt: 1, policy: consentedOpenAiProcessingPolicy }
+
+    const granted = hasProcessingConsentForPolicy({ consent, policy: createProcessingPolicy({ provider: 'deepseek' }) })
+
+    expect(granted).toBe(false)
   })
 
   it('states on the landing the policy of the provider the server calls', () => {

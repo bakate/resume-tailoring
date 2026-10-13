@@ -19,9 +19,24 @@ export function PrivacyStatement({ localization, processingPolicy }: Localizatio
       <IconLock aria-hidden="true" className="privacy-statement-icon" size={20} stroke={2} />
       <Text>{localization.translate('candidateJourney.privacyStatement')}</Text>
     </Group>
+    <ProcessingLocationStatement {...{ localization, processingPolicy }} />
     <details><summary>{localization.translate('candidateJourney.privacyLearnMore')}</summary>
       <Stack gap="xs" mt="xs"><ProcessingPolicyDetails {...{ localization, processingPolicy }} /></Stack></details>
   </Box>
+}
+
+/**
+ * A processing country is a transfer the Candidate must know of before choosing to start, so it is stated on the
+ * landing rather than only behind "Learn more".
+ */
+function ProcessingLocationStatement({ localization, processingPolicy }: LocalizationProps & Readonly<{
+  processingPolicy: ProcessingPolicy
+}>) {
+  const { processingCountry, provider } = processingPolicy
+  if (processingCountry === undefined) return null
+  return <Text mt="xs">{localization.translate('processingPolicy.processingLocationStatement')
+    .replace('{provider}', provider)
+    .replace('{processingCountry}', translateProcessingPolicyValue({ localization, value: processingCountry }))}</Text>
 }
 
 /** A smaller privacy line elsewhere on the page: the same lock as the privacy statement, beside one sentence. */
@@ -53,6 +68,10 @@ function ProcessingPolicyDetails({ localization, processingPolicy }: Localizatio
   return <>
     <PolicyText label={localization.translate('processingPolicy.provider')}
       value={processingPolicy.provider} />
+    {processingPolicy.processingCountry === undefined ? null : (
+      <PolicyText label={localization.translate('processingPolicy.processingCountry')}
+        value={translateProcessingPolicyValue({ localization, value: processingPolicy.processingCountry })} />
+    )}
     <PolicyList label={localization.translate('processingPolicy.purposes')}
       values={translateProcessingPolicyValues({
         localization, values: processingPolicy.purposes,
@@ -98,6 +117,9 @@ const processingPolicyTranslationKeyByValue = new Map<string, Parameters<
   ['Candidate Facts needed for matching, writing, and validation', 'processingPolicy.data.candidateFacts'],
   ['API inputs and outputs may be retained for abuse monitoring for up to 30 days, or longer when legally required.', 'processingPolicy.retentionValue'],
   ['Candidate content remains browser-local; model requests are stateless with application storage disabled.', 'processingPolicy.storageValue'],
+  ['China (outside the European Union)', 'processingPolicy.country.chinaOutsideEuropeanUnion'],
+  ['API inputs and outputs are retained as long as needed to provide the service, or longer for legal obligations, safety or legal claims, with no fixed period; they may be used to train DeepSeek models unless opted out.', 'processingPolicy.deepSeekRetentionValue'],
+  ['Candidate content remains browser-local; each model request is written to the provider\'s disk cache, usually cleared within a few hours to a few days.', 'processingPolicy.deepSeekStorageValue'],
 ])
 
 function PolicyText({ label, value }: Readonly<{ label: string; value: string }>) {

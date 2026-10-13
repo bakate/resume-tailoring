@@ -1,4 +1,6 @@
 export type ProcessingPolicy = Readonly<{
+  /** Where the provider processes and stores what it receives; stated when it is a transfer the Candidate must know of. */
+  processingCountry?: string
   provider: string
   purposes: readonly string[]
   retentionPolicy: string
@@ -25,6 +27,7 @@ function hasSameProcessingPolicy({ activePolicy, consentedPolicy }: Readonly<{
   consentedPolicy: ProcessingPolicy
 }>) {
   return consentedPolicy.provider === activePolicy.provider
+    && consentedPolicy.processingCountry === activePolicy.processingCountry
     && consentedPolicy.retentionPolicy === activePolicy.retentionPolicy
     && consentedPolicy.storageBehavior === activePolicy.storageBehavior
     && consentedPolicy.version === activePolicy.version

@@ -33,10 +33,19 @@ describe('Processing Consent', () => {
     ['an added purpose', { purposes: [...policy.purposes, 'Train'] }],
     ['reordered purposes', { purposes: ['Write', 'Extract'] }],
     ['another transmitted data category', { transmittedDataCategories: ['Evidence'] }],
+    ['a processing country it did not state', { processingCountry: 'China' }],
   ] as const)('requires new consent when the active policy has %s', (_change, activeChange) => {
     const consent = { grantedAt: 1, policy }
 
     const granted = hasProcessingConsentForPolicy({ consent, policy: { ...policy, ...activeChange } })
+
+    expect(granted).toBe(false)
+  })
+
+  it('requires new consent when the processing country changes', () => {
+    const consent = { grantedAt: 1, policy: { ...policy, processingCountry: 'United States' } }
+
+    const granted = hasProcessingConsentForPolicy({ consent, policy: { ...policy, processingCountry: 'China' } })
 
     expect(granted).toBe(false)
   })
