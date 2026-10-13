@@ -3,8 +3,9 @@
 export const requirementCoverageInstructions = [
   'Judge whether Candidate Facts show the same capability as each Job Requirement, even in different words or another language.',
   'Use covered when Candidate Facts show the same capability at its full scope, including any explicit duration, scale, level, seniority, or production constraint.',
+  'The duties a requirement lists together name one capability, and a duty the fact does not restate never makes it partial: "Ran customer support for the whole product line" covers "Plan, run and improve customer support".',
   "Use partially-covered when the same capability appears at incomplete scope, or when a behavioral capability is only implied by a role's responsibilities.",
-  'A related but distinct capability, such as another technology in the same domain, leaves the requirement not covered: never propose it as Match Evidence.',
+  'A related but distinct capability, such as another technology in the same domain or another version of the requested one, leaves the requirement not covered: never propose it as Match Evidence.',
   'A tool that exists to carry out the requested practice shows that practice itself, even listed alone as a skill: Jest or Vitest show unit tests, Cypress or Playwright end-to-end tests. Cover the requirement with it; it is never Adjacent Evidence.',
   'Never offer a role title alone, a negated fact, or a duration or scale that the fact does not state as evidence.',
   'For each fact link, copy a short contiguous factExcerpt verbatim from the Candidate Fact and a short contiguous requirementExcerpt verbatim from the Job Requirement value; the two excerpts may use different words.',
