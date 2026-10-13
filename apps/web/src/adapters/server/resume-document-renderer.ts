@@ -14,11 +14,12 @@ type RenderStage = 'launch' | 'layout' | 'photo' | 'print' | 'fonts' | 'pdf-read
 type RenderProgress = { stage: RenderStage }
 
 /**
- * Lambda runs Chromium in a Firecracker sandbox with no /dev/shm, no GPU and only /tmp writable: the zygote, GPU and
- * renderer processes it would fork there close the page mid-render, so everything runs in the browser process.
+ * Lambda runs Chromium in a Firecracker sandbox with no /dev/shm, no GPU and only /tmp writable, so it forks no zygote
+ * and no GPU process. Chromium 155 aborts at launch with --single-process (BAK-180); its renderer process prints the
+ * resume under Lambda's limits once HOME is in /tmp.
  */
-const chromiumArguments = ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox',
-  '--no-zygote', '--single-process', '--disable-gpu']
+const chromiumArguments = ['--disable-dev-shm-usage', '--no-sandbox', '--disable-setuid-sandbox', '--no-zygote',
+  '--disable-gpu']
 
 /** Chromium writes its crash database, configuration and font cache under HOME, which only /tmp can hold on Lambda. */
 function chromiumEnvironment() {
