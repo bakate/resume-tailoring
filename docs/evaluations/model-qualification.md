@@ -156,7 +156,7 @@ reports are in `docs/evaluations/qualification-reports/`:
 | `openai-structured` | `gpt-6-luna` | `low` | 91.3% | 100% | $0.0654 | every operation within its deadline (slowest, Match Evidence: 15,331 ms of 90,000) | 0 | yes |
 | `openai-writing` | `gpt-6-sol` | `medium` | 100% | 100% | $0.0677 | 9,782 ms | 0 | yes |
 | `deepseek-structured` | `deepseek-flash` | per operation | 98.6% | 100% | $0.0701 at peak, $0.0350 off-peak | every operation within its deadline | 0 | yes |
-| `deepseek-writing` | `deepseek-flash` | `high` | 90% | 100% | $0.0533 at peak, $0.0266 off-peak | 16,817 ms | 0 | no (not kept in the recorded runs) |
+| `deepseek-writing` | `deepseek-flash` | `high` | 100% | 100% | $0.0735 at peak, $0.0367 off-peak | 24,481 ms | 0 | yes (BAK-168) |
 
 Per source, structured recall (re-recorded in BAK-176) is Job Posting extraction 12/16, Match Evidence 25/26,
 cross-segment extraction 21/22, section preparation 3/3 and the front-end audit 2/2; writing recall is cross-segment
@@ -169,9 +169,9 @@ configurations stay qualified, every operation well within its 90 s deadline, wi
 strict Structured Outputs hold the schema).
 
 The DeepSeek configurations were recorded on 2026-10-13 on main's pipeline, off-peak (BAK-167). `deepseek-structured`
-qualifies. `deepseek-writing` fails recall: 2 of about 21 preparations ended unprepared, for two different reasons
-(BAK-179). Only passing runs are kept in `recorded-live-model-evaluation-runs.ts`, so its run is absent and its JSON
-report stays as evidence. `deepseek-qualification-2026-10.md` gives the thinking per operation, conformance retry
+qualifies. `deepseek-writing` then failed recall: 2 of about 21 preparations ended unprepared (BAK-179). Recorded again
+on 2026-10-13 at 14:39 UTC, off-peak, after BAK-178 and BAK-179, it qualifies on every gate with no conformance retry in
+61 section writing calls (BAK-168). `deepseek-qualification-2026-10.md` gives the thinking per operation, conformance retry
 rates, latency per operation and cost at peak and off-peak.
 
 ### Against the 2026-09-27 reference recordings

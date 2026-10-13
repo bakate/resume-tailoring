@@ -60,8 +60,10 @@ describe('Processing Policy derived from the active Language Model Provider', ()
     expect(granted).toBe(false)
   })
 
-  it('states on the landing the policy of the provider the server calls', () => {
-    const environment = { LANGUAGE_MODEL_PROVIDER: 'openai', OPENAI_API_KEY: 'secret-key' }
+  it.each([
+    { LANGUAGE_MODEL_PROVIDER: 'openai', OPENAI_API_KEY: 'secret-key' },
+    { LANGUAGE_MODEL_PROVIDER: 'deepseek', DEEPSEEK_API_KEY: 'secret-key' },
+  ])('states on the landing the policy of the provider the server calls: $LANGUAGE_MODEL_PROVIDER', (environment) => {
     const serverEnvironment = validateServerEnvironment({ environment })
     if (!serverEnvironment.ok) throw new Error('The test environment is valid')
 
