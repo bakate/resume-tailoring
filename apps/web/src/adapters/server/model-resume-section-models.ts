@@ -98,6 +98,8 @@ const sharedWritingInstructions = [
   'previousContent, when present, is your latest version of this section, sent back only for its rejectedFields. Keep every other group, item and field of it exactly as written, with the same id and text, and change only what the rejected fields require. A structure reason names your discarded answer, not previousContent: match it by text, and keep a previousContent field that merely shares its id.',
 ]
 
+const officialQualificationNameInstruction = 'Write each qualification under the official name its fact states, in every locale. In another language, a translation of the words of that name may follow it in parentheses, adding no degree, level or duration; never replace the name with an equivalent degree or level: write "BTS Négociation et Digitalisation de la Relation Client (negotiation and digitalization of customer relations)", never "Associate Degree in Sales" and never "BTS Négociation et Digitalisation de la Relation Client (associate degree)".'
+
 const sectionWritingInstructions: Record<ResumeSectionKind, string> = {
   'value-proposition': [
     'Write a specific concise Value Proposition as prose, normally one paragraph of two to four lines, supported by the strongest relevant evidence among the supplied facts.',
@@ -117,10 +119,16 @@ const sectionWritingInstructions: Record<ResumeSectionKind, string> = {
     'Group skills by category. Category labels organize items and never become standalone bullets. Remove duplicate skill items and redundant paraphrases within a group.',
     'Never repeat a label inside its items: write "Accessibilité: RGAA", never "Accessibilité: Accessibilité RGAA".',
   ].join(' '),
-  education: 'Keep each education entry distinct. Preserve complete qualifications, associated institutions and the year or dates their facts state, without invented levels.',
+  education: [
+    'Keep each education entry distinct. Preserve complete qualifications, associated institutions and the year or dates their facts state, without invented levels.',
+    officialQualificationNameInstruction,
+  ].join(' '),
   languages: 'Keep each language distinct. Preserve stated proficiency without invented levels.',
   projects: 'Keep each project distinct and describe it only as the supplied facts support.',
-  certifications: 'Keep each certification distinct. Preserve complete qualifications and issuers without invented levels.',
+  certifications: [
+    'Keep each certification distinct. Preserve complete qualifications and issuers without invented levels.',
+    officialQualificationNameInstruction,
+  ].join(' '),
 }
 
 function readSectionWritingInstructions(kind: ResumeSectionKind) {
@@ -134,6 +142,7 @@ const fieldValidationInstructions = [
   'For an unsupported field set unsupportedProposition to the proposition its cited facts do not support, quoting the unsupported name, technology, responsibility or outcome briefly; set it to null for a supported field.',
   'Reject unsupported terminology, stronger seniority, responsibility, causality, qualifications, dates, outcomes, quantities or levels.',
   'Faithful reformulation, translation and condensation are allowed. Proper nouns and qualification meaning must survive translation.',
+  'An education or certification field keeps the official name of the qualification its fact states, alone or followed by a translation of its words. An equivalent degree, level or duration written in its place or in that translation is an unsupported qualification, such as "Associate Degree in Sales" or "(two-year diploma)" for "BTS Négociation et Digitalisation de la Relation Client".',
   'A job title or headline without the contract type its fact states (CDI, CDD, freelance, internship, full-time) is faithful: a resume never shows the contract type, so its absence is never unsupported.',
   'Check that historical roles retain their meaning and each achievement belongs to the correct employer and dates. A normalized section must not imply tailoring or relevance to a Job Posting.',
 ].join(' ')
