@@ -48,7 +48,7 @@ export function mergeRecordedRuns({ recordedRun, runs }: Readonly<{
 
 export function renderRecordedRunsModule({ runs }: Readonly<{ runs: readonly RecordedModelEvaluationRun[] }>) {
   return [
-    "import type { ModelQualificationReport, RecordedModelEvaluationRun } from './model-qualification'",
+    "import type { RecordedModelEvaluationRun } from './model-qualification'",
     '',
     '// Written by `pnpm test:evaluation:record <candidate>`: one run per Qualified Model Configuration candidate.',
     `export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRun[] = ${JSON.stringify(runs, null, 2)}`,
@@ -69,6 +69,14 @@ export function renderQualificationReport({ recordedRun, report }: Readonly<{
 }
 
 /** Every setting but the prices, which weigh the evaluated cost and are no setting of the configuration. */
+// A configuration is the same whatever order its fields were written in, so its identity sorts them at every level.
 function readConfigurationIdentity({ configuration }: RecordedModelEvaluationRun) {
-  return JSON.stringify(Object.entries(configuration).filter(([name]) => name !== 'pricing'))
+  return JSON.stringify(sortFields(Object.fromEntries(Object.entries(configuration).filter(([name]) => name !== 'pricing'))))
+}
+
+function sortFields(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortFields)
+  if (typeof value !== 'object' || value === null) return value
+  return Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, field]) => [name, sortFields(field)]))
 }

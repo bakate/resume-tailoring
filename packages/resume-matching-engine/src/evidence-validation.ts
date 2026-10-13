@@ -65,8 +65,8 @@ export function validateAdjacentEvidence({
   for (const proposal of proposedAdjacentEvidence) {
     if (adjacentEvidenceByRequirementId.has(proposal.requirementId)
       || !requirementIds.has(proposal.requirementId)) continue
-    const factIds = proposal.factMatches.map(({ factId }) => factId)
-    if (factIds.length === 0 || new Set(factIds).size !== factIds.length) continue
+    const factIds = readDistinctCitedFactIds({ factMatches: proposal.factMatches })
+    if (factIds === null) continue
     if (!proposal.factMatches.every(({ factExcerpt, factId }) => {
       const fact = candidateFactById.get(factId)
       return fact !== undefined && containsTerm({ content: fact.value, term: factExcerpt })
@@ -85,10 +85,8 @@ function validateEvidenceProposal({ candidateFactById, proposal, requirementById
   requirementById: ReadonlyMap<string, JobRequirement>
 }>): MatchEvidence | null {
   const requirement = requirementById.get(proposal.requirementId)
-  const factIds = proposal.factMatches.map(({ factId }) => factId)
-  if (requirement === undefined || factIds.length === 0 || new Set(factIds).size !== factIds.length) {
-    return null
-  }
+  const factIds = readDistinctCitedFactIds({ factMatches: proposal.factMatches })
+  if (requirement === undefined || factIds === null) return null
   const supports = proposal.factMatches.map((factMatch) => {
     const fact = candidateFactById.get(factMatch.factId)
     return fact === undefined ? null : readEvidenceSupport({ fact, factMatch, requirement })
@@ -101,6 +99,16 @@ function validateEvidenceProposal({ candidateFactById, proposal, requirementById
     factIds,
     requirementId: proposal.requirementId,
   }
+}
+
+// One Candidate Fact may be cited through several distinct excerpts, since an excerpt never joins words across a gap;
+// the evidence then names that fact once. A proposal citing nothing, or repeating one citation, is discarded.
+function readDistinctCitedFactIds({ factMatches }: Readonly<{
+  factMatches: ProposedAdjacentEvidence['factMatches'] | ProposedMatchEvidence['factMatches']
+}>) {
+  const citations = new Set(factMatches.map((factMatch) => JSON.stringify(factMatch)))
+  if (factMatches.length === 0 || citations.size !== factMatches.length) return null
+  return [...new Set(factMatches.map(({ factId }) => factId))]
 }
 
 type RequirementProofInput = Readonly<{

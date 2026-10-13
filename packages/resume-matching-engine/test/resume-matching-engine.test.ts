@@ -404,7 +404,7 @@ describe('resume matching engine', () => {
     })
   })
 
-  it('rejects a proposal that cites the same Candidate Fact twice for one requirement', () => {
+  it('rejects a proposal that repeats one citation of a Candidate Fact for one requirement', () => {
     const [proposal] = reformulatedCapabilityInputs.proposedEvidence
     const result = analyzeResumeMatch({
       ...reformulatedCapabilityInputs,
@@ -414,6 +414,37 @@ describe('resume matching engine', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.value).toMatchObject({ evidence: [], matchScore: 0 })
+  })
+
+  it('covers a requirement from distinct excerpts of one Candidate Fact, citing that fact once', () => {
+    const result = analyzeResumeMatch({
+      candidateFacts: [{
+        id: 'fact-tests', kind: 'experience',
+        value: 'Introduced Playwright end-to-end tests and Vitest unit tests in the CI pipeline',
+      }],
+      proposedEvidence: [{
+        coverage: 'covered',
+        factMatches: [
+          { factExcerpt: 'Playwright end-to-end tests', factId: 'fact-tests', requirementExcerpt: 'automated tests' },
+          { factExcerpt: 'Vitest unit tests', factId: 'fact-tests', requirementExcerpt: 'automated tests' },
+        ],
+        requirementId: 'requirement-tests',
+      }],
+      requirements: [{
+        capability: { dimension: 'execution', name: 'Automated testing' },
+        id: 'requirement-tests',
+        importance: 'central',
+        sourceExcerpt: 'Write automated tests.',
+        value: 'Write automated tests',
+      }],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value).toMatchObject({
+      evidence: [{ coverage: 'covered', factIds: ['fact-tests'], requirementId: 'requirement-tests' }],
+      matchScore: 100,
+    })
   })
 
   it('calculates a Match Analysis from importance-weighted evidence coverage', () => {
@@ -597,7 +628,7 @@ describe('resume matching engine', () => {
       requirementId: 'requirement-unknown',
     },
     {
-      case: 'a Candidate Fact cited twice',
+      case: 'one citation of a Candidate Fact repeated',
       factMatches: [
         { factExcerpt: 'React', factId: 'fact-react' },
         { factExcerpt: 'React', factId: 'fact-react' },
@@ -625,6 +656,20 @@ describe('resume matching engine', () => {
     expect(result.value.adjacentEvidence).toEqual([
       { factIds: ['fact-react', 'fact-typescript'], requirementId: 'requirement-java-stack' },
     ])
+  })
+
+  it('reports Adjacent Evidence from distinct excerpts of one Candidate Fact, citing that fact once', () => {
+    const result = analyzeResumeMatch({
+      ...adjacentStackInputs,
+      proposedAdjacentEvidence: [{
+        factMatches: [{ factExcerpt: 'React', factId: 'fact-react' }, { factExcerpt: 'customer dashboards', factId: 'fact-react' }],
+        requirementId: 'requirement-java-stack',
+      }],
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.adjacentEvidence).toEqual([{ factIds: ['fact-react'], requirementId: 'requirement-java-stack' }])
   })
 })
 

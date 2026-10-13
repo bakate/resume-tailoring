@@ -44,9 +44,20 @@ describe('recording a Qualified Model Configuration candidate', () => {
     expect(runs).toEqual([other, rerun])
   })
 
+  it('replaces the run of the same configuration whatever order its fields were written in', () => {
+    const { role, pricing, ...rest } = structured
+    const reordered = { ...run, configuration: { pricing, role, ...rest } as ModelConfiguration }
+    const rerun = { ...run, recordedAt: '2026-10-13T10:00:00.000Z' }
+
+    const runs = mergeRecordedRuns({ recordedRun: rerun, runs: [reordered] })
+
+    expect(runs).toEqual([rerun])
+  })
+
   it('writes the runs as the module qualification reads', () => {
     const module = renderRecordedRunsModule({ runs: [run] })
 
+    expect(module.startsWith("import type { RecordedModelEvaluationRun } from './model-qualification'\n")).toBe(true)
     expect(module).toContain('export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRun[] = [')
     expect(module).toContain('"recordedAt": "2026-10-12T10:00:00.000Z"')
     expect(module.endsWith('\n')).toBe(true)

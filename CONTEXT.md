@@ -115,7 +115,7 @@ The scoring unit formed by semantically duplicate or explicitly substitutable Jo
 _Avoid_: Requirement cluster, keyword bucket
 
 **Requirement Coverage**:
-The evidence-backed assessment of a Job Requirement as covered, partially covered, or not covered. A requirement is covered when Candidate Facts show the same capability, even in different words. It is partially covered when the same capability appears at incomplete scope, or when a behavioral capability is only implied by a role's responsibilities. A related but distinct capability, such as another technology in the same domain, leaves the requirement not covered. These states contribute respectively all, half, or none of the requirement's effective weight to the Match Score.
+The evidence-backed assessment of a Job Requirement as covered, partially covered, or not covered. A requirement is covered when Candidate Facts show the same capability, even in different words. Duties a requirement lists together name one capability, so a fact showing that capability covers it without restating each duty; scope means an explicit duration, scale, level, seniority, or production constraint. It is partially covered when the same capability appears at incomplete scope, or when a behavioral capability is only implied by a role's responsibilities. A related but distinct capability, such as another technology in the same domain or another version of the requested one, leaves the requirement not covered. These states contribute respectively all, half, or none of the requirement's effective weight to the Match Score.
 _Avoid_: Model confidence, keyword equality
 
 **Match Evidence**:
@@ -123,7 +123,7 @@ The explicit relationship between one covered or partially covered Job Requireme
 _Avoid_: Keyword match, invented match
 
 **Adjacent Evidence**:
-A Candidate Fact showing a related but distinct capability for an uncovered Job Requirement, such as another technology in the same domain. It is shown to the Candidate alongside the gap, never changes Requirement Coverage or the Match Score, and never lets the Tailored Resume claim the requested capability.
+A Candidate Fact showing a related but distinct capability for an uncovered Job Requirement, such as another technology in the same domain or another version of the requested one. It is shown to the Candidate alongside the gap, never changes Requirement Coverage or the Match Score, and never lets the Tailored Resume claim the requested capability.
 _Avoid_: Partial coverage, transferable proof
 
 **Match Score**:

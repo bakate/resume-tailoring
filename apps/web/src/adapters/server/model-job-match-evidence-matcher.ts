@@ -119,6 +119,7 @@ const matchingInstructions = [
   untrustedContentInstruction,
   ...requirementCoverageInstructions,
   'List a related but distinct capability in adjacentEvidence instead, with the requirementId and, for each Candidate Fact, a short contiguous factExcerpt copied verbatim from that fact. Adjacent Evidence never counts as coverage; omit it for covered or partially covered requirements.',
+  'Check every not-covered requirement for Adjacent Evidence, one technology at a time, each in its own entry: another programming language is adjacent to a required language and another framework to a required framework, so a fact naming Go and Vue is adjacent both to a Kotlin requirement and to a Svelte one.',
   'Return relevance links for Candidate Facts relevant enough to support an honest Tailored Resume, with the same verbatim excerpts.',
   'Never calculate a score, importance, Match Band, or Generation Eligibility.',
   'Never invent identifiers, facts, requirements, or evidence.',
