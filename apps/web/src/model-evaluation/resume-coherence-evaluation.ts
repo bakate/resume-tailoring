@@ -56,12 +56,13 @@ export const resumeCoherenceSource: ModelObservationSource = {
       if (!result.ok) throw new Error(`The coherence check of ${id} failed: ${result.error.type}`)
       const flagged = result.value.issues.some(({ fieldId, kind }) => fieldId === valuePropositionFieldId
         && kind === 'mixed-association')
-      observations.push(mixesEmployers
-        ? createModelEvaluationObservation({ fixtureId: id, extractionExpectedCount: 1, extractionMatchedCount: Number(flagged),
-          unsupportedResumeClaimCount: Number(!flagged), observedValues: flagged ? []
-            : ['failed:the coherence check flags the Value Proposition as a mixed association'] })
-        : createModelEvaluationObservation({ fixtureId: id, extractionExpectedCount: 1, extractionMatchedCount: Number(!flagged),
-          observedValues: flagged ? ['failed:the coherence check leaves the faithful Value Proposition unflagged'] : [] }))
+      const judgedRight = flagged === mixesEmployers
+      observations.push(createModelEvaluationObservation({ fixtureId: id,
+        extractionExpectedCount: 1, extractionMatchedCount: Number(judgedRight),
+        unsupportedResumeClaimCount: Number(mixesEmployers && !flagged),
+        observedValues: judgedRight ? [] : [`failed:${mixesEmployers
+          ? 'the coherence check flags the Value Proposition as a mixed association'
+          : 'the coherence check leaves the faithful Value Proposition unflagged'}`] }))
     }
     return observations
   },

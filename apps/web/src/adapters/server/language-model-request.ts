@@ -70,6 +70,12 @@ export type ModelCallMeasurement = Readonly<{
 
 export type ConformanceRetry = 'retried' | 'retry-skipped'
 
+/** What privacy-safe telemetry and qualification observations call each conformance retry event. */
+export const conformanceRetryNames = {
+  retried: 'conformance-retry',
+  'retry-skipped': 'conformance-retry-skipped',
+} as const satisfies Record<ConformanceRetry, string>
+
 /**
  * What an operation adapter needs to reach a model. Qualification may also hand it the providers to choose from and
  * an observer of every call; production uses neither and reaches only the providers listed below.
@@ -139,7 +145,7 @@ async function sendModelRequest({ apiKey, configuration, details, now, provider,
   now: () => number
   provider: LanguageModelProviderAdapter<LanguageModelProvider>
   request: typeof fetch
-}>): Promise<ConformingModelRequestResult> {
+}>): Promise<ModelRequestOutcome> {
   const settings = readModelOperationSettings({ configuration, operation: details.operation })
   const deadline = createOperationDeadline({ deadlineMilliseconds: settings.deadlineMilliseconds })
   try {
@@ -161,12 +167,13 @@ function createOperationDeadline({ deadlineMilliseconds }: Readonly<{ deadlineMi
 
 type ModelCall = Parameters<typeof sendAttempt>[0]
 
-type ConformingModelRequestResult = Readonly<{ conformance?: ConformanceRetry; result: ModelRequestResult }>
+/** A request's result, and whether its first answer needed a conformance retry. */
+type ModelRequestOutcome = Readonly<{ conformance?: ConformanceRetry; result: ModelRequestResult }>
 
 async function sendConformingModelRequest({ call, deadlineMilliseconds }: Readonly<{
   call: ModelCall
   deadlineMilliseconds: number
-}>): Promise<ConformingModelRequestResult> {
+}>): Promise<ModelRequestOutcome> {
   const { configuration, details, now, provider } = call
   const startedAtMilliseconds = now()
   const first = await sendAttempt(call)
@@ -177,7 +184,8 @@ async function sendConformingModelRequest({ call, deadlineMilliseconds }: Readon
   }
   const elapsedMilliseconds = now() - startedAtMilliseconds
   const canRetry = deadlineMilliseconds - elapsedMilliseconds >= elapsedMilliseconds
-  recordConformanceRetry({ cause: nonConformance, configuration, operation: details.operation, retried: canRetry })
+  recordConformanceRetry({ cause: nonConformance, configuration, operation: details.operation,
+    retry: canRetry ? 'retried' : 'retry-skipped' })
   if (!canRetry) return { conformance: 'retry-skipped', result: { ok: true, value: createModelResponse(first.value) } }
   const retry = await sendAttempt(call)
   return { conformance: 'retried', result: retry.ok ? { ok: true, value: createModelResponse({ ...retry.value,
@@ -242,14 +250,14 @@ function readNonConformance({ answer, outputSchema }: Readonly<{ answer: ModelAn
   return outputSchema.safeParse(value).success ? null : 'invalid-schema'
 }
 
-function recordConformanceRetry({ cause, configuration, operation, retried }: Readonly<{
+function recordConformanceRetry({ cause, configuration, operation, retry }: Readonly<{
   cause: NonConformance
   configuration: LanguageModelConfiguration
   operation: ModelOperation
-  retried: boolean
+  retry: ConformanceRetry
 }>) {
   console.info(JSON.stringify({ category: 'privacy-safe-model-request',
-    metric: retried ? 'conformance-retry' : 'conformance-retry-skipped', value: 1,
+    metric: conformanceRetryNames[retry], value: 1,
     dimensions: { cause, operation, provider: configuration.provider } }))
 }
 

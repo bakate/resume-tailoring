@@ -173,6 +173,35 @@ describe('model operations', () => {
     })
   })
 
+  it('holds each operation\'s p95 to its own deadline when the threshold says so, naming every operation beyond it', () => {
+    const calls = [
+      callObservation({ latencyMilliseconds: 95_000, operation: 'explainable-match-evidence' }),
+      callObservation({ latencyMilliseconds: 1_000, operation: 'structured-source-profile-extraction' }),
+    ]
+
+    const report = qualifyModelConfiguration({ thresholds: { ...thresholds, p95LatencyMilliseconds: 'operation-deadline' },
+      recordedRun: { ...recordedRun, observations: [...observations, ...calls] } })
+
+    expect(report.gates.p95LatencyMilliseconds).toEqual({ passed: false, threshold: 'operation-deadline',
+      exceededOperations: ['explainable-match-evidence'] })
+  })
+
+  it('passes the per-operation latency gate when every operation answers within its deadline', () => {
+    const calls = [callObservation({ latencyMilliseconds: 89_000, operation: 'explainable-match-evidence' })]
+
+    const report = qualifyModelConfiguration({ thresholds: { ...thresholds, p95LatencyMilliseconds: 'operation-deadline' },
+      recordedRun: { ...recordedRun, observations: [...observations, ...calls] } })
+
+    expect(report.gates.p95LatencyMilliseconds).toEqual({ passed: true, threshold: 'operation-deadline', exceededOperations: [] })
+  })
+
+  it('leaves the per-operation latency gate unmeasured, so unpassed, when no model call was observed', () => {
+    const report = qualifyModelConfiguration({ thresholds: { ...thresholds, p95LatencyMilliseconds: 'operation-deadline' },
+      recordedRun })
+
+    expect(report.gates.p95LatencyMilliseconds).toEqual({ passed: false, status: 'not-measured' })
+  })
+
   it('leaves the operation summary empty when no observation is a model call', () => {
     const report = qualifyModelConfiguration({ thresholds, recordedRun })
 

@@ -1,4 +1,4 @@
-import type { ModelCallMeasurement, ModelConnection } from '../adapters/server/language-model-request'
+import { conformanceRetryNames, type ModelCallMeasurement, type ModelConnection } from '../adapters/server/language-model-request'
 import type { LanguageModelConfiguration, ModelRole } from '../language-model-configuration'
 import {
   qualifyModelConfiguration,
@@ -162,12 +162,6 @@ function readCallObservations({ calls, sourceId }: Readonly<{
   return calls.map(({ conformance, latencyMilliseconds, operation, outcome, usage }, callIndex) => createModelEvaluationObservation({
     fixtureId: `${sourceId}:call-${String(callIndex + 1)}:${operation}`, latencyMilliseconds, operation,
     inputTokens: usage?.inputTokens ?? 0, outputTokens: usage?.outputTokens ?? 0,
-    observedValues: [outcome, ...conformance === undefined ? [] : [conformanceObservedValues[conformance]]],
+    observedValues: [outcome, ...conformance === undefined ? [] : [conformanceRetryNames[conformance]]],
   }))
 }
-
-/** The names the call wrapper's privacy-safe telemetry gives the same events. */
-const conformanceObservedValues = {
-  retried: 'conformance-retry',
-  'retry-skipped': 'conformance-retry-skipped',
-} as const satisfies Record<NonNullable<ModelCallMeasurement['conformance']>, string>

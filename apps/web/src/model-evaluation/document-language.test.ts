@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ProfessionalResumeDocument } from '@resume-tailoring/application/candidate-journey'
 
-import { checkDocumentLanguage } from './document-language'
+import { checkDocumentLanguage, countDocumentLanguageChecks } from './document-language'
 
 describe('the language a prepared document is written in', () => {
   it('passes every prose field written in the requested language', () => {
@@ -30,6 +30,33 @@ describe('the language a prepared document is written in', () => {
     const checks = checkDocumentLanguage({ document, locale })
 
     expect(checks.filter(({ passed }) => !passed)).toEqual([failed])
+  })
+
+  it('counts a missing document as one failed language check', () => {
+    const document = null
+
+    const counts = countDocumentLanguageChecks({ document, locale: 'fr' })
+
+    expect(counts).toEqual({ checkCount: 1, failed: ['no document was prepared'], passedCount: 0 })
+  })
+
+  it('counts nothing for a prepared document whose prose is too short to tell, never a failed check', () => {
+    const document = createDocument({ achievements: ['TypeScript, React, Node.js'] })
+
+    const counts = countDocumentLanguageChecks({ document, locale: 'fr' })
+
+    expect(counts).toEqual({ checkCount: 0, failed: [], passedCount: 0 })
+  })
+
+  it('counts each checked field of a prepared document and names the failed ones', () => {
+    const document = createDocument({ achievements: [
+      'Conception et développement d\'une plateforme de paiement avec TypeScript pour les équipes produit',
+      'Built the end-to-end test suite for the payments platform and ran it in the CI pipeline',
+    ] })
+
+    const counts = countDocumentLanguageChecks({ document, locale: 'fr' })
+
+    expect(counts).toEqual({ checkCount: 2, failed: ['achievement-1 is written in fr'], passedCount: 1 })
   })
 
   it('skips fields too short or too neutral to tell, such as a list of tools', () => {

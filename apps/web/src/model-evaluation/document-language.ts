@@ -26,6 +26,20 @@ export function checkDocumentLanguage({ document, locale }: Readonly<{
   })
 }
 
+/**
+ * Multilingual fidelity counts for one preparation. No document is one failed check; a prepared document counts only
+ * the fields long enough to tell, so prose too short to read is never a failure.
+ */
+export function countDocumentLanguageChecks({ document, locale }: Readonly<{
+  document: ProfessionalResumeDocument | null
+  locale: TailoredResumeLocale
+}>) {
+  if (document === null) return { checkCount: 1, failed: ['no document was prepared'], passedCount: 0 }
+  const checks = checkDocumentLanguage({ document, locale })
+  return { checkCount: checks.length, failed: checks.filter(({ passed }) => !passed).map(({ name }) => name),
+    passedCount: checks.filter(({ passed }) => passed).length }
+}
+
 function countFunctionWords({ language, words }: Readonly<{ language: TailoredResumeLocale; words: readonly string[] }>) {
   return words.filter((word) => functionWords[language].has(word)).length
 }

@@ -68,9 +68,54 @@
     },
     "p95LatencyMilliseconds": {
       "passed": true,
-      "threshold": 45000,
-      "value": 8834
+      "threshold": "operation-deadline",
+      "exceededOperations": []
     }
   },
-  "qualified": true
+  "qualified": true,
+  "costUsdByPriceCondition": {
+    "standard": 0.0653632
+  },
+  "operations": {
+    "explainable-job-posting-extraction": {
+      "callCount": 28,
+      "conformanceRetryCount": 0,
+      "conformanceRetrySkippedCount": 0,
+      "conformanceRetryRate": 0,
+      "deadlineMilliseconds": 90000,
+      "p95LatencyMilliseconds": 9486
+    },
+    "explainable-match-evidence": {
+      "callCount": 22,
+      "conformanceRetryCount": 0,
+      "conformanceRetrySkippedCount": 0,
+      "conformanceRetryRate": 0,
+      "deadlineMilliseconds": 90000,
+      "p95LatencyMilliseconds": 15331
+    },
+    "resume-document-coherence": {
+      "callCount": 5,
+      "conformanceRetryCount": 0,
+      "conformanceRetrySkippedCount": 0,
+      "conformanceRetryRate": 0,
+      "deadlineMilliseconds": 90000,
+      "p95LatencyMilliseconds": 5617
+    },
+    "resume-section-validation": {
+      "callCount": 52,
+      "conformanceRetryCount": 0,
+      "conformanceRetrySkippedCount": 0,
+      "conformanceRetryRate": 0,
+      "deadlineMilliseconds": 90000,
+      "p95LatencyMilliseconds": 6097
+    },
+    "structured-source-profile-extraction": {
+      "callCount": 3,
+      "conformanceRetryCount": 0,
+      "conformanceRetrySkippedCount": 0,
+      "conformanceRetryRate": 0,
+      "deadlineMilliseconds": 90000,
+      "p95LatencyMilliseconds": 7280
+    }
+  }
 }

@@ -8,10 +8,11 @@ import { resumeCoherenceFixtures, resumeCoherenceSource } from './resume-coheren
 // Candidate Facts, so field validation accepts it, and the coherence check is the only net. It must flag the mixed
 // association in English and in French, and leave the faithful proposition alone.
 describe('a cross-employer Value Proposition, checked live', () => {
-  it('checks two mixed Value Propositions and one faithful one', () => {
-    const mixed = resumeCoherenceFixtures.filter(({ mixesEmployers }) => mixesEmployers)
+  it('checks a mixed Value Proposition in English and in French, and one faithful one', () => {
+    const fixtures = resumeCoherenceFixtures
 
-    expect(mixed.map(({ document }) => document.locale)).toEqual(['en', 'fr'])
+    expect(fixtures.map(({ document, mixesEmployers }) => [document.locale, mixesEmployers]))
+      .toEqual([['en', true], ['fr', true], ['en', false]])
   })
 
   it('flags each mixed association and spares the faithful proposition', async () => {

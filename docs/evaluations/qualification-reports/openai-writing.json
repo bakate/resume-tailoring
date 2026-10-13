@@ -56,5 +56,18 @@
       "value": 9782
     }
   },
-  "qualified": true
+  "qualified": true,
+  "costUsdByPriceCondition": {
+    "standard": 0.067731
+  },
+  "operations": {
+    "resume-section-writing": {
+      "callCount": 65,
+      "conformanceRetryCount": 0,
+      "conformanceRetrySkippedCount": 0,
+      "conformanceRetryRate": 0,
+      "deadlineMilliseconds": 90000,
+      "p95LatencyMilliseconds": 8152
+    }
+  }
 }

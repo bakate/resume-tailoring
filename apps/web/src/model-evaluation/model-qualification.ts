@@ -1,3 +1,4 @@
+import { conformanceRetryNames } from '../adapters/server/language-model-request'
 import {
   readModelOperationSettings,
   type LanguageModelConfiguration,
@@ -60,7 +61,11 @@ export type ModelEvaluationThresholds = Readonly<{
   costUsd?: number
   extractionRecall?: number
   multilingualFidelity?: number
-  p95LatencyMilliseconds?: number
+  /**
+   * One ceiling for every latency observed, or `operation-deadline`: each operation's p95 within that operation's own
+   * qualified deadline, the calls of the configuration under test alone.
+   */
+  p95LatencyMilliseconds?: number | 'operation-deadline'
 }>
 
 export type CalibratedGate = Readonly<{ passed: boolean; threshold: number; value: number }>
@@ -72,6 +77,12 @@ type UncalibratedGate = Readonly<{
 /** A gate nothing observed: it cannot fail, so it never passes. */
 type UnmeasuredGate = Readonly<{ passed: false; status: 'not-measured' }>
 type Gate = CalibratedGate | UncalibratedGate | UnmeasuredGate
+/** Every operation's p95 within its own deadline; the operations report holds each p95 and deadline. */
+type OperationDeadlineGate = Readonly<{
+  passed: boolean
+  threshold: 'operation-deadline'
+  exceededOperations: readonly ModelOperation[]
+}>
 
 /** One operation's calls by the configuration under test, reported beside the gates. */
 export type ModelOperationReport = Readonly<{
@@ -97,7 +108,7 @@ export type ModelQualificationReport = Readonly<{
     costUsd: Gate
     extractionRecall: CalibratedGate | UncalibratedGate
     multilingualFidelity: Gate
-    p95LatencyMilliseconds: CalibratedGate | UncalibratedGate
+    p95LatencyMilliseconds: CalibratedGate | UncalibratedGate | OperationDeadlineGate | UnmeasuredGate
     provenanceSafety: Readonly<{
       passed: boolean
       coveredTrapCount: number
@@ -116,14 +127,17 @@ export function qualifyModelConfiguration({ recordedRun, thresholds }: Readonly<
   thresholds: ModelEvaluationThresholds
 }>): ModelQualificationReport {
   const { companion, configuration, datasetId, observations } = recordedRun
+  const operations = readOperationReports({ configuration, observations })
   const gates = {
     provenanceSafety: createProvenanceSafetyGate({ observations }),
     extractionRecall: createMinimumGate({ threshold: thresholds.extractionRecall, value: calculateObservationRatio({
       observations, matchedProperty: 'extractionMatchedCount', totalProperty: 'extractionExpectedCount' }) }),
     multilingualFidelity: createMultilingualFidelityGate({ observations, threshold: thresholds.multilingualFidelity }),
     costUsd: createCostGate({ companion, configuration, observations, threshold: thresholds.costUsd }),
-    p95LatencyMilliseconds: createMaximumGate({ threshold: thresholds.p95LatencyMilliseconds,
-      value: calculateP95({ values: observations.map(({ latencyMilliseconds }) => latencyMilliseconds) }) }),
+    p95LatencyMilliseconds: thresholds.p95LatencyMilliseconds === 'operation-deadline'
+      ? createOperationDeadlineGate({ operations })
+      : createMaximumGate({ threshold: thresholds.p95LatencyMilliseconds,
+        value: calculateP95({ values: observations.map(({ latencyMilliseconds }) => latencyMilliseconds) }) }),
   }
   return {
     configuration,
@@ -131,7 +145,7 @@ export function qualifyModelConfiguration({ recordedRun, thresholds }: Readonly<
     datasetId,
     gates,
     observations,
-    operations: readOperationReports({ configuration, observations }),
+    operations,
     qualified: Object.values(gates).every(({ passed }) => passed),
   }
 }
@@ -148,6 +162,17 @@ function readCostByPriceCondition({ companion, configuration, observations }: Re
   }))
 }
 
+function createOperationDeadlineGate({ operations }: Readonly<{
+  operations: Readonly<Partial<Record<ModelOperation, ModelOperationReport>>>
+}>): OperationDeadlineGate | UnmeasuredGate {
+  const reports = Object.entries(operations) as [ModelOperation, ModelOperationReport][]
+  if (reports.length === 0) return unmeasuredGate
+  const exceededOperations = reports
+    .filter(([, { deadlineMilliseconds, p95LatencyMilliseconds }]) => p95LatencyMilliseconds > deadlineMilliseconds)
+    .map(([operation]) => operation)
+  return { passed: exceededOperations.length === 0, threshold: 'operation-deadline', exceededOperations }
+}
+
 function readOperationReports({ configuration, observations }: Readonly<{
   configuration: ModelConfiguration
   observations: readonly ModelEvaluationObservation[]
@@ -160,8 +185,8 @@ function readOperationReports({ configuration, observations }: Readonly<{
   return Object.fromEntries([...callsByOperation].sort(([left], [right]) => left.localeCompare(right))
     .map(([operation, calls]) => {
       const count = (value: string) => calls.filter(({ observedValues }) => observedValues.includes(value)).length
-      const conformanceRetryCount = count('conformance-retry')
-      const conformanceRetrySkippedCount = count('conformance-retry-skipped')
+      const conformanceRetryCount = count(conformanceRetryNames.retried)
+      const conformanceRetrySkippedCount = count(conformanceRetryNames['retry-skipped'])
       return [operation, {
         callCount: calls.length,
         conformanceRetryCount,

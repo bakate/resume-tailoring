@@ -162,7 +162,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 168,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-1:resume-section-writing"
+        "fixtureId": "cross-segment-writing:call-1:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -176,7 +177,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 295,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-2:resume-section-writing"
+        "fixtureId": "cross-segment-writing:call-2:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -190,7 +192,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 163,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-3:resume-section-writing"
+        "fixtureId": "cross-segment-writing:call-3:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -204,7 +207,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 175,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-4:resume-section-writing"
+        "fixtureId": "cross-segment-writing:call-4:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -218,7 +222,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 145,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-5:resume-section-writing"
+        "fixtureId": "cross-segment-writing:call-5:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -232,7 +237,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 192,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-6:resume-section-writing"
+        "fixtureId": "cross-segment-writing:call-6:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -246,7 +252,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 147,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-7:resume-section-writing"
+        "fixtureId": "cross-segment-writing:call-7:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -260,7 +267,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 264,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-8:resume-section-writing"
+        "fixtureId": "cross-segment-writing:call-8:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -274,7 +282,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 184,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-9:resume-section-writing"
+        "fixtureId": "cross-segment-writing:call-9:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -288,7 +297,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 322,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-10:resume-section-writing"
+        "fixtureId": "cross-segment-writing:call-10:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -302,7 +312,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 265,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-11:resume-section-writing"
+        "fixtureId": "cross-segment-writing:call-11:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 1,
@@ -921,7 +932,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 447,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-1:resume-section-writing"
+        "fixtureId": "section-preparation:call-1:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -935,7 +947,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 434,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-2:resume-section-writing"
+        "fixtureId": "section-preparation:call-2:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -949,7 +962,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 492,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-3:resume-section-writing"
+        "fixtureId": "section-preparation:call-3:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -963,7 +977,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 479,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-4:resume-section-writing"
+        "fixtureId": "section-preparation:call-4:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -977,7 +992,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 194,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-5:resume-section-writing"
+        "fixtureId": "section-preparation:call-5:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -991,7 +1007,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 195,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-6:resume-section-writing"
+        "fixtureId": "section-preparation:call-6:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1005,7 +1022,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 207,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-7:resume-section-writing"
+        "fixtureId": "section-preparation:call-7:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1019,7 +1037,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 196,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-8:resume-section-writing"
+        "fixtureId": "section-preparation:call-8:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1033,7 +1052,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 130,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-9:resume-section-writing"
+        "fixtureId": "section-preparation:call-9:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1047,7 +1067,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 143,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-10:resume-section-writing"
+        "fixtureId": "section-preparation:call-10:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1061,7 +1082,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 205,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-11:resume-section-writing"
+        "fixtureId": "section-preparation:call-11:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1075,7 +1097,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 145,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-12:resume-section-writing"
+        "fixtureId": "section-preparation:call-12:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1089,7 +1112,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 1101,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-13:resume-section-writing"
+        "fixtureId": "section-preparation:call-13:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1103,7 +1127,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 1068,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-14:resume-section-writing"
+        "fixtureId": "section-preparation:call-14:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1117,7 +1142,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 1124,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-15:resume-section-writing"
+        "fixtureId": "section-preparation:call-15:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1131,7 +1157,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 453,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-16:resume-section-writing"
+        "fixtureId": "section-preparation:call-16:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1145,7 +1172,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 438,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-17:resume-section-writing"
+        "fixtureId": "section-preparation:call-17:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1159,7 +1187,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 476,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-18:resume-section-writing"
+        "fixtureId": "section-preparation:call-18:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1173,7 +1202,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 551,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-19:resume-section-writing"
+        "fixtureId": "section-preparation:call-19:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1187,7 +1217,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 192,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-20:resume-section-writing"
+        "fixtureId": "section-preparation:call-20:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1201,7 +1232,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 200,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-21:resume-section-writing"
+        "fixtureId": "section-preparation:call-21:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1215,7 +1247,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 196,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-22:resume-section-writing"
+        "fixtureId": "section-preparation:call-22:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1229,7 +1262,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 219,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-23:resume-section-writing"
+        "fixtureId": "section-preparation:call-23:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1243,7 +1277,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 139,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-24:resume-section-writing"
+        "fixtureId": "section-preparation:call-24:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1257,7 +1292,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 174,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-25:resume-section-writing"
+        "fixtureId": "section-preparation:call-25:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1271,7 +1307,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 220,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-26:resume-section-writing"
+        "fixtureId": "section-preparation:call-26:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1285,7 +1322,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 145,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-27:resume-section-writing"
+        "fixtureId": "section-preparation:call-27:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1299,7 +1337,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 1219,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-28:resume-section-writing"
+        "fixtureId": "section-preparation:call-28:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1313,7 +1352,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 414,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-29:resume-section-writing"
+        "fixtureId": "section-preparation:call-29:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1327,7 +1367,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 425,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-30:resume-section-writing"
+        "fixtureId": "section-preparation:call-30:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1341,7 +1382,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 490,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-31:resume-section-writing"
+        "fixtureId": "section-preparation:call-31:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1355,7 +1397,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 483,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-32:resume-section-writing"
+        "fixtureId": "section-preparation:call-32:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1369,7 +1412,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 194,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-33:resume-section-writing"
+        "fixtureId": "section-preparation:call-33:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1383,7 +1427,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 195,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-34:resume-section-writing"
+        "fixtureId": "section-preparation:call-34:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1397,7 +1442,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 173,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-35:resume-section-writing"
+        "fixtureId": "section-preparation:call-35:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1411,7 +1457,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 238,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-36:resume-section-writing"
+        "fixtureId": "section-preparation:call-36:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1425,7 +1472,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 131,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-37:resume-section-writing"
+        "fixtureId": "section-preparation:call-37:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1439,7 +1487,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 111,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-38:resume-section-writing"
+        "fixtureId": "section-preparation:call-38:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1453,7 +1502,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 145,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-39:resume-section-writing"
+        "fixtureId": "section-preparation:call-39:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1467,7 +1517,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 230,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-40:resume-section-writing"
+        "fixtureId": "section-preparation:call-40:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1481,7 +1532,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 967,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-41:resume-section-writing"
+        "fixtureId": "section-preparation:call-41:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 2,
@@ -1563,7 +1615,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 356,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-1:resume-section-writing"
+        "fixtureId": "front-end-audit:call-1:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1577,7 +1630,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 365,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-2:resume-section-writing"
+        "fixtureId": "front-end-audit:call-2:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1591,7 +1645,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 368,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-3:resume-section-writing"
+        "fixtureId": "front-end-audit:call-3:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1605,7 +1660,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 547,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-4:resume-section-writing"
+        "fixtureId": "front-end-audit:call-4:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1619,7 +1675,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 403,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-5:resume-section-writing"
+        "fixtureId": "front-end-audit:call-5:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1633,7 +1690,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 813,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-6:resume-section-writing"
+        "fixtureId": "front-end-audit:call-6:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1647,7 +1705,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 640,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-7:resume-section-writing"
+        "fixtureId": "front-end-audit:call-7:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1661,7 +1720,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 767,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-8:resume-section-writing"
+        "fixtureId": "front-end-audit:call-8:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1675,7 +1735,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 78,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-9:resume-section-writing"
+        "fixtureId": "front-end-audit:call-9:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1689,7 +1750,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 114,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-10:resume-section-writing"
+        "fixtureId": "front-end-audit:call-10:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1703,7 +1765,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 143,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-11:resume-section-writing"
+        "fixtureId": "front-end-audit:call-11:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1717,7 +1780,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 239,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-12:resume-section-writing"
+        "fixtureId": "front-end-audit:call-12:resume-section-writing",
+        "operation": "resume-section-writing"
       },
       {
         "extractionExpectedCount": 0,
@@ -1731,7 +1795,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 707,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-13:resume-section-writing"
+        "fixtureId": "front-end-audit:call-13:resume-section-writing",
+        "operation": "resume-section-writing"
       }
     ],
     "recordedAt": "2026-10-13T07:01:05.262Z"
@@ -1862,7 +1927,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 335,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "job-posting-extraction:call-1:explainable-job-posting-extraction"
+        "fixtureId": "job-posting-extraction:call-1:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -1876,7 +1942,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 509,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "job-posting-extraction:call-2:explainable-job-posting-extraction"
+        "fixtureId": "job-posting-extraction:call-2:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -1890,7 +1957,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 365,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "job-posting-extraction:call-3:explainable-job-posting-extraction"
+        "fixtureId": "job-posting-extraction:call-3:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 2,
@@ -2128,7 +2196,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 294,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-1:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-1:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2142,7 +2211,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 203,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-2:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-2:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2156,7 +2226,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 236,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-3:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-3:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2170,7 +2241,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 120,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-4:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-4:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2184,7 +2256,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 120,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-5:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-5:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2198,7 +2271,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 97,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-6:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-6:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2212,7 +2286,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 185,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-7:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-7:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2226,7 +2301,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 134,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-8:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-8:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2240,7 +2316,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 158,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-9:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-9:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2254,7 +2331,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 86,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-10:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-10:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2268,7 +2346,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 26,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-11:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-11:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2282,7 +2361,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 92,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-12:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-12:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2296,7 +2376,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 187,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-13:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-13:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2310,7 +2391,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 184,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-14:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-14:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2324,7 +2406,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 55,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-15:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-15:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -2338,7 +2421,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 144,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "match-evidence:call-16:explainable-match-evidence"
+        "fixtureId": "match-evidence:call-16:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 1,
@@ -2660,7 +2744,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 156,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-1:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-1:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2674,7 +2759,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 208,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-2:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-2:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2688,7 +2774,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 117,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-3:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-3:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2702,7 +2789,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 148,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-4:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-4:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2716,7 +2804,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 165,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-5:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-5:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2730,7 +2819,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 124,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-6:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-6:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2744,7 +2834,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 166,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-7:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-7:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2758,7 +2849,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 210,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-8:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-8:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2772,7 +2864,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 154,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-9:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-9:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2786,7 +2879,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 155,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-10:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-10:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2800,7 +2894,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 95,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-11:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-11:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2814,7 +2909,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 217,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-12:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-12:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2828,7 +2924,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 168,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-13:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-13:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2842,7 +2939,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 210,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-14:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-14:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2856,7 +2954,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 149,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-15:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-15:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2870,7 +2969,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 196,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-16:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-16:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2884,7 +2984,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 746,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-17:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-17:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2898,7 +2999,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 842,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-18:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-18:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2912,7 +3014,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 770,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-19:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-19:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2926,7 +3029,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 904,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-20:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-20:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2940,7 +3044,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 797,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-21:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-21:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2954,7 +3059,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 640,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-extraction:call-22:explainable-job-posting-extraction"
+        "fixtureId": "cross-segment-extraction:call-22:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2982,7 +3088,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 832,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "prompt-injection:call-1:structured-source-profile-extraction"
+        "fixtureId": "prompt-injection:call-1:structured-source-profile-extraction",
+        "operation": "structured-source-profile-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -2996,7 +3103,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 861,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "prompt-injection:call-2:structured-source-profile-extraction"
+        "fixtureId": "prompt-injection:call-2:structured-source-profile-extraction",
+        "operation": "structured-source-profile-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -3010,7 +3118,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 1021,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "prompt-injection:call-3:explainable-job-posting-extraction"
+        "fixtureId": "prompt-injection:call-3:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -3024,7 +3133,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 1101,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "prompt-injection:call-4:explainable-job-posting-extraction"
+        "fixtureId": "prompt-injection:call-4:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -3038,7 +3148,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 921,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "prompt-injection:call-5:explainable-match-evidence"
+        "fixtureId": "prompt-injection:call-5:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -3052,7 +3163,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 1413,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "prompt-injection:call-6:explainable-match-evidence"
+        "fixtureId": "prompt-injection:call-6:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -3066,7 +3178,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 1554,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "prompt-injection:call-7:explainable-match-evidence"
+        "fixtureId": "prompt-injection:call-7:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -3080,7 +3193,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 1791,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "prompt-injection:call-8:explainable-match-evidence"
+        "fixtureId": "prompt-injection:call-8:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 1,
@@ -3151,7 +3265,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 206,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-1:resume-section-validation"
+        "fixtureId": "section-preparation:call-1:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3165,7 +3280,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 221,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-2:resume-section-validation"
+        "fixtureId": "section-preparation:call-2:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3179,7 +3295,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 234,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-3:resume-section-validation"
+        "fixtureId": "section-preparation:call-3:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3193,7 +3310,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 157,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-4:resume-section-validation"
+        "fixtureId": "section-preparation:call-4:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3207,7 +3325,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 117,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-5:resume-section-validation"
+        "fixtureId": "section-preparation:call-5:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3221,7 +3340,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 119,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-6:resume-section-validation"
+        "fixtureId": "section-preparation:call-6:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3235,7 +3355,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 114,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-7:resume-section-validation"
+        "fixtureId": "section-preparation:call-7:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3249,7 +3370,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 107,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-8:resume-section-validation"
+        "fixtureId": "section-preparation:call-8:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3263,7 +3385,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 68,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-9:resume-section-validation"
+        "fixtureId": "section-preparation:call-9:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3277,7 +3400,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 88,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-10:resume-section-validation"
+        "fixtureId": "section-preparation:call-10:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3291,7 +3415,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 53,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-11:resume-section-validation"
+        "fixtureId": "section-preparation:call-11:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3305,7 +3430,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 78,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-12:resume-section-validation"
+        "fixtureId": "section-preparation:call-12:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3319,7 +3445,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 615,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-13:resume-section-validation"
+        "fixtureId": "section-preparation:call-13:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3333,7 +3460,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 122,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-14:resume-document-coherence"
+        "fixtureId": "section-preparation:call-14:resume-document-coherence",
+        "operation": "resume-document-coherence"
       },
       {
         "extractionExpectedCount": 0,
@@ -3347,7 +3475,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 216,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-15:resume-section-validation"
+        "fixtureId": "section-preparation:call-15:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3361,7 +3490,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 233,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-16:resume-section-validation"
+        "fixtureId": "section-preparation:call-16:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3375,7 +3505,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 217,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-17:resume-section-validation"
+        "fixtureId": "section-preparation:call-17:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3389,7 +3520,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 168,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-18:resume-section-validation"
+        "fixtureId": "section-preparation:call-18:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3403,7 +3535,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 112,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-19:resume-section-validation"
+        "fixtureId": "section-preparation:call-19:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3417,7 +3550,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 109,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-20:resume-section-validation"
+        "fixtureId": "section-preparation:call-20:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3431,7 +3565,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 116,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-21:resume-section-validation"
+        "fixtureId": "section-preparation:call-21:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3445,7 +3580,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 109,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-22:resume-section-validation"
+        "fixtureId": "section-preparation:call-22:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3459,7 +3595,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 69,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-23:resume-section-validation"
+        "fixtureId": "section-preparation:call-23:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3473,7 +3610,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 65,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-24:resume-section-validation"
+        "fixtureId": "section-preparation:call-24:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3487,7 +3625,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 88,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-25:resume-section-validation"
+        "fixtureId": "section-preparation:call-25:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3501,7 +3640,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 88,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-26:resume-section-validation"
+        "fixtureId": "section-preparation:call-26:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3515,7 +3655,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 555,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-27:resume-section-validation"
+        "fixtureId": "section-preparation:call-27:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3529,7 +3670,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 269,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-28:resume-document-coherence"
+        "fixtureId": "section-preparation:call-28:resume-document-coherence",
+        "operation": "resume-document-coherence"
       },
       {
         "extractionExpectedCount": 0,
@@ -3543,7 +3685,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 177,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-29:resume-section-validation"
+        "fixtureId": "section-preparation:call-29:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3557,7 +3700,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 196,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-30:resume-section-validation"
+        "fixtureId": "section-preparation:call-30:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3571,7 +3715,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 237,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-31:resume-section-validation"
+        "fixtureId": "section-preparation:call-31:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3585,7 +3730,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 115,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-32:resume-section-validation"
+        "fixtureId": "section-preparation:call-32:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3599,7 +3745,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 190,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-33:resume-section-validation"
+        "fixtureId": "section-preparation:call-33:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3613,7 +3760,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 110,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-34:resume-section-validation"
+        "fixtureId": "section-preparation:call-34:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3627,7 +3775,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 118,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-35:resume-section-validation"
+        "fixtureId": "section-preparation:call-35:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3641,7 +3790,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 69,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-36:resume-section-validation"
+        "fixtureId": "section-preparation:call-36:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3655,7 +3805,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 118,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-37:resume-section-validation"
+        "fixtureId": "section-preparation:call-37:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3669,7 +3820,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 65,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-38:resume-section-validation"
+        "fixtureId": "section-preparation:call-38:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3683,7 +3835,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 56,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-39:resume-section-validation"
+        "fixtureId": "section-preparation:call-39:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3697,7 +3850,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 53,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-40:resume-section-validation"
+        "fixtureId": "section-preparation:call-40:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3711,7 +3865,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 588,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-41:resume-section-validation"
+        "fixtureId": "section-preparation:call-41:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3725,7 +3880,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 39,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-42:resume-document-coherence"
+        "fixtureId": "section-preparation:call-42:resume-document-coherence",
+        "operation": "resume-document-coherence"
       },
       {
         "extractionExpectedCount": 2,
@@ -3807,7 +3963,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 819,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-1:structured-source-profile-extraction"
+        "fixtureId": "front-end-audit:call-1:structured-source-profile-extraction",
+        "operation": "structured-source-profile-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -3821,7 +3978,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 1104,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-2:explainable-job-posting-extraction"
+        "fixtureId": "front-end-audit:call-2:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
@@ -3835,7 +3993,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 1394,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-3:explainable-match-evidence"
+        "fixtureId": "front-end-audit:call-3:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -3849,7 +4008,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 2351,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-4:explainable-match-evidence"
+        "fixtureId": "front-end-audit:call-4:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
@@ -3863,7 +4023,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 133,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-5:resume-section-validation"
+        "fixtureId": "front-end-audit:call-5:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3877,7 +4038,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 216,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-6:resume-section-validation"
+        "fixtureId": "front-end-audit:call-6:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3891,7 +4053,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 208,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-7:resume-section-validation"
+        "fixtureId": "front-end-audit:call-7:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3905,7 +4068,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 251,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-8:resume-section-validation"
+        "fixtureId": "front-end-audit:call-8:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3919,7 +4083,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 286,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-9:resume-section-validation"
+        "fixtureId": "front-end-audit:call-9:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3933,7 +4098,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 338,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-10:resume-section-validation"
+        "fixtureId": "front-end-audit:call-10:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3947,7 +4113,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 366,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-11:resume-section-validation"
+        "fixtureId": "front-end-audit:call-11:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3961,7 +4128,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 31,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-12:resume-section-validation"
+        "fixtureId": "front-end-audit:call-12:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3975,7 +4143,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 403,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-13:resume-section-validation"
+        "fixtureId": "front-end-audit:call-13:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -3989,7 +4158,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 64,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-14:resume-section-validation"
+        "fixtureId": "front-end-audit:call-14:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -4003,7 +4173,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 48,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-15:resume-section-validation"
+        "fixtureId": "front-end-audit:call-15:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -4017,7 +4188,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 24,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-16:resume-document-coherence"
+        "fixtureId": "front-end-audit:call-16:resume-document-coherence",
+        "operation": "resume-document-coherence"
       },
       {
         "extractionExpectedCount": 0,
@@ -4031,7 +4203,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 31,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-17:resume-section-validation"
+        "fixtureId": "front-end-audit:call-17:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -4045,7 +4218,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 311,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-18:resume-section-validation"
+        "fixtureId": "front-end-audit:call-18:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
@@ -4059,7 +4233,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         ],
         "outputTokens": 149,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-19:resume-document-coherence"
+        "fixtureId": "front-end-audit:call-19:resume-document-coherence",
+        "operation": "resume-document-coherence"
       }
     ],
     "recordedAt": "2026-10-13T08:54:50.866Z"
