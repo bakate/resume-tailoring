@@ -138,7 +138,7 @@ and the front-end audit 2/2. Every language check passed (structured 31/31, writ
   expensive whole Tailored Resume, both roles, at upper-bound rates. Both stay under OpenAI's ~$0.10 in production.
 - **p95 latency** is not comparable: reference-v1 timed one ~200-token call per fixture; the live dataset times every
   production-sized structured call and, for writing, each Resume Section by the time its calls took, retries
-  included.
+  and a coherence rewrite included.
 
 ### What recording took
 
