@@ -149,9 +149,9 @@ The first recordings failed provenance safety on measurement and evaluation defe
   and one injected run; replays showed two clean runs differ as much, so those comparisons were dropped (see above).
 
 Live runs a gate does not count, observed in these recordings: the structured run would fail its live evaluations on
-the Job Posting distinct capabilities (BAK-175) and on Match Evidence coverage recall (0.75 against 0.80); the writing
-run on the skills section's p95 (one run needed three writing calls, 54 s, against the 30 s section budget; the
-preparation stayed within its 90 s). An English preparation of the front-end audit also failed once on a degree name
+the Job Posting distinct capabilities (BAK-175) and on Match Evidence coverage recall (0.75 against 0.80, BAK-176); the
+writing run on the skills section's p95 (one run needed three writing calls, 54 s, against the 30 s section budget; the
+preparation stayed within its 90 s, BAK-177). An English preparation of the front-end audit also failed once on a degree name
 kept in French (BAK-174), which aborts a recording.
 
 Pricing recorded in the configurations is $0.10 input / $0.50 output per million tokens for GPT-6 Luna and $2 input /
