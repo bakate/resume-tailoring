@@ -1,7 +1,7 @@
 import { prepareResumeSections } from '@resume-tailoring/application/resume-preparation'
 
 import { crossSegmentQualificationCorpus } from './cross-segment-corpus'
-import { checkDocumentLanguage } from './document-language'
+import { countDocumentLanguageChecks } from './document-language'
 import { readLiveJobMatch } from './live-candidate-journey'
 import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
 import { createSectionModels } from './section-preparation-evaluation'
@@ -26,14 +26,13 @@ export const crossSegmentWritingSource: ModelObservationSource = {
       const output = await prepareResumeSections({ models, now: Date.now, recordTelemetry: () => undefined,
         request: { candidateFacts, jobMatch, locale: 'fr', purpose: 'tailored' }, revision: `cross-segment:${fixture.id}` })
       const document = output.status === 'prepared' ? output.document : null
-      const language = document === null ? [] : checkDocumentLanguage({ document, locale: 'fr' })
+      // A scenario that yields no document has failed French writing too.
+      const language = countDocumentLanguageChecks({ document, locale: 'fr' })
       observations.push(createModelEvaluationObservation({ fixtureId: fixture.id,
         extractionExpectedCount: 1, extractionMatchedCount: Number(document !== null),
-        // A scenario that yields no document has failed French writing too.
-        multilingualCheckCount: Math.max(1, language.length),
-        multilingualPassedCount: language.filter(({ passed }) => passed).length,
+        multilingualCheckCount: language.checkCount, multilingualPassedCount: language.passedCount,
         observedValues: [`outcome:${output.status}`, `role-family:${fixture.roleFamily}`,
-          ...language.filter(({ passed }) => !passed).map(({ name }) => `failed:${name}`)],
+          ...language.failed.map((name) => `failed:${name}`)],
         unsupportedResumeClaimCount: document === null ? 0 : countUnsupportedResumeClaims({ candidateFacts, document }) }))
     }
     return observations

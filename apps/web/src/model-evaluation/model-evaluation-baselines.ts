@@ -30,9 +30,9 @@ export const liveModelEvaluationThresholds = {
     // The reference recordings measured 100%; the floor keeps the headroom it was calibrated with.
     extractionRecall: 0.9,
     multilingualFidelity: 1,
-    // A production-sized extraction answers within the 45 seconds the Job Posting evaluation always allowed one call:
-    // half the per-request timeout. The reference 10 seconds bounded ~200-token fixtures.
-    p95LatencyMilliseconds: 45_000,
+    // Each structured operation answers within its own qualified deadline (BAK-166): DeepSeek's Match Evidence thinks
+    // for up to 110 s where extraction answers in seconds, so one figure across operations would gate on the slowest.
+    p95LatencyMilliseconds: 'operation-deadline',
     costUsd: maximumUsdPerTailoredResume,
   },
   writing: {

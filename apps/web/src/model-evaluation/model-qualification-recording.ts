@@ -57,15 +57,17 @@ export function renderRecordedRunsModule({ runs }: Readonly<{ runs: readonly Rec
 }
 
 /**
- * The JSON report a recording writes: the configuration, its gates and verdict. Its observations stay in the recorded
- * runs alone, which `recordedAt` points to.
+ * The JSON report a recording writes: the configuration, its gates and verdict, then what is reported beside them: the
+ * cost at each price condition and each operation's calls. Its observations stay in the recorded runs alone, which
+ * `recordedAt` points to.
  */
 export function renderQualificationReport({ recordedRun, report }: Readonly<{
   recordedRun: RecordedModelEvaluationRun
   report: ModelQualificationReport
 }>) {
-  const { configuration, datasetId, gates, qualified } = report
-  return `${JSON.stringify({ configuration, datasetId, recordedAt: recordedRun.recordedAt, gates, qualified }, null, 2)}\n`
+  const { configuration, costUsdByPriceCondition, datasetId, gates, operations, qualified } = report
+  return `${JSON.stringify({ configuration, datasetId, recordedAt: recordedRun.recordedAt, gates, qualified,
+    costUsdByPriceCondition, operations }, null, 2)}\n`
 }
 
 /** Every setting but the prices, which weigh the evaluated cost and are no setting of the configuration. */

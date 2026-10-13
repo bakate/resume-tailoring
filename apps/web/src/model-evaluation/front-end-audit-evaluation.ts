@@ -61,9 +61,18 @@ async function replayAuditRun({ intake, preparations }: Readonly<{
   return { candidateFacts: sourceIntake.candidateFacts, jobMatch, documents: { fr, en } }
 }
 
-/** The best coverage of the Job Requirements a pattern names, or null when none does. */
-function readAuditedCoverage({ jobMatch, requirement }: Readonly<{ jobMatch: JobMatch; requirement: RegExp }>) {
-  const ids = new Set<string>(jobMatch.requirements.filter(({ value }) => requirement.test(value)).map(({ id }) => id))
+type AuditedJobMatch = Readonly<{
+  requirements: readonly Pick<JobMatch['requirements'][number], 'id' | 'sourceExcerpt' | 'value'>[]
+  analysis: Readonly<{ requirementGroups: readonly Pick<JobMatch['analysis']['requirementGroups'][number], 'coverage' | 'requirementIds'>[] }>
+}>
+
+/**
+ * The best coverage of the Job Requirements a pattern names, or null when none does. A requirement is found by its
+ * value or its excerpt: a value may name the capability alone (BAK-175), leaving a duration to the excerpt.
+ */
+export function readAuditedCoverage({ jobMatch, requirement }: Readonly<{ jobMatch: AuditedJobMatch; requirement: RegExp }>) {
+  const ids = new Set<string>(jobMatch.requirements.filter(({ sourceExcerpt, value }) => requirement.test(value)
+    || requirement.test(sourceExcerpt)).map(({ id }) => id))
   if (ids.size === 0) return null
   const coverages = jobMatch.analysis.requirementGroups
     .filter(({ requirementIds }) => requirementIds.some((id) => ids.has(id))).map(({ coverage }) => coverage)

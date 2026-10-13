@@ -61,6 +61,8 @@ describe('recording a Qualified Model Configuration candidate', () => {
     expect(module).toContain('export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRun[] = [')
     expect(module).toContain('"recordedAt": "2026-10-12T10:00:00.000Z"')
     expect(module.endsWith('\n')).toBe(true)
+    // An import the module never uses fails lint on every recording.
+    expect(module.startsWith("import type { RecordedModelEvaluationRun } from './model-qualification'\n")).toBe(true)
   })
 
   it('writes the report without the observations the recorded runs already hold', async () => {
@@ -68,7 +70,8 @@ describe('recording a Qualified Model Configuration candidate', () => {
 
     const written = JSON.parse(renderQualificationReport({ recordedRun, report })) as Record<string, unknown>
 
-    expect(Object.keys(written)).toEqual(['configuration', 'datasetId', 'recordedAt', 'gates', 'qualified'])
+    expect(Object.keys(written)).toEqual(['configuration', 'datasetId', 'recordedAt', 'gates', 'qualified',
+      'costUsdByPriceCondition', 'operations'])
     expect(written.recordedAt).toBe(recordedRun.recordedAt)
   })
 })

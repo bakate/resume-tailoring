@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createOpenAiModelConfiguration } from '../language-model-configuration'
+import { createOpenAiModelConfiguration, type ModelOperation } from '../language-model-configuration'
 import {
   qualifyModelConfiguration,
   type ModelConfiguration,
@@ -15,6 +15,8 @@ describe('model configuration qualification', () => {
 
     expect(report).toEqual({
       configuration: structured,
+      // The companion has no 'standard' price, so its share reads its upper-bound rates.
+      costUsdByPriceCondition: { standard: 0.092 },
       datasetId: 'recorded-v1',
       gates: {
         provenanceSafety: { passed: true, coveredTrapCount: 0, obeyedInjectionCount: 0, unsupportedResumeClaimCount: 0 },
@@ -25,6 +27,7 @@ describe('model configuration qualification', () => {
         p95LatencyMilliseconds: { passed: true, value: 2_900, threshold: 3_000 },
       },
       observations: recordedRun.observations,
+      operations: {},
       qualified: true,
     })
   })
@@ -114,6 +117,24 @@ describe('cost per Tailored Resume', () => {
     expect(report.gates.costUsd).toMatchObject({ value: 0.092 })
   })
 
+  it('reports the most expensive Tailored Resume under each price condition, each role at that condition\'s rates', () => {
+    const configuration = { ...structured, pricing: [
+      { condition: 'off-peak', inputUsdPerMillionTokens: 0.05, outputUsdPerMillionTokens: 0.25 },
+      { condition: 'peak', inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.5 },
+    ] } satisfies ModelConfiguration
+
+    const report = qualifyModelConfiguration({ thresholds, recordedRun: { ...recordedRun, configuration } })
+
+    // Off-peak: 10,000 × $0.05 + 2,000 × $0.25 and 20,000 × $1 + 5,000 × $5; at peak, twice that.
+    expect(report.costUsdByPriceCondition).toEqual({ 'off-peak': 0.046, peak: 0.092 })
+  })
+
+  it('reports no cost per price condition without a Tailored Resume observed', () => {
+    const report = qualifyModelConfiguration({ thresholds, recordedRun: { ...recordedRun, observations } })
+
+    expect(report.costUsdByPriceCondition).toEqual({})
+  })
+
   it('is not measured, so never passes, without a Tailored Resume observed', () => {
     const report = qualifyModelConfiguration({ thresholds, recordedRun: { ...recordedRun, observations } })
 
@@ -129,6 +150,74 @@ describe('cost per Tailored Resume', () => {
     expect(report.gates.costUsd).toEqual({ passed: false, status: 'not-measured' })
   })
 })
+
+describe('model operations', () => {
+  it('reports each operation\'s calls, conformance retries and p95 latency against its own deadline', () => {
+    const calls = [
+      callObservation({ latencyMilliseconds: 1_000, operation: 'explainable-match-evidence' }),
+      callObservation({ latencyMilliseconds: 4_000, operation: 'explainable-match-evidence', conformance: 'conformance-retry' }),
+      callObservation({ latencyMilliseconds: 2_000, operation: 'explainable-match-evidence' }),
+      callObservation({ latencyMilliseconds: 3_000, operation: 'explainable-match-evidence' }),
+      callObservation({ latencyMilliseconds: 500, operation: 'structured-source-profile-extraction',
+        conformance: 'conformance-retry-skipped' }),
+    ]
+
+    const report = qualifyModelConfiguration({ thresholds, recordedRun: { ...recordedRun, observations: [...observations, ...calls] } })
+
+    // A retry skipped for want of time still counts a first answer that did not conform.
+    expect(report.operations).toEqual({
+      'explainable-match-evidence': { callCount: 4, conformanceRetryCount: 1, conformanceRetrySkippedCount: 0,
+        conformanceRetryRate: 0.25, deadlineMilliseconds: 90_000, p95LatencyMilliseconds: 4_000 },
+      'structured-source-profile-extraction': { callCount: 1, conformanceRetryCount: 0, conformanceRetrySkippedCount: 1,
+        conformanceRetryRate: 1, deadlineMilliseconds: 90_000, p95LatencyMilliseconds: 500 },
+    })
+  })
+
+  it('holds each operation\'s p95 to its own deadline when the threshold says so, naming every operation beyond it', () => {
+    const calls = [
+      callObservation({ latencyMilliseconds: 95_000, operation: 'explainable-match-evidence' }),
+      callObservation({ latencyMilliseconds: 1_000, operation: 'structured-source-profile-extraction' }),
+    ]
+
+    const report = qualifyModelConfiguration({ thresholds: { ...thresholds, p95LatencyMilliseconds: 'operation-deadline' },
+      recordedRun: { ...recordedRun, observations: [...observations, ...calls] } })
+
+    expect(report.gates.p95LatencyMilliseconds).toEqual({ passed: false, threshold: 'operation-deadline',
+      exceededOperations: ['explainable-match-evidence'] })
+  })
+
+  it('passes the per-operation latency gate when every operation answers within its deadline', () => {
+    const calls = [callObservation({ latencyMilliseconds: 89_000, operation: 'explainable-match-evidence' })]
+
+    const report = qualifyModelConfiguration({ thresholds: { ...thresholds, p95LatencyMilliseconds: 'operation-deadline' },
+      recordedRun: { ...recordedRun, observations: [...observations, ...calls] } })
+
+    expect(report.gates.p95LatencyMilliseconds).toEqual({ passed: true, threshold: 'operation-deadline', exceededOperations: [] })
+  })
+
+  it('leaves the per-operation latency gate unmeasured, so unpassed, when no model call was observed', () => {
+    const report = qualifyModelConfiguration({ thresholds: { ...thresholds, p95LatencyMilliseconds: 'operation-deadline' },
+      recordedRun })
+
+    expect(report.gates.p95LatencyMilliseconds).toEqual({ passed: false, status: 'not-measured' })
+  })
+
+  it('leaves the operation summary empty when no observation is a model call', () => {
+    const report = qualifyModelConfiguration({ thresholds, recordedRun })
+
+    expect(report.operations).toEqual({})
+  })
+})
+
+function callObservation({ conformance, latencyMilliseconds, operation }: Readonly<{
+  conformance?: 'conformance-retry' | 'conformance-retry-skipped'
+  latencyMilliseconds: number
+  operation: ModelOperation
+}>): ModelEvaluationObservation {
+  return { ...createObservation({ fixtureId: `call:${operation}`, extractionExpectedCount: 0, extractionMatchedCount: 0,
+    inputTokens: 100, latencyMilliseconds, multilingualCheckCount: 0, multilingualPassedCount: 0, outputTokens: 10 }),
+  operation, observedValues: ['answered', ...conformance === undefined ? [] : [conformance]] }
+}
 
 const structured = {
   ...createOpenAiModelConfiguration({ model: 'gpt-6-luna', reasoningEffort: 'low', role: 'structured' }),

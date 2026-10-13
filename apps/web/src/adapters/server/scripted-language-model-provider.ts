@@ -13,13 +13,15 @@ export type ScriptedModelAnswer = Readonly<{
  * A Language Model Provider no production code names: tests register it to prove a path never branches on the
  * provider. It answers through the AI SDK's model interface, so the call wrapper runs exactly as for a real provider.
  */
-export function createScriptedLanguageModelProvider({ answer }: Readonly<{
+export function createScriptedLanguageModelProvider({ answer, conformance = 'server-side' }: Readonly<{
   answer: (call: Readonly<{ model: string; outputName: string; userText: string }>) => ScriptedModelAnswer
+  /** Client-side makes the call wrapper hold each answer to its schema and retry one that does not conform. */
+  conformance?: LanguageModelProviderAdapter<LanguageModelProvider>['conformance']
 }>): LanguageModelProviderAdapter<LanguageModelProvider> {
   return {
     classifyFailure: () => ({ type: 'transport' }),
-    // The scripted model answers what it is told; nothing checks its answer twice.
-    conformance: 'server-side',
+    // By default the scripted model answers what it is told, and nothing checks its answer twice.
+    conformance,
     createLanguageModel: ({ model }) => new MockLanguageModelV4({
       provider: 'scripted', modelId: model,
       doGenerate: ({ prompt, responseFormat }) => {

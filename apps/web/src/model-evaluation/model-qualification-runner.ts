@@ -1,4 +1,4 @@
-import type { ModelCallMeasurement, ModelConnection } from '../adapters/server/language-model-request'
+import { conformanceRetryNames, type ModelCallMeasurement, type ModelConnection } from '../adapters/server/language-model-request'
 import type { LanguageModelConfiguration, ModelRole } from '../language-model-configuration'
 import {
   qualifyModelConfiguration,
@@ -151,13 +151,17 @@ function readRoleConfiguration({ companion, configuration, role }: Readonly<{
   return companion
 }
 
-/** One observation per call: its latency and usage, and whether it was answered, never what it carried. */
+/**
+ * One observation per call: its operation, latency and usage, whether it was answered and whether its first answer
+ * needed a conformance retry, never what it carried.
+ */
 function readCallObservations({ calls, sourceId }: Readonly<{
   calls: readonly ModelCallMeasurement[]
   sourceId: string
 }>) {
-  return calls.map(({ latencyMilliseconds, operation, outcome, usage }, callIndex) => createModelEvaluationObservation({
-    fixtureId: `${sourceId}:call-${String(callIndex + 1)}:${operation}`, latencyMilliseconds,
-    inputTokens: usage?.inputTokens ?? 0, outputTokens: usage?.outputTokens ?? 0, observedValues: [outcome],
+  return calls.map(({ conformance, latencyMilliseconds, operation, outcome, usage }, callIndex) => createModelEvaluationObservation({
+    fixtureId: `${sourceId}:call-${String(callIndex + 1)}:${operation}`, latencyMilliseconds, operation,
+    inputTokens: usage?.inputTokens ?? 0, outputTokens: usage?.outputTokens ?? 0,
+    observedValues: [outcome, ...conformance === undefined ? [] : [conformanceRetryNames[conformance]]],
   }))
 }

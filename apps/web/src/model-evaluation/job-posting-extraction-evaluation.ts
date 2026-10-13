@@ -2,7 +2,6 @@ import { createJobMatch, type JobMatch } from '@resume-tailoring/application/job
 
 import type { ModelCallMeasurement, ModelConnection } from '../adapters/server/language-model-request'
 import { createModelJobPostingExtractor } from '../adapters/server/model-job-posting-extractor'
-import { liveModelEvaluationThresholds } from './model-evaluation-baselines'
 import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
 
 type JobRequirement = JobMatch['requirements'][number]
@@ -105,7 +104,8 @@ export const jobPostingExtractionSource: ModelObservationSource = {
   },
 }
 
-const extractionCallBudgetMilliseconds = liveModelEvaluationThresholds.structured.p95LatencyMilliseconds
+// A production-sized extraction answers within 45 seconds, half the per-request timeout; the p95 gate holds it to its deadline.
+const extractionCallBudgetMilliseconds = 45_000
 
 function countPassed(checks: readonly JobPostingCheck[]) {
   return checks.filter(({ passed }) => passed).length

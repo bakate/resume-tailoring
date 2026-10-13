@@ -164,11 +164,12 @@ export const deepSeekMeasuredReasoningTokens = { disabled: 0, low: 10_600, high:
  * DeepSeek counts reasoning inside `max_tokens`, so each budget is the OpenAI answer budget of the operation plus the
  * reasoning measured at its thinking mode, rounded up for headroom. Match evidence gets the 32,000 the spike needed:
  * at 8,000, 7 of 20 answers came back empty or truncated. Its p95 was 82 s at `low`, hence its longer deadline.
- * Extraction thinks not at all: it was conformant and fully source-backed without, at a fraction of the latency.
- * These are the BAK-171 hypotheses that BAK-167 qualifies.
+ * Source Profile extraction thinks not at all: it was conformant and fully source-backed without, at a fraction of the
+ * latency. Job Posting extraction thinks at `low`: without thinking, BAK-167 measured its recall at about 60% (generic
+ * duties split, distinct technologies merged) against about 94% at `low`, for 15–21 s and under 4,000 tokens.
  */
 const deepSeekOperationSettings = {
-  'explainable-job-posting-extraction': { deadlineMilliseconds: defaultDeadlineMilliseconds, maxOutputTokens: 20_000, thinking: 'disabled' },
+  'explainable-job-posting-extraction': { deadlineMilliseconds: defaultDeadlineMilliseconds, maxOutputTokens: 31_000, thinking: 'low' },
   'explainable-match-evidence': { deadlineMilliseconds: 110_000, maxOutputTokens: 32_000, thinking: 'low' },
   'resume-claim-validation': { deadlineMilliseconds: defaultDeadlineMilliseconds, maxOutputTokens: 24_000, thinking: 'low' },
   'resume-claim-writing': { deadlineMilliseconds: defaultDeadlineMilliseconds, maxOutputTokens: 16_000, thinking: 'high' },

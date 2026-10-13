@@ -261,13 +261,13 @@ describe('Model request call wrapper, per operation', () => {
     } })
 
     await requester.send(modelRequest)
-    await requester.send({ ...modelRequest, operation: 'explainable-job-posting-extraction' })
+    await requester.send({ ...modelRequest, operation: 'structured-source-profile-extraction' })
 
     expect(requests.map(({ url }) => url)).toEqual(['https://api.deepseek.com/chat/completions', 'https://api.deepseek.com/chat/completions'])
     const [matching, extraction] = await Promise.all(requests.map((request) => request.json() as Promise<Record<string, unknown>>))
     expect(matching).toMatchObject({ model: 'deepseek-flash', max_tokens: 32_000, response_format: { type: 'json_object' },
       thinking: { type: 'enabled' }, reasoning_effort: 'low' })
-    expect(extraction).toMatchObject({ max_tokens: 20_000, thinking: { type: 'disabled' } })
+    expect(extraction).toMatchObject({ max_tokens: 16_000, thinking: { type: 'disabled' } })
     expect(extraction).not.toHaveProperty('reasoning_effort')
   })
 
@@ -336,6 +336,38 @@ describe('Model request call wrapper, per operation', () => {
       category: 'privacy-safe-model-request', metric: 'conformance-retry', value: 1,
       dimensions: { cause, operation: 'explainable-match-evidence', provider: 'deepseek' },
     }])
+  })
+
+  it.each([
+    { name: 'sent', firstAttemptMilliseconds: 1_000, conformance: 'retried' },
+    { name: 'skipped for want of time', firstAttemptMilliseconds: 60_000, conformance: 'retry-skipped' },
+  ])('tells its observer a conformance retry was $name, so qualification counts it per operation', async ({
+    conformance, firstAttemptMilliseconds,
+  }) => {
+    vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const measurements: unknown[] = []
+    let clock = 0
+    const requester = createModelRequester({ apiKey: operatorApiKey, configuration: deepSeekConfiguration, now: () => clock,
+      observeCall: (measurement) => { measurements.push(measurement) },
+      request: () => {
+        clock += firstAttemptMilliseconds
+        return Promise.resolve(createRecordedDeepSeekResponse({ outputText: '{"value":1}' }))
+      } })
+
+    await requester.send(modelRequest)
+
+    expect(measurements).toEqual([expect.objectContaining({ conformance, operation: 'explainable-match-evidence' })])
+  })
+
+  it('tells its observer nothing about conformance when the first answer conforms', async () => {
+    const measurements: object[] = []
+    const requester = createModelRequester({ apiKey: operatorApiKey, configuration: deepSeekConfiguration,
+      observeCall: (measurement) => { measurements.push(measurement) },
+      request: () => Promise.resolve(createRecordedDeepSeekResponse({ outputText: '{"value":"TypeScript"}' })) })
+
+    await requester.send(modelRequest)
+
+    expect(measurements.map((measurement) => 'conformance' in measurement)).toEqual([false])
   })
 
   it('returns the second non-conforming DeepSeek answer without a third call', async () => {
