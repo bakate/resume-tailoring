@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { ResumeSectionPlanEntry } from '@resume-tailoring/application/candidate-journey'
+import { prepareResumeSections } from '@resume-tailoring/application/resume-preparation'
+import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createFakeResumeSectionModels } from '@resume-tailoring/application/testing'
 
 import { realSizedResumeFixture } from './real-sized-resume-corpus'
 import {
   measureSectionModels,
   qualifySectionPreparation,
+  readPreparationFailureValues,
   readSectionPreparationBudgetFailures,
   type MeasuredResumeSection,
   type SectionPreparationRun,
@@ -104,6 +108,47 @@ describe('section preparation qualification on a real-sized resume', () => {
       durationMilliseconds: 3_000, writingCallCount: 2 })])
   })
 
+  it('records the section and the rejection kinds of each attempt of a Value Proposition rejected twice, and no field text', async () => {
+    const models = createFakeResumeSectionModels({ validateFields: ({ section, fields }) => Promise.resolve({ ok: true,
+      value: { fields: fields.map(({ id }) => ({ fieldId: id, supported: section.kind !== 'value-proposition' })) } }) })
+    const output = await prepare({ models })
+
+    const values = readPreparationFailureValues({ output })
+
+    expect(values).toEqual(['failed-section:value-proposition:attempt-1:unsupported',
+      'failed-section:value-proposition:attempt-2:unsupported'])
+    expect(values.join(' ')).not.toMatch(/summary-billing|billing screens/u)
+  })
+
+  it('records the coherence rejection kinds of a section the coherence check rejected again after its rewrite', async () => {
+    const models = createFakeResumeSectionModels({ checkCoherence: ({ document }) => Promise.resolve({ ok: true, value: {
+      coherent: false, languageMatches: true,
+      issues: document.valueProposition.paragraphs.map(({ id }) => ({ fieldId: id, kind: 'mixed-association' as const })) } }) })
+    const output = await prepare({ models })
+
+    const values = readPreparationFailureValues({ output })
+
+    expect(values).toEqual(['failed-section:value-proposition:attempt-1:mixed-association',
+      'failed-section:value-proposition:attempt-2:mixed-association'])
+  })
+
+  it('records the model failure type of a coherence check that gave no answer', async () => {
+    const models = createFakeResumeSectionModels({ checkCoherence: () => Promise.resolve({ ok: false, error: { type: 'timeout' } }) })
+    const output = await prepare({ models })
+
+    const values = readPreparationFailureValues({ output })
+
+    expect(values).toEqual(['failed-coherence:timeout'])
+  })
+
+  it('records nothing for a prepared Tailored Resume', async () => {
+    const output = await prepare({ models: createFakeResumeSectionModels() })
+
+    const values = readPreparationFailureValues({ output })
+
+    expect(values).toEqual([])
+  })
+
   it('supplies at least six experiences and every supporting section in the real-sized fixture', () => {
     const { candidateFacts } = realSizedResumeFixture.request
 
@@ -114,6 +159,12 @@ describe('section preparation qualification on a real-sized resume', () => {
     expect([...sections]).toEqual(expect.arrayContaining(['skills', 'education', 'languages', 'projects', 'certifications']))
   })
 })
+
+function prepare({ models }: Readonly<{ models: ResumeSectionModels }>) {
+  return prepareResumeSections({ models, now: Date.now, recordTelemetry: () => undefined, revision: 'failure-reasons',
+    request: { candidateFacts: structuredResumeSource.candidateFacts, jobMatch: structuredResumeJobMatch, locale: 'en',
+      purpose: 'tailored' } })
+}
 
 function qualify({ runs }: Readonly<{ runs: readonly SectionPreparationRun[] }>) {
   return qualifySectionPreparation({

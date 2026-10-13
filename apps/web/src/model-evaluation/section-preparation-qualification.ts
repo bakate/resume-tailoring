@@ -2,6 +2,7 @@ import type { ResumeDocumentCoherence, ResumeModelUsage, ResumeSectionKind, Resu
 
 import type { CalibratedGate } from './model-qualification'
 import type { ResumeSectionModels } from '@resume-tailoring/application/ports'
+import type { ResumeSectionsPreparation } from '@resume-tailoring/application/resume-preparation'
 
 export type SectionPreparationBudgets = Readonly<{
   sectionP95LatencyMilliseconds: number
@@ -82,6 +83,17 @@ export function readSectionPreparationBudgetFailures({ report: { gates } }: Read
     ...Object.entries(gates.sectionP95Latency.bySection).filter(([, gate]) => !gate.passed)
       .map(([key]) => `failed:${key} p95 latency over budget`),
   ]
+}
+
+/**
+ * Why a preparation failed, as content-free observed values: `failed-section:<plan key>:attempt-<n>:<kinds>` for each
+ * rejected version of a section still failed, or `failed-coherence:<kind>` for a coherence check that gave no usable
+ * answer. Kinds are joined by `+`. A prepared Tailored Resume has none.
+ */
+export function readPreparationFailureValues({ output }: Readonly<{ output: ResumeSectionsPreparation }>): readonly string[] {
+  if (output.status !== 'failed') return []
+  return output.failureReasons.flatMap((reason) => reason.step === 'coherence' ? [`failed-coherence:${reason.rejection}`]
+    : reason.attempts.map((kinds, index) => `failed-section:${reason.sectionKey}:attempt-${String(index + 1)}:${kinds.join('+')}`))
 }
 
 /**

@@ -54,6 +54,20 @@ A source also records as `failed:…` the checks a live run must hold but no gat
 writing defects, or Match Evidence coverage recall below the 80% a live run must reach on its own. A missed expected
 coverage is `missed:…`: it counts towards recall without failing a live run.
 
+A preparation that ends failed records why, content-free, next to its `outcome:failed` in the `section-preparation`
+and `cross-segment-writing` sources, and in the error a failed `front-end-audit` preparation throws
+(`readPreparationFailureValues`, `section-preparation-qualification.ts`):
+
+- `failed-section:<section key>:attempt-<n>:<kinds>` for each rejected version of a Resume Section that still failed,
+  by its plan key (`value-proposition`, `experiences.2`, `skills`). The kinds, joined by `+`, are `unsupported`, a
+  coherence issue kind (`mixed-association`, `redundant`, …), a structure rejection kind (`uncited`, `empty-text`, …)
+  or a model failure type (`timeout`, `invalid-provider-response`, …). A section the coherence check rejected again
+  after its rewrite lists both verdicts.
+- `failed-coherence:<kind>` when the coherence check gave no usable answer: a model failure type, or `language` for a
+  language mismatch naming no field.
+
+Field ids and texts never enter these values.
+
 ## Live sources and their gates
 
 Every model call a source makes with the configuration under test adds one observation with its latency and token

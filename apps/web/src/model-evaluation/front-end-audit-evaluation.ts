@@ -11,6 +11,7 @@ import { readLiveJobMatch, readLiveSourceIntake } from './live-candidate-journey
 import type { ModelTokenUsage } from './model-qualification'
 import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
 import { createSectionModels } from './section-preparation-evaluation'
+import { readPreparationFailureValues } from './section-preparation-qualification'
 import { countUnsupportedResumeClaims } from './unsupported-resume-claims'
 
 type AuditRun = Readonly<{
@@ -53,7 +54,8 @@ async function replayAuditRun({ intake, preparations }: Readonly<{
       request: { candidateFacts: sourceIntake.candidateFacts, jobMatch, locale, purpose: 'tailored' },
       revision: `front-end-audit:${locale}` })
     if (output.status !== 'prepared') {
-      throw new Error(`The ${locale} preparation failed: ${output.reason} ${JSON.stringify(lastCoherence)}`)
+      throw new Error(`The ${locale} preparation failed: ${output.reason} ${readPreparationFailureValues({ output }).join(' ')} ${
+        JSON.stringify(lastCoherence)}`)
     }
     return output.document
   }))
