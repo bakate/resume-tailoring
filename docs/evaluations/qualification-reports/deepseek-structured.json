@@ -49,7 +49,7 @@
     ]
   },
   "datasetId": "resume-tailoring-live-v1",
-  "recordedAt": "2026-10-13T09:30:46.642Z",
+  "recordedAt": "2026-10-13T10:27:49.178Z",
   "gates": {
     "provenanceSafety": {
       "passed": true,
@@ -60,7 +60,7 @@
     "extractionRecall": {
       "passed": true,
       "threshold": 0.9,
-      "value": 0.9444
+      "value": 0.9861
     },
     "multilingualFidelity": {
       "passed": true,
@@ -70,7 +70,7 @@
     "costUsd": {
       "passed": true,
       "threshold": 0.12,
-      "value": 0.069624
+      "value": 0.0700548
     },
     "p95LatencyMilliseconds": {
       "passed": true,
@@ -80,8 +80,8 @@
   },
   "qualified": true,
   "costUsdByPriceCondition": {
-    "off-peak, cache miss": 0.034812,
-    "peak, cache miss": 0.069624
+    "off-peak, cache miss": 0.0350274,
+    "peak, cache miss": 0.0700548
   },
   "operations": {
     "explainable-job-posting-extraction": {
@@ -90,15 +90,15 @@
       "conformanceRetrySkippedCount": 0,
       "conformanceRetryRate": 0,
       "deadlineMilliseconds": 90000,
-      "p95LatencyMilliseconds": 37075
+      "p95LatencyMilliseconds": 45226
     },
     "explainable-match-evidence": {
       "callCount": 22,
-      "conformanceRetryCount": 0,
+      "conformanceRetryCount": 1,
       "conformanceRetrySkippedCount": 0,
-      "conformanceRetryRate": 0,
+      "conformanceRetryRate": 0.0455,
       "deadlineMilliseconds": 110000,
-      "p95LatencyMilliseconds": 29635
+      "p95LatencyMilliseconds": 52940
     },
     "resume-document-coherence": {
       "callCount": 8,
@@ -106,15 +106,15 @@
       "conformanceRetrySkippedCount": 0,
       "conformanceRetryRate": 0,
       "deadlineMilliseconds": 90000,
-      "p95LatencyMilliseconds": 47588
+      "p95LatencyMilliseconds": 39300
     },
     "resume-section-validation": {
-      "callCount": 53,
+      "callCount": 51,
       "conformanceRetryCount": 0,
       "conformanceRetrySkippedCount": 0,
       "conformanceRetryRate": 0,
       "deadlineMilliseconds": 90000,
-      "p95LatencyMilliseconds": 9405
+      "p95LatencyMilliseconds": 5619
     },
     "structured-source-profile-extraction": {
       "callCount": 3,
@@ -122,7 +122,7 @@
       "conformanceRetrySkippedCount": 0,
       "conformanceRetryRate": 0,
       "deadlineMilliseconds": 90000,
-      "p95LatencyMilliseconds": 2874
+      "p95LatencyMilliseconds": 2380
     }
   }
 }

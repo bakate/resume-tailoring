@@ -29,7 +29,7 @@
     ]
   },
   "datasetId": "resume-tailoring-live-v1",
-  "recordedAt": "2026-10-13T09:39:21.366Z",
+  "recordedAt": "2026-10-13T11:41:06.804Z",
   "gates": {
     "provenanceSafety": {
       "passed": true,
@@ -38,9 +38,9 @@
       "unsupportedResumeClaimCount": 0
     },
     "extractionRecall": {
-      "passed": true,
+      "passed": false,
       "threshold": 1,
-      "value": 1
+      "value": 0.9
     },
     "multilingualFidelity": {
       "passed": true,
@@ -50,27 +50,27 @@
     "costUsd": {
       "passed": true,
       "threshold": 0.12,
-      "value": 0.0673026
+      "value": 0.0532623
     },
     "p95LatencyMilliseconds": {
       "passed": true,
       "threshold": 30000,
-      "value": 17801
+      "value": 16817
     }
   },
-  "qualified": true,
+  "qualified": false,
   "costUsdByPriceCondition": {
-    "off-peak, cache miss": 0.0336513,
-    "peak, cache miss": 0.0673026
+    "off-peak, cache miss": 0.02663115,
+    "peak, cache miss": 0.0532623
   },
   "operations": {
     "resume-section-writing": {
-      "callCount": 66,
+      "callCount": 63,
       "conformanceRetryCount": 0,
       "conformanceRetrySkippedCount": 0,
       "conformanceRetryRate": 0,
       "deadlineMilliseconds": 90000,
-      "p95LatencyMilliseconds": 17801
+      "p95LatencyMilliseconds": 14293
     }
   }
 }

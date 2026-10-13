@@ -4346,16 +4346,12 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       },
       {
         "extractionExpectedCount": 6,
-        "extractionMatchedCount": 3,
+        "extractionMatchedCount": 6,
         "inputTokens": 0,
         "latencyMilliseconds": 0,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
-        "observedValues": [
-          "failed:PostgreSQL has its own requirement",
-          "failed:Kafka has its own requirement",
-          "failed:Kubernetes has its own requirement"
-        ],
+        "observedValues": [],
         "outputTokens": 0,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "job-posting-extraction:distinct-capabilities-en"
@@ -4363,14 +4359,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1084,
-        "latencyMilliseconds": 10540,
+        "inputTokens": 1120,
+        "latencyMilliseconds": 10806,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1926,
+        "outputTokens": 1858,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "job-posting-extraction:call-1:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -4378,14 +4374,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1106,
-        "latencyMilliseconds": 12773,
+        "inputTokens": 1142,
+        "latencyMilliseconds": 24510,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 2526,
+        "outputTokens": 4613,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "job-posting-extraction:call-2:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -4393,14 +4389,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1075,
-        "latencyMilliseconds": 20847,
+        "inputTokens": 1111,
+        "latencyMilliseconds": 12187,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 4502,
+        "outputTokens": 2379,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "job-posting-extraction:call-3:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -4498,14 +4494,12 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       },
       {
         "extractionExpectedCount": 3,
-        "extractionMatchedCount": 2,
+        "extractionMatchedCount": 3,
         "inputTokens": 0,
         "latencyMilliseconds": 0,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
-        "observedValues": [
-          "failed:job-requirement-jee:adjacent"
-        ],
+        "observedValues": [],
         "outputTokens": 0,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:case-08",
@@ -4632,14 +4626,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1527,
-        "latencyMilliseconds": 1946,
+        "inputTokens": 1640,
+        "latencyMilliseconds": 4364,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 303,
+        "outputTokens": 730,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-1:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4647,14 +4641,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1543,
-        "latencyMilliseconds": 5515,
+        "inputTokens": 1656,
+        "latencyMilliseconds": 8775,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1120,
+        "outputTokens": 1692,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-2:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4662,14 +4656,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1564,
-        "latencyMilliseconds": 4189,
+        "inputTokens": 1677,
+        "latencyMilliseconds": 7023,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 648,
+        "outputTokens": 1236,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-3:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4677,14 +4671,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1506,
-        "latencyMilliseconds": 1952,
+        "inputTokens": 1619,
+        "latencyMilliseconds": 2227,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 309,
+        "outputTokens": 271,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-4:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4692,14 +4686,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1511,
-        "latencyMilliseconds": 1287,
+        "inputTokens": 1624,
+        "latencyMilliseconds": 1974,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 216,
+        "outputTokens": 262,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-5:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4707,14 +4701,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1541,
-        "latencyMilliseconds": 5924,
+        "inputTokens": 1654,
+        "latencyMilliseconds": 2739,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1256,
+        "outputTokens": 330,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-6:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4722,14 +4716,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1519,
-        "latencyMilliseconds": 2184,
+        "inputTokens": 1632,
+        "latencyMilliseconds": 1707,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 334,
+        "outputTokens": 237,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-7:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4737,14 +4731,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1561,
-        "latencyMilliseconds": 13107,
+        "inputTokens": 1674,
+        "latencyMilliseconds": 4034,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 2307,
+        "outputTokens": 582,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-8:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4752,14 +4746,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1502,
-        "latencyMilliseconds": 2649,
+        "inputTokens": 1615,
+        "latencyMilliseconds": 4584,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 454,
+        "outputTokens": 702,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-9:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4767,14 +4761,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1500,
-        "latencyMilliseconds": 5416,
+        "inputTokens": 1613,
+        "latencyMilliseconds": 7970,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 992,
+        "outputTokens": 1266,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-10:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4782,14 +4776,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1497,
-        "latencyMilliseconds": 8308,
+        "inputTokens": 1610,
+        "latencyMilliseconds": 1502,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1342,
+        "outputTokens": 115,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-11:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4797,14 +4791,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1494,
-        "latencyMilliseconds": 2340,
+        "inputTokens": 1607,
+        "latencyMilliseconds": 1903,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 311,
+        "outputTokens": 184,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-12:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4812,14 +4806,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1509,
-        "latencyMilliseconds": 2663,
+        "inputTokens": 1622,
+        "latencyMilliseconds": 8240,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 434,
+        "outputTokens": 1418,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-13:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4827,14 +4821,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1508,
-        "latencyMilliseconds": 5741,
+        "inputTokens": 1621,
+        "latencyMilliseconds": 6610,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1126,
+        "outputTokens": 1235,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-14:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4842,14 +4836,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1495,
-        "latencyMilliseconds": 1851,
+        "inputTokens": 1608,
+        "latencyMilliseconds": 1317,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 195,
+        "outputTokens": 63,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-15:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -4857,14 +4851,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1502,
-        "latencyMilliseconds": 2062,
+        "inputTokens": 1615,
+        "latencyMilliseconds": 5522,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 325,
+        "outputTokens": 892,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "match-evidence:call-16:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -5180,14 +5174,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1053,
-        "latencyMilliseconds": 14572,
+        "inputTokens": 1089,
+        "latencyMilliseconds": 7419,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 2842,
+        "outputTokens": 1213,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-1:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5195,14 +5189,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1059,
-        "latencyMilliseconds": 13989,
+        "inputTokens": 1095,
+        "latencyMilliseconds": 12348,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 2820,
+        "outputTokens": 2267,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-2:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5210,14 +5204,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1055,
-        "latencyMilliseconds": 3893,
+        "inputTokens": 1091,
+        "latencyMilliseconds": 8299,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 655,
+        "outputTokens": 1357,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-3:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5225,14 +5219,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1059,
-        "latencyMilliseconds": 13603,
+        "inputTokens": 1095,
+        "latencyMilliseconds": 12387,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 2724,
+        "outputTokens": 2117,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-4:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5240,14 +5234,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1054,
-        "latencyMilliseconds": 8126,
+        "inputTokens": 1090,
+        "latencyMilliseconds": 5214,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1513,
+        "outputTokens": 795,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-5:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5255,14 +5249,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1060,
-        "latencyMilliseconds": 13971,
+        "inputTokens": 1096,
+        "latencyMilliseconds": 8087,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 2811,
+        "outputTokens": 1285,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-6:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5270,14 +5264,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1052,
-        "latencyMilliseconds": 5106,
+        "inputTokens": 1088,
+        "latencyMilliseconds": 6838,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 866,
+        "outputTokens": 1100,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-7:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5285,14 +5279,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1054,
-        "latencyMilliseconds": 5738,
+        "inputTokens": 1090,
+        "latencyMilliseconds": 7494,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 981,
+        "outputTokens": 1195,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-8:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5300,14 +5294,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1050,
-        "latencyMilliseconds": 4808,
+        "inputTokens": 1086,
+        "latencyMilliseconds": 4094,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 715,
+        "outputTokens": 522,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-9:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5315,14 +5309,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1051,
-        "latencyMilliseconds": 7382,
+        "inputTokens": 1087,
+        "latencyMilliseconds": 6854,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1316,
+        "outputTokens": 1079,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-10:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5330,14 +5324,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1051,
-        "latencyMilliseconds": 5878,
+        "inputTokens": 1087,
+        "latencyMilliseconds": 2646,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1062,
+        "outputTokens": 341,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-11:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5345,14 +5339,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1052,
-        "latencyMilliseconds": 6104,
+        "inputTokens": 1088,
+        "latencyMilliseconds": 8367,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1050,
+        "outputTokens": 1258,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-12:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5360,14 +5354,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1054,
-        "latencyMilliseconds": 3257,
+        "inputTokens": 1090,
+        "latencyMilliseconds": 6702,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 570,
+        "outputTokens": 1117,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-13:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5375,8 +5369,8 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1055,
-        "latencyMilliseconds": 4305,
+        "inputTokens": 1091,
+        "latencyMilliseconds": 5118,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
@@ -5390,14 +5384,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1053,
-        "latencyMilliseconds": 7534,
+        "inputTokens": 1089,
+        "latencyMilliseconds": 12445,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1319,
+        "outputTokens": 2184,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-15:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5405,14 +5399,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1056,
-        "latencyMilliseconds": 4435,
+        "inputTokens": 1092,
+        "latencyMilliseconds": 3630,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 730,
+        "outputTokens": 557,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-16:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5420,14 +5414,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1090,
-        "latencyMilliseconds": 27430,
+        "inputTokens": 1126,
+        "latencyMilliseconds": 37996,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 5689,
+        "outputTokens": 7090,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-17:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5435,14 +5429,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1092,
-        "latencyMilliseconds": 30263,
+        "inputTokens": 1128,
+        "latencyMilliseconds": 38431,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 6243,
+        "outputTokens": 7207,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-18:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5450,14 +5444,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1091,
-        "latencyMilliseconds": 25478,
+        "inputTokens": 1127,
+        "latencyMilliseconds": 28728,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 5087,
+        "outputTokens": 5348,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-19:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5465,14 +5459,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1093,
-        "latencyMilliseconds": 22829,
+        "inputTokens": 1129,
+        "latencyMilliseconds": 23038,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 4278,
+        "outputTokens": 4004,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-20:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5480,14 +5474,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1091,
-        "latencyMilliseconds": 24366,
+        "inputTokens": 1127,
+        "latencyMilliseconds": 40939,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 4746,
+        "outputTokens": 7476,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-21:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5495,14 +5489,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1087,
-        "latencyMilliseconds": 33130,
+        "inputTokens": 1123,
+        "latencyMilliseconds": 22911,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 6140,
+        "outputTokens": 4099,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "cross-segment-extraction:call-22:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5525,7 +5519,7 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
         "inputTokens": 1604,
-        "latencyMilliseconds": 2401,
+        "latencyMilliseconds": 2259,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
@@ -5540,7 +5534,7 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
         "inputTokens": 1588,
-        "latencyMilliseconds": 2874,
+        "latencyMilliseconds": 2380,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
@@ -5554,14 +5548,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1201,
-        "latencyMilliseconds": 27699,
+        "inputTokens": 1237,
+        "latencyMilliseconds": 41580,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 5015,
+        "outputTokens": 8474,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "prompt-injection:call-3:explainable-job-posting-extraction",
         "operation": "explainable-job-posting-extraction"
@@ -5569,44 +5563,45 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1185,
-        "latencyMilliseconds": 37075,
+        "inputTokens": 3956,
+        "latencyMilliseconds": 11976,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 6900,
+        "outputTokens": 3062,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "prompt-injection:call-4:explainable-job-posting-extraction",
-        "operation": "explainable-job-posting-extraction"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 3768,
-        "latencyMilliseconds": 13465,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 3197,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "prompt-injection:call-5:explainable-match-evidence",
+        "fixtureId": "prompt-injection:call-4:explainable-match-evidence",
         "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 3750,
-        "latencyMilliseconds": 20266,
+        "inputTokens": 1221,
+        "latencyMilliseconds": 64218,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 4739,
+        "outputTokens": 12711,
+        "unsupportedResumeClaimCount": 0,
+        "fixtureId": "prompt-injection:call-5:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
+      },
+      {
+        "extractionExpectedCount": 0,
+        "extractionMatchedCount": 0,
+        "inputTokens": 7912,
+        "latencyMilliseconds": 32039,
+        "multilingualCheckCount": 0,
+        "multilingualPassedCount": 0,
+        "observedValues": [
+          "answered",
+          "conformance-retry"
+        ],
+        "outputTokens": 7203,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "prompt-injection:call-6:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -5614,14 +5609,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 3768,
-        "latencyMilliseconds": 35374,
+        "inputTokens": 3830,
+        "latencyMilliseconds": 16310,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 7924,
+        "outputTokens": 3570,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "prompt-injection:call-7:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -5629,14 +5624,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 3750,
-        "latencyMilliseconds": 29635,
+        "inputTokens": 3830,
+        "latencyMilliseconds": 17742,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 6340,
+        "outputTokens": 3715,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "prompt-injection:call-8:explainable-match-evidence",
         "operation": "explainable-match-evidence"
@@ -5680,14 +5675,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1206,
-        "latencyMilliseconds": 11503,
+        "inputTokens": 1237,
+        "latencyMilliseconds": 5535,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1808,
+        "outputTokens": 806,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "resume-coherence:call-1:resume-document-coherence",
         "operation": "resume-document-coherence"
@@ -5695,14 +5690,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1244,
-        "latencyMilliseconds": 5624,
+        "inputTokens": 1275,
+        "latencyMilliseconds": 6982,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 822,
+        "outputTokens": 1007,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "resume-coherence:call-2:resume-document-coherence",
         "operation": "resume-document-coherence"
@@ -5710,14 +5705,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1215,
-        "latencyMilliseconds": 3234,
+        "inputTokens": 1246,
+        "latencyMilliseconds": 2521,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 371,
+        "outputTokens": 280,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "resume-coherence:call-3:resume-document-coherence",
         "operation": "resume-document-coherence"
@@ -5731,7 +5726,7 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "multilingualPassedCount": 0,
         "observedValues": [
           "outcome:prepared",
-          "wall-time-milliseconds:46171"
+          "wall-time-milliseconds:65925"
         ],
         "outputTokens": 0,
         "unsupportedResumeClaimCount": 0,
@@ -5746,7 +5741,7 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "multilingualPassedCount": 0,
         "observedValues": [
           "outcome:prepared",
-          "wall-time-milliseconds:51866"
+          "wall-time-milliseconds:88866"
         ],
         "outputTokens": 0,
         "unsupportedResumeClaimCount": 0,
@@ -5761,7 +5756,7 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "multilingualPassedCount": 0,
         "observedValues": [
           "outcome:prepared",
-          "wall-time-milliseconds:53392"
+          "wall-time-milliseconds:57663"
         ],
         "outputTokens": 0,
         "unsupportedResumeClaimCount": 0,
@@ -5784,14 +5779,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1250,
-        "latencyMilliseconds": 2519,
+        "inputTokens": 1245,
+        "latencyMilliseconds": 2558,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 442,
+        "outputTokens": 435,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-1:resume-section-validation",
         "operation": "resume-section-validation"
@@ -5800,13 +5795,13 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
         "inputTokens": 871,
-        "latencyMilliseconds": 983,
+        "latencyMilliseconds": 1198,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 115,
+        "outputTokens": 122,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-2:resume-section-validation",
         "operation": "resume-section-validation"
@@ -5815,13 +5810,13 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
         "inputTokens": 873,
-        "latencyMilliseconds": 1326,
+        "latencyMilliseconds": 1069,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 148,
+        "outputTokens": 141,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-3:resume-section-validation",
         "operation": "resume-section-validation"
@@ -5829,14 +5824,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1289,
-        "latencyMilliseconds": 1518,
+        "inputTokens": 873,
+        "latencyMilliseconds": 1535,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 258,
+        "outputTokens": 146,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-4:resume-section-validation",
         "operation": "resume-section-validation"
@@ -5844,14 +5839,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 873,
-        "latencyMilliseconds": 1326,
+        "inputTokens": 1288,
+        "latencyMilliseconds": 2276,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 159,
+        "outputTokens": 449,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-5:resume-section-validation",
         "operation": "resume-section-validation"
@@ -5859,14 +5854,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 872,
-        "latencyMilliseconds": 1478,
+        "inputTokens": 873,
+        "latencyMilliseconds": 1660,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 180,
+        "outputTokens": 226,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-6:resume-section-validation",
         "operation": "resume-section-validation"
@@ -5874,14 +5869,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1277,
-        "latencyMilliseconds": 2688,
+        "inputTokens": 838,
+        "latencyMilliseconds": 1193,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 443,
+        "outputTokens": 115,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-7:resume-section-validation",
         "operation": "resume-section-validation"
@@ -5889,14 +5884,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 873,
-        "latencyMilliseconds": 1194,
+        "inputTokens": 1275,
+        "latencyMilliseconds": 2272,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 133,
+        "outputTokens": 492,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-8:resume-section-validation",
         "operation": "resume-section-validation"
@@ -5904,14 +5899,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 838,
-        "latencyMilliseconds": 1085,
+        "inputTokens": 913,
+        "latencyMilliseconds": 1578,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 110,
+        "outputTokens": 153,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-9:resume-section-validation",
         "operation": "resume-section-validation"
@@ -5919,14 +5914,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1578,
-        "latencyMilliseconds": 5841,
+        "inputTokens": 868,
+        "latencyMilliseconds": 1998,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 947,
+        "outputTokens": 244,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-10:resume-section-validation",
         "operation": "resume-section-validation"
@@ -5934,14 +5929,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 3179,
-        "latencyMilliseconds": 3016,
+        "inputTokens": 946,
+        "latencyMilliseconds": 1033,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 640,
+        "outputTokens": 115,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-11:resume-section-validation",
         "operation": "resume-section-validation"
@@ -5949,14 +5944,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 910,
-        "latencyMilliseconds": 1094,
+        "inputTokens": 3177,
+        "latencyMilliseconds": 3707,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 83,
+        "outputTokens": 950,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-12:resume-section-validation",
         "operation": "resume-section-validation"
@@ -5964,14 +5959,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 945,
-        "latencyMilliseconds": 1385,
+        "inputTokens": 1815,
+        "latencyMilliseconds": 10354,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 134,
+        "outputTokens": 1882,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-13:resume-section-validation",
         "operation": "resume-section-validation"
@@ -5979,44 +5974,44 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 868,
-        "latencyMilliseconds": 1137,
+        "inputTokens": 4642,
+        "latencyMilliseconds": 22698,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 163,
+        "outputTokens": 3982,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-14:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 4539,
-        "latencyMilliseconds": 14066,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 2161,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-15:resume-document-coherence",
+        "fixtureId": "section-preparation:call-14:resume-document-coherence",
         "operation": "resume-document-coherence"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1276,
-        "latencyMilliseconds": 2899,
+        "inputTokens": 1244,
+        "latencyMilliseconds": 2300,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 537,
+        "outputTokens": 451,
+        "unsupportedResumeClaimCount": 0,
+        "fixtureId": "section-preparation:call-15:resume-section-validation",
+        "operation": "resume-section-validation"
+      },
+      {
+        "extractionExpectedCount": 0,
+        "extractionMatchedCount": 0,
+        "inputTokens": 871,
+        "latencyMilliseconds": 1443,
+        "multilingualCheckCount": 0,
+        "multilingualPassedCount": 0,
+        "observedValues": [
+          "answered"
+        ],
+        "outputTokens": 161,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-16:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6025,13 +6020,13 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
         "inputTokens": 1288,
-        "latencyMilliseconds": 2457,
+        "latencyMilliseconds": 2444,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 413,
+        "outputTokens": 448,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-17:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6040,13 +6035,13 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
         "inputTokens": 873,
-        "latencyMilliseconds": 1265,
+        "latencyMilliseconds": 1505,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 144,
+        "outputTokens": 140,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-18:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6054,14 +6049,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 871,
-        "latencyMilliseconds": 1165,
+        "inputTokens": 1277,
+        "latencyMilliseconds": 2692,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 148,
+        "outputTokens": 539,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-19:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6070,13 +6065,13 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
         "inputTokens": 873,
-        "latencyMilliseconds": 1267,
+        "latencyMilliseconds": 1428,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 155,
+        "outputTokens": 185,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-20:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6085,13 +6080,13 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
         "inputTokens": 873,
-        "latencyMilliseconds": 1340,
+        "latencyMilliseconds": 1566,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 157,
+        "outputTokens": 188,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-21:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6100,13 +6095,13 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
         "inputTokens": 838,
-        "latencyMilliseconds": 1331,
+        "latencyMilliseconds": 1146,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 112,
+        "outputTokens": 74,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-22:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6114,14 +6109,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1249,
-        "latencyMilliseconds": 1634,
+        "inputTokens": 910,
+        "latencyMilliseconds": 1083,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 326,
+        "outputTokens": 116,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-23:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6129,14 +6124,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 913,
-        "latencyMilliseconds": 1250,
+        "inputTokens": 945,
+        "latencyMilliseconds": 1384,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 132,
+        "outputTokens": 175,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-24:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6144,14 +6139,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 3239,
-        "latencyMilliseconds": 3131,
+        "inputTokens": 3218,
+        "latencyMilliseconds": 5619,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 795,
+        "outputTokens": 1571,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-25:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6159,14 +6154,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 945,
-        "latencyMilliseconds": 1074,
+        "inputTokens": 869,
+        "latencyMilliseconds": 3481,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 134,
+        "outputTokens": 704,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-26:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6174,14 +6169,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 867,
-        "latencyMilliseconds": 2305,
+        "inputTokens": 1341,
+        "latencyMilliseconds": 4354,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 306,
+        "outputTokens": 761,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-27:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6189,44 +6184,44 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1666,
-        "latencyMilliseconds": 6077,
+        "inputTokens": 4541,
+        "latencyMilliseconds": 39300,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1111,
+        "outputTokens": 7164,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-28:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 4663,
-        "latencyMilliseconds": 19139,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 3142,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-29:resume-document-coherence",
+        "fixtureId": "section-preparation:call-28:resume-document-coherence",
         "operation": "resume-document-coherence"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1286,
-        "latencyMilliseconds": 1696,
+        "inputTokens": 1277,
+        "latencyMilliseconds": 2195,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 276,
+        "outputTokens": 464,
+        "unsupportedResumeClaimCount": 0,
+        "fixtureId": "section-preparation:call-29:resume-section-validation",
+        "operation": "resume-section-validation"
+      },
+      {
+        "extractionExpectedCount": 0,
+        "extractionMatchedCount": 0,
+        "inputTokens": 1301,
+        "latencyMilliseconds": 1850,
+        "multilingualCheckCount": 0,
+        "multilingualPassedCount": 0,
+        "observedValues": [
+          "answered"
+        ],
+        "outputTokens": 269,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-30:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6234,14 +6229,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 871,
-        "latencyMilliseconds": 1368,
+        "inputTokens": 1251,
+        "latencyMilliseconds": 1514,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 204,
+        "outputTokens": 264,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-31:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6249,14 +6244,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1249,
-        "latencyMilliseconds": 1857,
+        "inputTokens": 873,
+        "latencyMilliseconds": 1014,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 324,
+        "outputTokens": 123,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-32:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6264,14 +6259,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 873,
-        "latencyMilliseconds": 1088,
+        "inputTokens": 871,
+        "latencyMilliseconds": 1713,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 128,
+        "outputTokens": 209,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-33:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6280,13 +6275,13 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
         "inputTokens": 873,
-        "latencyMilliseconds": 1478,
+        "latencyMilliseconds": 1724,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 188,
+        "outputTokens": 218,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-34:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6295,13 +6290,13 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
         "inputTokens": 873,
-        "latencyMilliseconds": 1444,
+        "latencyMilliseconds": 2016,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 130,
+        "outputTokens": 234,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-35:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6310,13 +6305,13 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
         "inputTokens": 838,
-        "latencyMilliseconds": 1301,
+        "latencyMilliseconds": 1044,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 137,
+        "outputTokens": 99,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-36:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6324,14 +6319,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1406,
-        "latencyMilliseconds": 11784,
+        "inputTokens": 913,
+        "latencyMilliseconds": 1372,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1886,
+        "outputTokens": 171,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-37:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6339,14 +6334,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1311,
-        "latencyMilliseconds": 3162,
+        "inputTokens": 2517,
+        "latencyMilliseconds": 3334,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 573,
+        "outputTokens": 834,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-38:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6354,14 +6349,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 913,
-        "latencyMilliseconds": 2619,
+        "inputTokens": 945,
+        "latencyMilliseconds": 1948,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 542,
+        "outputTokens": 199,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-39:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6369,14 +6364,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 2467,
-        "latencyMilliseconds": 4061,
+        "inputTokens": 868,
+        "latencyMilliseconds": 1369,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 894,
+        "outputTokens": 146,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-40:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6384,14 +6379,14 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 868,
-        "latencyMilliseconds": 2115,
+        "inputTokens": 1495,
+        "latencyMilliseconds": 27431,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 271,
+        "outputTokens": 4649,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "section-preparation:call-41:resume-section-validation",
         "operation": "resume-section-validation"
@@ -6399,41 +6394,28 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 950,
-        "latencyMilliseconds": 1015,
+        "inputTokens": 4468,
+        "latencyMilliseconds": 16560,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 81,
+        "outputTokens": 2780,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-42:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 4359,
-        "latencyMilliseconds": 26175,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 4241,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-43:resume-document-coherence",
+        "fixtureId": "section-preparation:call-42:resume-document-coherence",
         "operation": "resume-document-coherence"
       },
       {
         "extractionExpectedCount": 2,
-        "extractionMatchedCount": 2,
+        "extractionMatchedCount": 1,
         "inputTokens": 0,
         "latencyMilliseconds": 0,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
-        "observedValues": [],
+        "observedValues": [
+          "failed:three years of React covered"
+        ],
         "outputTokens": 0,
         "unsupportedResumeClaimCount": 0,
         "fixtureId": "front-end-audit:audited-coverage"
@@ -6463,1910 +6445,12 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "fixtureId": "front-end-audit:tailored-resume-fr",
         "tailoredResumeUsage": {
           "structured": {
-            "inputTokens": 20676,
-            "outputTokens": 22162
+            "inputTokens": 20600,
+            "outputTokens": 37230
           },
           "writing": {
-            "inputTokens": 14788,
-            "outputTokens": 5415
-          }
-        }
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 0,
-        "multilingualCheckCount": 8,
-        "multilingualPassedCount": 8,
-        "observedValues": [],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:tailored-resume-en",
-        "tailoredResumeUsage": {
-          "structured": {
-            "inputTokens": 23439,
-            "outputTokens": 36648
-          },
-          "writing": {
-            "inputTokens": 19189,
-            "outputTokens": 10715
-          }
-        }
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1588,
-        "latencyMilliseconds": 2281,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 523,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-1:structured-source-profile-extraction",
-        "operation": "structured-source-profile-extraction"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1175,
-        "latencyMilliseconds": 41366,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 7698,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-2:explainable-job-posting-extraction",
-        "operation": "explainable-job-posting-extraction"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 3693,
-        "latencyMilliseconds": 12712,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 2996,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-3:explainable-match-evidence",
-        "operation": "explainable-match-evidence"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 3693,
-        "latencyMilliseconds": 17002,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 3847,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-4:explainable-match-evidence",
-        "operation": "explainable-match-evidence"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2162,
-        "latencyMilliseconds": 1851,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 343,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-5:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1175,
-        "latencyMilliseconds": 2740,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 430,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-6:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1523,
-        "latencyMilliseconds": 2873,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 576,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-7:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2182,
-        "latencyMilliseconds": 2861,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 604,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-8:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1157,
-        "latencyMilliseconds": 4899,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 823,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-9:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 765,
-        "latencyMilliseconds": 1451,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 139,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-10:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 824,
-        "latencyMilliseconds": 1259,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 119,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-11:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 783,
-        "latencyMilliseconds": 1021,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 108,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-12:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1330,
-        "latencyMilliseconds": 3952,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 710,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-13:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1489,
-        "latencyMilliseconds": 6636,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1533,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-14:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 817,
-        "latencyMilliseconds": 963,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 86,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-15:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2748,
-        "latencyMilliseconds": 27778,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 4781,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-16:resume-document-coherence",
-        "operation": "resume-document-coherence"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1862,
-        "latencyMilliseconds": 45307,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 8271,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-17:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2054,
-        "latencyMilliseconds": 9405,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1824,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-18:resume-section-validation",
-        "operation": "resume-section-validation"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2946,
-        "latencyMilliseconds": 47588,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 8335,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-19:resume-document-coherence",
-        "operation": "resume-document-coherence"
-      }
-    ],
-    "recordedAt": "2026-10-13T09:30:46.642Z"
-  },
-  {
-    "companion": {
-      "provider": "deepseek",
-      "model": "deepseek-flash",
-      "role": "structured",
-      "operations": {
-        "explainable-job-posting-extraction": {
-          "deadlineMilliseconds": 90000,
-          "maxOutputTokens": 31000,
-          "thinking": "low"
-        },
-        "explainable-match-evidence": {
-          "deadlineMilliseconds": 110000,
-          "maxOutputTokens": 32000,
-          "thinking": "low"
-        },
-        "resume-claim-validation": {
-          "deadlineMilliseconds": 90000,
-          "maxOutputTokens": 24000,
-          "thinking": "low"
-        },
-        "resume-document-coherence": {
-          "deadlineMilliseconds": 90000,
-          "maxOutputTokens": 20000,
-          "thinking": "low"
-        },
-        "resume-section-validation": {
-          "deadlineMilliseconds": 90000,
-          "maxOutputTokens": 20000,
-          "thinking": "low"
-        },
-        "structured-source-profile-extraction": {
-          "deadlineMilliseconds": 90000,
-          "maxOutputTokens": 16000,
-          "thinking": "disabled"
-        }
-      },
-      "pricing": [
-        {
-          "condition": "off-peak, cache miss",
-          "inputUsdPerMillionTokens": 0.15,
-          "outputUsdPerMillionTokens": 0.6
-        },
-        {
-          "condition": "peak, cache miss",
-          "inputUsdPerMillionTokens": 0.3,
-          "outputUsdPerMillionTokens": 1.2
-        }
-      ]
-    },
-    "configuration": {
-      "provider": "deepseek",
-      "model": "deepseek-flash",
-      "role": "writing",
-      "operations": {
-        "resume-claim-writing": {
-          "deadlineMilliseconds": 90000,
-          "maxOutputTokens": 16000,
-          "thinking": "high"
-        },
-        "resume-section-writing": {
-          "deadlineMilliseconds": 90000,
-          "maxOutputTokens": 20000,
-          "thinking": "high"
-        }
-      },
-      "pricing": [
-        {
-          "condition": "off-peak, cache miss",
-          "inputUsdPerMillionTokens": 0.15,
-          "outputUsdPerMillionTokens": 0.6
-        },
-        {
-          "condition": "peak, cache miss",
-          "inputUsdPerMillionTokens": 0.3,
-          "outputUsdPerMillionTokens": 1.2
-        }
-      ]
-    },
-    "datasetId": "resume-tailoring-live-v1",
-    "observations": [
-      {
-        "extractionExpectedCount": 1,
-        "extractionMatchedCount": 1,
-        "inputTokens": 0,
-        "latencyMilliseconds": 0,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "outcome:prepared",
-          "role-family:technology"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:technology-22"
-      },
-      {
-        "extractionExpectedCount": 1,
-        "extractionMatchedCount": 1,
-        "inputTokens": 0,
-        "latencyMilliseconds": 0,
-        "multilingualCheckCount": 1,
-        "multilingualPassedCount": 1,
-        "observedValues": [
-          "outcome:prepared",
-          "role-family:technology"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:technology-24"
-      },
-      {
-        "extractionExpectedCount": 1,
-        "extractionMatchedCount": 1,
-        "inputTokens": 0,
-        "latencyMilliseconds": 0,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "outcome:prepared",
-          "role-family:technology"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:technology-26"
-      },
-      {
-        "extractionExpectedCount": 1,
-        "extractionMatchedCount": 1,
-        "inputTokens": 0,
-        "latencyMilliseconds": 0,
-        "multilingualCheckCount": 1,
-        "multilingualPassedCount": 1,
-        "observedValues": [
-          "outcome:prepared",
-          "role-family:technology"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:technology-28"
-      },
-      {
-        "extractionExpectedCount": 1,
-        "extractionMatchedCount": 1,
-        "inputTokens": 0,
-        "latencyMilliseconds": 0,
-        "multilingualCheckCount": 1,
-        "multilingualPassedCount": 1,
-        "observedValues": [
-          "outcome:prepared",
-          "role-family:technology"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:technology-30"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1677,
-        "latencyMilliseconds": 3872,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 578,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-1:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2243,
-        "latencyMilliseconds": 10525,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1704,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-2:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2236,
-        "latencyMilliseconds": 8077,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1252,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-3:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1670,
-        "latencyMilliseconds": 8126,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1192,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-4:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1673,
-        "latencyMilliseconds": 7618,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1162,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-5:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2239,
-        "latencyMilliseconds": 10069,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1687,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-6:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1771,
-        "latencyMilliseconds": 4829,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 740,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-7:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2245,
-        "latencyMilliseconds": 4081,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 635,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-8:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1679,
-        "latencyMilliseconds": 7269,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1304,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-9:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1783,
-        "latencyMilliseconds": 8470,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1487,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-10:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2247,
-        "latencyMilliseconds": 6981,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1254,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-11:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1681,
-        "latencyMilliseconds": 12302,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 2342,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "cross-segment-writing:call-12:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 1,
-        "extractionMatchedCount": 1,
-        "inputTokens": 0,
-        "latencyMilliseconds": 0,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "outcome:prepared",
-          "wall-time-milliseconds:76546"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 6536,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:experiences.1"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 10338,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:experiences.0"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 3648,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:experiences.3"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 11906,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:experiences.2"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 2853,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:experiences.5"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 3583,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:experiences.4"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 3487,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:experiences.6"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 2592,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:education"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 5168,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:languages"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 50941,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:2"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:value-proposition"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 10549,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:skills"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 5969,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:projects"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 3732,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:certifications"
-      },
-      {
-        "extractionExpectedCount": 1,
-        "extractionMatchedCount": 1,
-        "inputTokens": 0,
-        "latencyMilliseconds": 0,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "outcome:prepared",
-          "wall-time-milliseconds:91203"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 5055,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:experiences.0"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 2727,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:experiences.3"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 10360,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:experiences.2"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 12653,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:value-proposition"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 3249,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:experiences.4"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 3411,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:experiences.5"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 3034,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:experiences.6"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 3110,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:education"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 3837,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:languages"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 19295,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:experiences.1"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 13239,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:skills"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 3528,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:certifications"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 7432,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:projects"
-      },
-      {
-        "extractionExpectedCount": 1,
-        "extractionMatchedCount": 1,
-        "inputTokens": 0,
-        "latencyMilliseconds": 0,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "outcome:prepared",
-          "wall-time-milliseconds:35931"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 7751,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:experiences.1"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 6434,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:experiences.0"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 9403,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:value-proposition"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 9395,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:experiences.2"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 3475,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:experiences.3"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 4064,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:experiences.4"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 3265,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:experiences.5"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 3547,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:experiences.6"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 2664,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:education"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 9616,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:skills"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 4510,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:languages"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 5836,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:projects"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 5104,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "writing-calls:1"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:certifications"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 0,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "failed:preparation wall time over budget",
-          "failed:value-proposition p95 latency over budget"
-        ],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:real-sized-platform-engineer-v1:budgets"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2734,
-        "latencyMilliseconds": 4796,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1042,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-1:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2839,
-        "latencyMilliseconds": 8139,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1563,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-2:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2585,
-        "latencyMilliseconds": 2223,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 341,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-3:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2660,
-        "latencyMilliseconds": 10196,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1954,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-4:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2489,
-        "latencyMilliseconds": 1465,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 366,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-5:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2584,
-        "latencyMilliseconds": 1851,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 359,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-6:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2481,
-        "latencyMilliseconds": 1942,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 322,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-7:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1471,
-        "latencyMilliseconds": 1569,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 244,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-8:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1508,
-        "latencyMilliseconds": 3941,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 650,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-9:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 6651,
-        "latencyMilliseconds": 19817,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 4370,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-10:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 3082,
-        "latencyMilliseconds": 7179,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 2058,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-11:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1466,
-        "latencyMilliseconds": 4822,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 854,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-12:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1535,
-        "latencyMilliseconds": 2232,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 363,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-13:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 7161,
-        "latencyMilliseconds": 17801,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 3735,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-14:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2839,
-        "latencyMilliseconds": 3160,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 640,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-15:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2585,
-        "latencyMilliseconds": 1507,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 265,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-16:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2660,
-        "latencyMilliseconds": 8023,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1587,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-17:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 6651,
-        "latencyMilliseconds": 8330,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1695,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-18:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2584,
-        "latencyMilliseconds": 1739,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 295,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-19:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2489,
-        "latencyMilliseconds": 2019,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 297,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-20:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2481,
-        "latencyMilliseconds": 1738,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 293,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-21:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1471,
-        "latencyMilliseconds": 1620,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 279,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-22:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1508,
-        "latencyMilliseconds": 2759,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 432,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-23:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2734,
-        "latencyMilliseconds": 17544,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 3760,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-24:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 3082,
-        "latencyMilliseconds": 6843,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1764,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-25:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1535,
-        "latencyMilliseconds": 1624,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 244,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-26:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1466,
-        "latencyMilliseconds": 6298,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1225,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-27:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2734,
-        "latencyMilliseconds": 4477,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 880,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-28:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2839,
-        "latencyMilliseconds": 4650,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 995,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-29:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 6651,
-        "latencyMilliseconds": 6420,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1323,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-30:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2660,
-        "latencyMilliseconds": 7679,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1352,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-31:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2585,
-        "latencyMilliseconds": 1871,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 336,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-32:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2584,
-        "latencyMilliseconds": 1944,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 265,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-33:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2489,
-        "latencyMilliseconds": 1833,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 303,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-34:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 2481,
-        "latencyMilliseconds": 1913,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 319,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-35:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1471,
-        "latencyMilliseconds": 1574,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 261,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-36:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 3082,
-        "latencyMilliseconds": 5827,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 1707,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-37:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1508,
-        "latencyMilliseconds": 3376,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 506,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-38:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1466,
-        "latencyMilliseconds": 4118,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 768,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-39:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 1535,
-        "latencyMilliseconds": 3502,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [
-          "answered"
-        ],
-        "outputTokens": 623,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "section-preparation:call-40:resume-section-writing",
-        "operation": "resume-section-writing"
-      },
-      {
-        "extractionExpectedCount": 2,
-        "extractionMatchedCount": 2,
-        "inputTokens": 0,
-        "latencyMilliseconds": 0,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:audited-coverage"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 0,
-        "multilingualCheckCount": 0,
-        "multilingualPassedCount": 0,
-        "observedValues": [],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:writing-defects"
-      },
-      {
-        "extractionExpectedCount": 0,
-        "extractionMatchedCount": 0,
-        "inputTokens": 0,
-        "latencyMilliseconds": 0,
-        "multilingualCheckCount": 8,
-        "multilingualPassedCount": 8,
-        "observedValues": [],
-        "outputTokens": 0,
-        "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:tailored-resume-fr",
-        "tailoredResumeUsage": {
-          "structured": {
-            "inputTokens": 20546,
-            "outputTokens": 18936
-          },
-          "writing": {
-            "inputTokens": 14814,
-            "outputTokens": 8954
+            "inputTokens": 14572,
+            "outputTokens": 12356
           }
         }
       },
@@ -8383,226 +6467,286 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "fixtureId": "front-end-audit:tailored-resume-en",
         "tailoredResumeUsage": {
           "structured": {
-            "inputTokens": 25692,
-            "outputTokens": 26855
+            "inputTokens": 20696,
+            "outputTokens": 38288
           },
           "writing": {
-            "inputTokens": 17998,
-            "outputTokens": 18308
+            "inputTokens": 14572,
+            "outputTokens": 9126
           }
         }
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 2551,
-        "latencyMilliseconds": 4689,
+        "inputTokens": 1588,
+        "latencyMilliseconds": 2054,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1115,
+        "outputTokens": 523,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-1:resume-section-writing",
-        "operation": "resume-section-writing"
+        "fixtureId": "front-end-audit:call-1:structured-source-profile-extraction",
+        "operation": "structured-source-profile-extraction"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 2551,
-        "latencyMilliseconds": 6362,
+        "inputTokens": 1211,
+        "latencyMilliseconds": 45226,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1682,
+        "outputTokens": 8552,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-2:resume-section-writing",
-        "operation": "resume-section-writing"
+        "fixtureId": "front-end-audit:call-2:explainable-job-posting-extraction",
+        "operation": "explainable-job-posting-extraction"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 2814,
-        "latencyMilliseconds": 9342,
+        "inputTokens": 3668,
+        "latencyMilliseconds": 52940,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 1899,
+        "outputTokens": 11969,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-3:resume-section-writing",
-        "operation": "resume-section-writing"
+        "fixtureId": "front-end-audit:call-3:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1455,
-        "latencyMilliseconds": 3122,
+        "inputTokens": 3668,
+        "latencyMilliseconds": 54421,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 480,
+        "outputTokens": 11181,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-4:resume-section-writing",
-        "operation": "resume-section-writing"
+        "fixtureId": "front-end-audit:call-4:explainable-match-evidence",
+        "operation": "explainable-match-evidence"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 2632,
-        "latencyMilliseconds": 11522,
+        "inputTokens": 1473,
+        "latencyMilliseconds": 3649,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 2391,
+        "outputTokens": 805,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-5:resume-section-writing",
-        "operation": "resume-section-writing"
+        "fixtureId": "front-end-audit:call-5:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1455,
-        "latencyMilliseconds": 3186,
+        "inputTokens": 1193,
+        "latencyMilliseconds": 3337,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 472,
+        "outputTokens": 577,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-6:resume-section-writing",
-        "operation": "resume-section-writing"
+        "fixtureId": "front-end-audit:call-6:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1476,
-        "latencyMilliseconds": 1682,
+        "inputTokens": 2186,
+        "latencyMilliseconds": 1914,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 270,
+        "outputTokens": 378,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-7:resume-section-writing",
-        "operation": "resume-section-writing"
+        "fixtureId": "front-end-audit:call-7:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 3886,
-        "latencyMilliseconds": 13394,
+        "inputTokens": 765,
+        "latencyMilliseconds": 1692,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 2799,
+        "outputTokens": 181,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-8:resume-section-writing",
-        "operation": "resume-section-writing"
+        "fixtureId": "front-end-audit:call-8:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 2632,
-        "latencyMilliseconds": 15588,
+        "inputTokens": 765,
+        "latencyMilliseconds": 1559,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 3213,
+        "outputTokens": 158,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-9:resume-section-writing",
-        "operation": "resume-section-writing"
+        "fixtureId": "front-end-audit:call-9:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1476,
-        "latencyMilliseconds": 2113,
+        "inputTokens": 2196,
+        "latencyMilliseconds": 3213,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 320,
+        "outputTokens": 678,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-10:resume-section-writing",
-        "operation": "resume-section-writing"
+        "fixtureId": "front-end-audit:call-10:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 3886,
-        "latencyMilliseconds": 23043,
+        "inputTokens": 1422,
+        "latencyMilliseconds": 2439,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 4729,
+        "outputTokens": 299,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-11:resume-section-writing",
-        "operation": "resume-section-writing"
+        "fixtureId": "front-end-audit:call-11:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 2814,
-        "latencyMilliseconds": 33523,
+        "inputTokens": 824,
+        "latencyMilliseconds": 1458,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 6958,
+        "outputTokens": 153,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-12:resume-section-writing",
-        "operation": "resume-section-writing"
+        "fixtureId": "front-end-audit:call-12:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1626,
-        "latencyMilliseconds": 1619,
+        "inputTokens": 1521,
+        "latencyMilliseconds": 3744,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 250,
+        "outputTokens": 905,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-13:resume-section-writing",
-        "operation": "resume-section-writing"
+        "fixtureId": "front-end-audit:call-13:resume-section-validation",
+        "operation": "resume-section-validation"
       },
       {
         "extractionExpectedCount": 0,
         "extractionMatchedCount": 0,
-        "inputTokens": 1558,
-        "latencyMilliseconds": 4392,
+        "inputTokens": 815,
+        "latencyMilliseconds": 1099,
         "multilingualCheckCount": 0,
         "multilingualPassedCount": 0,
         "observedValues": [
           "answered"
         ],
-        "outputTokens": 684,
+        "outputTokens": 119,
         "unsupportedResumeClaimCount": 0,
-        "fixtureId": "front-end-audit:call-14:resume-section-writing",
-        "operation": "resume-section-writing"
+        "fixtureId": "front-end-audit:call-14:resume-section-validation",
+        "operation": "resume-section-validation"
+      },
+      {
+        "extractionExpectedCount": 0,
+        "extractionMatchedCount": 0,
+        "inputTokens": 1154,
+        "latencyMilliseconds": 2382,
+        "multilingualCheckCount": 0,
+        "multilingualPassedCount": 0,
+        "observedValues": [
+          "answered"
+        ],
+        "outputTokens": 439,
+        "unsupportedResumeClaimCount": 0,
+        "fixtureId": "front-end-audit:call-15:resume-section-validation",
+        "operation": "resume-section-validation"
+      },
+      {
+        "extractionExpectedCount": 0,
+        "extractionMatchedCount": 0,
+        "inputTokens": 1196,
+        "latencyMilliseconds": 3837,
+        "multilingualCheckCount": 0,
+        "multilingualPassedCount": 0,
+        "observedValues": [
+          "answered"
+        ],
+        "outputTokens": 789,
+        "unsupportedResumeClaimCount": 0,
+        "fixtureId": "front-end-audit:call-16:resume-section-validation",
+        "operation": "resume-section-validation"
+      },
+      {
+        "extractionExpectedCount": 0,
+        "extractionMatchedCount": 0,
+        "inputTokens": 2736,
+        "latencyMilliseconds": 20121,
+        "multilingualCheckCount": 0,
+        "multilingualPassedCount": 0,
+        "observedValues": [
+          "answered"
+        ],
+        "outputTokens": 3565,
+        "unsupportedResumeClaimCount": 0,
+        "fixtureId": "front-end-audit:call-17:resume-document-coherence",
+        "operation": "resume-document-coherence"
+      },
+      {
+        "extractionExpectedCount": 0,
+        "extractionMatchedCount": 0,
+        "inputTokens": 2780,
+        "latencyMilliseconds": 12087,
+        "multilingualCheckCount": 0,
+        "multilingualPassedCount": 0,
+        "observedValues": [
+          "answered"
+        ],
+        "outputTokens": 2022,
+        "unsupportedResumeClaimCount": 0,
+        "fixtureId": "front-end-audit:call-18:resume-document-coherence",
+        "operation": "resume-document-coherence"
       }
     ],
-    "recordedAt": "2026-10-13T09:39:21.366Z"
+    "recordedAt": "2026-10-13T10:27:49.178Z"
   }
 ]

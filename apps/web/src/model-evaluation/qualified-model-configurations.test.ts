@@ -59,12 +59,20 @@ describe('qualified model configurations', () => {
     expect(result).toBe(false)
   })
 
-  it.each(['structured', 'writing'] as const)('qualifies deepseek-flash for the %s role, as BAK-167 recorded it', (role) => {
-    const configuration = createDeepSeekModelConfiguration({ model: 'deepseek-flash', role })
+  it('qualifies deepseek-flash for the structured role, as BAK-167 recorded it', () => {
+    const configuration = createDeepSeekModelConfiguration({ model: 'deepseek-flash', role: 'structured' })
 
     const result = isQualifiedModelConfiguration({ configuration })
 
     expect(result).toBe(true)
+  })
+
+  it('keeps deepseek-flash unqualified for the writing role, whose preparations failed on main (BAK-167, BAK-179)', () => {
+    const configuration = createDeepSeekModelConfiguration({ model: 'deepseek-flash', role: 'writing' })
+
+    const result = isQualifiedModelConfiguration({ configuration })
+
+    expect(result).toBe(false)
   })
 
   it.each(['structured', 'writing'] as const)('keeps a DeepSeek model nobody recorded unqualified for the %s role', (role) => {

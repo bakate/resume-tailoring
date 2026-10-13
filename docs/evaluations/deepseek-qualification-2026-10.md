@@ -6,11 +6,16 @@ follows the BAK-171 spike (`deepseek-spike-2026-10.md`) and uses the provider-ne
 
 ## Verdict
 
-**`deepseek-flash` qualifies for both model roles** on `resume-tailoring-live-v1`. All five gates pass, provenance
-safety and prompt injection included. Reports: `qualification-reports/deepseek-structured.json` and
-`qualification-reports/deepseek-writing.json`.
+- **`deepseek-flash` qualifies for the structured role** on `resume-tailoring-live-v1`, on main's pipeline (BAK-174
+  to BAK-177 included). All five gates pass, provenance safety and prompt injection included. Report:
+  `qualification-reports/deepseek-structured.json`.
+- **`deepseek-flash` does not yet qualify for the writing role.** Every gate passes except recall. In about 21
+  real-sized and audit preparations on main's pipeline, 2 ended unprepared, for two different reasons. Report:
+  `qualification-reports/deepseek-writing.json` (`qualified: false`); BAK-179 makes the next failure explain itself.
+- The server therefore still refuses `LANGUAGE_MODEL_PROVIDER=deepseek`: exactly one provider serves both roles.
 
-Getting there took three changes to what BAK-171 recommended. Each was found by a recording that failed:
+Getting the structured role there took three changes to what BAK-171 recommended. Each was found by a recording that
+failed:
 
 1. **Job Posting extraction thinks at `low`, not disabled.** Without thinking, recall was about 60% over three runs of
    the `job-posting-extraction` source (9/16, 11/16, 9/16). Generic duties came back one requirement per phrase, and
@@ -23,48 +28,50 @@ Getting there took three changes to what BAK-171 recommended. Each was found by 
 3. **Structured latency is gated per operation.** Each operation's p95 must stay within its own qualified deadline,
    instead of one 45 s figure over every structured call. Match Evidence has a 110 s deadline (BAK-166).
 
-Two measurement defects were fixed along the way, neither specific to DeepSeek:
+Three measurement defects were fixed along the way, none specific to DeepSeek:
 
-- `cross-segment-writing` counted a prepared document whose prose was too short to read as a failed language check.
-- The language check read education fields. Section writing preserves a qualification and its institution "without
-  invented levels", so an English Tailored Resume that keeps "Licence professionnelle …, Université de Lille" is
-  correct, not a translation miss. Whether a writing model translates a qualification into an invented equivalent
-  level is BAK-178.
+- **`cross-segment-writing`** counted a prepared document whose prose was too short to read as a failed language
+  check.
+- **The front-end audit** found the "3 ans d'expérience minimum en React" requirement by its value only. Since BAK-175 a
+  value names the capability alone, and DeepSeek extracted that line as value "React" with the duration in its excerpt
+  in 3 of 6 replays. Match Evidence covered it every time, yet the audit reported it uncovered. It now matches the
+  excerpt too.
+- **The language check** read education fields. BAK-174 made the same fix on main, which this issue first made on its
+  own: a French qualification kept in an English Tailored Resume is correct, not a translation miss. Whether a writing
+  model translates a qualification into an invented level is BAK-178.
 
-## Qualified configurations
+## Qualified configuration (structured)
 
-`deepseek-flash` for both roles, with thinking and budgets frozen per operation (`language-model-configuration.ts`):
+`deepseek-flash`, with thinking and budgets frozen per operation (`language-model-configuration.ts`):
 
-| Operation | Role | Thinking | Output budget | Deadline |
-| --- | --- | --- | ---: | ---: |
-| Job Posting extraction | structured | `low` | 31,000 | 90 s |
-| Source Profile extraction | structured | disabled | 16,000 | 90 s |
-| Match Evidence | structured | `low` | 32,000 | 110 s |
-| Field validation (section, claim) | structured | `low` | 20,000 / 24,000 | 90 s |
-| Coherence check | structured | `low` | 20,000 | 90 s |
-| Section writing | writing | `high` | 20,000 | 90 s |
-| Claim writing | writing | `high` | 16,000 | 90 s |
+| Operation | Thinking | Output budget | Deadline |
+| --- | --- | ---: | ---: |
+| Job Posting extraction | `low` | 31,000 | 90 s |
+| Source Profile extraction | disabled | 16,000 | 90 s |
+| Match Evidence | `low` | 32,000 | 110 s |
+| Field validation (section, claim) | `low` | 20,000 / 24,000 | 90 s |
+| Coherence check | `low` | 20,000 | 90 s |
 
-`deepseek-v4-pro` was not recorded: the spike dropped it at about five times the cost with equivalent provenance, and
-it missed the 30 s section budget. `deepseek-flash` is therefore the cheapest, and only, passing writing model.
+The writing configuration under test was the same model with thinking `high` for section and claim writing.
+`deepseek-v4-pro` was not recorded: the spike dropped it at about five times the cost with equivalent provenance, and it
+missed the 30 s section budget.
 
-## Gates
+## Gates on main's pipeline
 
-Recorded on 2026-10-13: structured at 09:30 UTC, writing at 09:39 UTC. Both were at peak hours.
+Recorded on 2026-10-13, off-peak: structured at 10:27 UTC, writing at 11:41 UTC.
 
 | Candidate | Recall | Multilingual | Cost per Tailored Resume | p95 latency | Provenance | Qualified |
 | --- | ---: | ---: | ---: | --- | ---: | --- |
-| `deepseek-structured` | 94.4% | 100% | $0.0696 | every operation within its deadline | 0 | yes |
-| `deepseek-writing` | 100% | 100% | $0.0673 | 17,801 ms per Resume Section (limit 30,000) | 0 | yes |
+| `deepseek-structured` | 98.6% | 100% | $0.0701 | every operation within its deadline | 0 | yes |
+| `deepseek-writing` | 90% (floor 100%) | 100% | $0.0533 | 16,817 ms per Resume Section (limit 30,000) | 0 | no |
 | `openai-structured`, for comparison (BAK-176) | 91.3% | 100% | $0.0654 | every operation within its deadline | 0 | yes |
 | `openai-writing`, for comparison | 100% | 100% | $0.0677 | 9,782 ms | 0 | yes |
 
 Per source, structured recall is:
 
-- Job Posting extraction 13/16: "PostgreSQL, Kafka and Kubernetes is required" still yielded no critical requirement
-  per technology. BAK-175 has since changed the extraction instructions for this.
-- Match Evidence 25/26: one Adjacent Evidence case missed.
-- Cross-segment extraction 22/22, coherence 3/3, section preparation 3/3, front-end audit 2/2.
+- Job Posting extraction 16/16, Match Evidence 26/26, cross-segment extraction 22/22, coherence 3/3, section
+  preparation 3/3.
+- Front-end audit 1/2: the "3 years of React" miss above, recorded before the audit's check was fixed.
 
 Provenance safety:
 
@@ -75,80 +82,84 @@ Provenance safety:
   English and in French, and spared the faithful one. That is the cross-employer association the spike saw in 3 of 4
   Value Propositions.
 
+### Why writing does not qualify
+
+Every writing measure passes: language 100%, provenance 0, 16.8 s per Resume Section, no conformance retry over 63
+calls. What fails is preparations that end unprepared. Writing's recall counts them, at a 100% floor:
+
+| Where (main's pipeline) | Preparations | Unprepared | Why |
+| --- | ---: | ---: | --- |
+| `section-preparation`, writing recording at 11:41 | 3 | 1 | The Value Proposition was written twice and the preparation failed. No model call failed, so field validation or the coherence check rejected it twice. The recording keeps no reason. |
+| `section-preparation`, structured recording at 10:27 | 3 | 0 | |
+| Diagnostic replays of the real-sized preparation | 12 | 0 | Not one rejection or rewrite. |
+| Writing re-recording at 11:49, front-end audit (English) | about 3 | 1 | `incoherent-content`: the coherence check kept flagging a skill's category (Redux) after its rewrite. The recording aborted and wrote nothing. |
+
+That is 2 of about 21 preparations (roughly 10%, a small sample), for two different reasons. Field validation and the
+coherence check run on DeepSeek (structured, thinking `low`), so either role may cause them. BAK-171 called out exactly
+these risks:
+
+- the Value Proposition was 5 s from the timeout;
+- OpenAI's own Value Proposition failed validation in 2 of 6 runs in `section-preparation-latency-2026-10-01.md`.
+
+Earlier the same day, on the pipeline before BAK-174 to BAK-177, a writing recording at 09:39 UTC passed every gate.
+It is not kept: the latest recording on main fails, and the qualification follows it.
+
 ## Conformance retry rate per operation
 
-DeepSeek's answers are held to their schema by the call wrapper, which retries one non-conforming answer:
+DeepSeek's answers are held to their schema by the call wrapper, which retries one non-conforming answer.
 
 | Operation | Calls | Retries sent | Retries skipped | Retry rate |
 | --- | ---: | ---: | ---: | ---: |
 | Job Posting extraction | 28 | 0 | 0 | 0% |
 | Source Profile extraction | 3 | 0 | 0 | 0% |
-| Match Evidence | 22 | 0 | 0 | 0% |
-| Section validation | 53 | 0 | 0 | 0% |
+| Match Evidence | 22 | 1 | 0 | 4.5% |
+| Section validation | 51 | 0 | 0 | 0% |
 | Coherence check | 8 | 0 | 0 | 0% |
-| Section writing | 66 | 0 | 0 | 0% |
+| Section writing (writing recording) | 63 | 0 | 0 | 0% |
 
 An earlier recording, with extraction thinking disabled, retried one Job Posting extraction for an invalid schema. The
 retry was also invalid, so the extraction failed.
 
 ## Latency against each operation's deadline
 
-| Operation | p95 | Deadline |
-| --- | ---: | ---: |
-| Job Posting extraction | 37,075 ms | 90,000 ms |
-| Source Profile extraction | 2,874 ms | 90,000 ms |
-| Match Evidence | 29,635 ms | 110,000 ms |
-| Section validation | 9,405 ms | 90,000 ms |
-| Coherence check | 47,588 ms | 90,000 ms |
-| Section writing (per call) | 17,801 ms | 90,000 ms |
+| Operation | p95 at peak (09:30 UTC, before BAK-174 to BAK-177) | p95 off-peak (10:27 UTC, main) | Deadline |
+| --- | ---: | ---: | ---: |
+| Job Posting extraction | 37,075 ms | 45,226 ms | 90,000 ms |
+| Source Profile extraction | 2,874 ms | 2,380 ms | 90,000 ms |
+| Match Evidence | 29,635 ms | 52,940 ms | 110,000 ms |
+| Section validation | 9,405 ms | 5,619 ms | 90,000 ms |
+| Coherence check | 47,588 ms | 39,300 ms | 90,000 ms |
+| Section writing (per call) | 17,801 ms | 14,293 ms | 90,000 ms |
 
-Match Evidence's p95 is 29.6 s against its 110 s deadline, far from the 82 s the spike measured off-peak on the same
-settings. Two more points:
+The pipelines differ between the two columns: BAK-175 and BAK-176 changed the extraction and Match Evidence
+instructions. So the columns show the spread, not a clean peak-versus-off-peak comparison. Every operation stays well
+within its deadline. Two latency risks remain:
 
-- The live `job-posting-extraction` evaluation also holds each extraction call to 45 s. Its 37 s p95 at `low` passes,
-  but with little headroom.
-- Outside the gates, `section-preparation` still reports the **Value Proposition section's p95 over its 30 s budget**,
-  and once the whole preparation over its 90 s wall time. These are live-run checks of `sectionPreparationBudgets`, not
-  gates. They are the latency risk to watch on DeepSeek, as the spike warned (Value Proposition p95 25 s, 5 s from the
-  timeout).
+- The live `job-posting-extraction` evaluation holds each extraction call to 45 s. Thinking at `low` brings the p95 to
+  that bound.
+- Outside the gates, `section-preparation` reports the Value Proposition section's p95 over its 30 s budget on every
+  DeepSeek recording, as the spike warned (Value Proposition p95 25 s, 5 s from the timeout).
 
 ## Cost per Tailored Resume
 
 Cost is measured on real preparations: the front-end audit's intake, Job Match and section-by-section preparation, both
 roles, in French and in English, through the production adapters. It prices the most expensive Tailored Resume
-observed, at **cache-miss** rates only, so none of the spike's cache-hit discount is counted. Token counts don't
-depend on the hour, so the same tokens are priced at each of DeepSeek's rates:
+observed, at **cache-miss** rates only, so none of the spike's cache-hit discount is counted. Token counts don't depend
+on the hour, so the same tokens are priced at each of DeepSeek's rates:
 
 | Recording | Off-peak | Peak (01:00–04:00 and 06:00–10:00 UTC, weekdays) |
 | --- | ---: | ---: |
-| `deepseek-structured` (its own front-end audit) | $0.0348 | $0.0696 |
-| `deepseek-writing` (its own front-end audit) | $0.0337 | $0.0673 |
+| `deepseek-structured` (main, 10:27) | $0.0350 | $0.0701 |
+| `deepseek-writing` (main, 11:41) | $0.0266 | $0.0533 |
+| `deepseek-structured` (before BAK-174 to BAK-177, 09:30) | $0.0348 | $0.0696 |
 
-The cost gate reads the peak, cache-miss rate, against $0.12. A Tailored Resume costs about **$0.035 off-peak and
-$0.07 at peak**. OpenAI's recordings price one at $0.065–0.068, and production at about $0.10. So:
+A Tailored Resume costs about **$0.035 off-peak and $0.07 at peak**. OpenAI's recordings price one at $0.065–0.068,
+and production at about $0.10. So:
 
 - DeepSeek is about half OpenAI's cost off-peak.
-- At peak, which covers the French morning, it is on par with OpenAI's recordings: the saving the spike expected
-  there is small.
+- At peak, which covers the French morning, it is on par with OpenAI's recordings: the saving the spike expected there
+  is small.
 - BAK-168 sets its budget from these numbers.
-
-Latency was measured at peak only. No off-peak recording was made on the qualified configuration.
-
-## Recorded before BAK-174 to BAK-177
-
-These recordings ran on the pipeline as of BAK-166 plus this issue's changes. Four changes merged to main the same
-morning, before this issue:
-
-- the extraction instructions give each technical capability listed in one sentence its own critical requirement
-  (BAK-175);
-- Match Evidence coverage instructions and validation changed (BAK-176);
-- a Resume Section is timed by its own calls, without the wait before its coherence rewrite (BAK-177);
-- education and certifications are left out of the language check (BAK-174).
-
-A Qualified Model Configuration is matched on its settings, not its prompts, so these recordings still qualify
-`deepseek-flash`. A recording keeps no prompt or answer, so they cannot be replayed on the new prompts. Re-recording both
-candidates measures DeepSeek on main's pipeline. It takes about 25 minutes and less than $1 of DeepSeek credit at peak,
-roughly half off-peak.
 
 ## Reproduce
 
@@ -156,3 +167,5 @@ roughly half off-peak.
 DEEPSEEK_API_KEY=... pnpm test:evaluation:record deepseek-structured
 DEEPSEEK_API_KEY=... pnpm test:evaluation:record deepseek-writing
 ```
+
+A complete pair costs less than $1 of DeepSeek credit at peak, roughly half off-peak, and takes about 25 minutes.
