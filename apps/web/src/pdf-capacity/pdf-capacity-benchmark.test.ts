@@ -5,6 +5,7 @@ import { runPdfCapacityScenario } from './pdf-capacity-benchmark'
 describe('PDF capacity benchmark', () => {
   it('runs the requested load without exceeding target concurrency', async () => {
     const renderTracker = createConcurrencyTrackingRenderer()
+
     const result = await runPdfCapacityScenario({
       readResidentMemoryBytes: readFixedResidentMemory,
       renderPdf: renderTracker.renderPdf,
@@ -24,6 +25,7 @@ describe('PDF capacity benchmark', () => {
 
   it('aborts an overdue render and records a timeout', async () => {
     const cleanupTracker = createTimeoutCleanupTracker()
+
     const result = await runPdfCapacityScenario({
       readResidentMemoryBytes: () => Promise.resolve({ ok: true, value: 1 } as const),
       renderPdf: cleanupTracker.renderPdf,

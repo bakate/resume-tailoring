@@ -117,7 +117,9 @@ describe('server environment validation', () => {
 
 describe('Language Model selection', () => {
   it('validates the provider and its model settings without the provider key, so the landing never needs it', () => {
-    expect(readLanguageModelSelection({ environment: {} })).toEqual({ ok: true, value: {
+    const selection = readLanguageModelSelection({ environment: {} })
+
+    expect(selection).toEqual({ ok: true, value: {
       provider: 'openai', structured: { active: qualifiedStructured }, writing: { active: qualifiedWriting },
     } })
   })
@@ -127,6 +129,8 @@ describe('Language Model selection', () => {
     { OPENAI_STRUCTURED_MODEL: 'unqualified-model' },
     { OPENAI_WRITING_REASONING_EFFORT: 'high' },
   ])('refuses a selection without a Qualified Model Configuration: %o', (environment) => {
-    expect(readLanguageModelSelection({ environment }).ok).toBe(false)
+    const selection = readLanguageModelSelection({ environment })
+
+    expect(selection.ok).toBe(false)
   })
 })

@@ -12,11 +12,15 @@ describe('Locale resolution on the server', () => {
     { acceptLanguage: 'de-DE,es;q=0.8', locale: 'en' },
     { acceptLanguage: 'fr;q=0, en', locale: 'en' },
   ] as const)('reads $locale from Accept-Language "$acceptLanguage"', ({ acceptLanguage, locale }) => {
-    expect(readRequestLocale({ acceptLanguage })).toBe(locale)
+    const resolvedLocale = readRequestLocale({ acceptLanguage })
+
+    expect(resolvedLocale).toBe(locale)
   })
 
   it.each([undefined, '', '*'])('renders French, like the search metadata, when the request states no language (%j)', (acceptLanguage) => {
-    expect(readRequestLocale({ acceptLanguage })).toBe('fr')
+    const resolvedLocale = readRequestLocale({ acceptLanguage })
+
+    expect(resolvedLocale).toBe('fr')
   })
 })
 
@@ -27,7 +31,9 @@ describe('Locale resolution in the browser', () => {
     { storedLocale: 'de', languages: ['de', 'fr'], locale: 'fr' },
     { storedLocale: null, languages: ['de'], locale: 'en' },
   ] as const)('prefers the stored $storedLocale over $languages', ({ languages, locale, storedLocale }) => {
-    expect(readBrowserLocale({ languages, storedLocale })).toBe(locale)
+    const resolvedLocale = readBrowserLocale({ languages, storedLocale })
+
+    expect(resolvedLocale).toBe(locale)
   })
 
   it.each([

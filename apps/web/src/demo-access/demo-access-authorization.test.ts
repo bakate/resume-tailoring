@@ -15,19 +15,23 @@ const nowMilliseconds = Date.UTC(2026, 8, 27, 12)
 
 describe('demo access authorization', () => {
   it('allows requests when protection is disabled', () => {
-    expect(readDemoAccessDecision({
+    const decision = readDemoAccessDecision({
       cookieHeader: '',
       environment: {},
       nowMilliseconds,
-    })).toEqual({ ok: true, value: { access: 'granted', mode: 'disabled' } })
+    })
+
+    expect(decision).toEqual({ ok: true, value: { access: 'granted', mode: 'disabled' } })
   })
 
   it('asks for a challenge without a signed session', () => {
-    expect(readDemoAccessDecision({
+    const decision = readDemoAccessDecision({
       cookieHeader: '',
       environment,
       nowMilliseconds,
-    })).toEqual({
+    })
+
+    expect(decision).toEqual({
       ok: true,
       value: { access: 'challenge-required', siteKey: 'turnstile-site-key' },
     })
@@ -39,11 +43,13 @@ describe('demo access authorization', () => {
       sessionSecret: environment.DEMO_SESSION_SECRET,
     })
 
-    expect(readDemoAccessDecision({
+    const decision = readDemoAccessDecision({
       cookieHeader,
       environment,
       nowMilliseconds: nowMilliseconds + 1_000,
-    })).toEqual({ ok: true, value: { access: 'granted', mode: 'enforced' } })
+    })
+
+    expect(decision).toEqual({ ok: true, value: { access: 'granted', mode: 'enforced' } })
   })
 
   it('rejects a protected request without a signed session', async () => {
@@ -64,12 +70,11 @@ describe('demo access authorization', () => {
       issuedAtMilliseconds: nowMilliseconds,
       sessionSecret: environment.DEMO_SESSION_SECRET,
     })
-    const response = createDemoAccessGuardResponse({
-      environment,
-      request: new Request('https://demo.example/api/match-analysis', {
-        headers: { cookie: cookieHeader },
-      }),
+    const request = new Request('https://demo.example/api/match-analysis', {
+      headers: { cookie: cookieHeader },
     })
+
+    const response = createDemoAccessGuardResponse({ environment, request })
 
     expect(response?.status).toBe(403)
     await expect(response?.json()).resolves.toEqual({

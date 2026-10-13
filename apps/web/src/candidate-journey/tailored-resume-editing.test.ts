@@ -36,6 +36,7 @@ describe('Tailored Resume field editing', () => {
   it('removes, restores, and reorders individual fields', () => {
     const reference = readResumeFields({ resume }).at(0)
     if (reference === undefined) throw new Error('Expected a Resume Field')
+
     const hiddenResume = removeResumeField({ location: reference.location, resume })
     const restoredResume = restoreResumeField({
       hiddenField: { field: reference.field, location: reference.location },

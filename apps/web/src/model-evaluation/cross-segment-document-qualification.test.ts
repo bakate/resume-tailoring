@@ -16,22 +16,39 @@ describe('cross-segment document qualification harness', () => {
     expect(report.outcomes.every(({ exportBlockers }) => exportBlockers.includes('layout-unavailable'))).toBe(true)
   })
 
+  it('reports no unsupported field in the reference document of a scenario with relevant evidence', () => {
+    const fixture = findFixtureWithRelevantEvidence()
+    const document = createQualificationResume({ fixture })
+
+    const unsupportedFields = findUnsupportedFields({ document, fixture })
+
+    expect(unsupportedFields).toEqual([])
+  })
+
   it('reports a professional statement whose number is absent from the cited evidence', () => {
-    const fixture = crossSegmentQualificationCorpus.fixtures.find(({ relevantFactIds }) => relevantFactIds.length > 0)
-    if (fixture === undefined) throw new Error('The corpus needs a scenario with relevant evidence')
+    const fixture = findFixtureWithRelevantEvidence()
     const document = createQualificationResume({ fixture })
     const inflated = { ...document, valueProposition: { ...document.valueProposition,
       paragraphs: document.valueProposition.paragraphs.map((paragraph) => ({ ...paragraph, text: `${paragraph.text} Led 40 people.` })) } }
 
-    expect(findUnsupportedFields({ document, fixture })).toEqual([])
-    expect(findUnsupportedFields({ document: inflated, fixture })).toEqual(['summary'])
+    const unsupportedFields = findUnsupportedFields({ document: inflated, fixture })
+
+    expect(unsupportedFields).toEqual(['summary'])
   })
 
   it('writes a non-tailored reference document when a scenario has no relevant evidence', () => {
     const fixture = crossSegmentQualificationCorpus.fixtures.find(({ relevantFactIds }) => relevantFactIds.length === 0)
     if (fixture === undefined) throw new Error('The corpus needs a scenario without relevant evidence')
 
-    expect(createQualificationResume({ fixture })).toMatchObject({ purpose: 'normalized', targetRole: null,
+    const document = createQualificationResume({ fixture })
+
+    expect(document).toMatchObject({ purpose: 'normalized', targetRole: null,
       valueProposition: { kind: 'evidence-excerpts', paragraphs: [] } })
   })
 })
+
+function findFixtureWithRelevantEvidence() {
+  const fixture = crossSegmentQualificationCorpus.fixtures.find(({ relevantFactIds }) => relevantFactIds.length > 0)
+  if (fixture === undefined) throw new Error('The corpus needs a scenario with relevant evidence')
+  return fixture
+}

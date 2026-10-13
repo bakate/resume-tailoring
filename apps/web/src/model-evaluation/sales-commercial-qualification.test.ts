@@ -8,16 +8,22 @@ import {
 
 describe('sales and commercial qualification corpus', () => {
   it('contains twenty reviewed French and English commercial scenarios', () => {
-    expect(salesCommercialQualificationCorpus.fixtures).toHaveLength(20)
-    expect(new Set(salesCommercialQualificationCorpus.fixtures.map(({ roleFamily }) => roleFamily))).toEqual(new Set(['sales']))
-    expect(salesCommercialQualificationCorpus.fixtures.map(({ id }) => id)).toEqual([
+    const { fixtures } = salesCommercialQualificationCorpus
+
+    const composition = { fixtureCount: fixtures.length, roleFamilies: new Set(fixtures.map(({ roleFamily }) => roleFamily)), ids: fixtures.map(({ id }) => id),
+      french: fixtures.filter(({ jobPosting }) => jobPosting.includes('[FR]')),
+      english: fixtures.filter(({ jobPosting }) => jobPosting.includes('[EN]')) }
+
+    expect(composition.fixtureCount).toBe(20)
+    expect(composition.roleFamilies).toEqual(new Set(['sales']))
+    expect(composition.ids).toEqual([
       'sales-01', 'sales-02', 'sales-03', 'sales-04', 'sales-05',
       'sales-06', 'sales-07', 'sales-08', 'sales-09', 'sales-10',
       'sales-11', 'sales-12', 'sales-13', 'sales-14', 'sales-15',
       'sales-16', 'sales-17', 'sales-18', 'sales-19', 'sales-20',
     ])
-    expect(salesCommercialQualificationCorpus.fixtures.filter(({ jobPosting }) => jobPosting.includes('[FR]'))).toHaveLength(10)
-    expect(salesCommercialQualificationCorpus.fixtures.filter(({ jobPosting }) => jobPosting.includes('[EN]'))).toHaveLength(10)
+    expect(composition.french).toHaveLength(10)
+    expect(composition.english).toHaveLength(10)
   })
 
   it('qualifies sales extraction, matching, evidence, score, provenance, and export independently', () => {

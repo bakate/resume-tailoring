@@ -152,27 +152,45 @@ describe('Tailored Resume export document', () => {
     expect(canExport).toBe(false)
   })
 
-  it('requires an identity and one contact method while keeping optional details optional', () => {
-    expect(hasValidTailoredResumeExport(source)).toBe(true)
-    expect(hasValidTailoredResumeExport({ ...source, tailoredResume: { ...source.tailoredResume, identity: null } })).toBe(false)
+  it('exports a resume with an identity and one contact method while keeping optional details optional', () => {
+    const canExport = hasValidTailoredResumeExport(source)
+
+    expect(canExport).toBe(true)
+  })
+
+  it('requires an identity to export', () => {
+    const anonymous = { ...source, tailoredResume: { ...source.tailoredResume, identity: null } }
+
+    const canExport = hasValidTailoredResumeExport(anonymous)
+
+    expect(canExport).toBe(false)
   })
 
   it('validates professional provenance independently from local contact details', () => {
-    expect(hasValidTailoredResumeProvenance({
-      ...source,
-      tailoredResume: { ...source.tailoredResume, contactDetails: [] },
-    })).toBe(true)
-    expect(hasValidTailoredResumeProvenance({
+    const withoutContacts = { ...source, tailoredResume: { ...source.tailoredResume, contactDetails: [] } }
+
+    const hasValidProvenance = hasValidTailoredResumeProvenance(withoutContacts)
+
+    expect(hasValidProvenance).toBe(true)
+  })
+
+  it('rejects professional provenance linked to a missing Candidate Fact', () => {
+    const unsupported: Parameters<typeof hasValidTailoredResumeProvenance>[0] = {
       ...source,
       tailoredResume: {
         ...source.tailoredResume,
         valueProposition: { kind: 'prose', paragraphs: [{ id: 'summary-1', factIds: ['source-fact-missing'], text: 'Unsupported' }] },
       },
-    })).toBe(false)
+    }
+
+    const hasValidProvenance = hasValidTailoredResumeProvenance(unsupported)
+
+    expect(hasValidProvenance).toBe(false)
   })
 
   it('renders standard ATS-readable sections from provenance-backed fields', () => {
     const html = renderTailoredResumeDocument({ tailoredResume: source.tailoredResume })
+
     expect(html).toContain('<h1>Ada Lovelace</h1>')
     expect(html).toContain('<h2>Summary</h2>')
     expect(html).toContain('<h2>Skills</h2>')

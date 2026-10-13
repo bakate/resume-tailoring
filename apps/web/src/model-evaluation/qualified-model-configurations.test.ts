@@ -9,17 +9,28 @@ import {
 } from './qualified-model-configurations'
 
 describe('qualified model configurations', () => {
+  it('records only passing qualification reports', () => {
+    const reports = recordedModelQualificationReports
+
+    const failingReports = reports.filter(({ qualified }) => !qualified)
+
+    expect(failingReports).toEqual([])
+  })
+
   it('derives fallback eligibility from passing recorded reports', () => {
-    expect(recordedModelQualificationReports.every(({ qualified }) => qualified)).toBe(true)
-    expect(isQualifiedModelConfiguration({ configuration: createOpenAiModelConfiguration({
-      model: 'gpt-6-luna', reasoningEffort: 'low', role: 'structured',
-    }) })).toBe(true)
+    const configuration = createOpenAiModelConfiguration({ model: 'gpt-6-luna', reasoningEffort: 'low', role: 'structured' })
+
+    const qualified = isQualifiedModelConfiguration({ configuration })
+
+    expect(qualified).toBe(true)
   })
 
   it('rejects a configuration without a passing recorded report', () => {
-    expect(isQualifiedModelConfiguration({ configuration: createOpenAiModelConfiguration({
-      model: 'gpt-6-sol', reasoningEffort: 'medium', role: 'structured',
-    }) })).toBe(false)
+    const configuration = createOpenAiModelConfiguration({ model: 'gpt-6-sol', reasoningEffort: 'medium', role: 'structured' })
+
+    const qualified = isQualifiedModelConfiguration({ configuration })
+
+    expect(qualified).toBe(false)
   })
 
   it.each([

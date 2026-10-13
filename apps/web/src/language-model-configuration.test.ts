@@ -7,7 +7,9 @@ const qualifiedStructured = createOpenAiModelConfiguration({ model: 'gpt-6-luna'
 
 describe('Qualified Model Configuration', () => {
   it('freezes stateless requests and strict Structured Outputs for OpenAI', () => {
-    expect(qualifiedStructured).toEqual({ provider: 'openai', model: 'gpt-6-luna', role: 'structured',
+    const configuration = createOpenAiModelConfiguration({ model: 'gpt-6-luna', reasoningEffort: 'low', role: 'structured' })
+
+    expect(configuration).toEqual({ provider: 'openai', model: 'gpt-6-luna', role: 'structured',
       providerOptions: { reasoningEffort: 'low', store: false, strictJsonSchema: true } })
   })
 

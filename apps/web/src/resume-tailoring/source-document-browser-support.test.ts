@@ -7,7 +7,9 @@ import { sourceDocumentBrowserSupportPolicy } from './source-document-browser-su
 
 describe('Source Document browser support policy', () => {
   it('requires an explicit compatibility review when PDF.js changes', () => {
-    expect(pdfJsPackage.version).toBe(sourceDocumentBrowserSupportPolicy.validatedPdfJsVersion)
+    const installedPdfJsVersion = pdfJsPackage.version
+
+    expect(installedPdfJsVersion).toBe(sourceDocumentBrowserSupportPolicy.validatedPdfJsVersion)
   })
 
   it('pre-bundles every package the PDF worker imports so the first PDF read does not reload dev', async () => {

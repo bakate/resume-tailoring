@@ -28,7 +28,9 @@ describe('Processing Policy derived from the active Language Model Provider', ()
   })
 
   it('keeps the OpenAI Processing Policy Candidates already consented to', () => {
-    expect(createProcessingPolicy({ provider: 'openai' })).toEqual(consentedOpenAiProcessingPolicy)
+    const policy = createProcessingPolicy({ provider: 'openai' })
+
+    expect(policy).toEqual(consentedOpenAiProcessingPolicy)
   })
 
   it('gives every provider its own policy version, so a provider change always asks for new consent', () => {
@@ -42,12 +44,15 @@ describe('Processing Policy derived from the active Language Model Provider', ()
     const serverEnvironment = validateServerEnvironment({ environment })
     if (!serverEnvironment.ok) throw new Error('The test environment is valid')
 
-    expect(readActiveProcessingPolicy({ environment }))
-      .toEqual(createProcessingPolicy({ provider: serverEnvironment.value.languageModel.provider }))
+    const policy = readActiveProcessingPolicy({ environment })
+
+    expect(policy).toEqual(createProcessingPolicy({ provider: serverEnvironment.value.languageModel.provider }))
   })
 
   it('states the policy without the provider key, so the landing renders it wherever the key lives', () => {
-    expect(readActiveProcessingPolicy({ environment: {} })).toEqual(createProcessingPolicy({ provider: 'openai' }))
+    const policy = readActiveProcessingPolicy({ environment: {} })
+
+    expect(policy).toEqual(createProcessingPolicy({ provider: 'openai' }))
   })
 
   it.each([

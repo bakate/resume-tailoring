@@ -14,6 +14,8 @@ describe('Model request failures as API failures', () => {
     [{ type: 'upstream-failure', status: 503 }, { type: 'provider-unavailable' }],
     [{ type: 'transport' }, { type: 'provider-unavailable' }],
   ] as const)('reads %o as %o without naming the operation', (failure, apiFailure) => {
-    expect(readModelApiFailure(failure)).toEqual(apiFailure)
+    const translatedFailure = readModelApiFailure(failure)
+
+    expect(translatedFailure).toEqual(apiFailure)
   })
 })
