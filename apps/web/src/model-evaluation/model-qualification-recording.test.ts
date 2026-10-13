@@ -7,6 +7,7 @@ import { createModelEvaluationObservation, type ModelObservationSource } from '.
 import {
   mergeRecordedRuns,
   recordModelQualification,
+  renderQualificationReport,
   renderRecordedRunsModule,
 } from './model-qualification-recording'
 
@@ -48,6 +49,15 @@ describe('recording a Qualified Model Configuration candidate', () => {
     expect(module).toContain('export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRun[] = [')
     expect(module).toContain('"recordedAt": "2026-10-12T10:00:00.000Z"')
     expect(module.endsWith('\n')).toBe(true)
+  })
+
+  it('writes the report without the observations the recorded runs already hold', async () => {
+    const { recordedRun, report } = await recordModelQualification({ ...recording, candidateId: 'scripted-structured' })
+
+    const written = JSON.parse(renderQualificationReport({ recordedRun, report })) as Record<string, unknown>
+
+    expect(Object.keys(written)).toEqual(['configuration', 'datasetId', 'recordedAt', 'gates', 'qualified'])
+    expect(written.recordedAt).toBe(recordedRun.recordedAt)
   })
 })
 

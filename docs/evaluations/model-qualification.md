@@ -20,7 +20,8 @@ then writes:
 
 - its observations into `recorded-live-model-evaluation-runs.ts`, under dataset `resume-tailoring-live-v1`, replacing an
   earlier run of the very same configuration;
-- its JSON report into `docs/evaluations/qualification-reports/<candidate>.json`.
+- its JSON report into `docs/evaluations/qualification-reports/<candidate>.json`: the configuration, `recordedAt`, the
+  gates and the verdict. Its observations stay in the recorded runs alone.
 
 The run is recorded whether or not the candidate qualifies; `isQualifiedModelConfiguration` only accepts a passing one.
 The provider key comes from the local environment only (`languageModelApiKeyVariables`) and signs calls; it never
