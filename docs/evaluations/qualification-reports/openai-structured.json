@@ -2,13 +2,7 @@
   "configuration": {
     "provider": "openai",
     "model": "gpt-6-luna",
-    "pricing": [
-      {
-        "condition": "standard",
-        "inputUsdPerMillionTokens": 0.1,
-        "outputUsdPerMillionTokens": 0.5
-      }
-    ],
+    "role": "structured",
     "providerOptions": {
       "reasoningEffort": "low",
       "store": false,
@@ -40,10 +34,16 @@
         "maxOutputTokens": 16000
       }
     },
-    "role": "structured"
+    "pricing": [
+      {
+        "condition": "standard",
+        "inputUsdPerMillionTokens": 0.1,
+        "outputUsdPerMillionTokens": 0.5
+      }
+    ]
   },
   "datasetId": "resume-tailoring-live-v1",
-  "recordedAt": "2026-10-13T06:56:27.228Z",
+  "recordedAt": "2026-10-13T08:54:50.866Z",
   "gates": {
     "provenanceSafety": {
       "passed": true,
@@ -54,7 +54,7 @@
     "extractionRecall": {
       "passed": true,
       "threshold": 0.9,
-      "value": 0.942
+      "value": 0.913
     },
     "multilingualFidelity": {
       "passed": true,
@@ -64,12 +64,12 @@
     "costUsd": {
       "passed": true,
       "threshold": 0.12,
-      "value": 0.0569438
+      "value": 0.0653632
     },
     "p95LatencyMilliseconds": {
       "passed": true,
       "threshold": 45000,
-      "value": 9093
+      "value": 8834
     }
   },
   "qualified": true
