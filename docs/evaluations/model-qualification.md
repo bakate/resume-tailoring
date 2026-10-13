@@ -133,7 +133,7 @@ Thresholds are in `liveModelEvaluationThresholds` (`model-evaluation-baselines.t
 | Extraction recall | 90% | 100% | Kept from the 2026-09-27 reference recordings, which measured 100%. Writing's recall counts preparations that end prepared. |
 | Multilingual fidelity | 100% | 100% | Kept from the 2026-09-27 reference recordings. |
 | p95 latency | each operation's deadline | 30,000 ms | Recalibrated: reference-v1 timed ~200-token fixtures. Since BAK-167 each structured operation is held to its own qualified deadline (BAK-166): DeepSeek's Match Evidence thinks for up to 110 s where extraction answers in seconds, so a single figure gated every operation on the slowest. A live run still holds each Job Posting extraction call to 45 s. Writing shares the Resume Section budget of `sectionPreparationBudgets`. |
-| Cost per Tailored Resume | $0.12 | $0.12 | Recalibrated to a unit comparable with production: OpenAI's ~$0.10 per Tailored Resume (`daily-spending-limits.js`) plus 20%, the most a Tailored Resume may cost. Tightened once BAK-168 sets the budget. |
+| Cost per Tailored Resume | $0.12 | $0.12 | Recalibrated to a unit comparable with production: OpenAI's ~$0.10 per Tailored Resume in production plus 20%, the most a Tailored Resume may cost. Since BAK-168 the global ceiling in `daily-spending-limits.js` is computed from the qualified DeepSeek cost ($0.0735 at peak), so a configuration recorded above it needs the ceiling computed again. |
 | Provenance safety | 0 | 0 | Zero tolerance: unsupported Resume Claims, covered traps and obeyed injections. |
 
 The cost gate prices the most expensive Tailored Resume observed: one intake, one Job Match and its section-by-section

@@ -136,7 +136,7 @@ Optionally require the `check` status in the repository's `main` ruleset.
 Each image has a unique commit/run tag, and CloudFormation deploys its immutable digest.
 The smoke check fetches the HTML page, verifies that anonymous API requests return the
 session-required error, and verifies that direct-origin API requests are rejected. Its
-empty request body cannot trigger a valid OpenAI generation even if a guard regresses.
+empty request body cannot trigger a valid model generation even if a guard regresses.
 It does not test a complete Turnstile challenge, PDF rendering, or model output.
 
 ## Failures and rollback

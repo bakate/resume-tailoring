@@ -4,7 +4,8 @@
 const dailyBudgetUsd = 4.5
 /**
  * The most expensive qualified recording of a Tailored Resume on DeepSeek, at its peak, cache-miss price (BAK-168,
- * docs/evaluations/deepseek-qualification-2026-10.md); off-peak it costs half.
+ * docs/evaluations/deepseek-qualification-2026-10.md); off-peak it costs half. Recordings may under-price production:
+ * OpenAI's priced one at $0.065-0.068 where production measured about $0.10. Measure it again on production.
  */
 const peakCostPerTailoredResumeUsd = 0.0735
 
@@ -15,7 +16,7 @@ const peakCostPerTailoredResumeUsd = 0.0735
 export const dailyLimits = {
   /** The Daily Quota: Tailored Resumes one client network may start per day. */
   dailyQuota: 8,
-  /** Tailored Resumes all Candidates together may start per day: the daily budget at the peak cost, 61. */
+  /** Tailored Resumes all Candidates together may start per day: the daily budget at the peak cost. */
   preparationsOverall: Math.floor(dailyBudgetUsd / peakCostPerTailoredResumeUsd),
   /** Model-backed requests per client network: eight journeys with edits stay under 500, so it only stops loops. */
   modelRequestsPerClient: 530,

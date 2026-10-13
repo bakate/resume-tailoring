@@ -16,8 +16,9 @@ export const sectionPreparationBudgets = {
 /** The live evaluations of today's pipeline (BAK-172), which replaced the 2026-09-27 reference recordings. */
 export const liveModelEvaluationDatasetId = 'resume-tailoring-live-v1'
 
-// Cost is per Tailored Resume, both roles at their upper-bound rates: OpenAI's ~$0.10 in production
-// (daily-spending-limits.js) plus 20%, the most a Tailored Resume may cost. Tighten it once BAK-168 sets the budget.
+// Cost is per Tailored Resume, both roles at their upper-bound rates: OpenAI's ~$0.10 in production plus 20%, the most
+// a Tailored Resume may cost. The global ceiling assumes the qualified DeepSeek cost instead (daily-spending-limits.js,
+// BAK-168): a configuration recorded above it needs the ceiling computed again.
 const maximumUsdPerTailoredResume = 0.12
 
 /**

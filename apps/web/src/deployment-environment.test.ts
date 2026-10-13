@@ -50,11 +50,16 @@ describe('production deployment environment', () => {
     })
   })
 
-  it('holds no key or setting of a provider it does not call', () => {
-    const environment = readDeployedEnvironment()
+  it('sets no setting of a provider it does not call', () => {
+    const settingNames = Object.keys(readDeployedEnvironment())
 
-    expect(Object.keys(environment).filter((name) => name.startsWith('OPENAI_'))).toEqual([])
-    expect(readTemplate()).not.toContain('OpenAiApiKey')
+    expect(settingNames).not.toContainEqual(expect.stringMatching(/^OPENAI_/u))
+  })
+
+  it('takes no key of a provider it does not call', () => {
+    const template = readTemplate()
+
+    expect(template).not.toContain('OpenAiApiKey')
   })
 })
 
