@@ -99,7 +99,7 @@ The unambiguous role title copied from an exact Job Posting excerpt. It orients 
 _Avoid_: Inferred title, desired role, generated headline
 
 **Job Requirement**:
-One assessable capability that a Job Posting explicitly asks for, as a qualification, responsibility, or expectation, backed by an exact source excerpt, assigned a Capability Dimension, and reviewed with a Requirement Importance. Generic duties listed together in one sentence form a single Job Requirement rather than one per phrase.
+One assessable capability that a Job Posting explicitly asks for, as a qualification, responsibility, or expectation, backed by an exact source excerpt, assigned a Capability Dimension, and reviewed with a Requirement Importance. Generic duties listed together in one sentence form a single Job Requirement rather than one per phrase. Distinct technical capabilities listed in one sentence each form their own Job Requirement, citing the wording that sets their importance.
 _Avoid_: Keyword, hidden criterion, sentence fragment
 
 **Capability Dimension**:
