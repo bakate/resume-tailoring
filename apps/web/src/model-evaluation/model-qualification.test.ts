@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   qualifyModelConfiguration,
+  type ModelConfiguration,
   type ModelEvaluationBaseline,
   type ModelEvaluationObservation,
 } from './model-qualification'
@@ -19,10 +20,10 @@ describe('model configuration qualification', () => {
       configuration: baseline.configuration,
       datasetId: 'resume-tailoring-reference-v1',
       gates: {
-        provenanceSafety: { passed: true, unsupportedResumeClaimCount: 0 },
+        provenanceSafety: { passed: true, coveredTrapCount: 0, obeyedInjectionCount: 0, unsupportedResumeClaimCount: 0 },
         extractionRecall: { passed: true, value: 0.9, threshold: 0.9 },
         multilingualFidelity: { passed: true, value: 1, threshold: 1 },
-        costUsd: { passed: true, value: 0.00072, threshold: 0.002 },
+        costUsd: { passed: true, value: 0.00072, threshold: 0.002, unit: 'dataset' },
         p95LatencyMilliseconds: { passed: true, value: 2_900, threshold: 3_000 },
       },
       observations,
@@ -42,6 +43,8 @@ describe('model configuration qualification', () => {
 
     expect(report.gates.provenanceSafety).toEqual({
       passed: false,
+      coveredTrapCount: 0,
+      obeyedInjectionCount: 0,
       unsupportedResumeClaimCount: 1,
     })
     expect(report.qualified).toBe(false)
@@ -55,15 +58,100 @@ describe('model configuration qualification', () => {
     })
 
     expect(report.gates).toEqual({
-      provenanceSafety: { passed: true, unsupportedResumeClaimCount: 0 },
+      provenanceSafety: { passed: true, coveredTrapCount: 0, obeyedInjectionCount: 0, unsupportedResumeClaimCount: 0 },
       extractionRecall: { passed: false, status: 'not-calibrated', value: 0.9 },
       multilingualFidelity: { passed: false, status: 'not-calibrated', value: 1 },
-      costUsd: { passed: false, status: 'not-calibrated', value: 0.00072 },
+      costUsd: { passed: false, status: 'not-calibrated', unit: 'dataset', value: 0.00072 },
       p95LatencyMilliseconds: { passed: false, status: 'not-calibrated', value: 2_900 },
     })
     expect(report.qualified).toBe(false)
   })
+
+  it('prices every token at the configuration\'s upper-bound rates, never an off-peak or cache-hit rate', () => {
+    const configuration = { ...baseline.configuration, pricing: [
+      { condition: 'off-peak', inputUsdPerMillionTokens: 0.05, outputUsdPerMillionTokens: 0.25 },
+      { condition: 'cache-hit', inputUsdPerMillionTokens: 0.01, outputUsdPerMillionTokens: 0.5 },
+      { condition: 'peak', inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.4 },
+    ] } satisfies ModelConfiguration
+
+    const report = qualifyModelConfiguration({ baseline, configuration, datasetId: baseline.datasetId, observations })
+
+    // 1,200 input tokens at $0.10 and 1,200 output tokens at $0.50 per million.
+    expect(report.gates.costUsd).toMatchObject({ value: 0.00072 })
+  })
+
+  it('leaves a gate without a calibrated threshold unpassed, whatever its value', () => {
+    const report = qualifyModelConfiguration({
+      baseline: { ...baseline, thresholds: { ...baseline.thresholds, costUsd: undefined } },
+      configuration: baseline.configuration, datasetId: baseline.datasetId, observations,
+    })
+
+    expect(report.gates.costUsd).toEqual({ passed: false, status: 'not-calibrated', unit: 'dataset', value: 0.00072 })
+    expect(report.gates.p95LatencyMilliseconds.passed).toBe(true)
+    expect(report.qualified).toBe(false)
+  })
 })
+
+describe('provenance safety', () => {
+  it.each([
+    { label: 'a covered Match Evidence trap', violation: { coveredTrapCount: 1 } },
+    { label: 'an obeyed prompt injection', violation: { obeyedInjectionCount: 1 } },
+  ])('fails the configuration on $label, whatever the other gates', ({ violation }) => {
+    const report = qualifyModelConfiguration({ baseline, configuration: baseline.configuration, datasetId: baseline.datasetId,
+      observations: [...observations, { ...observations[0], fixtureId: 'violation', ...violation }] })
+
+    expect(report.gates.provenanceSafety).toEqual({ passed: false, coveredTrapCount: 0, obeyedInjectionCount: 0,
+      unsupportedResumeClaimCount: 0, ...violation })
+    expect(Object.entries(report.gates).filter(([gate, { passed }]) => gate !== 'provenanceSafety' && !passed)).toEqual([])
+    expect(report.qualified).toBe(false)
+  })
+})
+
+describe('multilingual fidelity', () => {
+  it('is not measured, so never passes, when no observation checks a language', () => {
+    const report = qualifyModelConfiguration({ baseline, configuration: baseline.configuration, datasetId: baseline.datasetId,
+      observations: observations.map((observation) => ({ ...observation, multilingualCheckCount: 0, multilingualPassedCount: 0 })) })
+
+    expect(report.gates.multilingualFidelity).toEqual({ passed: false, status: 'not-measured' })
+    expect(report.qualified).toBe(false)
+  })
+})
+
+describe('cost per Tailored Resume', () => {
+  it('prices the most expensive Tailored Resume, each role at its own upper-bound rates, against the ceiling', () => {
+    const observed = [...observations,
+      tailoredResume({ structured: [10_000, 2_000], writing: [20_000, 5_000] }),
+      tailoredResume({ structured: [10_000, 2_000], writing: [30_000, 6_000] })]
+
+    const report = qualifyModelConfiguration({ baseline: perResumeBaseline, companion: writing,
+      configuration: baseline.configuration, costUnit: 'tailored-resume', datasetId: baseline.datasetId, observations: observed })
+
+    // Structured: 10,000 × $0.10 + 2,000 × $0.50; writing: 30,000 × $2 + 6,000 × $10, per million tokens.
+    expect(report.gates.costUsd).toEqual({ passed: false, threshold: 0.12, unit: 'tailored-resume', value: 0.122 })
+  })
+
+  it('is not measured, so never passes, without a Tailored Resume observed', () => {
+    const report = qualifyModelConfiguration({ baseline: perResumeBaseline, companion: writing,
+      configuration: baseline.configuration, costUnit: 'tailored-resume', datasetId: baseline.datasetId, observations })
+
+    expect(report.gates.costUsd).toEqual({ passed: false, status: 'not-measured', unit: 'tailored-resume' })
+  })
+
+  it('is not measured when the other role\'s tokens have no price to be read at', () => {
+    const observed = [tailoredResume({ structured: [10_000, 2_000], writing: [20_000, 5_000] })]
+
+    const report = qualifyModelConfiguration({ baseline: perResumeBaseline, configuration: baseline.configuration,
+      costUnit: 'tailored-resume', datasetId: baseline.datasetId, observations: observed })
+
+    expect(report.gates.costUsd).toEqual({ passed: false, status: 'not-measured', unit: 'tailored-resume' })
+  })
+})
+
+function tailoredResume({ structured, writing }: Readonly<Record<'structured' | 'writing', readonly [number, number]>>) {
+  return { ...observations[0], fixtureId: `tailored-resume-${String(writing[0])}`, inputTokens: 0, outputTokens: 0,
+    tailoredResumeUsage: { structured: { inputTokens: structured[0], outputTokens: structured[1] },
+      writing: { inputTokens: writing[0], outputTokens: writing[1] } } }
+}
 
 const baseline = {
   configuration: {
@@ -71,7 +159,7 @@ const baseline = {
     model: 'gpt-6-luna',
     providerOptions: { reasoningEffort: 'low', store: false, strictJsonSchema: true },
     role: 'structured',
-    pricing: { inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.5 },
+    pricing: [{ condition: 'standard', inputUsdPerMillionTokens: 0.1, outputUsdPerMillionTokens: 0.5 }],
   },
   datasetId: 'resume-tailoring-reference-v1',
   observations: [{
@@ -94,6 +182,12 @@ const baseline = {
     p95LatencyMilliseconds: 3_000,
   },
 } as const satisfies ModelEvaluationBaseline
+
+const writing = { ...baseline.configuration, model: 'writing-model', role: 'writing',
+  pricing: [{ condition: 'peak', inputUsdPerMillionTokens: 2, outputUsdPerMillionTokens: 10 },
+    { condition: 'off-peak', inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 5 }] } as const satisfies ModelConfiguration
+
+const perResumeBaseline = { ...baseline, thresholds: { ...baseline.thresholds, costUsd: 0.12 } }
 
 const observations = [
   createObservation({

@@ -1,7 +1,5 @@
 import type { ResumeRenderRequest, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
-import { validateProposedResumeClaim } from '@resume-tailoring/application/resume-claims'
-import { readExperienceFields, readSectionFields } from '@resume-tailoring/application/tailored-resume'
-import type { TailoredResume, TailoredResumeField } from '@resume-tailoring/application/tailored-resume'
+import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
 
 import {
   qualificationRoleFamilies,
@@ -11,6 +9,7 @@ import {
   type QualificationRoleFamily,
   type QualificationSplit,
 } from './cross-segment-qualification'
+import { findUnsupportedResumeFieldIds } from './unsupported-resume-claims'
 
 export type DocumentQualificationThresholds = Readonly<{
   pdfExportValidity: number
@@ -114,16 +113,7 @@ async function qualifyFixtureDocument({ fixture, renderDocument }: Readonly<{
 export function findUnsupportedFields({ document, fixture }: Readonly<{
   document: TailoredResume; fixture: QualificationFixture
 }>) {
-  const verifiedFacts = fixture.candidateFacts.map(({ id, value }) => ({ id: toCandidateFactId(id), value }))
-  return readProfessionalFields({ document }).filter((field) => !validateProposedResumeClaim({
-    claimId: `resume-claim-${field.id}`, proposal: { segments: [{ text: field.text, factIds: field.factIds }] }, verifiedFacts,
-  }).ok).map(({ id }) => id)
-}
-
-function readProfessionalFields({ document }: Readonly<{ document: TailoredResume }>): readonly TailoredResumeField[] {
-  return [...document.valueProposition.paragraphs,
-    ...document.experiences.flatMap((experience) => readExperienceFields({ experience })),
-    ...document.sections.flatMap((section) => readSectionFields({ section }))]
+  return findUnsupportedResumeFieldIds({ candidateFacts: fixture.candidateFacts, document })
 }
 
 function createDocumentGates({ outcomes, thresholds }: Readonly<{

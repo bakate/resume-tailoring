@@ -42,6 +42,10 @@ _Avoid_: Per-document consent, per-action consent
 The disclosed external processor selected to perform model-backed operations under the current Processing Policy. Exactly one is active at a time, and every model-backed operation uses it: a failing operation never moves to another processor the Candidate has not consented to, so changing it is a material change of the Processing Policy.
 _Avoid_: OpenAI in domain language, AI session, fallback provider
 
+**Qualified Model Configuration**:
+A model of the active Language Model Provider, with the exact settings it runs with, that has passed the recorded evaluation of extraction recall, multilingual fidelity, latency, cost and provenance safety. Only a qualified one performs model-backed operations; changing the model or any setting requires qualifying it again.
+_Avoid_: Approved model, whitelisted model, model config
+
 **Daily Quota**:
 The number of Tailored Resumes one client network (an IPv4 address or an IPv6 /64) may start for free each day. Each Job Posting extracted for a Job Match uses one, and all reset at 00:00 Europe/Paris. A global daily ceiling across all Candidates bounds it too; past either, the preparation is refused as Daily Quota reached until the reset.
 _Avoid_: Credits, per-session limit, per-cookie limit

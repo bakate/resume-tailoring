@@ -1,28 +1,33 @@
 import { describe, expect, it } from 'vitest'
-import { prepareResumeSections } from '@resume-tailoring/application/resume-preparation'
 
-import {
-  createOpenAiResumeCoherenceChecker,
-  createOpenAiResumeFieldValidator,
-  createOpenAiResumeSectionWriter,
-} from '../adapters/server/openai-resume-section-models'
 import { validateServerEnvironment, type ServerEnvironment } from '../env'
 import { sectionPreparationBudgets } from './model-evaluation-baselines'
 import { realSizedResumeFixture } from './real-sized-resume-corpus'
 import {
-  measureSectionModels,
-  qualifySectionPreparation,
-  type SectionPreparationRun,
-} from './section-preparation-qualification'
+  createSectionModels,
+  prepareRealSizedResume,
+  sectionPreparationRunCount,
+} from './section-preparation-evaluation'
+import { qualifySectionPreparation, type SectionPreparationRun } from './section-preparation-qualification'
+import { countUnsupportedResumeClaims } from './unsupported-resume-claims'
 
-const runCount = 3
-
+// The same runs feed the qualification runner (`section-preparation` source).
 describe('section-by-section preparation on a real-sized resume', () => {
-  it('writes every section and the whole preparation within the latency budgets', async () => {
+  it('writes every section and the whole preparation within the latency budgets, with no unsupported Resume Claim', async () => {
     const environment = readServerEnvironment()
+    const apiKey = { value: environment.languageModel.apiKey } as const
+    const models = createSectionModels({
+      structured: { apiKey, configuration: environment.languageModel.structured.active },
+      writing: { apiKey, configuration: environment.languageModel.writing.active },
+    })
     const runs: SectionPreparationRun[] = []
-    for (let runIndex = 0; runIndex < runCount; runIndex += 1) {
-      runs.push(await prepareRealSizedResume({ environment, runIndex }))
+    let unsupportedResumeClaimCount = 0
+    for (let runIndex = 0; runIndex < sectionPreparationRunCount; runIndex += 1) {
+      const prepared = await prepareRealSizedResume({ models, runIndex })
+      runs.push(prepared.run)
+      unsupportedResumeClaimCount += prepared.document === null ? 0 : countUnsupportedResumeClaims({
+        candidateFacts: realSizedResumeFixture.request.candidateFacts, document: prepared.document,
+        rejectedFieldIds: prepared.rejectedFieldIds })
     }
     const report = qualifySectionPreparation({
       budgets: sectionPreparationBudgets,
@@ -33,9 +38,10 @@ describe('section-by-section preparation on a real-sized resume', () => {
       fixtureId: realSizedResumeFixture.id,
       runs,
     })
-    console.info(JSON.stringify(report))
+    console.info(JSON.stringify({ ...report, unsupportedResumeClaimCount }))
 
     expect(report.qualified).toBe(true)
+    expect(unsupportedResumeClaimCount).toBe(0)
   }, 900_000)
 })
 
@@ -43,37 +49,8 @@ function readQualifiedSettings({ model, providerOptions }: ServerEnvironment['la
   return { model, reasoningEffort: providerOptions.reasoningEffort }
 }
 
-async function prepareRealSizedResume({ environment, runIndex }: Readonly<{
-  environment: ServerEnvironment; runIndex: number
-}>): Promise<SectionPreparationRun> {
-  const now = () => performance.now()
-  const measured = measureSectionModels({ models: createConfiguredSectionModels({ environment }), now })
-  const startedAt = now()
-  const output = await prepareResumeSections({
-    models: measured.models,
-    now,
-    recordTelemetry: () => undefined,
-    request: realSizedResumeFixture.request,
-    revision: `${realSizedResumeFixture.id}:${String(runIndex)}`,
-  })
-  return { outcome: output.status, wallTimeMilliseconds: Math.round(now() - startedAt), ...measured.readMeasurements() }
-}
-
-/**
- * The configured roles the section routes use: writing for sections, structured for validation and coherence.
- * The adapters are called directly, so the browser-to-route hop a Candidate also waits for is not measured.
- */
-function createConfiguredSectionModels({ environment }: Readonly<{ environment: ServerEnvironment }>) {
-  const apiKey = { value: environment.languageModel.apiKey } as const
-  const writer = createOpenAiResumeSectionWriter({ apiKey, configuration: environment.languageModel.writing.active })
-  const structured = { apiKey, configuration: environment.languageModel.structured.active }
-  const validator = createOpenAiResumeFieldValidator(structured)
-  const coherenceChecker = createOpenAiResumeCoherenceChecker(structured)
-  return { writeSection: writer.write, validateFields: validator.validate, checkCoherence: coherenceChecker.check }
-}
-
 function readServerEnvironment() {
   const environment = validateServerEnvironment({ environment: process.env })
-  if (!environment.ok) throw new Error('OPENAI_API_KEY must be configured for live evaluation')
+  if (!environment.ok) throw new Error('A Language Model Provider key must be configured for live evaluation')
   return environment.value
 }

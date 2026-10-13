@@ -17,6 +17,11 @@ export const languageModelProviders = ['openai'] as const
 
 export type LanguageModelProvider = typeof languageModelProviders[number]
 
+/** The environment variable holding each provider's operator key. */
+export const languageModelApiKeyVariables = {
+  openai: 'OPENAI_API_KEY',
+} as const satisfies Record<LanguageModelProvider, string>
+
 /** OpenAI requests are stateless and answer under strict Structured Outputs; only the reasoning effort varies. */
 export type OpenAiProviderOptions = Readonly<{
   reasoningEffort: OpenAiReasoningEffort

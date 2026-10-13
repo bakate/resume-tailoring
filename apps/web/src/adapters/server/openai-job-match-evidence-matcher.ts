@@ -3,7 +3,7 @@ import type { z } from 'zod'
 import type { LanguageModelConfiguration } from '../../language-model-configuration'
 import {
   createModelRequester,
-  type ModelApiKey,
+  type ModelConnection,
   type ModelRequestFailure,
 } from './language-model-request'
 import { requirementCoverageInstructions } from '../../resume-tailoring/requirement-coverage-instructions'
@@ -14,17 +14,9 @@ import {
 import type { MatchEvidenceMatcher } from '@resume-tailoring/application/ports'
 import { delimitSuppliedData, untrustedContentInstruction } from './untrusted-model-input'
 
-export function createOpenAiJobMatchEvidenceMatcher({
-  apiKey, configuration, request = fetch,
-}: Readonly<{
-  apiKey: ModelApiKey
-  configuration: LanguageModelConfiguration
-  request?: typeof fetch
-}>): MatchEvidenceMatcher {
+export function createOpenAiJobMatchEvidenceMatcher(connection: ModelConnection): MatchEvidenceMatcher {
   return { match: async (matchRequest) => {
-    const result = await requestOpenAiJobMatchEvidence({
-      apiKey, configuration, matchRequest, request,
-    })
+    const result = await requestOpenAiJobMatchEvidence({ ...connection, matchRequest })
     return result.ok ? result : unavailableResult
   } }
 }
@@ -40,13 +32,8 @@ type InvalidModelOutputCause =
   | 'invalid-schema'
   | 'missing-output-text'
 
-export async function requestOpenAiJobMatchEvidence({
-  apiKey, configuration, matchRequest, request = fetch,
-}: Readonly<{
-  apiKey: ModelApiKey
-  configuration: LanguageModelConfiguration
+export async function requestOpenAiJobMatchEvidence({ matchRequest, ...connection }: ModelConnection & Readonly<{
   matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
-  request?: typeof fetch
 }>): Promise<Readonly<{ ok: true; value: z.infer<typeof matchEvidenceProposalSchema> }> | Readonly<{
   ok: false
   error: OpenAiMatchEvidenceFailure
@@ -61,7 +48,7 @@ export async function requestOpenAiJobMatchEvidence({
         cause: 'request-too-large',
         maximumRequestCharacters: maximumMatchEvidenceRequestCharacters,
         operation: 'explainable-match-evidence',
-        provider: configuration.provider,
+        provider: connection.configuration.provider,
         requestCharacters: requestCharacterCount,
       },
     }))
@@ -71,7 +58,7 @@ export async function requestOpenAiJobMatchEvidence({
       type: 'request-too-large',
     } }
   }
-  const requester = createModelRequester({ apiKey, configuration, request })
+  const requester = createModelRequester(connection)
   const response = await requester.send({
     instructions: matchingInstructions,
     maxOutputTokens: 8_000,
@@ -80,7 +67,7 @@ export async function requestOpenAiJobMatchEvidence({
     userText: delimitSuppliedData(matchRequest),
   })
   if (!response.ok) return response
-  return parseModelOutput({ outputText: response.value.text, provider: configuration.provider })
+  return parseModelOutput({ outputText: response.value.text, provider: connection.configuration.provider })
 }
 
 function parseModelOutput({ outputText, provider }: Readonly<{

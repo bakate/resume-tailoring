@@ -23,7 +23,7 @@ Adapters translate and nothing more. A business rule lives in the application, o
 - Server adapters (OpenAI, Puppeteer renderer): `apps/web/src/adapters/server/`.
 - Composition root: `apps/web/src/composition-root.ts` wires the browser adapters into `createCandidateJourney`.
 
-Adapter contract tests sit next to their adapter. `pnpm check:architecture` rejects any `apps/web` module other than the composition root, API routes and their `-` helpers, adapters, and tests that imports `src/adapters/**`.
+Adapter contract tests sit next to their adapter. `pnpm check:architecture` rejects any `apps/web` module other than the composition root, API routes and their `-` helpers, adapters, model evaluation (`src/model-evaluation/`), and tests that imports `src/adapters/**`. Model evaluation never imports a Language Model Provider adapter or package (`model-qualification-is-provider-neutral`).
 
 ## Fakes
 

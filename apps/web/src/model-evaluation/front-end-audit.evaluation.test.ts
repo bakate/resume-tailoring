@@ -1,27 +1,23 @@
 import { beforeAll, describe, expect, it } from 'vitest'
-import { createJobMatch, type JobMatch } from '@resume-tailoring/application/job-match'
-import { prepareResumeSections } from '@resume-tailoring/application/resume-preparation'
-import { createSourceIntake, type SourceIntake } from '@resume-tailoring/application/source-intake'
-import type { ProfessionalResumeDocument } from '@resume-tailoring/application/candidate-journey'
+import type { JobMatch } from '@resume-tailoring/application/job-match'
 
-import { createOpenAiJobMatchEvidenceMatcher } from '../adapters/server/openai-job-match-evidence-matcher'
-import { createOpenAiJobPostingExtractor } from '../adapters/server/openai-job-posting-extractor'
-import {
-  createOpenAiResumeCoherenceChecker,
-  createOpenAiResumeFieldValidator,
-  createOpenAiResumeSectionWriter,
-} from '../adapters/server/openai-resume-section-models'
-import { createOpenAiStructuredSourceProfileExtractor } from '../adapters/server/openai-structured-source-profile-extractor'
-import { validateServerEnvironment, type ServerEnvironment } from '../env'
-import { frontEndAuditJobPosting, frontEndAuditResume } from './front-end-audit-corpus'
+import { validateServerEnvironment } from '../env'
+import { checkDocumentLanguage } from './document-language'
+import { readAuditedCoverage, replayAuditRun, type AuditRun } from './front-end-audit-evaluation'
+import { countUnsupportedResumeClaims } from './unsupported-resume-claims'
 
 // Live replay of the audited front-end run (BAK-139): the Source Document and Job Posting go through the production
 // extraction, Match Analysis and section-by-section preparation, then each defect the audit saw is one case.
+// The same run feeds the qualification runner (`front-end-audit` source).
 describe('audited front-end run, replayed live', () => {
   let run: AuditRun
 
   beforeAll(async () => {
-    run = await replayAuditRun({ environment: readServerEnvironment() })
+    const { languageModel } = readServerEnvironment()
+    const apiKey = { value: languageModel.apiKey } as const
+    const roles = { structured: { apiKey, configuration: languageModel.structured.active },
+      writing: { apiKey, configuration: languageModel.writing.active } }
+    run = await replayAuditRun({ intake: roles.structured, preparations: { fr: roles, en: roles } })
     console.info(JSON.stringify(run.report))
   }, 900_000)
 
@@ -64,6 +60,14 @@ describe('audited front-end run, replayed live', () => {
       && fold(items[0]?.text ?? '').includes(fold(category.text))).map(({ category }) => category?.text)).toEqual([])
   })
 
+  it.each(['fr', 'en'] as const)('writes the %s document without an unsupported Resume Claim', (locale) => {
+    expect(countUnsupportedResumeClaims({ candidateFacts: run.candidateFacts, document: run.documents[locale] })).toBe(0)
+  })
+
+  it.each(['fr', 'en'] as const)('writes every prose field of the %s document in its language', (locale) => {
+    expect(checkDocumentLanguage({ document: run.documents[locale], locale }).filter(({ passed }) => !passed)).toEqual([])
+  })
+
   it('keeps the education year the Source Document gives', () => {
     const education = run.documents.fr.sections.flatMap((section) => section.section === 'education' ? section.fields : [])
 
@@ -71,88 +75,15 @@ describe('audited front-end run, replayed live', () => {
   })
 })
 
-type AuditRun = Readonly<{
-  jobMatch: JobMatch
-  documents: Readonly<Record<'fr' | 'en', ProfessionalResumeDocument>>
-  report: unknown
-}>
-
-async function replayAuditRun({ environment }: Readonly<{ environment: ServerEnvironment }>): Promise<AuditRun> {
-  const structured = { apiKey: { value: environment.languageModel.apiKey } as const, configuration: environment.languageModel.structured.active }
-  const sourceIntake = await readSourceIntake({ structured })
-  const jobMatchResult = await createJobMatch({
-    candidateFacts: sourceIntake.candidateFacts,
-    document: { bytes: new TextEncoder().encode(frontEndAuditJobPosting), mediaType: 'text/plain', name: 'pasted-job-posting.txt' },
-    jobPostingDocumentReader: { read: () => Promise.resolve({ ok: true, value: { text: frontEndAuditJobPosting } }) },
-    jobPostingExtractor: createOpenAiJobPostingExtractor(structured),
-    matchEvidenceMatcher: createOpenAiJobMatchEvidenceMatcher(structured),
-    now: Date.now,
-  })
-  if (!jobMatchResult.ok) throw new Error(`Job Match failed: ${jobMatchResult.error}`)
-  const jobMatch = jobMatchResult.value
-  const [fr, en] = await Promise.all((['fr', 'en'] as const).map(async (locale) => {
-    const models = createSectionModels({ environment, structured })
-    // The last coherence verdict and the document it judged explain a failed preparation.
-    let lastCoherence: unknown = null
-    const output = await prepareResumeSections({ now: Date.now, recordTelemetry: () => undefined,
-      models: { ...models, checkCoherence: async (input) => {
-        const result = await models.checkCoherence(input)
-        lastCoherence = { result, document: input.document }
-        return result
-      } },
-      request: { candidateFacts: sourceIntake.candidateFacts, jobMatch, locale, purpose: 'tailored' },
-      revision: `front-end-audit:${locale}` })
-    if (output.status !== 'prepared') {
-      throw new Error(`The ${locale} preparation failed: ${output.reason} ${JSON.stringify(lastCoherence)}`)
-    }
-    return output.document
-  }))
-  if (fr === undefined || en === undefined) throw new Error('Both preparations must finish')
-  return { jobMatch, documents: { fr, en }, report: {
-    requirements: jobMatch.requirements.map(({ id, value }) => ({ id, value,
-      coverage: readCoverage({ jobMatch, requirement: new RegExp(escapeRegExp(value), 'u') }) })),
-    headline: fr.headline?.text ?? null, targetRole: jobMatch.targetRole?.value ?? null,
-    valueProposition: { fr: fr.valueProposition.paragraphs.map(({ text }) => text),
-      en: en.valueProposition.paragraphs.map(({ text }) => text) },
-    roles: fr.experiences.map(({ role }) => role?.text ?? null),
-    skills: fr.sections.flatMap((section) => section.section === 'skills' ? section.groups : [])
-      .map(({ category, items }) => [category?.text ?? null, items.map(({ text }) => text)]),
-    education: fr.sections.flatMap((section) => section.section === 'education' ? section.fields : []).map(({ text }) => text),
-  } }
-}
-
-async function readSourceIntake({ structured }: Readonly<{ structured: Parameters<typeof createOpenAiStructuredSourceProfileExtractor>[0] }>):
-Promise<SourceIntake> {
-  const result = await createSourceIntake({
-    document: { bytes: new TextEncoder().encode(frontEndAuditResume), mediaType: 'text/plain', name: 'pasted-resume.txt' },
-    sourceDocumentReader: { read: () => Promise.resolve({ ok: true, value: { pageCount: null, text: frontEndAuditResume } }) },
-    sourceProfileExtractor: createOpenAiStructuredSourceProfileExtractor(structured),
-  })
-  if (!result.ok) throw new Error(`Source Intake failed: ${result.error}`)
-  return result.value
-}
-
-/** The configured roles the section routes use: writing for sections, structured for validation and coherence. */
-function createSectionModels({ environment, structured }: Readonly<{
-  environment: ServerEnvironment; structured: Parameters<typeof createOpenAiResumeSectionWriter>[0]
-}>) {
-  const writer = createOpenAiResumeSectionWriter({ apiKey: { value: environment.languageModel.apiKey } as const, configuration: environment.languageModel.writing.active })
-  const validator = createOpenAiResumeFieldValidator(structured)
-  return { writeSection: writer.write, validateFields: validator.validate,
-    checkCoherence: createOpenAiResumeCoherenceChecker(structured).check }
-}
-
 function readCoverage({ jobMatch, requirement }: Readonly<{ jobMatch: JobMatch; requirement: RegExp }>) {
-  const ids = new Set<string>(jobMatch.requirements.filter(({ value }) => requirement.test(value)).map(({ id }) => id))
-  expect(ids.size, `No Job Requirement matches ${String(requirement)}`).toBeGreaterThan(0)
-  const coverages = jobMatch.analysis.requirementGroups
-    .filter(({ requirementIds }) => requirementIds.some((id) => ids.has(id))).map(({ coverage }) => coverage)
-  return coverages.includes('covered') ? 'covered' : coverages[0] ?? 'uncovered'
+  const coverage = readAuditedCoverage({ jobMatch, requirement })
+  expect(coverage, `No Job Requirement matches ${String(requirement)}`).not.toBeNull()
+  return coverage
 }
 
 function readServerEnvironment() {
   const environment = validateServerEnvironment({ environment: process.env })
-  if (!environment.ok) throw new Error('OPENAI_API_KEY must be configured for live evaluation')
+  if (!environment.ok) throw new Error('A Language Model Provider key must be configured for live evaluation')
   return environment.value
 }
 
@@ -160,9 +91,6 @@ function fold(value: string) {
   return value.normalize('NFD').replaceAll(/\p{Diacritic}/gu, '').toLocaleLowerCase('fr')
 }
 
-function escapeRegExp(value: string) {
-  return value.replaceAll(/[.*+?^${}()|[\]\\]/gu, '\\$&')
-}
 
 const personalPronouns = {
   fr: /(?:^|[^\p{L}])(?:(?:il|elle|ils|elles|je|nous)(?![\p{L}])|j['’])/iu,
