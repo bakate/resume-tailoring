@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
-import { createOpenAiStructuredSourceProfileExtractor } from '../adapters/server/openai-structured-source-profile-extractor'
+import { createModelStructuredSourceProfileExtractor } from '../adapters/server/model-structured-source-profile-extractor'
 import { structuredSourceProfileRequestSchema } from '../candidate-journey/structured-source-profile-schema'
 import { failureResponse, readRouteApiFailure } from '../api-failure'
 import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
@@ -24,7 +24,7 @@ async function extractStructuredSourceProfile({ request }: Readonly<{ request: R
   if (!contentResult.ok) return failureResponse({ type: contentResult.type })
   const environmentResult = validateServerEnvironment({ environment: process.env })
   if (!environmentResult.ok) return failureResponse({ type: 'service-misconfigured' })
-  const extractor = createOpenAiStructuredSourceProfileExtractor({
+  const extractor = createModelStructuredSourceProfileExtractor({
     apiKey: { value: environmentResult.value.languageModel.apiKey },
     configuration: environmentResult.value.languageModel.structured.active,
   })

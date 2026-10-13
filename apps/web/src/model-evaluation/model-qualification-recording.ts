@@ -68,6 +68,7 @@ export function renderQualificationReport({ recordedRun, report }: Readonly<{
   return `${JSON.stringify({ configuration, datasetId, recordedAt: recordedRun.recordedAt, gates, qualified }, null, 2)}\n`
 }
 
-function readConfigurationIdentity({ configuration: { model, provider, providerOptions, role } }: RecordedModelEvaluationRun) {
-  return JSON.stringify({ model, provider, providerOptions, role })
+/** Every setting but the prices, which weigh the evaluated cost and are no setting of the configuration. */
+function readConfigurationIdentity({ configuration }: RecordedModelEvaluationRun) {
+  return JSON.stringify(Object.entries(configuration).filter(([name]) => name !== 'pricing'))
 }

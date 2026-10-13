@@ -16,8 +16,8 @@ import {
   createGatewayResumeSectionModels,
   createGatewaySourceProfileExtractor,
 } from './adapters/browser/language-model-gateway-ports'
-import { createOpenAiLanguageModelGateway } from './adapters/browser/openai-language-model-gateway'
-import type { OpenAiLanguageModelGateway } from './adapters/browser/openai-language-model-gateway'
+import { createServerLanguageModelGateway } from './adapters/browser/server-language-model-gateway'
+import type { ServerLanguageModelGateway } from './adapters/browser/server-language-model-gateway'
 import { createResumeDocumentModelAdapters } from './adapters/browser/resume-document-model-adapters'
 import { createBrowserSourceIntakeDocumentReader } from './adapters/browser/source-intake-document-reader'
 import { listenForUncaughtErrors, reportUncaughtError } from './adapters/browser/uncaught-error-reporting'
@@ -41,7 +41,7 @@ export function createBrowserCandidateJourneySystem({ processingPolicy }: Readon
   eraseRetiredCandidateApiKey({ readStorage: () => sessionStorage })
   const request = createAccessRecoveringRequest({ recovery: demoAccessRecovery,
     request: createDailyQuotaObservingRequest({ dailyQuota, request: fetch }) })
-  const languageModelGateway = createOpenAiLanguageModelGateway({
+  const languageModelGateway = createServerLanguageModelGateway({
     processingPolicy,
     readProcessingConsent: () => readProcessingConsent({ candidateJourney }),
     request,
@@ -56,7 +56,7 @@ export function createBrowserCandidateJourneySystem({ processingPolicy }: Readon
 }
 
 function createBrowserDependencies({ languageModelGateway, persistence, request }: Readonly<{
-  languageModelGateway: OpenAiLanguageModelGateway
+  languageModelGateway: ServerLanguageModelGateway
   persistence: BrowserCandidateSessionPersistence
   request: typeof fetch
 }>): CandidateJourneyDependencies {

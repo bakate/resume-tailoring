@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createOpenAiModelConfiguration } from '../language-model-configuration'
+import { createDeepSeekModelConfiguration, createOpenAiModelConfiguration } from '../language-model-configuration'
 import { qualifyModelConfiguration, type ModelConfiguration } from './model-qualification'
 import { createModelEvaluationObservation } from './model-qualification-runner'
 import {
@@ -49,6 +49,24 @@ describe('qualified model configurations', () => {
     expect(isQualifiedModelConfiguration({ configuration })).toBe(false)
   })
 
+  it('rejects a qualified model whose operation settings changed', () => {
+    const qualified = createOpenAiModelConfiguration({ model: 'gpt-6-luna', reasoningEffort: 'low', role: 'structured' })
+    const configuration = { ...qualified, operations: { ...qualified.operations,
+      'explainable-match-evidence': { deadlineMilliseconds: 90_000, maxOutputTokens: 4_000 } } }
+
+    const result = isQualifiedModelConfiguration({ configuration })
+
+    expect(result).toBe(false)
+  })
+
+  it.each(['structured', 'writing'] as const)('keeps DeepSeek unqualified for the %s role until its baselines are recorded', (role) => {
+    const configuration = createDeepSeekModelConfiguration({ model: 'deepseek-flash', role })
+
+    const result = isQualifiedModelConfiguration({ configuration })
+
+    expect(result).toBe(false)
+  })
+
   describe('once a configuration is recorded', () => {
     it('qualifies exactly the recorded configuration', () => {
       const qualified = isQualifiedModelConfiguration({ configuration: recordedConfiguration, reports: [recordedReport] })
@@ -76,20 +94,22 @@ describe('qualified model configurations', () => {
 })
 
 // Per-operation options, as a provider that budgets output tokens per operation records them.
+const recordedProviderOptions = { thinking: 'low',
+  outputTokenBudgets: { 'explainable-match-evidence': 32_000, 'resume-section-writing': 16_000 } }
+
 const recordedConfiguration = {
   provider: 'scripted', model: 'scripted-writing', role: 'writing',
   pricing: [{ condition: 'peak', inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 4 }],
-  providerOptions: { thinking: 'low',
-    outputTokenBudgets: { 'explainable-match-evidence': 32_000, 'resume-section-writing': 16_000 } },
+  providerOptions: recordedProviderOptions,
 } as unknown as ModelConfiguration
 
 const recordedReport = recordReport(recordedConfiguration)
 
 const optionChanges = [
-  { label: 'a reasoning effort', providerOptions: { ...recordedConfiguration.providerOptions, thinking: 'high' } },
-  { label: 'an output token budget', providerOptions: { ...recordedConfiguration.providerOptions,
+  { label: 'a reasoning effort', providerOptions: { ...recordedProviderOptions, thinking: 'high' } },
+  { label: 'an output token budget', providerOptions: { ...recordedProviderOptions,
     outputTokenBudgets: { 'explainable-match-evidence': 32_000, 'resume-section-writing': 8_000 } } },
-  { label: 'an added option', providerOptions: { ...recordedConfiguration.providerOptions, temperature: 0 } },
+  { label: 'an added option', providerOptions: { ...recordedProviderOptions, temperature: 0 } },
   { label: 'a removed option', providerOptions: { thinking: 'low' } },
 ]
 

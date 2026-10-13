@@ -53,6 +53,7 @@ Resources:
       Architectures:
         - arm64
       MemorySize: 2048
+      # Past the longest provider deadline (110 s, match evidence on DeepSeek), so a route answers with a Failure Cause.
       Timeout: 120
       # No ReservedConcurrentExecutions: the account quota is 10 concurrent executions and Lambda keeps 10 unreserved,
       # so any reservation fails the deployment. The account quota is the concurrency ceiling; keep it at 10.
@@ -114,6 +115,34 @@ Resources:
       EvaluationPeriods: 1
       Threshold: 1000
       ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AbuseAlarmTopic]
+
+  # Exhausted Language Model Provider credit (OpenAI insufficient_quota, DeepSeek 402) stops every model operation,
+  # and only the operator can restore it. The call wrapper logs one operator-alert metric per such failure.
+  OperatorAlertMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref WebFunctionLogGroup
+      FilterPattern: '"operator-alert"'
+      MetricTransformations:
+        - MetricName: OperatorAlerts
+          MetricNamespace: !Sub ${ApplicationName}/language-model-provider
+          MetricValue: '1'
+          DefaultValue: 0
+
+  ExhaustedProviderCreditAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub ${ApplicationName}-exhausted-provider-credit
+      AlarmDescription: The Language Model Provider refused a request for exhausted operator credit
+      Namespace: !Sub ${ApplicationName}/language-model-provider
+      MetricName: OperatorAlerts
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
       AlarmActions: [!Ref AbuseAlarmTopic]
 

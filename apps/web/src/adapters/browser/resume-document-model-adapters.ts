@@ -1,8 +1,8 @@
 import type { LanguageModelFailure, ResumeClaimModelResult, ResumeDocumentPorts } from '@resume-tailoring/application/ports'
-import type { OpenAiLanguageModelGateway } from './openai-language-model-gateway'
+import type { ServerLanguageModelGateway } from './server-language-model-gateway'
 
 /** Translates the resume claim model ports onto the Language Model Gateway; the application owns every rule. */
-export function createResumeDocumentModelAdapters({ gateway }: Readonly<{ gateway: OpenAiLanguageModelGateway }>):
+export function createResumeDocumentModelAdapters({ gateway }: Readonly<{ gateway: ServerLanguageModelGateway }>):
 Pick<ResumeDocumentPorts, 'validateClaim' | 'condenseClaim'> {
   return {
     validateClaim: async (input) => {

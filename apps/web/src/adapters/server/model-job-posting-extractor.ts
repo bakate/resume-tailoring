@@ -15,29 +15,29 @@ import {
 import type { JobPostingExtractor } from '@resume-tailoring/application/ports'
 import { delimitUntrustedContent, untrustedContentInstruction } from './untrusted-model-input'
 
-export function createOpenAiJobPostingExtractor(connection: ModelConnection): JobPostingExtractor {
+export function createModelJobPostingExtractor(connection: ModelConnection): JobPostingExtractor {
   return { extract: async ({ jobPostingContent }) => {
-    const result = await requestOpenAiJobPostingExtraction({ ...connection, jobPostingContent })
+    const result = await requestJobPostingExtraction({ ...connection, jobPostingContent })
     return result.ok ? result : unavailableResult
   } }
 }
 
-export type OpenAiJobPostingExtractionFailure = Readonly<{
+export type JobPostingExtractionFailure = Readonly<{
   type: 'invalid-model-output'
 }> | ModelRequestFailure
 
-export async function requestOpenAiJobPostingExtraction({ jobPostingContent, ...connection }: ModelConnection & Readonly<{
+export async function requestJobPostingExtraction({ jobPostingContent, ...connection }: ModelConnection & Readonly<{
   jobPostingContent: string
 }>): Promise<Readonly<{ ok: true; value: ExtractedJobPosting }> | Readonly<{
   ok: false
-  error: OpenAiJobPostingExtractionFailure
+  error: JobPostingExtractionFailure
 }>> {
   const requester = createModelRequester(connection)
   const response = await requester.send({
     instructions: extractionInstructions,
-    maxOutputTokens: 20_000,
     operation: 'explainable-job-posting-extraction',
     output: jobPostingExtractionResponseFormat,
+    outputSchema: jobPostingExtractionSchema,
     userText: delimitUntrustedContent({ kind: 'job-posting', content: jobPostingContent }),
   })
   if (!response.ok) return response

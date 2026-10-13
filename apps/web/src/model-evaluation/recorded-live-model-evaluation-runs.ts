@@ -18,6 +18,16 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "store": false,
         "strictJsonSchema": true
       },
+      "operations": {
+        "resume-claim-writing": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 12000
+        },
+        "resume-section-writing": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 16000
+        }
+      },
       "role": "writing"
     },
     "configuration": {
@@ -34,6 +44,32 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "reasoningEffort": "low",
         "store": false,
         "strictJsonSchema": true
+      },
+      "operations": {
+        "explainable-job-posting-extraction": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 20000
+        },
+        "explainable-match-evidence": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 8000
+        },
+        "resume-claim-validation": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 12000
+        },
+        "resume-document-coherence": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 8000
+        },
+        "resume-section-validation": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 8000
+        },
+        "structured-source-profile-extraction": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 16000
+        }
       },
       "role": "structured"
     },
@@ -2325,6 +2361,32 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "store": false,
         "strictJsonSchema": true
       },
+      "operations": {
+        "explainable-job-posting-extraction": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 20000
+        },
+        "explainable-match-evidence": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 8000
+        },
+        "resume-claim-validation": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 12000
+        },
+        "resume-document-coherence": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 8000
+        },
+        "resume-section-validation": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 8000
+        },
+        "structured-source-profile-extraction": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 16000
+        }
+      },
       "role": "structured"
     },
     "configuration": {
@@ -2341,6 +2403,16 @@ export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRu
         "reasoningEffort": "medium",
         "store": false,
         "strictJsonSchema": true
+      },
+      "operations": {
+        "resume-claim-writing": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 12000
+        },
+        "resume-section-writing": {
+          "deadlineMilliseconds": 90000,
+          "maxOutputTokens": 16000
+        }
       },
       "role": "writing"
     },

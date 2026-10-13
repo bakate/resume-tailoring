@@ -3,16 +3,16 @@ import { describe, expect, it } from 'vitest'
 import { createOpenAiModelConfiguration } from '../../language-model-configuration'
 
 import {
-  createOpenAiResumeClaimSemanticValidator,
-  createOpenAiResumeClaimReformulator,
-} from './openai-resume-claim-service'
+  createModelResumeClaimSemanticValidator,
+  createModelResumeClaimReformulator,
+} from './model-resume-claim-service'
 import { createRecordedOpenAiResponse } from './recorded-openai-responses'
 import { delimitSuppliedData } from './untrusted-model-input'
 
-describe('OpenAI Resume Claim service contract', () => {
+describe('Resume Claim service contract', () => {
   it('reformulates a claim through a strict stateless writing-model request', async () => {
     const requests: Request[] = []
-    const reformulator = createOpenAiResumeClaimReformulator({
+    const reformulator = createModelResumeClaimReformulator({
       apiKey: { value: 'test-api-key' },
       configuration: createOpenAiModelConfiguration({ model: 'writing-model', reasoningEffort: 'medium', role: 'writing' }),
       request: createRequestSpy({ requests, value: { claims: [proposedClaim] } }),
@@ -41,7 +41,7 @@ describe('OpenAI Resume Claim service contract', () => {
   })
 
   it('rejects a reformulation that references facts outside the minimized writing input', async () => {
-    const reformulator = createOpenAiResumeClaimReformulator({
+    const reformulator = createModelResumeClaimReformulator({
       apiKey: { value: 'test-api-key' },
       configuration: createOpenAiModelConfiguration({ model: 'writing-model', reasoningEffort: 'medium', role: 'writing' }),
       request: createRequestSpy({
@@ -59,7 +59,7 @@ describe('OpenAI Resume Claim service contract', () => {
 
   it('semantically rejects inexact fact references with the structured model', async () => {
     const requests: Request[] = []
-    const validator = createOpenAiResumeClaimSemanticValidator({
+    const validator = createModelResumeClaimSemanticValidator({
       apiKey: { value: 'test-api-key' },
       configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRequestSpy({
@@ -98,10 +98,10 @@ describe('OpenAI Resume Claim service contract', () => {
   it('reuses one deadline across sequential semantic validations', async () => {
     const requests: Request[] = []
     const signals: (AbortSignal | null)[] = []
-    const deadlineSignal = new AbortController().signal
-    const validator = createOpenAiResumeClaimSemanticValidator({
+    const deadline = new AbortController()
+    const validator = createModelResumeClaimSemanticValidator({
       apiKey: { value: 'test-api-key' },
-      deadlineSignal,
+      deadlineSignal: deadline.signal,
       configuration: createOpenAiModelConfiguration({ model: 'structured-model', reasoningEffort: 'low', role: 'structured' }),
       request: createRequestSpy({
         requests,
@@ -112,8 +112,9 @@ describe('OpenAI Resume Claim service contract', () => {
 
     await validator.validate({ claim: storedClaim, verifiedFacts: writingInputs.verifiedFacts })
     await validator.validate({ claim: storedClaim, verifiedFacts: writingInputs.verifiedFacts })
+    deadline.abort()
 
-    expect(signals).toEqual([deadlineSignal, deadlineSignal])
+    expect(signals.map((signal) => signal?.aborted)).toEqual([true, true])
   })
 })
 

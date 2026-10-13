@@ -6,7 +6,7 @@ import {
 } from '@resume-tailoring/matching-engine'
 
 import type { ModelConnection } from '../adapters/server/language-model-request'
-import { createOpenAiJobMatchEvidenceMatcher } from '../adapters/server/openai-job-match-evidence-matcher'
+import { createModelJobMatchEvidenceMatcher } from '../adapters/server/model-job-match-evidence-matcher'
 import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
 
 /** The coverage recall a live run must reach on its own; qualification gates recall over every source. */
@@ -20,7 +20,7 @@ async function evaluateMatchEvidenceCase({ connection, evaluationCase }: Readonl
   evaluationCase: MatchEvidenceEvaluationCase
 }>) {
   const requirements = evaluationCase.requirements.map(createRequirement)
-  const result = await createOpenAiJobMatchEvidenceMatcher(connection)
+  const result = await createModelJobMatchEvidenceMatcher(connection)
     .match({ candidateFacts: evaluationCase.candidateFacts, requirements })
   if (!result.ok) {
     return { adjacentRequirementIds: new Set<string>(),

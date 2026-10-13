@@ -1,18 +1,22 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createOpenAiModelConfiguration } from '../../language-model-configuration'
 import { resumeSectionKinds } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeSectionContent, ResumeSectionKind, ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
 import { readResumeSection, groupedResumeDocument, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
-import { createOpenAiResumeCoherenceChecker, createOpenAiResumeFieldValidator, createOpenAiResumeSectionWriter } from './openai-resume-section-models'
+import { createModelResumeCoherenceChecker, createModelResumeFieldValidator, createModelResumeSectionWriter } from './model-resume-section-models'
 import { resumeSectionWritingInputSchema } from '../../candidate-journey/resume-document-schemas'
 import { createRecordedOpenAiResponse } from './recorded-openai-responses'
 
 describe('Resume section model adapters', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it.each(resumeSectionKinds)('writes the %s section under its own strict structured-output schema', async (kind) => {
     let body: RequestBody | null = null
     const content = readResumeSection({ document: groupedResumeDocument, section: sectionFor(kind) })
-    const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
+    const writer = createModelResumeSectionWriter({ ...writingRole, request: (_url, options) => {
       body = readBody(options)
       return Promise.resolve(modelResponse(sectionOutput(content)))
     } })
@@ -33,7 +37,7 @@ describe('Resume section model adapters', () => {
       factIds: ['source-fact-experiences-0-role-0', 'source-fact-skills-0-name-0'] } as const
     const content = { kind: 'value-proposition', headline,
       paragraphs: groupedResumeDocument.valueProposition.paragraphs } as const satisfies ResumeSectionContent
-    const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
+    const writer = createModelResumeSectionWriter({ ...writingRole, request: (_url, options) => {
       body = readBody(options)
       return Promise.resolve(modelResponse(sectionOutput(content)))
     } })
@@ -48,7 +52,7 @@ describe('Resume section model adapters', () => {
   it('accepts a coherence rewrite with the previous version of its section and passes it to the writer', async () => {
     let body: RequestBody | null = null
     const previousContent = readResumeSection({ document: groupedResumeDocument, section: sectionFor('skills') })
-    const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
+    const writer = createModelResumeSectionWriter({ ...writingRole, request: (_url, options) => {
       body = readBody(options)
       return Promise.resolve(modelResponse(sectionOutput(previousContent)))
     } })
@@ -66,7 +70,7 @@ describe('Resume section model adapters', () => {
   it('accepts a rewrite with the fields its structure was rejected for and passes them to the writer', async () => {
     let body: RequestBody | null = null
     const content = readResumeSection({ document: groupedResumeDocument, section: sectionFor('experience') })
-    const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
+    const writer = createModelResumeSectionWriter({ ...writingRole, request: (_url, options) => {
       body = readBody(options)
       return Promise.resolve(modelResponse(sectionOutput(content)))
     } })
@@ -82,7 +86,7 @@ describe('Resume section model adapters', () => {
   it('accepts an experience with the class and achievement budget code set and passes them to the writer', async () => {
     let body: RequestBody | null = null
     const content = readResumeSection({ document: groupedResumeDocument, section: sectionFor('experience') })
-    const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: (_url, options) => {
+    const writer = createModelResumeSectionWriter({ ...writingRole, request: (_url, options) => {
       body = readBody(options)
       return Promise.resolve(modelResponse(sectionOutput(content)))
     } })
@@ -99,7 +103,7 @@ describe('Resume section model adapters', () => {
     const validation = { fields: [{ fieldId: 'degree', supported: false, unsupportedProposition: 'The cited facts name no degree' },
       { fieldId: 'institution', supported: true, unsupportedProposition: null }] }
     let body: RequestBody | null = null
-    const validator = createOpenAiResumeFieldValidator({ ...structuredRole, request: (_url, options) => {
+    const validator = createModelResumeFieldValidator({ ...structuredRole, request: (_url, options) => {
       body = readBody(options)
       return Promise.resolve(modelResponse(validation))
     } })
@@ -115,7 +119,7 @@ describe('Resume section model adapters', () => {
 
   it('withholds the unsupported proposition from a browser loaded before it could read one', async () => {
     const validation = { fields: [{ fieldId: 'degree', supported: false, unsupportedProposition: 'The cited facts name no degree' }] }
-    const validator = createOpenAiResumeFieldValidator({ ...structuredRole,
+    const validator = createModelResumeFieldValidator({ ...structuredRole,
       request: () => Promise.resolve(modelResponse(validation)) })
 
     const outcome = await validator.validate(validationInput())
@@ -126,7 +130,7 @@ describe('Resume section model adapters', () => {
 
   it('checks the assembled document for coherence and language and names the fields to rewrite', async () => {
     const coherence = { coherent: false, languageMatches: true, issues: [{ fieldId: 'summary-0', kind: 'redundant' }] }
-    const checker = createOpenAiResumeCoherenceChecker({ ...structuredRole,
+    const checker = createModelResumeCoherenceChecker({ ...structuredRole,
       request: () => Promise.resolve(modelResponse(coherence)) })
 
     const { purpose, locale, targetRole, valueProposition, experiences, sections } = groupedResumeDocument
@@ -136,17 +140,27 @@ describe('Resume section model adapters', () => {
   })
 
   it.each([['malformed', { outputText: '{}', usage: null }],
-    ['incomplete', { incompleteReason: 'max_output_tokens', usage: null }]] as const)('reports an invalid provider response on %s output', async (_label, response) => {
-    const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: () => Promise.resolve(createRecordedOpenAiResponse(response)) })
+    ['filtered', { incompleteReason: 'content_filter', usage: null }]] as const)('reports an invalid provider response on %s output', async (_label, response) => {
+    const writer = createModelResumeSectionWriter({ ...writingRole, request: () => Promise.resolve(createRecordedOpenAiResponse(response)) })
 
     const outcome = await writer.write(writingInput('skills'))
 
     expect(outcome).toEqual({ ok: false, error: { type: 'invalid-provider-response' } })
   })
 
+  it('reports output cut at its budget as an unavailable provider, never as an invalid response', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const writer = createModelResumeSectionWriter({ ...writingRole,
+      request: () => Promise.resolve(createRecordedOpenAiResponse({ incompleteReason: 'max_output_tokens', usage: null })) })
+
+    const outcome = await writer.write(writingInput('skills'))
+
+    expect(outcome).toEqual({ ok: false, error: { type: 'provider-unavailable' } })
+  })
+
   it('reports an upstream outage as an unavailable provider without retrying inside the adapter', async () => {
     let requests = 0
-    const writer = createOpenAiResumeSectionWriter({ ...writingRole, request: () => {
+    const writer = createModelResumeSectionWriter({ ...writingRole, request: () => {
       requests += 1
       return Promise.resolve(new Response(null, { status: 503 }))
     } })
@@ -158,7 +172,7 @@ describe('Resume section model adapters', () => {
   })
 
   it('reports a provider rate limit with the delay it asks for', async () => {
-    const writer = createOpenAiResumeSectionWriter({ ...writingRole,
+    const writer = createModelResumeSectionWriter({ ...writingRole,
       request: () => Promise.resolve(new Response(null, { status: 429, headers: { 'Retry-After': '12' } })) })
 
     const outcome = await writer.write(writingInput('skills'))
@@ -167,7 +181,7 @@ describe('Resume section model adapters', () => {
   })
 
   it('reports a request timeout as a timeout', async () => {
-    const writer = createOpenAiResumeSectionWriter({ ...writingRole,
+    const writer = createModelResumeSectionWriter({ ...writingRole,
       request: () => Promise.reject(new DOMException('The operation timed out.', 'TimeoutError')) })
 
     const outcome = await writer.write(writingInput('skills'))

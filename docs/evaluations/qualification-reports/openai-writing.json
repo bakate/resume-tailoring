@@ -14,6 +14,16 @@
       "store": false,
       "strictJsonSchema": true
     },
+    "operations": {
+      "resume-claim-writing": {
+        "deadlineMilliseconds": 90000,
+        "maxOutputTokens": 12000
+      },
+      "resume-section-writing": {
+        "deadlineMilliseconds": 90000,
+        "maxOutputTokens": 16000
+      }
+    },
     "role": "writing"
   },
   "datasetId": "resume-tailoring-live-v1",

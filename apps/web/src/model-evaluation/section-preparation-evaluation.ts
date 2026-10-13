@@ -4,10 +4,10 @@ import { prepareResumeSections } from '@resume-tailoring/application/resume-prep
 
 import type { ModelConnection } from '../adapters/server/language-model-request'
 import {
-  createOpenAiResumeCoherenceChecker,
-  createOpenAiResumeFieldValidator,
-  createOpenAiResumeSectionWriter,
-} from '../adapters/server/openai-resume-section-models'
+  createModelResumeCoherenceChecker,
+  createModelResumeFieldValidator,
+  createModelResumeSectionWriter,
+} from '../adapters/server/model-resume-section-models'
 import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
 import { realSizedResumeFixture } from './real-sized-resume-corpus'
 import { sectionPreparationBudgets } from './model-evaluation-baselines'
@@ -37,9 +37,9 @@ export function createSectionModels({ structured, writing }: Readonly<{
   writing: ModelConnection
 }>): ResumeSectionModels {
   return {
-    writeSection: createOpenAiResumeSectionWriter(writing).write,
-    validateFields: createOpenAiResumeFieldValidator(structured).validate,
-    checkCoherence: createOpenAiResumeCoherenceChecker(structured).check,
+    writeSection: createModelResumeSectionWriter(writing).write,
+    validateFields: createModelResumeFieldValidator(structured).validate,
+    checkCoherence: createModelResumeCoherenceChecker(structured).check,
   }
 }
 

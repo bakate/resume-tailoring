@@ -105,10 +105,14 @@ Resources:
                   StringEquals:
                     iam:PassedToService: lambda.amazonaws.com
               - Effect: Allow
-                Action: logs:DescribeLogGroups
+                Action:
+                  - logs:DescribeLogGroups
+                  - logs:DescribeMetricFilters
                 Resource: '*'
               - Effect: Allow
                 Action:
+                  - logs:DeleteMetricFilter
+                  - logs:PutMetricFilter
                   - logs:PutRetentionPolicy
                   - logs:ListTagsForResource
                   - logs:TagResource

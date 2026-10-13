@@ -1,15 +1,35 @@
 import { z } from 'zod'
 
 import { isQualifiedModelConfiguration } from './model-evaluation/qualified-model-configurations'
-import { structuredModelConfiguration, writingModelConfiguration } from './model-evaluation/model-configurations'
-import { createOpenAiModelConfiguration, languageModelProviders, openAiReasoningEfforts } from './language-model-configuration'
-import type { ActiveLanguageModel, LanguageModelSelection, ModelRole, OpenAiReasoningEffort } from './language-model-configuration'
+import {
+  deepSeekStructuredModelConfiguration,
+  deepSeekWritingModelConfiguration,
+  structuredModelConfiguration,
+  writingModelConfiguration,
+} from './model-evaluation/model-configurations'
+import {
+  createDeepSeekModelConfiguration,
+  createOpenAiModelConfiguration,
+  languageModelProviders,
+  openAiReasoningEfforts,
+} from './language-model-configuration'
+import type {
+  ActiveLanguageModel,
+  LanguageModelProvider,
+  LanguageModelSelection,
+  ModelRole,
+  OpenAiReasoningEffort,
+} from './language-model-configuration'
 
 const providerEnvironmentSchema = z.object({
   LANGUAGE_MODEL_PROVIDER: z.enum(languageModelProviders).default('openai'),
 })
 
-const openAiKeySchema = z.object({ OPENAI_API_KEY: z.string().trim().min(1) })
+/** Only the active provider's key is required: a deployment never holds the key of a provider it does not call. */
+const providerKeySchemas = {
+  deepseek: z.object({ DEEPSEEK_API_KEY: z.string().trim().min(1) }).transform(({ DEEPSEEK_API_KEY }) => DEEPSEEK_API_KEY),
+  openai: z.object({ OPENAI_API_KEY: z.string().trim().min(1) }).transform(({ OPENAI_API_KEY }) => OPENAI_API_KEY),
+} as const satisfies Record<LanguageModelProvider, z.ZodType<string>>
 
 const openAiModelSettingsSchema = z.object({
   OPENAI_STRUCTURED_FALLBACK_MODEL: z.string().trim().min(1).optional(),
@@ -31,6 +51,22 @@ const openAiModelSettingsSchema = z.object({
   }
 })
 
+/**
+ * DeepSeek's thinking and output budget are frozen per operation in its Qualified Model Configuration, so only the
+ * model of each role is a setting.
+ */
+const deepSeekModelSettingsSchema = z.object({
+  DEEPSEEK_STRUCTURED_MODEL: z.string().trim().min(1).default(deepSeekStructuredModelConfiguration.model),
+  DEEPSEEK_WRITING_MODEL: z.string().trim().min(1).default(deepSeekWritingModelConfiguration.model),
+}).superRefine((environment, context) => {
+  for (const role of modelRoles) {
+    const path = role === 'structured' ? 'DEEPSEEK_STRUCTURED_MODEL' : 'DEEPSEEK_WRITING_MODEL'
+    const configuration = createDeepSeekModelConfiguration({ model: environment[path], role })
+    if (isQualifiedModelConfiguration({ configuration })) continue
+    context.addIssue({ code: 'custom', message: unqualifiedConfigurationMessage, path: [path] })
+  }
+})
+
 export type ServerEnvironment = Readonly<{ languageModel: ActiveLanguageModel }>
 
 /**
@@ -41,14 +77,15 @@ export function validateServerEnvironment({
   environment,
 }: Readonly<{ environment: Record<string, unknown> }>) {
   const selection = readLanguageModelSelection({ environment })
-  const key = openAiKeySchema.safeParse(environment)
-  if (!selection.ok || !key.success) {
+  const provider = providerEnvironmentSchema.safeParse(environment)
+  const key = provider.success ? providerKeySchemas[provider.data.LANGUAGE_MODEL_PROVIDER].safeParse(environment) : undefined
+  if (!selection.ok || key?.success !== true) {
     return createInvalidEnvironmentResult({ issues: [
       ...(selection.ok ? [] : selection.error.issues),
-      ...(key.success ? [] : readIssues({ issues: key.error.issues })),
+      ...(key === undefined || key.success ? [] : readIssues({ issues: key.error.issues })),
     ] })
   }
-  const languageModel: ActiveLanguageModel = { apiKey: key.data.OPENAI_API_KEY, ...selection.value }
+  const languageModel: ActiveLanguageModel = { apiKey: key.data, ...selection.value }
   return { ok: true, value: { languageModel } } as const
 }
 
@@ -59,9 +96,24 @@ export function validateServerEnvironment({
 export function readLanguageModelSelection({ environment }: Readonly<{ environment: Record<string, unknown> }>) {
   const provider = providerEnvironmentSchema.safeParse(environment)
   if (!provider.success) return createInvalidEnvironmentResult({ issues: readIssues({ issues: provider.error.issues }) })
+  if (provider.data.LANGUAGE_MODEL_PROVIDER === 'deepseek') {
+    const settings = deepSeekModelSettingsSchema.safeParse(environment)
+    if (!settings.success) return createInvalidEnvironmentResult({ issues: readIssues({ issues: settings.error.issues }) })
+    return { ok: true, value: createDeepSeekSelection({ environment: settings.data }) } as const
+  }
   const settings = openAiModelSettingsSchema.safeParse(environment)
   if (!settings.success) return createInvalidEnvironmentResult({ issues: readIssues({ issues: settings.error.issues }) })
   return { ok: true, value: createOpenAiSelection({ environment: settings.data }) } as const
+}
+
+function createDeepSeekSelection({ environment }: Readonly<{
+  environment: z.infer<typeof deepSeekModelSettingsSchema>
+}>): LanguageModelSelection {
+  return {
+    provider: 'deepseek',
+    structured: { active: createDeepSeekModelConfiguration({ model: environment.DEEPSEEK_STRUCTURED_MODEL, role: 'structured' }) },
+    writing: { active: createDeepSeekModelConfiguration({ model: environment.DEEPSEEK_WRITING_MODEL, role: 'writing' }) },
+  }
 }
 
 type OpenAiEnvironment = z.infer<typeof openAiModelSettingsSchema>
@@ -116,7 +168,7 @@ function validateConfiguration({ context, path, ...settings }: ModelSettings & R
   if (configuration !== undefined && isQualifiedModelConfiguration({ configuration })) return
   context.addIssue({
     code: 'custom',
-    message: 'Model configuration has no passing qualification run',
+    message: unqualifiedConfigurationMessage,
     path: [path],
   })
 }
@@ -131,3 +183,4 @@ function createInvalidEnvironmentResult({ issues }: Readonly<{ issues: readonly 
 }
 
 const modelRoles = ['structured', 'writing'] as const satisfies readonly ModelRole[]
+const unqualifiedConfigurationMessage = 'Model configuration has no passing qualification run'

@@ -1,7 +1,7 @@
 import { createJobMatch, type JobMatch } from '@resume-tailoring/application/job-match'
 
 import type { ModelCallMeasurement, ModelConnection } from '../adapters/server/language-model-request'
-import { createOpenAiJobPostingExtractor } from '../adapters/server/openai-job-posting-extractor'
+import { createModelJobPostingExtractor } from '../adapters/server/model-job-posting-extractor'
 import { liveModelEvaluationThresholds } from './model-evaluation-baselines'
 import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
 
@@ -22,7 +22,7 @@ export async function extractJobPosting({ connection, jobPostingContent }: Reado
     jobPostingDocumentReader: { read: (document) => Promise.resolve({
       ok: true, value: { text: new TextDecoder().decode(document.bytes) },
     }) },
-    jobPostingExtractor: createOpenAiJobPostingExtractor(connection),
+    jobPostingExtractor: createModelJobPostingExtractor(connection),
     matchEvidenceMatcher: { match: () => Promise.resolve({
       ok: true, value: { adjacentEvidence: [], evidence: [], relevance: [] },
     }) },

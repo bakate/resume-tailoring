@@ -13,6 +13,8 @@ describe('Model request failures as API failures', () => {
     [{ type: 'upstream-invalid-request', status: 401 }, { type: 'service-misconfigured' }],
     [{ type: 'upstream-failure', status: 503 }, { type: 'provider-unavailable' }],
     [{ type: 'transport' }, { type: 'provider-unavailable' }],
+    // An answer cut at its budget would be cut again: no Recovery helps the Candidate but waiting for the operator.
+    [{ type: 'truncated' }, { type: 'provider-unavailable' }],
   ] as const)('reads %o as %o without naming the operation', (failure, apiFailure) => {
     const translatedFailure = readModelApiFailure(failure)
 

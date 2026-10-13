@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
 
-import { requestOpenAiJobPostingExtraction } from '../adapters/server/openai-job-posting-extractor'
+import { requestJobPostingExtraction } from '../adapters/server/model-job-posting-extractor'
 import { jobPostingExtractionRequestSchema } from '../candidate-journey/job-match-schemas'
 import { failureResponse } from '../api-failure'
 import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
@@ -22,7 +22,7 @@ async function extractJobPosting({ request }: Readonly<{ request: Request }>) {
   if (!bodyResult.ok) return failureResponse({ type: bodyResult.type })
   const environmentResult = validateServerEnvironment({ environment: process.env })
   if (!environmentResult.ok) return failureResponse({ type: 'service-misconfigured' })
-  const result = await requestOpenAiJobPostingExtraction({
+  const result = await requestJobPostingExtraction({
     apiKey: { value: environmentResult.value.languageModel.apiKey },
     jobPostingContent: bodyResult.value.jobPostingContent,
     configuration: environmentResult.value.languageModel.structured.active,

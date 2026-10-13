@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createScriptedLanguageModelProvider } from '../adapters/server/scripted-language-model-provider'
+import { createOpenAiModelConfiguration } from '../language-model-configuration'
 import { jobPostingExtractionSource } from './job-posting-extraction-evaluation'
 import type { ModelConfiguration } from './model-qualification'
 import { runModelQualification } from './model-qualification-runner'
@@ -90,5 +91,6 @@ const faithfulAnswers = {
 // A provider production does not know, so the source is shown to run on any provider the runner is handed.
 const configuration = {
   provider: 'scripted', model: 'scripted-structured', role: 'structured', providerOptions: {},
+  operations: createOpenAiModelConfiguration({ model: 'scripted', reasoningEffort: 'low', role: 'structured' }).operations,
   pricing: [{ condition: 'peak', inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 4 }],
 } as unknown as ModelConfiguration

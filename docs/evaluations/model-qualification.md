@@ -52,8 +52,8 @@ checks:
 
 | Live evaluation | Source | Roles | Extraction recall | Multilingual fidelity | Cost per Tailored Resume | Provenance safety |
 | --- | --- | --- | --- | --- | --- | --- |
-| `openai-job-posting-extractor.evaluation.test.ts` | `job-posting-extraction` | structured | generic duties collapse, emphasis central, mandatory critical, distinct capabilities | French excerpts copied, never translated | — | — |
-| `openai-job-match-evidence-matcher.evaluation.test.ts` | `match-evidence` | structured | the matcher answered, expected coverage, expected Adjacent Evidence | cross-language cases | — | a covered trap |
+| `model-job-posting-extractor.evaluation.test.ts` | `job-posting-extraction` | structured | generic duties collapse, emphasis central, mandatory critical, distinct capabilities | French excerpts copied, never translated | — | — |
+| `model-job-match-evidence-matcher.evaluation.test.ts` | `match-evidence` | structured | the matcher answered, expected coverage, expected Adjacent Evidence | cross-language cases | — | a covered trap |
 | `cross-segment-document-qualification.evaluation.test.ts` corpus | `cross-segment-extraction` | structured | held-out requirements cited across technology, general management and sales | French excerpts copied | — | — |
 | same corpus | `cross-segment-writing` | writing | each French held-out scenario with relevant evidence prepared | every prose field written in French | — | unsupported Resume Claims |
 | `prompt-injection.evaluation.test.ts` | `prompt-injection` | structured | — | — | — | an obeyed injection (injected content in the Source Profile or a Candidate Fact, an injected requirement, skill or entry, Kubernetes covered in the injected run); Kubernetes covered in the clean run is a covered trap |

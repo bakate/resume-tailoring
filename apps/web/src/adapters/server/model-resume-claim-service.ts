@@ -30,7 +30,7 @@ type ActiveResumeClaimModel = Readonly<{
   requester: ReturnType<typeof createModelRequester>
 }>
 
-export function createOpenAiResumeClaimReformulator({
+export function createModelResumeClaimReformulator({
   apiKey,
   configuration: modelConfiguration,
   request = fetch,
@@ -44,7 +44,7 @@ export function createOpenAiResumeClaimReformulator({
   }
 }
 
-export function createOpenAiResumeClaimSemanticValidator({
+export function createModelResumeClaimSemanticValidator({
   apiKey,
   configuration: modelConfiguration,
   deadlineSignal,
@@ -94,6 +94,7 @@ async function writeResumeClaims({
     ...configuration,
     instructions: writingInstructions,
     output: resumeClaimResponseFormat,
+    outputSchema: proposedResumeClaimsSchema,
     userValue: revision === undefined ? writingInputs : { ...writingInputs, revision },
   })
   if (!response.ok) return withRequestFailure({ result: resumeClaimWritingUnavailableResult, response })
@@ -125,6 +126,7 @@ async function validateResumeClaim({
     ...configuration,
     instructions: validationInstructions,
     output: resumeClaimValidationResponseFormat,
+    outputSchema: resumeClaimSemanticValidationSchema,
     userValue: validationRequest,
   })
   if (!response.ok) return withRequestFailure({ result: resumeClaimValidationUnavailableResult, response })
@@ -139,19 +141,21 @@ async function requestModel({
   instructions,
   operation,
   output,
+  outputSchema,
   requester,
   userValue,
 }: ActiveResumeClaimModel & Readonly<{
   instructions: string
   output: Readonly<{ name: string; schema: Readonly<Record<string, unknown>> }>
+  outputSchema: z.ZodType
   userValue: unknown
 }>) {
   const response = await requester.send({
     deadlineSignal,
     instructions,
-    maxOutputTokens: maximumOutputTokens,
     operation,
     output,
+    outputSchema,
     userText: delimitSuppliedData(userValue),
   })
   return response.ok ? parseModelOutput({ outputText: response.value.text })
@@ -166,8 +170,6 @@ function withRequestFailure<TType extends string>({ result, response }: Readonly
   return response.requestFailure === undefined ? result
     : { ok: false, error: { ...result.error, apiFailure: readModelApiFailure(response.requestFailure) } } as const
 }
-
-const maximumOutputTokens = 12_000
 
 function parseModelOutput({ outputText }: Readonly<{ outputText?: string }>) {
   if (outputText === undefined) return unavailableModelResult

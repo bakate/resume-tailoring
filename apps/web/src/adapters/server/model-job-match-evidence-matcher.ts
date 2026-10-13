@@ -14,14 +14,14 @@ import {
 import type { MatchEvidenceMatcher } from '@resume-tailoring/application/ports'
 import { delimitSuppliedData, untrustedContentInstruction } from './untrusted-model-input'
 
-export function createOpenAiJobMatchEvidenceMatcher(connection: ModelConnection): MatchEvidenceMatcher {
+export function createModelJobMatchEvidenceMatcher(connection: ModelConnection): MatchEvidenceMatcher {
   return { match: async (matchRequest) => {
-    const result = await requestOpenAiJobMatchEvidence({ ...connection, matchRequest })
+    const result = await requestJobMatchEvidence({ ...connection, matchRequest })
     return result.ok ? result : unavailableResult
   } }
 }
 
-export type OpenAiMatchEvidenceFailure = Readonly<{
+export type MatchEvidenceFailure = Readonly<{
   type: 'invalid-model-output' | 'request-too-large'
   characterCount?: number
   maximumCharacterCount?: number
@@ -32,11 +32,11 @@ type InvalidModelOutputCause =
   | 'invalid-schema'
   | 'missing-output-text'
 
-export async function requestOpenAiJobMatchEvidence({ matchRequest, ...connection }: ModelConnection & Readonly<{
+export async function requestJobMatchEvidence({ matchRequest, ...connection }: ModelConnection & Readonly<{
   matchRequest: Parameters<MatchEvidenceMatcher['match']>[0]
 }>): Promise<Readonly<{ ok: true; value: z.infer<typeof matchEvidenceProposalSchema> }> | Readonly<{
   ok: false
-  error: OpenAiMatchEvidenceFailure
+  error: MatchEvidenceFailure
 }>> {
   const requestCharacterCount = JSON.stringify(matchRequest).length
   if (requestCharacterCount > maximumMatchEvidenceRequestCharacters) {
@@ -61,9 +61,9 @@ export async function requestOpenAiJobMatchEvidence({ matchRequest, ...connectio
   const requester = createModelRequester(connection)
   const response = await requester.send({
     instructions: matchingInstructions,
-    maxOutputTokens: 8_000,
     operation: 'explainable-match-evidence',
     output: matchEvidenceResponseFormat,
+    outputSchema: matchEvidenceProposalSchema,
     userText: delimitSuppliedData(matchRequest),
   })
   if (!response.ok) return response

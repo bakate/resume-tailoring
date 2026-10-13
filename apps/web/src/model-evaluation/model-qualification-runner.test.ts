@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { createOpenAiJobPostingExtractor } from '../adapters/server/openai-job-posting-extractor'
+import { createModelJobPostingExtractor } from '../adapters/server/model-job-posting-extractor'
 import { createScriptedLanguageModelProvider } from '../adapters/server/scripted-language-model-provider'
+import { createOpenAiModelConfiguration } from '../language-model-configuration'
 import type { ModelConfiguration } from './model-qualification'
 import {
   createModelEvaluationObservation,
@@ -44,7 +45,7 @@ describe('provider-neutral qualification runner', () => {
 
   it('counts only the calls of the configuration under test, never its companion role\'s', async () => {
     const companionSource: ModelObservationSource = { id: 'companion', roles: ['structured'], observe: async ({ connect }) => {
-      await createOpenAiJobPostingExtractor(connect('writing')).extract({ jobPostingContent: typescriptPosting })
+      await createModelJobPostingExtractor(connect('writing')).extract({ jobPostingContent: typescriptPosting })
       return []
     } }
 
@@ -57,8 +58,8 @@ describe('provider-neutral qualification runner', () => {
     const tailoredResumeSource: ModelObservationSource = { id: 'tailored-resume', roles: ['structured'],
       observe: async ({ trackUsage }) => {
         const tracker = trackUsage()
-        await createOpenAiJobPostingExtractor(tracker.connect('structured')).extract({ jobPostingContent: typescriptPosting })
-        await createOpenAiJobPostingExtractor(tracker.connect('writing')).extract({ jobPostingContent: typescriptPosting })
+        await createModelJobPostingExtractor(tracker.connect('structured')).extract({ jobPostingContent: typescriptPosting })
+        await createModelJobPostingExtractor(tracker.connect('writing')).extract({ jobPostingContent: typescriptPosting })
         return [createModelEvaluationObservation({ fixtureId: 'whole', tailoredResumeUsage: tracker.readUsage() })]
       } }
 
@@ -133,10 +134,12 @@ const scriptedProvider = createScriptedLanguageModelProvider({ answer: ({ output
 // A provider production does not know: only the providers handed to the runner can serve it.
 const scriptedConfiguration = {
   provider: 'scripted', model: 'scripted-structured', role: 'structured', providerOptions: { thinking: 'disabled' },
+  operations: createOpenAiModelConfiguration({ model: 'scripted', reasoningEffort: 'low', role: 'structured' }).operations,
   pricing: [{ condition: 'off-peak', inputUsdPerMillionTokens: 0.5, outputUsdPerMillionTokens: 2 },
     { condition: 'peak', inputUsdPerMillionTokens: 1, outputUsdPerMillionTokens: 4 }],
 } as unknown as ModelConfiguration
 
+// The scripted model answers extraction alone, so the companion stands in for writing calls with extraction calls.
 const scriptedCompanion = { ...scriptedConfiguration, model: 'scripted-writing', role: 'writing',
   pricing: [{ condition: 'peak', inputUsdPerMillionTokens: 2, outputUsdPerMillionTokens: 8 }] } as ModelConfiguration
 
@@ -145,7 +148,7 @@ const extractionSource: ModelObservationSource = {
   roles: ['structured'],
   observe: async ({ trackUsage }) => {
     const tracker = trackUsage()
-    const result = await createOpenAiJobPostingExtractor(tracker.connect('structured')).extract({ jobPostingContent: typescriptPosting })
+    const result = await createModelJobPostingExtractor(tracker.connect('structured')).extract({ jobPostingContent: typescriptPosting })
     const recalled = result.ok && result.value.requirements.some(({ sourceExcerpt }) => sourceExcerpt.includes('TypeScript'))
     const copied = result.ok && result.value.requirements.every(({ sourceExcerpt }) => typescriptPosting.includes(sourceExcerpt))
     return [createModelEvaluationObservation({ fixtureId: 'typescript-posting', tailoredResumeUsage: tracker.readUsage(),
