@@ -72,7 +72,7 @@ async function prepareRealSizedResume({ models, runIndex }: Readonly<{
 
 /**
  * Each run checks that preparation ends prepared, reports its wall time, and counts the unsupported Resume Claims
- * of its document. Writing is measured per Resume Section, from its first writing call to its last call, retries
+ * of its document. Writing is measured per Resume Section by the time its calls took, retries and a coherence rewrite
  * included; the structured role's calls are measured one by one by the runner. The runs together are held to
  * `sectionPreparationBudgets`, which a live run fails on and qualification reports without gating.
  */

@@ -73,7 +73,7 @@ describe('section preparation qualification on a real-sized resume', () => {
       structuredUsage: { inputTokens: 1_800, outputTokens: 90 } })
   })
 
-  it('times each Resume Section by its plan key from its first writing call to its last call', async () => {
+  it('times each Resume Section by its plan key across its writing and validation calls', async () => {
     const clock = createClock()
     const measured = measureSectionModels({ models: createTimedModels({ clock }), now: clock.now })
     const experience = { key: 'experiences.3', kind: 'experience' } as const
@@ -88,6 +88,20 @@ describe('section preparation qualification on a real-sized resume', () => {
       sections: [{ key: 'experiences.3', kind: 'experience', durationMilliseconds: 3_000, writingCallCount: 2,
         writingUsage: { inputTokens: 200, outputTokens: 20 }, validationUsage: { inputTokens: 30, outputTokens: 3 } }],
     })
+  })
+
+  it('leaves out the wait between a Resume Section\'s first pass and its coherence rewrite', async () => {
+    const clock = createClock()
+    const measured = measureSectionModels({ models: createTimedModels({ clock }), now: clock.now })
+    const skills = { key: 'skills', kind: 'skills' } as const
+    await measured.models.writeSection(writingInput({ section: skills }))
+    await measured.models.validateFields({ ...writingInput({ section: skills }), fields: [] })
+    clock.advance(20_000)
+
+    await measured.models.writeSection(writingInput({ section: skills }))
+
+    expect(measured.readMeasurements().sections).toEqual([expect.objectContaining({ key: 'skills',
+      durationMilliseconds: 3_000, writingCallCount: 2 })])
   })
 
   it('supplies at least six experiences and every supporting section in the real-sized fixture', () => {

@@ -8,7 +8,10 @@ export type SectionPreparationBudgets = Readonly<{
   preparationWallTimeMilliseconds: number
 }>
 
-/** One Resume Section of a run, timed from its first writing call to its last call, retries included. */
+/**
+ * One Resume Section of a run, timed by the time its calls took, retries and a coherence rewrite included. Its calls
+ * never overlap, so waiting for the other sections or the coherence check between two passes is not counted.
+ */
 export type MeasuredResumeSection = Readonly<{
   key: string
   kind: ResumeSectionKind
@@ -87,16 +90,15 @@ export function readSectionPreparationBudgetFailures({ report: { gates } }: Read
  */
 export function measureSectionModels({ models, now }: Readonly<{ models: ResumeSectionModels; now: () => number }>) {
   const sections = new Map<string, MeasuredResumeSection>()
-  const sectionStarts = new Map<string, number>()
   let coherence: SectionPreparationRun['coherence'] = null
   const measure = async <TResult extends Readonly<{ usage?: ResumeModelUsage }>>({ call, key, kind, role }: Readonly<{
     call: () => Promise<TResult>; key: string; kind: ResumeSectionKind; role: 'writing' | 'validation'
   }>) => {
-    if (!sectionStarts.has(key)) sectionStarts.set(key, now())
+    const startedAt = now()
     const result = await call()
     const previous = sections.get(key) ?? { key, kind, durationMilliseconds: 0, writingCallCount: 0,
       writingUsage: noUsage, validationUsage: noUsage }
-    sections.set(key, { ...previous, durationMilliseconds: Math.round(now() - (sectionStarts.get(key) ?? 0)),
+    sections.set(key, { ...previous, durationMilliseconds: previous.durationMilliseconds + Math.round(now() - startedAt),
       writingCallCount: previous.writingCallCount + (role === 'writing' ? 1 : 0),
       writingUsage: role === 'writing' ? sumUsage({ usages: [previous.writingUsage, result.usage ?? noUsage] }) : previous.writingUsage,
       validationUsage: role === 'validation' ? sumUsage({ usages: [previous.validationUsage, result.usage ?? noUsage] })
