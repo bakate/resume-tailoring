@@ -71,6 +71,16 @@ export function qualifySectionPreparation({ budgets, fixtureId, runs }: Readonly
   }
 }
 
+/** Each budget a report's runs broke, named as a failed check. */
+export function readSectionPreparationBudgetFailures({ report: { gates } }: Readonly<{ report: SectionPreparationReport }>) {
+  return [
+    ...gates.outcomes.passed ? [] : [`failed:${String(gates.outcomes.failedPreparationCount)} preparation(s) not prepared`],
+    ...gates.preparationWallTime.passed ? [] : ['failed:preparation wall time over budget'],
+    ...Object.entries(gates.sectionP95Latency.bySection).filter(([, gate]) => !gate.passed)
+      .map(([key]) => `failed:${key} p95 latency over budget`),
+  ]
+}
+
 /**
  * Wraps the section models of one run to time each Resume Section by its plan key and split usage by role.
  * The production telemetry only carries the section kind, which would pool the experiences together.

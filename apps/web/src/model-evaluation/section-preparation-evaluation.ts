@@ -14,7 +14,7 @@ import { sectionPreparationBudgets } from './model-evaluation-baselines'
 import {
   measureSectionModels,
   qualifySectionPreparation,
-  type SectionPreparationReport,
+  readSectionPreparationBudgetFailures,
   type SectionPreparationRun,
 } from './section-preparation-qualification'
 import { countUnsupportedResumeClaims } from './unsupported-resume-claims'
@@ -99,17 +99,8 @@ export const sectionPreparationSource: ModelObservationSource = {
         observedValues: [`writing-calls:${String(section.writingCallCount)}`] })))
     }
     observations.push(createModelEvaluationObservation({ fixtureId: `${realSizedResumeFixture.id}:budgets`,
-      observedValues: readBudgetFailures({ report: qualifySectionPreparation({ budgets: sectionPreparationBudgets,
+      observedValues: readSectionPreparationBudgetFailures({ report: qualifySectionPreparation({ budgets: sectionPreparationBudgets,
         fixtureId: realSizedResumeFixture.id, runs }) }) }))
     return observations
   },
-}
-
-function readBudgetFailures({ report: { gates } }: Readonly<{ report: SectionPreparationReport }>) {
-  return [
-    ...gates.outcomes.passed ? [] : [`failed:${String(gates.outcomes.failedPreparationCount)} preparation(s) not prepared`],
-    ...gates.preparationWallTime.passed ? [] : ['failed:preparation wall time over budget'],
-    ...Object.entries(gates.sectionP95Latency.bySection).filter(([, gate]) => !gate.passed)
-      .map(([key]) => `failed:${key} p95 latency over budget`),
-  ]
 }

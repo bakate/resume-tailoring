@@ -6,6 +6,7 @@ import type { ModelConfiguration } from './model-qualification'
 import {
   createModelEvaluationObservation,
   readFailedObservations,
+  readRoleCandidate,
   runModelQualification,
   type ModelObservationSource,
 } from './model-qualification-runner'
@@ -107,6 +108,15 @@ describe('provider-neutral qualification runner', () => {
     const failed = readFailedObservations({ observations })
 
     expect(failed.map(({ fixtureId }) => fixtureId)).toEqual(['failed'])
+  })
+
+  it.each(['structured', 'writing'] as const)('pairs the %s configuration with the other role\'s as its companion', (role) => {
+    const configurations = { structured: scriptedConfiguration, writing: { ...scriptedConfiguration, role: 'writing' } } as const
+
+    const candidate = readRoleCandidate({ configurations, role })
+
+    expect([candidate.configuration.role, candidate.companion.role]).toEqual(
+      role === 'structured' ? ['structured', 'writing'] : ['writing', 'structured'])
   })
 })
 

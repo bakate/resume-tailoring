@@ -177,8 +177,9 @@ function normalizeDateToken(token: string) {
 }
 
 // Thousands are grouped by a comma in English and by a space, often a no-break one, in French.
-const groupedAmountPattern = /^\d{1,3}(?:[, \u00A0\u202F]\d{3})+$/u
-const numericExpressionPattern = /(?<prefix>[-+$€£])?\s*(?<amount>\d{1,3}(?:[, \u00A0\u202F]\d{3})+(?!\d)|\d+(?:[.,]\d+)?)\s*(?<suffix>%|percent|pour\s+cent|years?|ans?|months?|mois|days?|jours?|hours?|heures?|usd|eur|gbp|k|m|millions?)?/giu
+const groupedAmount = String.raw`\d{1,3}(?:[, \u00A0\u202F]\d{3})+`
+const groupedAmountPattern = new RegExp(`^${groupedAmount}$`, 'u')
+const numericExpressionPattern = new RegExp(String.raw`(?<prefix>[-+$€£])?\s*(?<amount>${groupedAmount}(?!\d)|\d+(?:[.,]\d+)?)\s*(?<suffix>%|percent|pour\s+cent|years?|ans?|months?|mois|days?|jours?|hours?|heures?|usd|eur|gbp|k|m|millions?)?`, 'giu')
 const dateTokenPattern = /\b(?:jan(?:uary|vier)?|feb(?:ruary)?|f[eé]v(?:rier)?|mar(?:ch|s)?|apr(?:il)?|avr(?:il)?|may|mai|jun(?:e)?|juin|jul(?:y)?|juil(?:let)?|aug(?:ust)?|ao[uû]t|sep(?:tember|tembre)?|oct(?:ober|obre)?|nov(?:ember|embre)?|dec(?:ember)?|d[eé]c(?:embre)?)\b/giu
 const numericSuffixTranslations: Readonly<Record<string, string>> = {
   percent: '%', 'pour cent': '%',

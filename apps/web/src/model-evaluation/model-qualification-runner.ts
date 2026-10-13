@@ -121,6 +121,17 @@ export function createModelEvaluationObservation(
   }
 }
 
+/**
+ * The candidate for one role of a selection: that role's configuration under test, the other role's as its companion,
+ * as a live evaluation runs the configurations the environment validates.
+ */
+export function readRoleCandidate({ configurations, role }: Readonly<{
+  configurations: Readonly<Record<ModelRole, LanguageModelConfiguration>>
+  role: ModelRole
+}>) {
+  return { configuration: configurations[role], companion: configurations[role === 'structured' ? 'writing' : 'structured'] }
+}
+
 function assertCompanion({ candidate: { companion, configuration } }: Readonly<{ candidate: QualificationCandidate }>) {
   if (companion === undefined) return
   // Only one provider exists yet; the check keeps a second one from pairing with another provider's configuration.
