@@ -1,5 +1,5 @@
 import type { ProfessionalResumeDocument } from '@resume-tailoring/application/candidate-journey'
-import type { TailoredResumeLocale } from '@resume-tailoring/application/tailored-resume'
+import type { TailoredResumeLocale, TailoredResumeSection } from '@resume-tailoring/application/tailored-resume'
 
 import { readProfessionalFields } from './unsupported-resume-claims'
 
@@ -8,13 +8,15 @@ export type LanguageCheck = Readonly<{ name: string; passed: boolean }>
 /**
  * One check per prose field of a prepared document: it must read as the requested language, judged by the function
  * words each language cannot write without. A field too short or too neutral to tell, such as a list of tools, is
- * skipped rather than guessed.
+ * skipped rather than guessed. Education and certifications are skipped whole: the official name of a degree, diploma
+ * or certification may stay in its own language, alone or next to its translation.
  */
 export function checkDocumentLanguage({ document, locale }: Readonly<{
   document: ProfessionalResumeDocument
   locale: TailoredResumeLocale
 }>): readonly LanguageCheck[] {
-  return readProfessionalFields({ document }).flatMap(({ id, text }) => {
+  const sections = document.sections.filter(({ section }) => !sectionsKeepingOfficialNames.has(section))
+  return readProfessionalFields({ document: { ...document, sections } }).flatMap(({ id, text }) => {
     const words = text.toLocaleLowerCase('fr').match(/\p{Letter}+/gu) ?? []
     if (words.length < minimumWordCount) return []
     const scores = { en: countFunctionWords({ language: 'en', words }), fr: countFunctionWords({ language: 'fr', words }) }
@@ -29,6 +31,8 @@ function countFunctionWords({ language, words }: Readonly<{ language: TailoredRe
 }
 
 const minimumWordCount = 6
+
+const sectionsKeepingOfficialNames: ReadonlySet<TailoredResumeSection['section']> = new Set(['education', 'certifications'])
 
 const functionWords: Readonly<Record<TailoredResumeLocale, ReadonlySet<string>>> = {
   en: new Set(['the', 'and', 'of', 'to', 'in', 'for', 'with', 'on', 'an', 'by', 'from', 'as', 'at', 'is', 'are', 'its',

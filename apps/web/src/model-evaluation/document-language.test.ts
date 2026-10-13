@@ -39,15 +39,29 @@ describe('the language a prepared document is written in', () => {
 
     expect(checks).toEqual([])
   })
+
+  it.each(['education', 'certifications'] as const)('skips %s, whose official names may stay in their own language', (section) => {
+    const document = createDocument({ achievements: [], sections: [{ section, fields: [
+      'Licence professionnelle Développement Web de l\'Université de Lille, 2018',
+      'Professional Licence in Web Development (Licence professionnelle Développement Web de l\'Université de Lille), 2018',
+    ].map((text, index) => ({ id: `${section}-${String(index)}`, text, factIds: ['source-fact-0'] })) }] })
+
+    const checks = checkDocumentLanguage({ document, locale: 'en' })
+
+    expect(checks).toEqual([])
+  })
 })
 
-function createDocument({ achievements }: Readonly<{ achievements: readonly string[] }>): ProfessionalResumeDocument {
+function createDocument({ achievements, sections = [] }: Readonly<{
+  achievements: readonly string[]
+  sections?: ProfessionalResumeDocument['sections']
+}>): ProfessionalResumeDocument {
   return {
     purpose: 'tailored', locale: 'fr', targetRole: null,
     valueProposition: { kind: 'prose', paragraphs: [] },
     experiences: [{ id: 'experiences.0', chronology: 'relevant', role: null, organization: null, startDate: null,
       endDate: null, context: null, achievements: achievements.map((text, index) => ({ id: `achievement-${String(index)}`,
         text, factIds: ['source-fact-0'] })) }],
-    sections: [],
+    sections,
   }
 }
