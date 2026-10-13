@@ -54,8 +54,8 @@ async function replayAuditRun({ intake, preparations }: Readonly<{
       request: { candidateFacts: sourceIntake.candidateFacts, jobMatch, locale, purpose: 'tailored' },
       revision: `front-end-audit:${locale}` })
     if (output.status !== 'prepared') {
-      throw new Error(`The ${locale} preparation failed: ${output.reason} ${readPreparationFailureValues({ output }).join(' ')} ${
-        JSON.stringify(lastCoherence)}`)
+      const reasons = readPreparationFailureValues({ output }).join(' ')
+      throw new Error(`The ${locale} preparation failed: ${output.reason} ${reasons} ${JSON.stringify(lastCoherence)}`)
     }
     return output.document
   }))

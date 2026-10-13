@@ -7,8 +7,8 @@ import { assembleResumeDocumentWithOrigins, citedCandidateFacts, copyExperienceF
   isSectionFullyValidated, normalizeSectionContent, planResumeSections, readRejectedFields,
   readSectionContentFields, removeSectionFields } from './resume-sections'
 import type { ResumeCoherenceIssue, ResumeDocumentCoherence, ResumeFieldRejection, ResumeFieldValidation,
-  ResumeFieldValidationInput, ResumeModelUsage, ResumeRejectedField, ResumeSectionContent, ResumeSectionModelResult, ResumeSectionPlanEntry, ResumeSectionsRequest,
-  ResumeSectionWritingInput } from './resume-sections'
+  ResumeFieldValidationInput, ResumeModelUsage, ResumeRejectedField, ResumeSectionContent, ResumeSectionModelResult,
+  ResumeSectionPlanEntry, ResumeSectionsRequest, ResumeSectionWritingInput } from './resume-sections'
 import type { ReadApiFailure, ResumeSectionModels } from './ports'
 import { explainFailure, isRetryable } from './failure-cause'
 import type { ExplainedFailure } from './failure-cause'
@@ -20,13 +20,15 @@ type ResumeSectionFailure = Readonly<{
 
 /** Why one written version of a Resume Section was rejected: a field rejection kind, or the model failure type of its call. */
 export type ResumeAttemptRejection = ResumeFieldRejection | ResumeSectionFailure['type']
+/** The rejection kinds of each rejected version of one Resume Section, in the order they were written. */
+type ResumeAttemptRejections = readonly (readonly ResumeAttemptRejection[])[]
 
 /**
  * Why a preparation failed, content-free: each failed Resume Section by its plan key with the rejection kinds of each
  * of its rejected versions, or the coherence check's model failure or language mismatch naming no field.
  */
 export type ResumePreparationFailureReason =
-  | Readonly<{ step: 'section'; sectionKey: string; attempts: readonly (readonly ResumeAttemptRejection[])[] }>
+  | Readonly<{ step: 'section'; sectionKey: ResumeSectionPlanEntry['key']; attempts: ResumeAttemptRejections }>
   | Readonly<{ step: 'coherence'; rejection: ResumeAttemptRejection }>
 
 /** A section with content was validated as written, or copied from its Candidate Facts after its rewrite still failed. */
@@ -35,8 +37,9 @@ export type ResumeSectionResult = Readonly<{
   attempt: number
   durationMilliseconds: number
   usage: ResumeModelUsage
+  attemptRejections: ResumeAttemptRejections
 }> & (Readonly<{ status: 'validated' | 'copied-from-source'; content: ResumeSectionContent }>
-  | Readonly<{ status: 'failed'; failure: ResumeSectionFailure; attemptRejections: readonly (readonly ResumeAttemptRejection[])[] }>)
+  | Readonly<{ status: 'failed'; failure: ResumeSectionFailure }>)
 
 type SectionProgressStatus = 'writing' | 'validating'
 
@@ -54,7 +57,7 @@ type ResumeSectionMachineContext = ResumeSectionMachineInput & Readonly<{
   failure: ResumeSectionFailure | null
   rejectedFields: readonly ResumeRejectedField[]
   /** The rejection kinds of each rejected version, the coherence feedback a rewritten section started from first. */
-  attemptRejections: readonly (readonly ResumeAttemptRejection[])[]
+  attemptRejections: ResumeAttemptRejections
   startedAt: number
   usage: ResumeModelUsage
 }>
@@ -147,11 +150,10 @@ function addUsage(total: ResumeModelUsage, usage: ResumeModelUsage | undefined):
 
 function readSectionResult(context: ResumeSectionMachineContext): ResumeSectionResult {
   const measured = { section: context.writingInput.section, attempt: context.attempt, usage: context.usage,
-    durationMilliseconds: Math.max(0, context.now() - context.startedAt) }
+    durationMilliseconds: Math.max(0, context.now() - context.startedAt), attemptRejections: context.attemptRejections }
   if (context.failure === null && context.content !== null) return { ...measured, status: 'validated', content: context.content }
   const copy = context.failure?.type === 'unsupported' ? readSourceCopy(context.writingInput) : null
-  return copy === null ? { ...measured, status: 'failed', failure: context.failure ?? { type: 'unexpected-response' },
-    attemptRejections: context.attemptRejections }
+  return copy === null ? { ...measured, status: 'failed', failure: context.failure ?? { type: 'unexpected-response' } }
     : { ...measured, status: 'copied-from-source', content: copy }
 }
 
@@ -438,7 +440,8 @@ type PreparationStepFailure = ResumeSectionFailure | Readonly<{ type: 'incoheren
 /**
  * Why a preparation that ended failed did, for model qualification: every section still failed, by the rejection
  * kinds of each version written, or the coherence check that gave no usable answer. A section the coherence check
- * rejected again after its rewrite lists both verdicts. Field ids and texts are left out.
+ * rejected again after its rewrite lists every verdict its versions got, the last check's included. Field ids and
+ * texts are left out.
  */
 export function readPreparationFailureReasons(context: ResumePreparationMachineContext): readonly ResumePreparationFailureReason[] {
   const { coherence } = context
@@ -446,10 +449,13 @@ export function readPreparationFailureReasons(context: ResumePreparationMachineC
     : [{ step: 'section', sectionKey: result.section.key, attempts: result.attemptRejections }])
   if (!coherence.ok) return [{ step: 'coherence', rejection: coherence.error.type }]
   const { rewrites } = resolveCoherence({ context, coherence })
-  // A language mismatch naming no field gives no section to blame.
-  if (!hasCoherenceRejections(rewrites)) return coherence.value.languageMatches ? [] : [{ step: 'coherence', rejection: 'language' }]
-  return Object.entries(rewrites).map(([sectionKey, rejected]) => ({ step: 'section', sectionKey,
-    attempts: [context.coherenceRejections?.[sectionKey] ?? [], rejected].filter((fields) => fields.length > 0).map(readRejectionKinds) }))
+  const sections = context.results.flatMap(({ section, attemptRejections }): ResumePreparationFailureReason[] => {
+    const rejected = rewrites[section.key]
+    return rejected === undefined ? []
+      : [{ step: 'section', sectionKey: section.key, attempts: [...attemptRejections, readRejectionKinds(rejected)] }]
+  })
+  // A language mismatch can name no field, so it is recorded apart from the sections.
+  return coherence.value.languageMatches ? sections : [...sections, { step: 'coherence', rejection: 'language' }]
 }
 
 /**
@@ -511,7 +517,7 @@ function readRestoredSection({ section, saved }: Readonly<{
 }>): Extract<ResumeSectionResult, { content: ResumeSectionContent }> | null {
   if (saved.status !== 'validated') return null
   return { section, status: isCopiedFromSource(saved.content) ? 'copied-from-source' : 'validated', content: saved.content,
-    attempt: saved.attempt, durationMilliseconds: 0, usage: noUsage }
+    attempt: saved.attempt, durationMilliseconds: 0, usage: noUsage, attemptRejections: [] }
 }
 
 function readSectionSnapshot(result: ResumeSectionResult): ResumeSectionSnapshot {

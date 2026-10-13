@@ -132,6 +132,25 @@ describe('section preparation qualification on a real-sized resume', () => {
       'failed-section:value-proposition:attempt-2:mixed-association'])
   })
 
+  it('records a rejection inside the coherence rewrite between the coherence verdicts of a section rejected twice', async () => {
+    let valuePropositionValidations = 0
+    const models = createFakeResumeSectionModels({
+      validateFields: ({ section, fields }) => {
+        if (section.kind === 'value-proposition') valuePropositionValidations += 1
+        const rejected = section.kind === 'value-proposition' && valuePropositionValidations === 2
+        return Promise.resolve({ ok: true, value: { fields: fields.map(({ id }) => ({ fieldId: id, supported: !rejected })) } })
+      },
+      checkCoherence: ({ document }) => Promise.resolve({ ok: true, value: { coherent: false, languageMatches: true,
+        issues: document.valueProposition.paragraphs.map(({ id }) => ({ fieldId: id, kind: 'mixed-association' as const })) } }),
+    })
+    const output = await prepare({ models })
+
+    const values = readPreparationFailureValues({ output })
+
+    expect(values).toEqual(['failed-section:value-proposition:attempt-1:mixed-association',
+      'failed-section:value-proposition:attempt-2:unsupported', 'failed-section:value-proposition:attempt-3:mixed-association'])
+  })
+
   it('records the model failure type of a coherence check that gave no answer', async () => {
     const models = createFakeResumeSectionModels({ checkCoherence: () => Promise.resolve({ ok: false, error: { type: 'timeout' } }) })
     const output = await prepare({ models })

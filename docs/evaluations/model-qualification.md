@@ -62,7 +62,7 @@ and `cross-segment-writing` sources, and in the error a failed `front-end-audit`
   by its plan key (`value-proposition`, `experiences.2`, `skills`). The kinds, joined by `+`, are `unsupported`, a
   coherence issue kind (`mixed-association`, `redundant`, …), a structure rejection kind (`uncited`, `empty-text`, …)
   or a model failure type (`timeout`, `invalid-provider-response`, …). A section the coherence check rejected again
-  after its rewrite lists both verdicts.
+  after its rewrite lists every verdict its versions got, the last check's included.
 - `failed-coherence:<kind>` when the coherence check gave no usable answer: a model failure type, or `language` for a
   language mismatch naming no field.
 
