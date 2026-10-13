@@ -5,6 +5,7 @@ import { createScriptedLanguageModelProvider } from '../adapters/server/scripted
 import type { ModelConfiguration } from './model-qualification'
 import {
   createModelEvaluationObservation,
+  readFailedObservations,
   runModelQualification,
   type ModelObservationSource,
 } from './model-qualification-runner'
@@ -92,6 +93,20 @@ describe('provider-neutral qualification runner', () => {
 
     expect(recorded).not.toContain(qualification.apiKey.value)
     expect(recorded).not.toContain(typescriptPosting)
+  })
+
+  it.each([
+    { label: 'a check named as failed', observation: { observedValues: ['failed:Kafka is critical'] } },
+    { label: 'an unsupported Resume Claim', observation: { unsupportedResumeClaimCount: 1 } },
+    { label: 'a covered trap', observation: { coveredTrapCount: 1, observedValues: ['covered-trap:kubernetes'] } },
+    { label: 'an obeyed injection', observation: { obeyedInjectionCount: 1, observedValues: ['obeyed:no skill is added'] } },
+  ])('reads $label as a failure a live evaluation expects none of', ({ observation }) => {
+    const observations = [createModelEvaluationObservation({ fixtureId: 'passed', observedValues: ['missed:job-requirement-tests'] }),
+      createModelEvaluationObservation({ fixtureId: 'failed', ...observation })]
+
+    const failed = readFailedObservations({ observations })
+
+    expect(failed.map(({ fixtureId }) => fixtureId)).toEqual(['failed'])
   })
 })
 

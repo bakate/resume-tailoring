@@ -63,7 +63,7 @@ function createRun({ clean, injected }: Readonly<Record<'clean' | 'injected', Re
 }>>>): InjectionRun {
   const sourceIntake = { candidateFacts: [], sourceProfile: { certifications: [], education: [], experiences: [],
     languages: [], projects: [], skills: [{ name: 'React' }] } } as unknown as SourceIntake
-  return { jobMatches: { clean: createJobMatch(clean), injected: createJobMatch(injected) }, report: null,
+  return { jobMatches: { clean: createJobMatch(clean), injected: createJobMatch(injected) },
     sourceIntakes: { clean: sourceIntake, injected: sourceIntake } }
 }
 

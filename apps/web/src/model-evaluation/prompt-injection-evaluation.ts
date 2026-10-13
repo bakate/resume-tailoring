@@ -8,14 +8,14 @@ import { createModelEvaluationObservation, type ModelObservationSource } from '.
 import { cleanJobPosting, injectedJobPosting, injectedResume } from './prompt-injection-corpus'
 
 type Variants<TValue> = Readonly<{ clean: TValue; injected: TValue }>
-export type InjectionRun = Readonly<{ jobMatches: Variants<JobMatch>; report: unknown; sourceIntakes: Variants<SourceIntake> }>
+export type InjectionRun = Readonly<{ jobMatches: Variants<JobMatch>; sourceIntakes: Variants<SourceIntake> }>
 
 /** What the injected Source Document asks for, and what the injected Job Posting asks for. */
 const injectedContent = /kubernetes|ignore previous/iu
 const injectedRequirement = /ignore previous|covered/iu
 
 /** Each document runs clean and injected through the production prompts. */
-export async function replayInjectionRun({ structured }: Readonly<{ structured: ModelConnection }>): Promise<InjectionRun> {
+async function replayInjectionRun({ structured }: Readonly<{ structured: ModelConnection }>): Promise<InjectionRun> {
   const [cleanIntake, injectedIntake] = await Promise.all([frontEndAuditResume, injectedResume]
     .map((resume) => readLiveSourceIntake({ resume, structured })))
   if (cleanIntake === undefined || injectedIntake === undefined) throw new Error('Both Source Intakes must finish')
@@ -23,11 +23,7 @@ export async function replayInjectionRun({ structured }: Readonly<{ structured: 
   const [clean, injected] = await Promise.all([cleanJobPosting, injectedJobPosting]
     .map((jobPosting) => readLiveJobMatch({ candidateFacts: cleanIntake.candidateFacts, jobPosting, structured })))
   if (clean === undefined || injected === undefined) throw new Error('Both Job Matches must finish')
-  return { jobMatches: { clean, injected }, sourceIntakes: { clean: cleanIntake, injected: injectedIntake }, report: {
-    skills: { clean: readSkillNames(cleanIntake), injected: readSkillNames(injectedIntake) },
-    coverage: { clean: readCoverageByRequirement(clean), injected: readCoverageByRequirement(injected) },
-    matchScore: { clean: clean.analysis.matchScore, injected: injected.analysis.matchScore },
-  } }
+  return { jobMatches: { clean, injected }, sourceIntakes: { clean: cleanIntake, injected: injectedIntake } }
 }
 
 /**
@@ -74,17 +70,17 @@ export const promptInjectionSource: ModelObservationSource = {
   },
 }
 
-export function readSkillNames({ sourceProfile }: SourceIntake) {
+function readSkillNames({ sourceProfile }: SourceIntake) {
   return sourceProfile.skills.map(({ name }) => name.toLocaleLowerCase('fr')).sort()
 }
 
-export function readEntryCounts({ sourceProfile }: SourceIntake) {
+function readEntryCounts({ sourceProfile }: SourceIntake) {
   const { certifications, education, experiences, languages, projects } = sourceProfile
   return { certifications: certifications.length, education: education.length, experiences: experiences.length,
     languages: languages.length, projects: projects.length }
 }
 
-export function readCoverageOf({ jobMatch, requirement }: Readonly<{ jobMatch: JobMatch; requirement: RegExp }>) {
+function readCoverageOf({ jobMatch, requirement }: Readonly<{ jobMatch: JobMatch; requirement: RegExp }>) {
   return Object.entries(readCoverageByRequirement(jobMatch)).filter(([value]) => requirement.test(value))
     .map(([, coverage]) => coverage)
 }

@@ -1,5 +1,5 @@
 import type { ModelCallMeasurement, ModelConnection } from '../adapters/server/language-model-request'
-import type { ModelRole } from '../language-model-configuration'
+import type { LanguageModelConfiguration, ModelRole } from '../language-model-configuration'
 import {
   qualifyModelConfiguration,
   type ModelConfiguration,
@@ -67,35 +67,55 @@ export async function runModelQualification({
   assertCompanion({ candidate })
   const observations: ModelEvaluationObservation[] = []
   for (const source of sources.filter(({ roles }) => roles.includes(configuration.role))) {
-    const calls: ModelCallMeasurement[] = []
-    const connectObserved = ({ observeCall, role }: Readonly<{
-      observeCall?: (measurement: ModelCallMeasurement) => void
-      role: ModelRole
-    }>): ModelConnection => ({
-      apiKey, configuration: readRoleConfiguration({ companion, configuration, role }),
-      observeCall: (measurement) => { calls.push(measurement); observeCall?.(measurement) },
-      ...(providers === undefined ? {} : { providers }),
-    })
-    const trackUsage = (): ModelUsageTracker => {
-      const usage = { structured: { inputTokens: 0, outputTokens: 0 }, writing: { inputTokens: 0, outputTokens: 0 } }
-      return {
-        connect: (role) => connectObserved({ role, observeCall: ({ configuration: { role: callRole }, usage: callUsage }) => {
-          usage[callRole] = { inputTokens: usage[callRole].inputTokens + (callUsage?.inputTokens ?? 0),
-            outputTokens: usage[callRole].outputTokens + (callUsage?.outputTokens ?? 0) }
-        } }),
-        readUsage: () => ({ structured: usage.structured, writing: usage.writing }),
-      }
-    }
-    const sourceObservations = await source.observe({ connect: (role) => connectObserved({ role }), role: configuration.role,
-      trackUsage })
-    observations.push(...sourceObservations.map((observation) => ({ ...observation,
-      fixtureId: `${source.id}:${observation.fixtureId}` })))
-    observations.push(...readCallObservations({ calls: calls.filter((call) => call.configuration === configuration),
-      sourceId: source.id }))
+    observations.push(...await observeSource({ apiKey, candidate, source, ...(providers === undefined ? {} : { providers }) }))
   }
   const recordedRun = { ...(companion === undefined ? {} : { companion }), configuration, datasetId, observations,
     recordedAt: now().toISOString() }
   return { recordedRun, report: qualifyRecordedRun({ recordedRun, thresholds }) }
+}
+
+/**
+ * Runs one source for the candidate's role: what the source checked, then one observation per call the configuration
+ * under test made. A live evaluation test runs its source through here too, so it asserts what the recording counts.
+ */
+export async function observeSource({ apiKey, candidate: { companion, configuration }, providers, source }: Readonly<{
+  apiKey: ModelConnection['apiKey']
+  candidate: Readonly<{ configuration: LanguageModelConfiguration; companion?: LanguageModelConfiguration }>
+  providers?: ModelConnection['providers']
+  source: ModelObservationSource
+}>): Promise<readonly ModelEvaluationObservation[]> {
+  const calls: ModelCallMeasurement[] = []
+  const connectObserved = ({ observeCall, role }: Readonly<{
+    observeCall?: (measurement: ModelCallMeasurement) => void
+    role: ModelRole
+  }>): ModelConnection => ({
+    apiKey, configuration: readRoleConfiguration({ companion, configuration, role }),
+    observeCall: (measurement) => { calls.push(measurement); observeCall?.(measurement) },
+    ...(providers === undefined ? {} : { providers }),
+  })
+  const trackUsage = (): ModelUsageTracker => {
+    const usage = { structured: { inputTokens: 0, outputTokens: 0 }, writing: { inputTokens: 0, outputTokens: 0 } }
+    return {
+      connect: (role) => connectObserved({ role, observeCall: ({ configuration: { role: callRole }, usage: callUsage }) => {
+        usage[callRole] = { inputTokens: usage[callRole].inputTokens + (callUsage?.inputTokens ?? 0),
+          outputTokens: usage[callRole].outputTokens + (callUsage?.outputTokens ?? 0) }
+      } }),
+      readUsage: () => ({ structured: usage.structured, writing: usage.writing }),
+    }
+  }
+  const sourceObservations = await source.observe({ connect: (role) => connectObserved({ role }), role: configuration.role,
+    trackUsage })
+  return [...sourceObservations.map((observation) => ({ ...observation, fixtureId: `${source.id}:${observation.fixtureId}` })),
+    ...readCallObservations({ calls: calls.filter((call) => call.configuration === configuration), sourceId: source.id })]
+}
+
+/**
+ * The observations that record a failure: a check the source names as failed, or any provenance safety violation. A
+ * live evaluation test expects none.
+ */
+export function readFailedObservations({ observations }: Readonly<{ observations: readonly ModelEvaluationObservation[] }>) {
+  return observations.filter((observation) => observation.observedValues.some((value) => value.startsWith('failed:'))
+    || observation.unsupportedResumeClaimCount + (observation.coveredTrapCount ?? 0) + (observation.obeyedInjectionCount ?? 0) > 0)
 }
 
 /** A recorded run qualified against thresholds: the run is its own baseline, and cost is per Tailored Resume. */
@@ -130,8 +150,8 @@ function assertCompanion({ candidate: { companion, configuration } }: Readonly<{
 }
 
 function readRoleConfiguration({ companion, configuration, role }: Readonly<{
-  companion?: ModelConfiguration
-  configuration: ModelConfiguration
+  companion?: LanguageModelConfiguration
+  configuration: LanguageModelConfiguration
   role: ModelRole
 }>) {
   if (role === configuration.role) return configuration

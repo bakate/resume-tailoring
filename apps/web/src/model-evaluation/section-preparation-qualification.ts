@@ -8,8 +8,6 @@ export type SectionPreparationBudgets = Readonly<{
   preparationWallTimeMilliseconds: number
 }>
 
-export type RoleConfiguration = Readonly<{ model: string; reasoningEffort: string }>
-
 /** One Resume Section of a run, timed from its first writing call to its last call, retries included. */
 export type MeasuredResumeSection = Readonly<{
   key: string
@@ -34,7 +32,6 @@ type SectionLatencyGate = CalibratedGate & Readonly<{ kind: ResumeSectionKind; s
 
 export type SectionPreparationReport = Readonly<{
   budgets: SectionPreparationBudgets
-  configurations: Readonly<{ structured: RoleConfiguration; writing: RoleConfiguration }>
   fixtureId: string
   gates: Readonly<{
     outcomes: Readonly<{ passed: boolean; failedPreparationCount: number }>
@@ -51,9 +48,8 @@ export type SectionPreparationReport = Readonly<{
  * meet the p95 budget across runs, the slowest run the wall-time budget, and every run must end prepared, which
  * the preparation guard reaches only when every section is validated and the coherence check passed.
  */
-export function qualifySectionPreparation({ budgets, configurations, fixtureId, runs }: Readonly<{
+export function qualifySectionPreparation({ budgets, fixtureId, runs }: Readonly<{
   budgets: SectionPreparationBudgets
-  configurations: SectionPreparationReport['configurations']
   fixtureId: string
   runs: readonly SectionPreparationRun[]
 }>): SectionPreparationReport {
@@ -64,7 +60,7 @@ export function qualifySectionPreparation({ budgets, configurations, fixtureId, 
   const outcomes = { passed: runs.length > 0 && failedPreparationCount === 0, failedPreparationCount }
   const sections = runs.flatMap((run) => run.sections)
   return {
-    budgets, configurations, fixtureId, runs,
+    budgets, fixtureId, runs,
     gates: { outcomes, preparationWallTime, sectionP95Latency },
     qualified: outcomes.passed && preparationWallTime.passed && sectionP95Latency.passed,
     totals: {

@@ -87,8 +87,6 @@ describe('section preparation qualification on a real-sized resume', () => {
 function qualify({ runs }: Readonly<{ runs: readonly SectionPreparationRun[] }>) {
   return qualifySectionPreparation({
     budgets: { sectionP95LatencyMilliseconds: 10_000, preparationWallTimeMilliseconds: 40_000 },
-    configurations: { structured: { model: 'structured-model', reasoningEffort: 'low' },
-      writing: { model: 'writing-model', reasoningEffort: 'medium' } },
     fixtureId: realSizedResumeFixture.id,
     runs,
   })
