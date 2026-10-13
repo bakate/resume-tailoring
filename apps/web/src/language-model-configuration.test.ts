@@ -45,11 +45,12 @@ describe('DeepSeek operation settings', () => {
   const openAi = { ...createOpenAiModelConfiguration({ model: 'model', reasoningEffort: 'low', role: 'structured' }).operations,
     ...createOpenAiModelConfiguration({ model: 'model', reasoningEffort: 'low', role: 'writing' }).operations }
 
-  it('thinks as the BAK-171 spike recommends: not to extract, low to match, high to write', () => {
+  it('thinks low to extract a Job Posting and to match, not to extract a Source Profile, and high to write', () => {
     const thinking = Object.fromEntries(Object.entries(deepSeek).map(([operation, settings]) => [operation, settings.thinking]))
 
-    expect(thinking).toMatchObject({ 'explainable-job-posting-extraction': 'disabled', 'explainable-match-evidence': 'low',
-      'resume-section-writing': 'high' })
+    // BAK-167: without thinking, Job Posting extraction recall fell to about 60% against 94% at low.
+    expect(thinking).toMatchObject({ 'explainable-job-posting-extraction': 'low', 'explainable-match-evidence': 'low',
+      'structured-source-profile-extraction': 'disabled', 'resume-section-writing': 'high' })
   })
 
   it.each(Object.keys(deepSeek))('leaves %s the answer budget plus the reasoning the spike measured', (operation) => {

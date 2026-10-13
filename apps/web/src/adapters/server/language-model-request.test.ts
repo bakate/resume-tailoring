@@ -261,13 +261,13 @@ describe('Model request call wrapper, per operation', () => {
     } })
 
     await requester.send(modelRequest)
-    await requester.send({ ...modelRequest, operation: 'explainable-job-posting-extraction' })
+    await requester.send({ ...modelRequest, operation: 'structured-source-profile-extraction' })
 
     expect(requests.map(({ url }) => url)).toEqual(['https://api.deepseek.com/chat/completions', 'https://api.deepseek.com/chat/completions'])
     const [matching, extraction] = await Promise.all(requests.map((request) => request.json() as Promise<Record<string, unknown>>))
     expect(matching).toMatchObject({ model: 'deepseek-flash', max_tokens: 32_000, response_format: { type: 'json_object' },
       thinking: { type: 'enabled' }, reasoning_effort: 'low' })
-    expect(extraction).toMatchObject({ max_tokens: 20_000, thinking: { type: 'disabled' } })
+    expect(extraction).toMatchObject({ max_tokens: 16_000, thinking: { type: 'disabled' } })
     expect(extraction).not.toHaveProperty('reasoning_effort')
   })
 
