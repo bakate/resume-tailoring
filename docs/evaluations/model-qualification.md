@@ -136,6 +136,8 @@ reports are in `docs/evaluations/qualification-reports/`:
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | `openai-structured` | `gpt-6-luna` | `low` | 91.3% | 100% | $0.0654 | every operation within its deadline (slowest, Match Evidence: 15,331 ms of 90,000) | 0 | yes |
 | `openai-writing` | `gpt-6-sol` | `medium` | 100% | 100% | $0.0677 | 9,782 ms | 0 | yes |
+| `deepseek-structured` | `deepseek-flash` | per operation | 94.4% | 100% | $0.0696 at peak, $0.0348 off-peak | every operation within its deadline | 0 | yes |
+| `deepseek-writing` | `deepseek-flash` | `high` | 100% | 100% | $0.0673 at peak, $0.0337 off-peak | 17,801 ms | 0 | yes |
 
 Per source, structured recall (re-recorded in BAK-176) is Job Posting extraction 12/16, Match Evidence 25/26,
 cross-segment extraction 21/22, section preparation 3/3 and the front-end audit 2/2; writing recall is cross-segment
@@ -146,6 +148,9 @@ Since BAK-167, structured latency is gated per operation. The recorded call obse
 from each call's fixture identifier, and both reports were regenerated from the unchanged recorded runs: both
 configurations stay qualified, every operation well within its 90 s deadline, with no conformance retry (OpenAI's
 strict Structured Outputs hold the schema).
+
+The DeepSeek configurations were recorded on 2026-10-13 at peak hours (BAK-167); `deepseek-qualification-2026-10.md`
+gives their thinking per operation, conformance retry rates, latency per operation and cost at peak and off-peak.
 
 ### Against the 2026-09-27 reference recordings
 

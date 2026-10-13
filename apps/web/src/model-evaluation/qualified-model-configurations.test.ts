@@ -59,8 +59,16 @@ describe('qualified model configurations', () => {
     expect(result).toBe(false)
   })
 
-  it.each(['structured', 'writing'] as const)('keeps DeepSeek unqualified for the %s role until its baselines are recorded', (role) => {
+  it.each(['structured', 'writing'] as const)('qualifies deepseek-flash for the %s role, as BAK-167 recorded it', (role) => {
     const configuration = createDeepSeekModelConfiguration({ model: 'deepseek-flash', role })
+
+    const result = isQualifiedModelConfiguration({ configuration })
+
+    expect(result).toBe(true)
+  })
+
+  it.each(['structured', 'writing'] as const)('keeps a DeepSeek model nobody recorded unqualified for the %s role', (role) => {
+    const configuration = createDeepSeekModelConfiguration({ model: 'deepseek-v4-pro', role })
 
     const result = isQualifiedModelConfiguration({ configuration })
 
