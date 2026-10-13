@@ -61,7 +61,8 @@ checks:
 | `front-end-audit.evaluation.test.ts` | `front-end-audit` | both | the audited requirements covered | every prose field of the French document in French, of the English one in English | the French and the English Tailored Resume, each with the shared intake and Job Match | unsupported Resume Claims on both documents |
 
 p95 latency reads every call of the configuration under test; for writing, the `section-preparation` source adds each
-Resume Section, from its first writing call to its last call, retries included.
+Resume Section, by the time its calls took, retries and a coherence rewrite included. Waiting between two passes, for
+the other sections or the coherence check, is not counted: the wall-time budget holds the whole preparation.
 
 Notes on the mapping:
 
@@ -136,8 +137,8 @@ and the front-end audit 2/2. Every language check passed (structured 31/31, writ
 - **Cost** is not comparable: reference-v1 priced ~200-token fixtures once each; the live dataset prices the most
   expensive whole Tailored Resume, both roles, at upper-bound rates. Both stay under OpenAI's ~$0.10 in production.
 - **p95 latency** is not comparable: reference-v1 timed one ~200-token call per fixture; the live dataset times every
-  production-sized structured call and, for writing, each Resume Section from its first writing call to its last,
-  retries included.
+  production-sized structured call and, for writing, each Resume Section by the time its calls took, retries
+  and a coherence rewrite included.
 
 ### What recording took
 

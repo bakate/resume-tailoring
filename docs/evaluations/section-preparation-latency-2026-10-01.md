@@ -56,9 +56,11 @@ The budgets live in `sectionPreparationBudgets` (`apps/web/src/model-evaluation/
 
   The production telemetry is not used for gating because it carries only the section kind, which
   would pool the seven experiences and let one slow experience pass.
-- **What a section's latency includes:** time runs from the first writing call to the last call
-  for that section. That covers writing, structured validation, and a rewrite when one happens.
-  It is stricter than the writing role's latency alone.
+- **What a section's latency includes:** in these sessions, time ran from the first writing call to
+  the last call for that section. That covers writing, structured validation, and a rewrite when one happens.
+  It is stricter than the writing role's latency alone. Since BAK-177 (2026-10-13) a section is
+  timed by the time its own calls took. A section the coherence check sends back no longer counts
+  the wait for the other sections and the check between its two passes.
 - **Not measured:** the browser-to-route HTTP hop. The adapters are called directly, so a
   Candidate waits slightly longer than the recorded wall time.
 - **Runs:** three sequential preparations. Each section's p95 is taken over its three samples,

@@ -3,8 +3,8 @@ import type { ModelEvaluationThresholds } from './model-qualification'
 import type { SectionPreparationBudgets } from './section-preparation-qualification'
 
 /**
- * Latency budgets for section-by-section preparation of the real-sized resume. A section is measured
- * from its first writing call to its last call, retries included; the preparation from planning to coherence.
+ * Latency budgets for section-by-section preparation of the real-sized resume. A section is measured by the time its
+ * calls took, retries and a coherence rewrite included; the preparation from planning to coherence.
  */
 export const sectionPreparationBudgets = {
   // A third of the 90-second per-request timeout: a section near it is one slow retry away from timing out.
