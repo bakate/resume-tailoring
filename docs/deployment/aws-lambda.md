@@ -9,17 +9,14 @@ and AWS Lambda Web Adapter for the Nitro HTTP server.
 
 ## Cost and abuse controls
 
-- Set a hard spend limit on a dedicated OpenAI project before using its API key.
-- Keep production and development in separate OpenAI projects, each with its own API key and spend limit.
-  Local runs, `test:evaluation` and `test:qualification` call the real API and must use the development
-  project, so they never consume the public demo's budget.
-- Disable automatic OpenAI credit recharge.
-- Restrict the OpenAI project to the configured structured and writing models.
+- Production calls DeepSeek (`LANGUAGE_MODEL_PROVIDER=deepseek`). Its API is prepaid: the account balance is the
+  hard spend limit, and an exhausted balance answers `402`, which alerts the operator (below). Top up only what the
+  daily budget needs.
+- Keep the production DeepSeek key for production alone. Local runs, `test:evaluation` and `test:qualification` call
+  the real API and must use another key and balance, so they never consume the public demo's budget.
 - Configure a Cloudflare Turnstile widget for the `workers.dev` hostname.
 - Keep `DEMO_ORIGIN_SECRET` identical in the Worker secret and Lambda environment. Protected API
   routes reject requests made directly to the Lambda Function URL.
-- Set a monthly budget alert on the production OpenAI project, below its hard limit, so a spending
-  drift is noticed before the limit stops the demo.
 - Keep the account Lambda concurrency quota at ten: it is the function's concurrency ceiling. The
   template sets no `ReservedConcurrentExecutions`, because Lambda keeps at least ten unreserved
   executions per account and any reservation would fail the deployment at this quota. If the quota
@@ -28,7 +25,7 @@ and AWS Lambda Web Adapter for the Nitro HTTP server.
 
 Turnstile grants a signed, HTTP-only access cookie for 30 minutes. Protected API routes reject
 requests without that cookie. This reduces automated abuse but does not replace the enforced
-OpenAI spend limit, nor the daily limits below: a renewed cookie would reset any limit keyed on it.
+prepaid DeepSeek balance, nor the daily limits below: a renewed cookie would reset any limit keyed on it.
 
 ### Daily spending limits
 
@@ -41,7 +38,7 @@ when the object deletes everything it holds.
 | Limit | Per day | Keyed by | Counted on |
 | -- | -- | -- | -- |
 | Daily Quota | 8 | client network | `POST /api/explainable-job-posting-extraction` |
-| Global ceiling | 45 | all clients | the same request |
+| Global ceiling | 61 | all clients | the same request |
 | Technical ceiling | 530 | client network | every model-backed API route |
 | PDF renders | 200 | client network | `POST /api/resume-document` |
 
@@ -57,7 +54,7 @@ and `x-resume-quota-reset` (the ISO 8601 reset instant). `GET /api/daily-quota`,
 Worker itself, returns the same two values without counting anything, so the interface shows them
 before the Candidate starts a preparation.
 
-Every model-backed request is signed with `OPENAI_API_KEY`. Eight journeys with edits stay under 500
+Every model-backed request is signed with `DEEPSEEK_API_KEY`. Eight journeys with edits stay under 500
 model-backed requests, so the technical ceiling only stops loops. The Worker strips the
 `x-candidate-api-key` header an earlier version of the interface sent; it lifts no limit.
 
@@ -93,8 +90,8 @@ another attempt as long as the first.
 
 The PDF renderer was sized against a 100 s Cloudflare proxy limit. Cloudflare documents that limit
 (error 524) for proxied origins, not for a Worker's `fetch` to the Lambda Function URL, but it has not
-been measured on this deployment. Before production runs on DeepSeek (BAK-168), confirm on the deployed
-Worker that a match evidence request answered after 100 s still reaches the browser.
+been measured on this deployment. Right after switching to DeepSeek (BAK-168), confirm on the deployed Worker that a
+match evidence request answered after 100 s still reaches the browser; otherwise lower its deadline below 100 s.
 
 ## Security headers
 
@@ -109,7 +106,7 @@ any `securitypolicyviolation`.
 
 - Docker
 - AWS CLI authenticated to the target account
-- A dedicated OpenAI project API key
+- A DeepSeek API key used by production alone
 - A Cloudflare Turnstile site key and secret key
 
 ## Build
@@ -145,7 +142,7 @@ aws cloudformation deploy \
     DemoSessionSecret=... \
     DemoOriginSecret=... \
     DemoPublicHostname=resume-studio.bakateba.workers.dev \
-    OpenAiApiKey=... \
+    DeepSeekApiKey=... \
     TurnstileSecretKey=... \
     TurnstileSiteKey=...
 ```
@@ -164,9 +161,35 @@ and share its `workers.dev` URL. Add that hostname to the Turnstile widget befor
 docker build --platform linux/arm64 --tag honest-resume-demo .
 docker run --rm --publish 8080:8080 \
   --env DEMO_ACCESS_MODE=disabled \
-  --env OPENAI_API_KEY=test-only \
+  --env LANGUAGE_MODEL_PROVIDER=deepseek \
+  --env DEEPSEEK_API_KEY=test-only \
   honest-resume-demo
 ```
 
 Open `http://localhost:8080`. This check validates the container and Chromium packaging without
-calling OpenAI.
+calling DeepSeek.
+
+## Switching the stack to DeepSeek (once, BAK-168)
+
+The stack replaces its `OpenAiApiKey` parameter with `DeepSeekApiKey`. The deployment workflow passes only the
+image and keeps every other parameter's previous value, and `DeepSeekApiKey` has none yet, so its first run after the
+merge fails at "Update the application stack" and leaves production untouched on OpenAI. Then:
+
+1. Copy the image URI the failed run pushed (its "Build and push the Lambda image" step logs the digest: `…/honest-resume-demo@sha256:…`).
+2. Update the stack with it and the DeepSeek key, from `main`:
+
+   ```sh
+   aws cloudformation deploy \
+     --region eu-west-3 \
+     --stack-name honest-resume-demo \
+     --template-file template.yaml \
+     --capabilities CAPABILITY_IAM \
+     --parameter-overrides \
+       ContainerImageUri=IMAGE_URI \
+       DeepSeekApiKey=...
+   ```
+
+3. Re-run the failed workflow. The stack keeps the key, and the run deploys the Worker with its new global ceiling.
+4. Check that the landing names DeepSeek and China, then the 100 s check under "Deadline chain".
+
+Every later run keeps the key. Revoke the production OpenAI key once DeepSeek serves Candidates.

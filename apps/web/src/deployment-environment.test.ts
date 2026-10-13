@@ -39,12 +39,22 @@ describe('production deployment environment', () => {
     expect(Math.max(...deadlines) + routeAnswerMarginMilliseconds).toBeLessThanOrEqual(lambdaTimeoutMilliseconds)
   })
 
-  it('sets every model setting explicitly rather than relying on a default', () => {
+  it('deploys DeepSeek with every model setting explicit rather than relying on a default', () => {
     const environment = readDeployedEnvironment()
 
-    expect(Object.keys(environment)).toEqual(expect.arrayContaining([
-      'OPENAI_STRUCTURED_MODEL', 'OPENAI_STRUCTURED_REASONING_EFFORT', 'OPENAI_WRITING_MODEL', 'OPENAI_WRITING_REASONING_EFFORT',
-    ]))
+    expect(environment).toMatchObject({
+      DEEPSEEK_API_KEY: 'deployment-parameter',
+      DEEPSEEK_STRUCTURED_MODEL: deepSeekStructuredModelConfiguration.model,
+      DEEPSEEK_WRITING_MODEL: deepSeekWritingModelConfiguration.model,
+      LANGUAGE_MODEL_PROVIDER: 'deepseek',
+    })
+  })
+
+  it('holds no key or setting of a provider it does not call', () => {
+    const environment = readDeployedEnvironment()
+
+    expect(Object.keys(environment).filter((name) => name.startsWith('OPENAI_'))).toEqual([])
+    expect(readTemplate()).not.toContain('OpenAiApiKey')
   })
 })
 

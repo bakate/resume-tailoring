@@ -109,7 +109,7 @@ The workflow also accepts `AWS_DEPLOY_ROLE_ARN` as a secret. The Cloudflare secr
 above match the existing GitHub configuration exactly. The workflow maps them to
 `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`, the environment variables required by Wrangler.
 
-The application already has its OpenAI, Turnstile, session, and origin secrets configured.
+The application already has its DeepSeek, Turnstile, session, and origin secrets configured.
 The workflow overrides only `ContainerImageUri`; CloudFormation retains all other existing
 parameter values. Wrangler retains the existing `ORIGIN_SECRET` Worker secret. Do not add
 these application secrets to GitHub or replace them during this setup.

@@ -1671,7 +1671,7 @@ class CandidateJourneyTestSystem {
   async expectPolicyDisclosedAtGeneration() {
     this.#expectAction()
     const generate = this.#page.getByRole('button', { name: 'Generate my resume' })
-    await expect(generate).toHaveAccessibleDescription(/OpenAI/)
+    await expect(generate).toHaveAccessibleDescription(/DeepSeek/)
     await expect(generate).toBeEnabled()
     await expect(this.#page.getByRole('textbox', { name: 'Professional text' })).toBeVisible()
     await expect(this.#page.getByRole('textbox', { name: 'Job posting text' })).toBeVisible()
@@ -1686,6 +1686,7 @@ class CandidateJourneyTestSystem {
     const box = await statement.boundingBox()
     expect((box?.y ?? Infinity) + (box?.height ?? 0)).toBeLessThanOrEqual(this.#page.viewportSize()?.height ?? 0)
     await expect(this.#page.locator('svg.tabler-icon-lock')).toHaveCount(1)
+    await expect(this.#page.getByText(processingCountryStatement, { exact: true })).toBeVisible()
     await this.#page.getByText('Learn more', { exact: true }).click()
     await expect(this.#page.getByText(/^Policy version /)).toBeVisible()
   }
@@ -1780,6 +1781,7 @@ function matchFor(scenario: Scenario) {
 
 const dropFileCopy = 'Drop your file or click here'
 const chooseFileCopy = 'Choose a file'
+const processingCountryStatement = 'DeepSeek processes and stores your professional content in China (outside the European Union).'
 const privacyStatement = 'Nothing is stored on our servers: your documents stay in this browser. They are deleted on your next visit after 24 hours, or right away with “Delete my data”.'
 
 /** The Candidate Session the page keeps in local storage and in the tab's session storage. */

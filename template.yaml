@@ -20,7 +20,7 @@ Parameters:
   DemoPublicHostname:
     Type: String
     MinLength: 1
-  OpenAiApiKey:
+  DeepSeekApiKey:
     Type: String
     NoEcho: true
     MinLength: 1
@@ -65,12 +65,10 @@ Resources:
           DEMO_ORIGIN_SECRET: !Ref DemoOriginSecret
           DEMO_PUBLIC_HOSTNAME: !Ref DemoPublicHostname
           DEMO_SESSION_SECRET: !Ref DemoSessionSecret
-          LANGUAGE_MODEL_PROVIDER: openai
-          OPENAI_API_KEY: !Ref OpenAiApiKey
-          OPENAI_STRUCTURED_MODEL: gpt-6-luna
-          OPENAI_STRUCTURED_REASONING_EFFORT: low
-          OPENAI_WRITING_MODEL: gpt-6-sol
-          OPENAI_WRITING_REASONING_EFFORT: medium
+          DEEPSEEK_API_KEY: !Ref DeepSeekApiKey
+          DEEPSEEK_STRUCTURED_MODEL: deepseek-flash
+          DEEPSEEK_WRITING_MODEL: deepseek-flash
+          LANGUAGE_MODEL_PROVIDER: deepseek
           TURNSTILE_SECRET_KEY: !Ref TurnstileSecretKey
           TURNSTILE_SITE_KEY: !Ref TurnstileSiteKey
       FunctionUrlConfig:
