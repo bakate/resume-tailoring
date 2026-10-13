@@ -73,7 +73,7 @@ const extractionInstructions = [
   'Extract targetRole only when an unambiguous role title is explicit; copy its value and sourceExcerpt exactly.',
   'Extract only explicit professional qualifications, responsibilities, or expectations, as one requirement per assessable capability.',
   'Generic duties listed together, such as defining features, ensuring quality, and collaborating with product managers, form one requirement; do not split them into one requirement per phrase.',
-  'Keep distinct technical capabilities, such as separate technologies, languages, or certifications, as separate requirements, even when listed in one sentence.',
+  'Keep distinct technical capabilities, such as separate technologies, languages, or certifications, as separate requirements, even when listed in one sentence: each value is that capability alone, and each sourceExcerpt is the shortest exact passage containing both that capability and the wording that sets its importance, which may be the whole sentence.',
   'Copy every requirement value and sourceExcerpt exactly from the Job Posting; each sourceExcerpt is the exact passage stating that capability.',
   'Assign one role-neutral capability dimension and a concise capability name.',
   'Classify importance as critical only for explicit mandatory or decisive wording.',
