@@ -20,7 +20,7 @@ describe('provider-neutral qualification runner', () => {
       extractionRecall: { passed: true, threshold: 0.9, value: 1 },
       multilingualFidelity: { passed: true, threshold: 1, value: 1 },
       // The Tailored Resume's 900 input tokens at $1 and 120 output tokens at $4 per million, the upper-bound rates.
-      costUsd: { passed: true, threshold: 0.01, unit: 'tailored-resume', value: 0.00138 },
+      costUsd: { passed: true, threshold: 0.01, value: 0.00138 },
       p95LatencyMilliseconds: { passed: true, threshold: 30_000, value: expect.any(Number) as number },
     })
     expect(result.recordedRun).toMatchObject({ configuration: scriptedConfiguration, datasetId: 'scripted-dataset-v1',
@@ -66,7 +66,7 @@ describe('provider-neutral qualification runner', () => {
     expect(result.recordedRun.observations[0]?.tailoredResumeUsage).toEqual({
       structured: { inputTokens: 900, outputTokens: 120 }, writing: { inputTokens: 900, outputTokens: 120 } })
     // Writing's tokens at the companion's $2 and $8 per million: 0.00138 + 0.00276.
-    expect(result.report.gates.costUsd).toMatchObject({ unit: 'tailored-resume', value: 0.00414 })
+    expect(result.report.gates.costUsd).toMatchObject({ value: 0.00414 })
     expect(result.recordedRun.companion).toBe(scriptedCompanion)
   })
 

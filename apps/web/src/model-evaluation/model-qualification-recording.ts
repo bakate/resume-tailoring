@@ -7,8 +7,8 @@ import {
   runModelQualification,
   type ModelObservationSource,
   type QualificationCandidate,
-  type RecordedModelEvaluationRun,
 } from './model-qualification-runner'
+import type { RecordedModelEvaluationRun } from './model-qualification'
 
 /**
  * Runs every live source for one declared candidate, with the key its provider reads from the local environment. The
@@ -48,7 +48,7 @@ export function mergeRecordedRuns({ recordedRun, runs }: Readonly<{
 
 export function renderRecordedRunsModule({ runs }: Readonly<{ runs: readonly RecordedModelEvaluationRun[] }>) {
   return [
-    "import type { RecordedModelEvaluationRun } from './model-qualification-runner'",
+    "import type { RecordedModelEvaluationRun } from './model-qualification'",
     '',
     '// Written by `pnpm test:evaluation:record <candidate>`: one run per Qualified Model Configuration candidate.',
     `export const recordedLiveModelEvaluationRuns: readonly RecordedModelEvaluationRun[] = ${JSON.stringify(runs, null, 2)}`,

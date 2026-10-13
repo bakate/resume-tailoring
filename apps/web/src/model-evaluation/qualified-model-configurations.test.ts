@@ -85,8 +85,9 @@ const optionChanges = [
 function recordReport(configuration: ModelConfiguration) {
   const observations = [createModelEvaluationObservation({ fixtureId: 'recorded', extractionExpectedCount: 1,
     extractionMatchedCount: 1, inputTokens: 10, latencyMilliseconds: 10, multilingualCheckCount: 1, multilingualPassedCount: 1,
-    outputTokens: 10 })]
-  return qualifyModelConfiguration({ configuration, datasetId: 'recorded-v1', observations, baseline: {
-    configuration, datasetId: 'recorded-v1', observations, recordedAt: '2026-10-12T10:00:00.000Z',
-    thresholds: { costUsd: 1, extractionRecall: 1, multilingualFidelity: 1, p95LatencyMilliseconds: 1_000 } } })
+    outputTokens: 10, tailoredResumeUsage: { structured: { inputTokens: 0, outputTokens: 0 },
+      writing: { inputTokens: 10, outputTokens: 10 } } })]
+  return qualifyModelConfiguration({ recordedRun: { configuration, datasetId: 'recorded-v1', observations,
+    recordedAt: '2026-10-12T10:00:00.000Z' },
+  thresholds: { costUsd: 1, extractionRecall: 1, multilingualFidelity: 1, p95LatencyMilliseconds: 1_000 } })
 }

@@ -1,29 +1,14 @@
 import type { LanguageModelConfiguration } from '../language-model-configuration'
-import { qualifyModelConfiguration, type ModelQualificationReport } from './model-qualification'
+import { liveModelEvaluationDatasetId, liveModelEvaluationThresholds } from './model-evaluation-baselines'
 import {
-  liveModelEvaluationDatasetId,
-  liveModelEvaluationThresholds,
-  structuredModelEvaluationBaseline,
-  writingModelEvaluationBaseline,
-} from './model-evaluation-baselines'
-import { qualifyRecordedRun, type RecordedModelEvaluationRun } from './model-qualification-runner'
+  qualifyModelConfiguration,
+  type ModelQualificationReport,
+  type RecordedModelEvaluationRun,
+} from './model-qualification'
 import { recordedLiveModelEvaluationRuns } from './recorded-live-model-evaluation-runs'
-import {
-  recordedStructuredModelEvaluation,
-  recordedWritingModelEvaluation,
-} from './recorded-model-evaluation-runs'
 
-export const recordedModelQualificationReports: readonly ModelQualificationReport[] = [
-  qualifyRecordedConfiguration({
-    baseline: structuredModelEvaluationBaseline,
-    recordedEvaluation: recordedStructuredModelEvaluation,
-  }),
-  qualifyRecordedConfiguration({
-    baseline: writingModelEvaluationBaseline,
-    recordedEvaluation: recordedWritingModelEvaluation,
-  }),
-  ...recordedLiveModelEvaluationRuns.map(qualifyLiveRun),
-]
+export const recordedModelQualificationReports: readonly ModelQualificationReport[] =
+  recordedLiveModelEvaluationRuns.map(qualifyLiveRun)
 
 /** A configuration is qualified only as a whole: the same provider, model, role and every provider option. */
 export function isQualifiedModelConfiguration({ configuration, reports = recordedModelQualificationReports }: Readonly<{
@@ -50,23 +35,9 @@ function hasSameValue({ qualified, requested }: Readonly<{ qualified: unknown; r
       && hasSameValue({ qualified: value, requested: (requested as Readonly<Record<string, unknown>>)[name] }))
 }
 
-function qualifyRecordedConfiguration({
-  baseline,
-  recordedEvaluation,
-}: Readonly<{
-  baseline: typeof structuredModelEvaluationBaseline | typeof writingModelEvaluationBaseline
-  recordedEvaluation: typeof recordedStructuredModelEvaluation | typeof recordedWritingModelEvaluation
-}>) {
-  return qualifyModelConfiguration({
-    baseline,
-    configuration: recordedEvaluation.configuration,
-    datasetId: recordedEvaluation.datasetId,
-    observations: recordedEvaluation.observations,
-  })
-}
-
 /** A run recorded on another dataset than the live one has no calibrated threshold, so it qualifies nothing. */
-function qualifyLiveRun(run: RecordedModelEvaluationRun) {
-  const thresholds = run.datasetId === liveModelEvaluationDatasetId ? liveModelEvaluationThresholds[run.configuration.role] : {}
-  return qualifyRecordedRun({ recordedRun: run, thresholds })
+function qualifyLiveRun(recordedRun: RecordedModelEvaluationRun) {
+  const thresholds = recordedRun.datasetId === liveModelEvaluationDatasetId
+    ? liveModelEvaluationThresholds[recordedRun.configuration.role] : {}
+  return qualifyModelConfiguration({ recordedRun, thresholds })
 }

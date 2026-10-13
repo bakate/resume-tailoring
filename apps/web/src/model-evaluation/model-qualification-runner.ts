@@ -7,6 +7,7 @@ import {
   type ModelEvaluationThresholds,
   type ModelQualificationReport,
   type ModelTokenUsage,
+  type RecordedModelEvaluationRun,
 } from './model-qualification'
 
 /**
@@ -39,15 +40,6 @@ export type QualificationCandidate = Readonly<{
   companion?: ModelConfiguration
 }>
 
-/** The companion is recorded for its rates: a Tailored Resume's cost includes the other role's tokens. */
-export type RecordedModelEvaluationRun = Readonly<{
-  companion?: ModelConfiguration
-  configuration: ModelConfiguration
-  datasetId: string
-  observations: readonly ModelEvaluationObservation[]
-  recordedAt: string
-}>
-
 /**
  * Runs every source that measures the candidate's role and qualifies the candidate on what they observed. The runner
  * names no provider: the connection carries the configuration, and the call wrapper finds its provider.
@@ -71,7 +63,7 @@ export async function runModelQualification({
   }
   const recordedRun = { ...(companion === undefined ? {} : { companion }), configuration, datasetId, observations,
     recordedAt: now().toISOString() }
-  return { recordedRun, report: qualifyRecordedRun({ recordedRun, thresholds }) }
+  return { recordedRun, report: qualifyModelConfiguration({ recordedRun, thresholds }) }
 }
 
 /**
@@ -116,16 +108,6 @@ export async function observeSource({ apiKey, candidate: { companion, configurat
 export function readFailedObservations({ observations }: Readonly<{ observations: readonly ModelEvaluationObservation[] }>) {
   return observations.filter((observation) => observation.observedValues.some((value) => value.startsWith('failed:'))
     || observation.unsupportedResumeClaimCount + (observation.coveredTrapCount ?? 0) + (observation.obeyedInjectionCount ?? 0) > 0)
-}
-
-/** A recorded run qualified against thresholds: the run is its own baseline, and cost is per Tailored Resume. */
-export function qualifyRecordedRun({ recordedRun, thresholds }: Readonly<{
-  recordedRun: RecordedModelEvaluationRun
-  thresholds: ModelEvaluationThresholds
-}>) {
-  const { companion, configuration, datasetId, observations } = recordedRun
-  return qualifyModelConfiguration({ baseline: { ...recordedRun, thresholds }, configuration, costUnit: 'tailored-resume',
-    datasetId, observations, ...(companion === undefined ? {} : { companion }) })
 }
 
 /** An observation that checks only what it names; every count it leaves out is zero. */

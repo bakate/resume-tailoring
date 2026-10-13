@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { createScriptedLanguageModelProvider } from '../adapters/server/scripted-language-model-provider'
 import type { ModelConfiguration } from './model-qualification'
-import { createModelEvaluationObservation, type ModelObservationSource, type RecordedModelEvaluationRun } from './model-qualification-runner'
+import type { RecordedModelEvaluationRun } from './model-qualification'
+import { createModelEvaluationObservation, type ModelObservationSource } from './model-qualification-runner'
 import {
   mergeRecordedRuns,
   recordModelQualification,

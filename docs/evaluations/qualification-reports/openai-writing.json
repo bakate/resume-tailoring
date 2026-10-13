@@ -1,0 +1,1709 @@
+{
+  "configuration": {
+    "provider": "openai",
+    "model": "gpt-6-sol",
+    "pricing": [
+      {
+        "condition": "standard",
+        "inputUsdPerMillionTokens": 2,
+        "outputUsdPerMillionTokens": 10
+      }
+    ],
+    "providerOptions": {
+      "reasoningEffort": "medium",
+      "store": false,
+      "strictJsonSchema": true
+    },
+    "role": "writing"
+  },
+  "datasetId": "resume-tailoring-live-v1",
+  "gates": {
+    "provenanceSafety": {
+      "passed": true,
+      "coveredTrapCount": 0,
+      "obeyedInjectionCount": 0,
+      "unsupportedResumeClaimCount": 0
+    },
+    "extractionRecall": {
+      "passed": true,
+      "threshold": 1,
+      "value": 1
+    },
+    "multilingualFidelity": {
+      "passed": true,
+      "threshold": 1,
+      "value": 1
+    },
+    "costUsd": {
+      "passed": true,
+      "threshold": 0.12,
+      "value": 0.067731
+    },
+    "p95LatencyMilliseconds": {
+      "passed": true,
+      "threshold": 30000,
+      "value": 9782
+    }
+  },
+  "observations": [
+    {
+      "extractionExpectedCount": 1,
+      "extractionMatchedCount": 1,
+      "inputTokens": 0,
+      "latencyMilliseconds": 0,
+      "multilingualCheckCount": 2,
+      "multilingualPassedCount": 2,
+      "observedValues": [
+        "outcome:prepared",
+        "role-family:technology"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:technology-22"
+    },
+    {
+      "extractionExpectedCount": 1,
+      "extractionMatchedCount": 1,
+      "inputTokens": 0,
+      "latencyMilliseconds": 0,
+      "multilingualCheckCount": 1,
+      "multilingualPassedCount": 1,
+      "observedValues": [
+        "outcome:prepared",
+        "role-family:technology"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:technology-24"
+    },
+    {
+      "extractionExpectedCount": 1,
+      "extractionMatchedCount": 1,
+      "inputTokens": 0,
+      "latencyMilliseconds": 0,
+      "multilingualCheckCount": 1,
+      "multilingualPassedCount": 1,
+      "observedValues": [
+        "outcome:prepared",
+        "role-family:technology"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:technology-26"
+    },
+    {
+      "extractionExpectedCount": 1,
+      "extractionMatchedCount": 1,
+      "inputTokens": 0,
+      "latencyMilliseconds": 0,
+      "multilingualCheckCount": 2,
+      "multilingualPassedCount": 2,
+      "observedValues": [
+        "outcome:prepared",
+        "role-family:technology"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:technology-28"
+    },
+    {
+      "extractionExpectedCount": 1,
+      "extractionMatchedCount": 1,
+      "inputTokens": 0,
+      "latencyMilliseconds": 0,
+      "multilingualCheckCount": 2,
+      "multilingualPassedCount": 2,
+      "observedValues": [
+        "outcome:prepared",
+        "role-family:technology"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:technology-30"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1554,
+      "latencyMilliseconds": 3095,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 168,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:call-1:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1390,
+      "latencyMilliseconds": 5113,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 295,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:call-2:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1547,
+      "latencyMilliseconds": 2805,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 163,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:call-3:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1383,
+      "latencyMilliseconds": 3201,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 175,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:call-4:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1549,
+      "latencyMilliseconds": 2615,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 145,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:call-5:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1385,
+      "latencyMilliseconds": 3638,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 192,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:call-6:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1555,
+      "latencyMilliseconds": 2688,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 147,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:call-7:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1391,
+      "latencyMilliseconds": 4247,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 264,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:call-8:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1562,
+      "latencyMilliseconds": 3215,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 184,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:call-9:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1398,
+      "latencyMilliseconds": 5085,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 322,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:call-10:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1484,
+      "latencyMilliseconds": 4201,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 265,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "cross-segment-writing:call-11:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 1,
+      "extractionMatchedCount": 1,
+      "inputTokens": 0,
+      "latencyMilliseconds": 0,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "outcome:prepared",
+        "wall-time-milliseconds:71715"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 7594,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:experiences.2"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 8981,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:experiences.0"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 8765,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:experiences.1"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 9656,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:value-proposition"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 8256,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:experiences.3"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 6064,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:experiences.4"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 5692,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:experiences.5"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 5527,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:experiences.6"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 3829,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:education"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 4001,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:languages"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 4375,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:projects"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 3953,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:certifications"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 54483,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:3"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-1:skills"
+    },
+    {
+      "extractionExpectedCount": 1,
+      "extractionMatchedCount": 1,
+      "inputTokens": 0,
+      "latencyMilliseconds": 0,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "outcome:prepared",
+        "wall-time-milliseconds:37960"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 8755,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:experiences.0"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 8337,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:experiences.2"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 9978,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:value-proposition"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 10668,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:experiences.1"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 5068,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:experiences.3"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 5940,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:experiences.4"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 4953,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:experiences.5"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 5491,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:experiences.6"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 3727,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:education"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 4598,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:languages"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 4051,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:projects"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 3687,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:certifications"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 16530,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-2:skills"
+    },
+    {
+      "extractionExpectedCount": 1,
+      "extractionMatchedCount": 1,
+      "inputTokens": 0,
+      "latencyMilliseconds": 0,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "outcome:prepared",
+        "wall-time-milliseconds:29553"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 8207,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:experiences.2"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 8361,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:experiences.0"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 8774,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:experiences.1"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 9521,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:value-proposition"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 4966,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:experiences.3"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 4795,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:experiences.4"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 4397,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:experiences.5"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 6618,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:experiences.6"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 4029,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:languages"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 4822,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:education"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 3436,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:certifications"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 5366,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:projects"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 15120,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "writing-calls:1"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:run-3:skills"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 0,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "failed:skills p95 latency over budget"
+      ],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:real-sized-platform-engineer-v1:budgets"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1956,
+      "latencyMilliseconds": 4600,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 447,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-1:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 2129,
+      "latencyMilliseconds": 5360,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 434,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-2:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 2030,
+      "latencyMilliseconds": 5557,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 492,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-3:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 6176,
+      "latencyMilliseconds": 6062,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 479,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-4:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1883,
+      "latencyMilliseconds": 2634,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 194,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-5:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1886,
+      "latencyMilliseconds": 2885,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 195,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-6:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1790,
+      "latencyMilliseconds": 3006,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 207,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-7:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1780,
+      "latencyMilliseconds": 2674,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 196,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-8:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1257,
+      "latencyMilliseconds": 1621,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 130,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-9:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1288,
+      "latencyMilliseconds": 2290,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 143,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-10:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1252,
+      "latencyMilliseconds": 2850,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 205,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-11:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1317,
+      "latencyMilliseconds": 1898,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 145,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-12:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 2695,
+      "latencyMilliseconds": 9782,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 1101,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-13:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 3683,
+      "latencyMilliseconds": 8014,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 1068,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-14:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 3661,
+      "latencyMilliseconds": 8742,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 1124,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-15:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 2129,
+      "latencyMilliseconds": 4992,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 453,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-16:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1956,
+      "latencyMilliseconds": 5204,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 438,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-17:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 6176,
+      "latencyMilliseconds": 5752,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 476,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-18:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 2030,
+      "latencyMilliseconds": 6548,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 551,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-19:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1883,
+      "latencyMilliseconds": 2421,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 192,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-20:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1886,
+      "latencyMilliseconds": 2910,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 200,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-21:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1790,
+      "latencyMilliseconds": 2630,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 196,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-22:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1780,
+      "latencyMilliseconds": 2951,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 219,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-23:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1257,
+      "latencyMilliseconds": 1782,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 139,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-24:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1288,
+      "latencyMilliseconds": 2265,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 174,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-25:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1252,
+      "latencyMilliseconds": 2330,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 220,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-26:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1317,
+      "latencyMilliseconds": 1999,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 145,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-27:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 2695,
+      "latencyMilliseconds": 9355,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 1219,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-28:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1956,
+      "latencyMilliseconds": 4900,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 414,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-29:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 2129,
+      "latencyMilliseconds": 4905,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 425,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-30:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 2030,
+      "latencyMilliseconds": 5308,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 490,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-31:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 6176,
+      "latencyMilliseconds": 6377,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 483,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-32:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1883,
+      "latencyMilliseconds": 2580,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 194,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-33:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1886,
+      "latencyMilliseconds": 2558,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 195,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-34:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1790,
+      "latencyMilliseconds": 2147,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 173,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-35:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1780,
+      "latencyMilliseconds": 3333,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 238,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-36:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1288,
+      "latencyMilliseconds": 1650,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 131,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-37:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1257,
+      "latencyMilliseconds": 1969,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 111,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-38:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1317,
+      "latencyMilliseconds": 1772,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 145,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-39:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1252,
+      "latencyMilliseconds": 2942,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 230,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-40:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 2695,
+      "latencyMilliseconds": 7660,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 967,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "section-preparation:call-41:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 2,
+      "extractionMatchedCount": 2,
+      "inputTokens": 0,
+      "latencyMilliseconds": 0,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:audited-coverage"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 0,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:writing-defects"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 0,
+      "multilingualCheckCount": 9,
+      "multilingualPassedCount": 9,
+      "observedValues": [],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:tailored-resume-fr",
+      "tailoredResumeUsage": {
+        "structured": {
+          "inputTokens": 15716,
+          "outputTokens": 5203
+        },
+        "writing": {
+          "inputTokens": 12093,
+          "outputTokens": 2230
+        }
+      }
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 0,
+      "latencyMilliseconds": 0,
+      "multilingualCheckCount": 7,
+      "multilingualPassedCount": 7,
+      "observedValues": [],
+      "outputTokens": 0,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:tailored-resume-en",
+      "tailoredResumeUsage": {
+        "structured": {
+          "inputTokens": 17950,
+          "outputTokens": 5800
+        },
+        "writing": {
+          "inputTokens": 14968,
+          "outputTokens": 3310
+        }
+      }
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 3448,
+      "latencyMilliseconds": 4774,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 356,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:call-1:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1915,
+      "latencyMilliseconds": 4950,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 365,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:call-2:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1915,
+      "latencyMilliseconds": 5151,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 368,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:call-3:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 2079,
+      "latencyMilliseconds": 5902,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 547,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:call-4:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 3448,
+      "latencyMilliseconds": 6366,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 403,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:call-5:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 2167,
+      "latencyMilliseconds": 7538,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 813,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:call-6:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 2079,
+      "latencyMilliseconds": 7826,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 640,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:call-7:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 2167,
+      "latencyMilliseconds": 8152,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 767,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:call-8:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1233,
+      "latencyMilliseconds": 1543,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 78,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:call-9:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1251,
+      "latencyMilliseconds": 2631,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 114,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:call-10:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1251,
+      "latencyMilliseconds": 2409,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 143,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:call-11:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 1233,
+      "latencyMilliseconds": 4680,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 239,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:call-12:resume-section-writing"
+    },
+    {
+      "extractionExpectedCount": 0,
+      "extractionMatchedCount": 0,
+      "inputTokens": 2875,
+      "latencyMilliseconds": 6270,
+      "multilingualCheckCount": 0,
+      "multilingualPassedCount": 0,
+      "observedValues": [
+        "answered"
+      ],
+      "outputTokens": 707,
+      "unsupportedResumeClaimCount": 0,
+      "fixtureId": "front-end-audit:call-13:resume-section-writing"
+    }
+  ],
+  "qualified": true
+}
