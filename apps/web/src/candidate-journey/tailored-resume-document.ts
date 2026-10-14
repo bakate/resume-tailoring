@@ -116,8 +116,11 @@ function renderSection({ section, locale }: Readonly<{
   const groups = section.groups.filter(({ items }) => items.length > 0).map(({ category, items }) => {
     const heading = category === null ? '' : `<h3>${renderText(category.text)}</h3>`
     return `<div class="skill-group">${heading}<p>${items.map(({ text }) => renderText(text)).join(' · ')}</p></div>`
-  }).join('')
-  return groups.length === 0 ? '' : `<section><h2>${title}</h2>${groups}</section>`
+  })
+  if (groups.length === 0) return ''
+  // Several groups sit side by side, short lines that would otherwise leave most of the page width empty.
+  const body = groups.length === 1 ? groups.join('') : `<div class="skill-groups">${groups.join('')}</div>`
+  return `<section><h2>${title}</h2>${body}</section>`
 }
 
 function renderFieldSection({ fields, title }: Readonly<{

@@ -97,6 +97,19 @@ describe('Tailored Resume export document', () => {
     expect(html.match(/<h3>Front-end<\/h3>/gu)).toHaveLength(1)
   })
 
+  it('lays several skill groups out side by side, and a single group across the page', () => {
+    const group = (id: string, category: string) => ({ id, category: { id: `${id}-category`, factIds: ['source-fact-1'] as const, text: category },
+      items: [{ id: `${id}-item`, factIds: ['source-fact-1'] as const, text: 'TypeScript' }] })
+    const withGroups = (groups: readonly ReturnType<typeof group>[]) => ({ ...source.tailoredResume,
+      sections: [{ section: 'skills', groups }] }) as const
+
+    const several = renderTailoredResumeDocument({ tailoredResume: withGroups([group('skills.0', 'Languages'), group('skills.1', 'Back-end')]) })
+    const single = renderTailoredResumeDocument({ tailoredResume: withGroups([group('skills.0', 'Languages')]) })
+
+    expect(several).toMatch(/<div class="skill-groups"><div class="skill-group"><h3>Languages<\/h3>.*<h3>Back-end<\/h3>.*<\/div><\/div><\/section>/u)
+    expect(single).not.toContain('<div class="skill-groups">')
+  })
+
   it('renders a written Value Proposition as prose with its provenance', () => {
     const tailoredResume = { ...source.tailoredResume,
       valueProposition: { kind: 'prose', paragraphs: [
