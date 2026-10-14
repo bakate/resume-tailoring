@@ -186,6 +186,11 @@ export type ResumeClaimSemanticValidator = Readonly<{
 
 export type ResumeDocumentRenderer = Readonly<{
   render: (request: ResumeRenderRequest) => Promise<ResumeRenderResult>
+  /**
+   * Readies the renderer for the first render of a preparation, without waiting for it and without any Candidate
+   * content. It is not a render: it counts against no render allowance, and its failure only leaves a render cold.
+   */
+  warmUp: () => void
 }>
 
 // Telemetry

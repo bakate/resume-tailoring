@@ -192,6 +192,16 @@ test.describe('Candidate Journey integration qualification', () => {
     await system.expectAnotherOpportunityPreview()
   })
 
+  test('warms the rendering browser up once per preparation, when Resume Section writing starts, without content', async ({ page }) => {
+    const system = createSystemUnderTest({ page })
+    await system.givenReplacedJobPosting()
+
+    await system.regenerateForAnotherOpportunity()
+
+    await system.expectAnotherOpportunityPreview()
+    system.expectOneContentFreeRendererWarmUpPerPreparation()
+  })
+
   test('deletes a prepared session without leaving stale output', async ({ page }) => {
     const system = createSystemUnderTest({ page })
     await system.givenDownloadedResume()
@@ -408,6 +418,7 @@ class CandidateJourneyIntegrationSystem {
   readonly #analytics: AnalyticsEvent[] = []
   readonly #modelRequests: string[] = []
   readonly #modelRequestBodies: string[] = []
+  readonly #rendererWarmUpBodies: (string | null)[] = []
   #posting = firstPosting
   #pdfText: string | null = null
   #pdfPageCount = 0
@@ -979,6 +990,15 @@ class CandidateJourneyIntegrationSystem {
     expect(this.#modelRequests.filter((path) => path.endsWith('/api/explainable-job-posting-extraction'))).toHaveLength(2)
   }
 
+  /** Each preparation warms the renderer up after matching, before its first Resume Section is written, with no body. */
+  expectOneContentFreeRendererWarmUpPerPreparation() {
+    this.#expectAction()
+    const steps = this.#modelRequests.filter((path) => [matchEvidencePath, rendererWarmUpPath, sectionWritingPath].includes(path))
+    expect(steps.filter((path, position) => path !== steps[position - 1])).toEqual([matchEvidencePath, rendererWarmUpPath,
+      sectionWritingPath, matchEvidencePath, rendererWarmUpPath, sectionWritingPath])
+    expect(this.#rendererWarmUpBodies).toEqual([null, null])
+  }
+
   async expectNoStaleOutputAfterDeletion() {
     this.#expectAction()
     await expect(this.#page.getByText('Your data was deleted from this browser.')).toBeVisible()
@@ -1246,6 +1266,7 @@ class CandidateJourneyIntegrationSystem {
   #recordModelRequest(request: Request) {
     const path = new URL(request.url()).pathname
     if (path.startsWith('/api/')) this.#modelRequests.push(path)
+    if (path === rendererWarmUpPath) this.#rendererWarmUpBodies.push(request.postData())
     if (path.startsWith('/api/') && path !== '/api/resume-document' && path !== '/api/analytics') {
       this.#modelRequestBodies.push(request.postData() ?? '')
     }
@@ -1292,6 +1313,9 @@ const secondPosting = 'Accessibility Lead. React is required. Inclusive product 
 const correctedSummary = 'Built accessible billing screens with React.'
 const candidateContent = ['Northwind', 'Contoso', 'billing', 'Alex', 'Morgan', 'example.com', 'Frontend', 'Accessibility'] as const
 const candidateApiKeyLeftByAnEarlierVersion = 'sk-proj-LeftBehind0123456789abcdef'
+const matchEvidencePath = '/api/explainable-match-evidence'
+const rendererWarmUpPath = '/api/resume-document-warm-up'
+const sectionWritingPath = '/api/resume-section-writing'
 const reactMatch = { factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' } as const
 
 const overflowStatus = /^Your resume runs to \d+ pages, two at most\.$/u

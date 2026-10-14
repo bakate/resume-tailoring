@@ -779,7 +779,9 @@ const candidateJourneyMachine = setup({
           },
         },
         preparingResume: {
+          // Resume Section writing starts now; the renderer has until the first layout to get ready.
           entry: [({ context }) => { recordJourneyPhase({ context, phase: 'tailored-resume-preparation' }) },
+            ({ context }) => { context.dependencies.resumeDocumentRenderer?.warmUp() },
             assign({ preparationPhase: null, preparationStep: 'writing-sections' })],
           on: { RESUME_SECTIONS_PROGRESSED: { actions: assign(({ context, event }) => ({ preparationSections: event.sections,
             ...saveResumeSectionsProgress({ context, sections: event.sections }) })) },

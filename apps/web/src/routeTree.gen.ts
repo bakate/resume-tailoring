@@ -20,6 +20,7 @@ import { Route as ApiResumeClaimValidationRouteImport } from './routes/api.resum
 import { Route as ApiResumeClaimWritingRouteImport } from './routes/api.resume-claim-writing'
 import { Route as ApiResumeDocumentRouteImport } from './routes/api.resume-document'
 import { Route as ApiResumeDocumentCoherenceRouteImport } from './routes/api.resume-document-coherence'
+import { Route as ApiResumeDocumentWarmUpRouteImport } from './routes/api.resume-document-warm-up'
 import { Route as ApiResumeSectionValidationRouteImport } from './routes/api.resume-section-validation'
 import { Route as ApiResumeSectionWritingRouteImport } from './routes/api.resume-section-writing'
 import { Route as ApiStructuredSourceProfileExtractionRouteImport } from './routes/api.structured-source-profile-extraction'
@@ -82,6 +83,11 @@ const ApiResumeDocumentCoherenceRoute =
     path: '/api/resume-document-coherence',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiResumeDocumentWarmUpRoute = ApiResumeDocumentWarmUpRouteImport.update({
+  id: '/api/resume-document-warm-up',
+  path: '/api/resume-document-warm-up',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiResumeSectionValidationRoute =
   ApiResumeSectionValidationRouteImport.update({
     id: '/api/resume-section-validation',
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
   '/api/resume-document': typeof ApiResumeDocumentRoute
   '/api/resume-document-coherence': typeof ApiResumeDocumentCoherenceRoute
+  '/api/resume-document-warm-up': typeof ApiResumeDocumentWarmUpRoute
   '/api/resume-section-validation': typeof ApiResumeSectionValidationRoute
   '/api/resume-section-writing': typeof ApiResumeSectionWritingRoute
   '/api/structured-source-profile-extraction': typeof ApiStructuredSourceProfileExtractionRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
   '/api/resume-document': typeof ApiResumeDocumentRoute
   '/api/resume-document-coherence': typeof ApiResumeDocumentCoherenceRoute
+  '/api/resume-document-warm-up': typeof ApiResumeDocumentWarmUpRoute
   '/api/resume-section-validation': typeof ApiResumeSectionValidationRoute
   '/api/resume-section-writing': typeof ApiResumeSectionWritingRoute
   '/api/structured-source-profile-extraction': typeof ApiStructuredSourceProfileExtractionRoute
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/api/resume-claim-writing': typeof ApiResumeClaimWritingRoute
   '/api/resume-document': typeof ApiResumeDocumentRoute
   '/api/resume-document-coherence': typeof ApiResumeDocumentCoherenceRoute
+  '/api/resume-document-warm-up': typeof ApiResumeDocumentWarmUpRoute
   '/api/resume-section-validation': typeof ApiResumeSectionValidationRoute
   '/api/resume-section-writing': typeof ApiResumeSectionWritingRoute
   '/api/structured-source-profile-extraction': typeof ApiStructuredSourceProfileExtractionRoute
@@ -160,6 +169,7 @@ export interface FileRouteTypes {
     | '/api/resume-claim-writing'
     | '/api/resume-document'
     | '/api/resume-document-coherence'
+    | '/api/resume-document-warm-up'
     | '/api/resume-section-validation'
     | '/api/resume-section-writing'
     | '/api/structured-source-profile-extraction'
@@ -174,6 +184,7 @@ export interface FileRouteTypes {
     | '/api/resume-claim-writing'
     | '/api/resume-document'
     | '/api/resume-document-coherence'
+    | '/api/resume-document-warm-up'
     | '/api/resume-section-validation'
     | '/api/resume-section-writing'
     | '/api/structured-source-profile-extraction'
@@ -190,6 +201,7 @@ export interface FileRouteTypes {
     | '/api/resume-claim-writing'
     | '/api/resume-document'
     | '/api/resume-document-coherence'
+    | '/api/resume-document-warm-up'
     | '/api/resume-section-validation'
     | '/api/resume-section-writing'
     | '/api/structured-source-profile-extraction'
@@ -206,6 +218,7 @@ export interface RootRouteChildren {
   ApiResumeClaimWritingRoute: typeof ApiResumeClaimWritingRoute
   ApiResumeDocumentRoute: typeof ApiResumeDocumentRoute
   ApiResumeDocumentCoherenceRoute: typeof ApiResumeDocumentCoherenceRoute
+  ApiResumeDocumentWarmUpRoute: typeof ApiResumeDocumentWarmUpRoute
   ApiResumeSectionValidationRoute: typeof ApiResumeSectionValidationRoute
   ApiResumeSectionWritingRoute: typeof ApiResumeSectionWritingRoute
   ApiStructuredSourceProfileExtractionRoute: typeof ApiStructuredSourceProfileExtractionRoute
@@ -290,6 +303,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiResumeDocumentCoherenceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/resume-document-warm-up': {
+      id: '/api/resume-document-warm-up'
+      path: '/api/resume-document-warm-up'
+      fullPath: '/api/resume-document-warm-up'
+      preLoaderRoute: typeof ApiResumeDocumentWarmUpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/resume-section-validation': {
       id: '/api/resume-section-validation'
       path: '/api/resume-section-validation'
@@ -338,6 +358,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiResumeClaimWritingRoute: ApiResumeClaimWritingRoute,
   ApiResumeDocumentRoute: ApiResumeDocumentRoute,
   ApiResumeDocumentCoherenceRoute: ApiResumeDocumentCoherenceRoute,
+  ApiResumeDocumentWarmUpRoute: ApiResumeDocumentWarmUpRoute,
   ApiResumeSectionValidationRoute: ApiResumeSectionValidationRoute,
   ApiResumeSectionWritingRoute: ApiResumeSectionWritingRoute,
   ApiStructuredSourceProfileExtractionRoute:

@@ -1,8 +1,12 @@
 import { groupedResumeDocument, resumeContractRevision } from '@resume-tailoring/application/structured-resume-fixtures'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import type { Browser, Page } from 'puppeteer'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 
-import { renderResumeDocument } from './resume-document-renderer'
+import { createRenderingBrowser, createResumeDocumentRenderer, launchChromium,
+  renderResumeDocument } from './resume-document-renderer'
 
 describe('structured resume PDF rendering boundary', () => {
   it('renders the current grouped document as selectable A4 pages with embedded fonts', async () => {
@@ -151,6 +155,138 @@ describe('structured resume PDF rendering boundary', () => {
     expect(JSON.stringify(log.mock.calls)).not.toContain('Alex Morgan')
   }, 20_000)
 })
+
+
+describe('reused rendering browser', () => {
+  it('renders two consecutive documents with one browser, closing each request\'s browsing context', async () => {
+    const rendering = createLaunchRecordingRenderer()
+
+    const results = [await rendering.renderer.render(simpleRequest), await rendering.renderer.render(simpleRequest)]
+
+    expect(results.map(({ pdf }) => pdf !== null)).toEqual([true, true])
+    expect(rendering.browsers).toHaveLength(1)
+    expect(rendering.browsers[0]?.browserContexts(), 'Only the default context is left open').toHaveLength(1)
+  }, 30_000)
+
+  it('keeps no cookie, local storage entry or cached resource from one request to the next', async () => {
+    const site = await serveStatefulSite()
+    const rendering = createLaunchRecordingRenderer()
+
+    const first = await rendering.browser.withIsolatedPage((page) => site.storeStateAndReadIt(page))
+    const second = await rendering.browser.withIsolatedPage((page) => site.readState(page))
+
+    expect(first, 'The state is kept, and the resource cached, within one request').toEqual({ cookie: 'candidate=stored',
+      storage: 'stored', resourceDownloads: 1 })
+    expect(second).toEqual({ cookie: '', storage: null, resourceDownloads: 2 })
+    expect(rendering.browsers).toHaveLength(1)
+  }, 30_000)
+
+  it.each(['closed', 'crashed'] as const)('relaunches a browser that %s before the next render', async (ending) => {
+    const rendering = createLaunchRecordingRenderer()
+    await rendering.renderer.render(simpleRequest)
+    await endBrowser({ browser: rendering.browsers[0], ending })
+
+    const result = await rendering.renderer.render(simpleRequest)
+
+    expect(result.pdf).not.toBeNull()
+    expect(rendering.browsers).toHaveLength(2)
+  }, 30_000)
+
+  it('answers a launch slower than its deadline with a timeout, logged at its stage without content', async () => {
+    const log = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    onTestFinished(() => { log.mockRestore() })
+    const renderer = createResumeDocumentRenderer({ browser: createRenderingBrowser({ launchTimeoutMilliseconds: 50,
+      launch: () => new Promise<Browser>(() => undefined) }) })
+
+    const result = await renderer.render(simpleRequest)
+
+    expect(result.assessment.layout).toEqual({ status: 'unavailable', revision: resumeContractRevision })
+    expect(result.failure?.cause).toEqual({ type: 'timeout' })
+    expect(log.mock.calls.map(([line]) => JSON.parse(String(line)) as unknown)).toContainEqual({
+      category: 'privacy-safe-resume-render', metric: 'unavailable', value: 1,
+      dimensions: { stage: 'launch', errorName: 'TimeoutError' } })
+    expect(JSON.stringify(log.mock.calls)).not.toContain('Alex Morgan')
+  })
+
+  it('warms the browser up so the next render reuses it', async () => {
+    const rendering = createLaunchRecordingRenderer()
+
+    const warmUp = await rendering.renderer.warmUp()
+    const result = await rendering.renderer.render(simpleRequest)
+
+    expect(warmUp).toBe('ready')
+    expect(result.pdf).not.toBeNull()
+    expect(rendering.browsers).toHaveLength(1)
+  }, 30_000)
+
+  it('reports a warm-up whose launch outlasted its deadline as a timeout', async () => {
+    const renderer = createResumeDocumentRenderer({ browser: createRenderingBrowser({ launchTimeoutMilliseconds: 50,
+      launch: () => new Promise<Browser>(() => undefined) }) })
+
+    const warmUp = await renderer.warmUp()
+
+    expect(warmUp).toBe('timeout')
+  })
+})
+
+const simpleRequest = { draft: { document: groupedResumeDocument, revision: resumeContractRevision }, unsupportedFieldIds: [] }
+
+/** A renderer of its own whose launches are kept, so a case can count them and every browser closes after it. */
+function createLaunchRecordingRenderer() {
+  const browsers: Browser[] = []
+  const browser = createRenderingBrowser({ launch: async (options) => {
+    const launched = await launchChromium(options)
+    browsers.push(launched)
+    return launched
+  } })
+  onTestFinished(async () => { await Promise.all(browsers.map((launched) => launched.close().catch(() => undefined))) })
+  return { browser, browsers, renderer: createResumeDocumentRenderer({ browser }) }
+}
+
+async function endBrowser({ browser, ending }: Readonly<{ browser: Browser | undefined; ending: 'closed' | 'crashed' }>) {
+  if (browser === undefined) return expect.fail('Expected a launched browser')
+  const disconnected = new Promise((resolve) => { browser.once('disconnected', resolve) })
+  if (ending === 'closed') await browser.close()
+  else browser.process()?.kill('SIGKILL')
+  await disconnected
+}
+
+/**
+ * A local site whose page stores a cookie and a local storage entry and loads a resource cacheable for an hour, so a
+ * second request shows whether any of it survived the first.
+ */
+async function serveStatefulSite() {
+  let resourceDownloads = 0
+  const server = createServer((request, response) => {
+    if (request.url === '/cached.js') {
+      resourceDownloads += 1
+      response.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'public, max-age=3600' })
+      response.end('window.cachedResourceLoaded = true')
+      return
+    }
+    response.writeHead(200, { 'Content-Type': 'text/html' })
+    response.end('<!doctype html><script src="/cached.js"></script>')
+  })
+  await new Promise<void>((resolve) => { server.listen(0, '127.0.0.1', resolve) })
+  onTestFinished(() => new Promise<void>((resolve) => { server.close(() => { resolve() }) }))
+  const origin = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`
+  const readState = async (page: Page) => {
+    await page.goto(`${origin}/probe`, { waitUntil: 'load' })
+    const stored = await page.evaluate(() => ({ cookie: document.cookie, storage: localStorage.getItem('candidate') }))
+    return { ...stored, resourceDownloads }
+  }
+  return {
+    readState,
+    async storeStateAndReadIt(page: Page) {
+      await page.goto(`${origin}/store`, { waitUntil: 'load' })
+      await page.evaluate(() => {
+        document.cookie = 'candidate=stored; max-age=3600'
+        localStorage.setItem('candidate', 'stored')
+      })
+      return readState(page)
+    },
+  }
+}
 
 
 /** Text extracted from a PDF Source Document often carries invisible characters that a PDF never prints. */

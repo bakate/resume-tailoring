@@ -109,6 +109,7 @@ export function createFakeResumeSectionModels(overrides: Partial<ResumeSectionMo
 export function createFakeResumeDocumentRenderer(overrides: Partial<ResumeDocumentRenderer> = {}): ResumeDocumentRenderer {
   return {
     render: (request) => Promise.resolve({ assessment: assessOnePageLayout(request), pdf: new TextEncoder().encode('%PDF-') }),
+    warmUp: () => undefined,
     ...overrides,
   }
 }

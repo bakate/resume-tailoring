@@ -17,7 +17,9 @@ async function renderDocumentResponse({ request }: Readonly<{ request: Request }
   const renderRequest = await readRenderRequest({ request })
   if (!renderRequest.ok) return failureResponse({ type: renderRequest.type })
   const result = await renderResumeDocument(renderRequest.value)
-  if (result.assessment.layout.status === 'unavailable') return failureResponse({ type: 'provider-unavailable' })
+  if (result.assessment.layout.status === 'unavailable') {
+    return failureResponse({ type: result.failure?.cause.type === 'timeout' ? 'timeout' : 'provider-unavailable' })
+  }
   return Response.json({ ...result, pdf: result.pdf === null ? null
     : Buffer.from(result.pdf).toString('base64') }, { headers: privateHeaders })
 }

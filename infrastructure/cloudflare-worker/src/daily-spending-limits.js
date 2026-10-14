@@ -36,6 +36,7 @@ const modelBackedPaths = new Set([
   '/api/resume-section-validation',
   '/api/resume-document-coherence',
 ])
+/** Only a render counts: the rendering browser warm-up (`/api/resume-document-warm-up`) renders nothing. */
 const renderPath = '/api/resume-document'
 
 /** The counters a request consumes, or none when its route is not limited. */

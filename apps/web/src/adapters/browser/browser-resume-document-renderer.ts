@@ -12,15 +12,30 @@ type RendererDependencies = Readonly<{ request: typeof fetch; telemetry: Privacy
 
 const transientCategories: ReadonlySet<RenderFailureCategory> = new Set(['timeout', 'server', 'network'])
 /**
- * A render launches Chromium on the server, which takes about 25 s on a cold Lambda. Wait up to 90 s: below Cloudflare's
- * 100 s proxy limit and the Lambda's 120 s timeout, so the browser never gives up on a render the server will finish.
+ * A render on a cold Lambda launches Chromium first, which takes about 25 s with the render; the warm-up launches it
+ * earlier. Wait up to 90 s: below Cloudflare's 100 s proxy limit and the Lambda's 120 s timeout, so the browser never
+ * gives up on a render the server will finish.
  */
 const renderTimeoutMilliseconds = 90_000
 
 export function createBrowserResumeDocumentRenderer({ request = fetch, telemetry, timeoutMilliseconds = renderTimeoutMilliseconds }: Readonly<{
   request?: typeof fetch; telemetry: PrivacySafeTelemetry; timeoutMilliseconds?: number
 }>): ResumeDocumentRenderer {
-  return { render: (input) => renderDocument({ input, dependencies: { request, telemetry, timeoutMilliseconds } }) }
+  return {
+    render: (input) => renderDocument({ input, dependencies: { request, telemetry, timeoutMilliseconds } }),
+    warmUp: () => { warmUpServerRenderer({ request, timeoutMilliseconds }) },
+  }
+}
+
+/**
+ * Asks the server to launch its browser while Resume Sections are written. The request has no body, and its route is
+ * not the render route, so it counts against no render limit. A failed warm-up only leaves the first render cold.
+ */
+function warmUpServerRenderer({ request, timeoutMilliseconds }: Readonly<{
+  request: typeof fetch; timeoutMilliseconds: number
+}>) {
+  void request('/api/resume-document-warm-up', { method: 'POST', cache: 'no-store',
+    signal: AbortSignal.timeout(timeoutMilliseconds) }).catch(() => undefined)
 }
 
 async function renderDocument({ input, dependencies }: Readonly<{
