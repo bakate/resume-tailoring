@@ -5,7 +5,7 @@ import { groupedResumeDocument, resumeContractRevision } from '@resume-tailoring
 import { describe, expect, it, vi } from 'vitest'
 
 import { failureResponse } from '../../api-failure'
-import { createBrowserResumeDocumentRenderer } from './browser-resume-document-renderer'
+import { createBrowserResumeDocumentRenderer, resumeDocumentWarmUpPath } from './browser-resume-document-renderer'
 
 describe('browser resume document renderer', () => {
   const transientFailures = [
@@ -46,6 +46,29 @@ describe('browser resume document renderer', () => {
     expect(calls()).toBe(1)
     expect(telemetry).toEqual([{ name: 'resume-render-failed', category, retried: false }])
   })
+
+  it('warms the server renderer up with a request of its own that carries no content', async () => {
+    const { warmUp, requests } = rendererAnswering([() => new Response(null, { status: 204 })])
+
+    warmUp()
+
+    await vi.waitFor(() => { expect(requests()).toHaveLength(1) })
+    const [path, init] = requests()[0] ?? expect.fail('Expected a warm-up request')
+    expect(path).toBe(resumeDocumentWarmUpPath)
+    expect(init).toMatchObject({ method: 'POST' })
+    expect(init?.body).toBeUndefined()
+  })
+
+  it.each([['an unavailable server', () => failureResponse({ type: 'timeout' })],
+    ['a network failure', () => { throw new TypeError('Failed to fetch') }]] as const)(
+    'ignores a warm-up answered by %s', async (_case, failure) => {
+      const { warmUp, telemetry, calls } = rendererAnswering([failure])
+
+      warmUp()
+
+      await vi.waitFor(() => { expect(calls()).toBe(1) })
+      expect(telemetry).toEqual([])
+    })
 })
 
 type Answer = (() => Response) | 'hang'
@@ -76,5 +99,6 @@ function rendererAnswering(answers: readonly Answer[]) {
   })
   const renderer = createBrowserResumeDocumentRenderer({ request, timeoutMilliseconds: 20,
     telemetry })
-  return { render: renderer.render, telemetry: telemetry.events, calls: () => request.mock.calls.length }
+  return { render: renderer.render, warmUp: renderer.warmUp, telemetry: telemetry.events,
+    calls: () => request.mock.calls.length, requests: () => request.mock.calls }
 }

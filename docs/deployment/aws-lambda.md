@@ -41,11 +41,14 @@ when the object deletes everything it holds.
 | Global ceiling | 61 | all clients | the same request |
 | Technical ceiling | 530 | client network | every model-backed API route |
 | PDF renders | 200 | client network | `POST /api/resume-document` |
+| Rendering browser warm-ups | 40 | client network | `POST /api/resume-document-warm-up` |
 
 Over the Daily Quota, the global ceiling or the technical ceiling, the Worker answers `429` with the
 `daily-quota-reached` API Failure, `retryAfterSeconds` until the reset, and `x-resume-quota-scope`
 (`daily-quota`, `overall` or `model-requests`), so the Candidate comes back after the reset. Over
-the PDF render limit, it answers the `rate-limited` API Failure instead. Neither reaches the Lambda. A request the application refuses before any model
+the PDF render limit or the warm-up limit, it answers the `rate-limited` API Failure instead. Neither reaches the
+Lambda. A warm-up renders nothing, so it never uses the render limit; its own limit stops a loop from holding Lambdas
+while Chromium launches. A request the application refuses before any model
 call (`400`, `401`, `403` or `413`), such as a demo access renewal, gives back what it counted. A
 provider failure keeps it counted, so a loop of failing model calls still reaches the technical
 ceiling. Responses to a Job Posting extraction carry `x-resume-quota-remaining` (Tailored Resumes
@@ -92,6 +95,30 @@ The PDF renderer was sized against a 100 s Cloudflare proxy limit. Cloudflare do
 (error 524) for proxied origins, not for a Worker's `fetch` to the Lambda Function URL, but it has not
 been measured on this deployment. Right after switching to DeepSeek (BAK-168), confirm on the deployed Worker that a
 match evidence request answered after 100 s still reaches the browser; otherwise lower its deadline below 100 s.
+
+### Rendering browser
+
+Each execution environment launches one Chromium, on its first render or warm-up, and keeps it for every later
+request (BAK-183). Each render opens its own browsing context and closes it when the request ends, so no cookie,
+storage entry or cached resource of one Candidate reaches the next. A browser that crashed or disconnected is launched
+again on the next request.
+
+A launch gets 45 s, above the cold start, and fails as the `timeout` API Failure (`504`), which the browser retries
+once, never as a `502`. With 15 s for layout and 15 s for printing, a render still ends before the browser's 90 s
+deadline. Every launch logs its duration, and every failure its stage and error class:
+
+```text
+fields @timestamp
+| filter @message like /"category":"privacy-safe-resume-render"/
+| parse @message /"metric":"(?<metric>[^"]+)"/
+| parse @message /"value":(?<value>\d+)/
+| parse @message /"stage":"(?<stage>[^"]+)"/
+| stats count(*) as samples, pct(value, 50) as p50, pct(value, 95) as p95 by metric, stage
+```
+
+When Resume Section writing starts, the browser sends one warm-up per preparation, with no body. The route answers
+once Chromium is running, because Lambda freezes the execution environment after a response. The first render of the
+preparation then usually finds the browser running, unless Lambda routes it to another execution environment.
 
 ### Preparation phase timings
 

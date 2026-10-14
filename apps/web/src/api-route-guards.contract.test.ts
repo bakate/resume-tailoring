@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createDemoAccessCookie } from './demo-access/demo-access-session'
 import { Route as AnalyticsRoute } from './routes/api.analytics'
+import { Route as ResumeDocumentWarmUpRoute } from './routes/api.resume-document-warm-up'
 import { Route as ResumeSectionWritingRoute } from './routes/api.resume-section-writing'
 
 const environment = {
@@ -45,6 +46,15 @@ describe('API route guards', () => {
 
     expect(response.status).toBe(202)
     expect(writeEvent).toHaveBeenCalledOnce()
+  })
+
+  it('rejects a rendering browser warm-up without demo access before launching anything', async () => {
+    const request = new Request('https://resume-studio.example/api', { method: 'POST', headers: originHeaders })
+
+    const response = await postTo(ResumeDocumentWarmUpRoute, request)
+
+    expect(response.status).toBe(401)
+    await expect(response.json()).resolves.toEqual({ ok: false, error: { type: 'demo-access-required' } })
   })
 
   it('rejects an oversized model request from its declared length before reading it', async () => {

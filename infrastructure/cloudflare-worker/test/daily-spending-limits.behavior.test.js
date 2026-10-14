@@ -152,6 +152,34 @@ describe('Daily spending limits at the edge', () => {
     await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
   })
 
+  it('serves a rendering browser warm-up from an IP at the render limit', async () => {
+    const system = createSystemUnderTest()
+    await system.givenRendersRequested({ clientIp: '198.51.100.1', count: dailyLimits.rendersPerClient })
+
+    await system.warmUpRenderer({ clientIp: '198.51.100.1' })
+
+    await system.expectServedByOrigin()
+  })
+
+  it('stops rendering browser warm-ups from one IP at their own limit', async () => {
+    const system = createSystemUnderTest()
+    await system.givenRendererWarmedUp({ clientIp: '198.51.100.1', count: dailyLimits.rendererWarmUpsPerClient })
+
+    await system.warmUpRenderer({ clientIp: '198.51.100.1' })
+
+    await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
+  })
+
+  it('counts no rendering browser warm-up against the render limit', async () => {
+    const system = createSystemUnderTest()
+    await system.givenRendererWarmedUp({ clientIp: '198.51.100.1', count: 8 })
+    await system.givenRendersRequested({ clientIp: '198.51.100.1', count: dailyLimits.rendersPerClient - 1 })
+
+    await system.requestRender({ clientIp: '198.51.100.1' })
+
+    await system.expectServedByOrigin()
+  })
+
   it('serves every model request of eight journeys with edits under the technical ceiling', async () => {
     const system = createSystemUnderTest()
     await system.givenModelRequestsSent({
@@ -265,6 +293,7 @@ function createSystemUnderTest({ originStatus = 200 } = {}) {
     path: '/api/resume-section-writing', clientIp, candidateApiKeyHeader,
   })
   const render = ({ clientIp }) => send({ path: '/api/resume-document', clientIp })
+  const warmUp = ({ clientIp }) => send({ path: '/api/resume-document-warm-up', clientIp })
   const repeat = async ({ count, sendOne }) => {
     for (let index = 0; index < count; index += 1) await sendOne()
   }
@@ -290,6 +319,7 @@ function createSystemUnderTest({ originStatus = 200 } = {}) {
     },
     givenModelRequestsSent: ({ clientIp, count }) => repeat({ count, sendOne: () => modelRequest({ clientIp }) }),
     givenRendersRequested: ({ clientIp, count }) => repeat({ count, sendOne: () => render({ clientIp }) }),
+    givenRendererWarmedUp: ({ clientIp, count }) => repeat({ count, sendOne: () => warmUp({ clientIp }) }),
 
     startTailoredResume: ({ clientIp, cookie, candidateApiKeyHeader }) => recordAction(() => preparation({
       clientIp, cookie, candidateApiKeyHeader,
@@ -298,6 +328,7 @@ function createSystemUnderTest({ originStatus = 200 } = {}) {
       clientIp, candidateApiKeyHeader,
     })),
     requestRender: ({ clientIp }) => recordAction(() => render({ clientIp })),
+    warmUpRenderer: ({ clientIp }) => recordAction(() => warmUp({ clientIp })),
     sendWithCandidateApiKeyHeader: ({ clientIp, path, candidateApiKeyHeader }) => recordAction(() => send({
       path, clientIp, method: path.startsWith('/api/') ? 'POST' : 'GET', candidateApiKeyHeader,
     })),
