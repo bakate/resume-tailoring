@@ -2,11 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import { preparationProgressPhases } from '@resume-tailoring/application/candidate-journey'
 import type { PreparationProgress } from '@resume-tailoring/application/candidate-journey'
+import { locales } from '../localization/localization'
 import type { Locale } from '../localization/localization'
 import { renderLocalizedMarkup } from './localized-markup'
 import { PreparationPhaseStatus } from './preparation-phase-status'
-
-const locales = ['en', 'fr'] as const satisfies readonly Locale[]
 
 describe('Preparation phase status', () => {
   it.each(locales)('names every preparation phase with its own label in %s', (locale) => {

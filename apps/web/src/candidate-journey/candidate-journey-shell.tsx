@@ -26,7 +26,7 @@ import {
   useLocalization,
 } from '../localization/localization'
 import type { Localization } from '../localization/localization'
-import type { CandidateJourneyView, ValidatedResult } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateJourneyView, PreparationProgressPhase, ValidatedResult } from '@resume-tailoring/application/candidate-journey'
 import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
 import { candidateJourneyPhases } from './candidate-journey-phases'
 import type { CandidateJourneyPhase } from './candidate-journey-phases'
@@ -133,11 +133,14 @@ type CandidateJourneyProps = LocalizationProps & Readonly<{ candidateJourney: Ca
  */
 function readActivePhase({ view }: CandidateJourneyController): CandidateJourneyPhase | null {
   if (view.status !== 'candidate-session-open') return null
-  const phase = view.preparationProgress?.phase
-  if (phase === 'source-intake') return 'source-intake'
-  if (phase === 'job-posting-extraction' || phase === 'match-evidence') return 'job-match'
-  return phase !== undefined || view.operation === 'preparing-tailored-resume' ? 'tailored-resume-preparation' : view.session.phase
+  return view.preparationProgress === null ? view.session.phase : journeyPhaseOfPreparation[view.preparationProgress.phase]
 }
+
+const journeyPhaseOfPreparation = {
+  'source-intake': 'source-intake', 'job-posting-extraction': 'job-match', 'match-evidence': 'job-match',
+  'resume-sections': 'tailored-resume-preparation', coherence: 'tailored-resume-preparation',
+  'overflow-reduction': 'tailored-resume-preparation',
+} as const satisfies Record<PreparationProgressPhase, CandidateJourneyPhase>
 
 /** Preparing and rendering the Tailored Resume are shown on `/resume`, not on the intake. */
 export function isResultOperation({ view }: CandidateJourneyController) {

@@ -5,6 +5,7 @@ import { localeStorageKey, readBrowserLocale } from './locale-resolution'
 import type { Locale } from './locale-resolution'
 
 export type { Locale }
+export { locales } from './locale-resolution'
 
 const englishCatalog = {
   'candidateJourney.operation.renderingResumeDocument': 'Preparing the PDF preview',

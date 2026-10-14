@@ -169,8 +169,8 @@ class PreparationProgressSystem {
 
   expectPhasesExposedInOrder(phases: readonly ProgressPhase[]) {
     this.#expectAction('preparation')
-    const exposed = this.#observed.map(({ phase }) => phase)
-      .filter((phase, index, all) => index === 0 || all[index - 1] !== phase)
+    // Each phase once, however many sections it reported.
+    const exposed = this.#observed.flatMap(({ phase }, index, all) => all[index - 1]?.phase === phase ? [] : [phase])
     expect(exposed).toEqual(phases)
   }
 

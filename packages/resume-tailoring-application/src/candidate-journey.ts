@@ -14,7 +14,7 @@ import { completeOverflowReduction, completePreparationStep, enterOverflowReduct
   timeFirstDownloadablePdf } from './preparation-timing'
 import type { PreparationTiming } from './preparation-timing'
 import { readPreparationProgress } from './preparation-progress'
-import type { PreparationProgress } from './preparation-progress'
+import type { PreparationProgress, PreparationProgressStep } from './preparation-progress'
 export { preparationProgressPhases } from './preparation-progress'
 export type { PreparationProgress, PreparationProgressPhase } from './preparation-progress'
 import { prepareCombinedIntake, publishResumePreparation, unavailable } from './combined-intake'
@@ -119,8 +119,8 @@ type CandidateJourneyContext = Readonly<{
   dependencies: CandidateJourneyDependencies
   preparationOutcome: CombinedIntakeOutcome | null
   preparationPhase: PreparationPhase | null
-  /** The step the resume preparation reported last; null until it reports one. */
-  preparationStep: ResumePreparationStep | null
+  /** Where the running preparation is; each of its states starts at its first step. */
+  preparationStep: PreparationProgressStep
   /**
    * The Resume Sections the running preparation reported last, kept in memory while it lays out the pages: the
    * published session no longer keeps them.
@@ -616,7 +616,7 @@ const candidateJourneyMachine = setup({
     resumeRendering: null, resumeRenderSequence: 0,
     preparationOutcome: null,
     preparationPhase: null,
-    preparationStep: null,
+    preparationStep: 'extracting-source',
     preparationSections: [],
     awaitingPreparedPdf: false,
     preparedInputs: null,
@@ -737,7 +737,7 @@ const candidateJourneyMachine = setup({
       },
     },
     generatingApplicationResume: {
-      entry: assign({ resumeRendering: null, preparationOutcome: null, preparationPhase: null, preparationStep: null, preparationSections: [], awaitingPreparedPdf: false, preparedInputs: null, resumeReview: emptyResumeReview,
+      entry: assign({ resumeRendering: null, preparationOutcome: null, preparationPhase: null, preparationStep: 'extracting-source', preparationSections: [], awaitingPreparedPdf: false, preparedInputs: null, resumeReview: emptyResumeReview,
         preparationTiming: ({ context }) => startPreparationTiming(context.dependencies),
         session: ({ context }) => context.session === null ? null
           : invalidateEditingRevision(context.session, context.dependencies.createIdentifier),
@@ -746,7 +746,7 @@ const candidateJourneyMachine = setup({
       on: { INVALIDATE_RESUME_INPUTS: { target: 'candidateSessionAvailable', actions: assign({
         session: ({ context }) => invalidateResumeInputs(context), preparationPhase: null, preparationTiming: null, preparationOutcome: null, preparedInputs: null, resumeReview: emptyResumeReview,
       }) }, PREPARATION_PROGRESS: { actions: [({ context, event }) => { recordJourneyPhase({ context, phase: event.phase }) },
-        assign({ preparationPhase: ({ event }) => event.phase, session: ({ event }) => event.session,
+        assign({ preparationPhase: ({ event }) => event.phase, preparationStep: ({ event }) => event.phase, session: ({ event }) => event.session,
           preparationTiming: ({ context, event }) => enterPreparationStep({ ...readTiming({ context, at: event.at }),
             step: event.phase }) })] },
         DELETE_CANDIDATE_SESSION: { target: 'removingCandidateSession', actions: [recordSessionDeletion, assign({ notice: 'deleted' })] },
@@ -780,7 +780,7 @@ const candidateJourneyMachine = setup({
         },
         preparingResume: {
           entry: [({ context }) => { recordJourneyPhase({ context, phase: 'tailored-resume-preparation' }) },
-            assign({ preparationPhase: null, preparationStep: null })],
+            assign({ preparationPhase: null, preparationStep: 'writing-sections' })],
           on: { RESUME_SECTIONS_PROGRESSED: { actions: assign(({ context, event }) => ({ preparationSections: event.sections,
             ...saveResumeSectionsProgress({ context, sections: event.sections }) })) },
           RESUME_PREPARATION_STEP: { actions: assign({ preparationStep: ({ event }) => event.step, preparationTiming: ({ context, event }) =>
@@ -800,6 +800,7 @@ const candidateJourneyMachine = setup({
           },
         },
         fittingPageBudget: {
+          entry: assign({ preparationStep: 'fitting-page-budget' }),
           invoke: {
             src: 'fitPageBudget',
             input: ({ context }) => ({ dependencies: context.dependencies,
@@ -1174,21 +1175,11 @@ function isPrepared({ preparationOutcome }: CandidateJourneyContext) {
  * planning belongs to writing the sections, and the pages are laid out until the preview renders their first PDF.
  */
 function readPreparationProgressView({ snapshot }: Readonly<{ snapshot: CandidateJourneySnapshot }>): PreparationProgress | null {
-  const { awaitingPreparedPdf, preparationPhase, preparationStep, preparationSections: sections } = snapshot.context
+  const { awaitingPreparedPdf, preparationStep: step, preparationSections: sections } = snapshot.context
+  if (snapshot.matches('generatingApplicationResume')) return readPreparationProgress({ step, sections })
   // The laid-out resume is in the preview, rendering: its sections no longer stand in for it.
-  if (awaitingPreparedPdf && snapshot.matches({ candidateSessionAvailable: 'rendering' })) {
-    return readPreparationProgress({ step: 'fitting-page-budget', sections: [] })
-  }
-  if (snapshot.matches({ generatingApplicationResume: 'preparingInputs' })) {
-    return readPreparationProgress({ step: preparationPhase ?? 'extracting-source', sections })
-  }
-  if (snapshot.matches({ generatingApplicationResume: 'preparingResume' })) {
-    return readPreparationProgress({ step: preparationStep ?? 'writing-sections', sections })
-  }
-  if (snapshot.matches({ generatingApplicationResume: 'fittingPageBudget' })) {
-    return readPreparationProgress({ step: 'fitting-page-budget', sections })
-  }
-  return null
+  return awaitingPreparedPdf && snapshot.matches({ candidateSessionAvailable: 'rendering' })
+    ? readPreparationProgress({ step: 'fitting-page-budget', sections: [] }) : null
 }
 
 function readValidatedResult({ session }: Readonly<{ session: CandidateSession }>): ValidatedResult | null {

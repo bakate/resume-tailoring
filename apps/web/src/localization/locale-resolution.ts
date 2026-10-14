@@ -1,4 +1,10 @@
-export type Locale = 'en' | 'fr'
+import { z } from 'zod'
+
+/** Every interface language, the one source the locale type, its parsing and the tests read. */
+export const locales = ['en', 'fr'] as const
+export type Locale = typeof locales[number]
+
+const localeSchema = z.enum(locales)
 
 export const defaultLocale: Locale = 'en'
 export const localeStorageKey = 'honest-resume-locale'
@@ -13,7 +19,8 @@ const unstatedLanguageLocale: Locale = 'fr'
 const localePendingAttribute = 'data-locale-pending'
 
 export function parseLocale({ value }: Readonly<{ value: string | null | undefined }>): Locale | null {
-  return value === 'en' || value === 'fr' ? value : null
+  const parsed = localeSchema.safeParse(value)
+  return parsed.success ? parsed.data : null
 }
 
 /** The first supported language in order of preference, or English when none is supported. */

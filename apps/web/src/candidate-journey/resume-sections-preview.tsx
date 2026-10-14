@@ -24,13 +24,13 @@ type SectionNaming = Pick<ResumePreparation, 'sourceIntake'>
 export function ResumeSectionsPreview({ candidateJourney, localization }: ResumeSectionsPreviewProps) {
   const { view } = candidateJourney
   if (view.status !== 'candidate-session-open') return null
-  const preparation = view.session.preparation
-  const resumeLocale = preparation === undefined ? 'en' : readResumeLocale({ preparation, session: view.session })
-  const progressing = view.preparationProgress?.sections ?? []
-  if (progressing.length > 0) return <ResumeSectionsPanel {...{ localization, resumeLocale }} naming={preparation ?? { sourceIntake: null }}
-    sections={progressing} state="preparing" />
-  if (preparation === undefined || !shouldRevealKeptSections(preparation)) return null
-  return <ResumeSectionsPanel {...{ localization, resumeLocale }} naming={preparation} sections={preparation.sections ?? []} state="kept" />
+  const { preparationProgress, session, session: { preparation } } = view
+  if (preparation === undefined) return null
+  const panel = { localization, naming: preparation, resumeLocale: readResumeLocale({ preparation, session }) }
+  if (preparationProgress !== null) return preparationProgress.sections.length === 0 ? null
+    : <ResumeSectionsPanel {...panel} sections={preparationProgress.sections} state="preparing" />
+  const kept = readKeptSections(preparation)
+  return kept.length === 0 ? null : <ResumeSectionsPanel {...panel} sections={kept} state="kept" />
 }
 
 /**
@@ -65,8 +65,8 @@ export function ResumeSectionsPanel({ localization, naming, resumeLocale, sectio
 export function FailedSectionsSummary({ candidateJourney, localization }: ResumeSectionsPreviewProps) {
   const { view } = candidateJourney
   const preparation = view.status === 'candidate-session-open' ? view.session.preparation : undefined
-  if (preparation === undefined || !shouldRevealKeptSections(preparation)) return null
-  const failed = (preparation.sections ?? []).filter(({ status }) => status === 'failed')
+  if (preparation === undefined) return null
+  const failed = readKeptSections(preparation).filter(({ status }) => status === 'failed')
   if (failed.length === 0) return null
   return <Stack gap={4}>
     <Text size="sm">{localization.translate('resumeSections.failedSummary')}</Text>
@@ -99,8 +99,9 @@ function readSectionName({ localization, naming, section }: Readonly<{
 }
 
 // After a failure or an interruption only validated text is worth keeping on screen.
-function shouldRevealKeptSections({ sections = [], status }: ResumePreparation) {
-  return (status === 'failed' || status === 'interrupted') && sections.some((section) => section.status === 'validated')
+function readKeptSections({ sections = [], status }: ResumePreparation) {
+  const kept = (status === 'failed' || status === 'interrupted') && sections.some((section) => section.status === 'validated')
+  return kept ? sections : []
 }
 
 type ResumeSectionGroup = readonly [ResumeSectionSnapshot, ...ResumeSectionSnapshot[]]
