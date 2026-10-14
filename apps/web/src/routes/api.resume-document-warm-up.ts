@@ -1,8 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
-import { failureResponse } from '../api-failure'
+import { failureResponse, privateHeaders } from '../api-failure'
+import type { ApiFailureType } from '../api-failure'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { warmUpResumeDocumentRenderer } from '../adapters/server/resume-document-renderer'
+import type { RenderWarmUp } from '../adapters/server/resume-document-renderer'
 
 /**
  * Launches the rendering browser while Resume Sections are written, so the first render starts at layout. It reads no
@@ -18,9 +20,11 @@ async function warmUpResponse({ request }: Readonly<{ request: Request }>) {
   const denied = createDemoAccessGuardResponse({ request })
   if (denied !== null) return denied
   const warmUp = await warmUpResumeDocumentRenderer()
-  if (warmUp === 'timeout') return failureResponse({ type: 'timeout' })
-  if (warmUp === 'unavailable') return failureResponse({ type: 'provider-unavailable' })
-  return new Response(null, { status: 204, headers: privateHeaders })
+  return warmUp === 'ready' ? new Response(null, { status: 204, headers: privateHeaders })
+    : failureResponse({ type: failureTypeByWarmUp[warmUp] })
 }
 
-const privateHeaders = { 'Cache-Control': 'no-store, max-age=0', Pragma: 'no-cache' } as const
+const failureTypeByWarmUp = {
+  timeout: 'timeout',
+  unavailable: 'provider-unavailable',
+} as const satisfies Record<Exclude<RenderWarmUp, 'ready'>, ApiFailureType>

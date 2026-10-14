@@ -41,12 +41,14 @@ when the object deletes everything it holds.
 | Global ceiling | 61 | all clients | the same request |
 | Technical ceiling | 530 | client network | every model-backed API route |
 | PDF renders | 200 | client network | `POST /api/resume-document` |
+| Rendering browser warm-ups | 40 | client network | `POST /api/resume-document-warm-up` |
 
 Over the Daily Quota, the global ceiling or the technical ceiling, the Worker answers `429` with the
 `daily-quota-reached` API Failure, `retryAfterSeconds` until the reset, and `x-resume-quota-scope`
 (`daily-quota`, `overall` or `model-requests`), so the Candidate comes back after the reset. Over
-the PDF render limit, it answers the `rate-limited` API Failure instead. Neither reaches the Lambda. A rendering
-browser warm-up (`POST /api/resume-document-warm-up`) renders nothing and counts against no limit. A request the application refuses before any model
+the PDF render limit or the warm-up limit, it answers the `rate-limited` API Failure instead. Neither reaches the
+Lambda. A warm-up renders nothing, so it never uses the render limit; its own limit stops a loop from holding Lambdas
+while Chromium launches. A request the application refuses before any model
 call (`400`, `401`, `403` or `413`), such as a demo access renewal, gives back what it counted. A
 provider failure keeps it counted, so a loop of failing model calls still reaches the technical
 ceiling. Responses to a Job Posting extraction carry `x-resume-quota-remaining` (Tailored Resumes

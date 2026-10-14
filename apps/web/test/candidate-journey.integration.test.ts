@@ -3,6 +3,7 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { expect, test } from './content-security-policy'
 import type { Page, Request } from '@playwright/test'
 import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
+import { resumeDocumentWarmUpPath as rendererWarmUpPath } from '../src/adapters/browser/browser-resume-document-renderer'
 import { routeResumeSectionModels, writeFixtureSection } from './resume-section-model-routes'
 
 test.describe('Candidate Journey integration qualification', () => {
@@ -994,7 +995,7 @@ class CandidateJourneyIntegrationSystem {
   expectOneContentFreeRendererWarmUpPerPreparation() {
     this.#expectAction()
     const steps = this.#modelRequests.filter((path) => [matchEvidencePath, rendererWarmUpPath, sectionWritingPath].includes(path))
-    expect(steps.filter((path, position) => path !== steps[position - 1])).toEqual([matchEvidencePath, rendererWarmUpPath,
+    expect(dedupeConsecutive(steps)).toEqual([matchEvidencePath, rendererWarmUpPath,
       sectionWritingPath, matchEvidencePath, rendererWarmUpPath, sectionWritingPath])
     expect(this.#rendererWarmUpBodies).toEqual([null, null])
   }
@@ -1314,7 +1315,6 @@ const correctedSummary = 'Built accessible billing screens with React.'
 const candidateContent = ['Northwind', 'Contoso', 'billing', 'Alex', 'Morgan', 'example.com', 'Frontend', 'Accessibility'] as const
 const candidateApiKeyLeftByAnEarlierVersion = 'sk-proj-LeftBehind0123456789abcdef'
 const matchEvidencePath = '/api/explainable-match-evidence'
-const rendererWarmUpPath = '/api/resume-document-warm-up'
 const sectionWritingPath = '/api/resume-section-writing'
 const reactMatch = { factId: 'source-fact-skills-0-name-0', factExcerpt: 'React', requirementExcerpt: 'React' } as const
 
@@ -1334,4 +1334,12 @@ function condense(text: string) { return `${text.split(' ').slice(0, 5).join(' '
 function denseAchievementFields() {
   return denseAchievements.slice(0, 2).map((text, index) => ({ id: `dense-achievement-${String(index)}`, text,
     factIds: [`source-fact-experiences-0-achievements-${String(index)}` as const] }))
+}
+
+/**
+ * The values in order, without the repetitions of the value just before. The application's own helper sits beside
+ * vitest, which cannot load inside Playwright.
+ */
+function dedupeConsecutive<TValue>(values: readonly TValue[]): TValue[] {
+  return values.filter((value, position) => position === 0 || value !== values[position - 1])
 }

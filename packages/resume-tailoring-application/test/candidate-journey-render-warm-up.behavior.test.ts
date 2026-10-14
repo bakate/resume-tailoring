@@ -3,7 +3,7 @@ import { createCandidateJourney } from '@resume-tailoring/application/candidate-
 import type { CandidateJourney, ResumeCoherenceInput } from '@resume-tailoring/application/candidate-journey'
 import { readGroupedResumeSection, structuredResumeJobMatch } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createFakeCandidateJourneyDependencies, createFakeMatchEvidenceMatcher, createFakeResumeDocumentRenderer,
-  createFakeResumeSectionModels } from '@resume-tailoring/application/testing'
+  createFakeResumeSectionModels, dedupeConsecutive } from '@resume-tailoring/application/testing'
 
 describe('Candidate Journey renderer warm-up', () => {
   it('warms the renderer up when Resume Section writing starts, before the first section is written', async () => {
@@ -109,9 +109,8 @@ class RendererWarmUpSystem {
       && this.#readOpenView().preparationOutcome?.status === 'prepared').toBe(true)
   }
 
-  /** Each step in order, ignoring repetitions of the step before it. */
   expectStepsInOrder(steps: readonly Step[]) {
-    expect(this.#steps.filter((step, position) => step !== this.#steps[position - 1])).toEqual(steps)
+    expect(dedupeConsecutive(this.#steps)).toEqual(steps)
   }
 
   expectWarmUpsWithoutArguments() {

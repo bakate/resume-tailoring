@@ -22,6 +22,11 @@ export const dailyLimits = {
   modelRequestsPerClient: 530,
   /** PDF renders per client network: one per saved edit. */
   rendersPerClient: 200,
+  /**
+   * Rendering browser warm-ups per client network: one per preparation, and each can hold a Lambda until Chromium
+   * runs. Five per Tailored Resume of the Daily Quota leaves room for retries and language changes.
+   */
+  rendererWarmUpsPerClient: 40,
 }
 
 /** The Job Posting extraction starts a Tailored Resume, so it uses one unit of the Daily Quota. */
@@ -36,13 +41,15 @@ const modelBackedPaths = new Set([
   '/api/resume-section-validation',
   '/api/resume-document-coherence',
 ])
-/** Only a render counts: the rendering browser warm-up (`/api/resume-document-warm-up`) renders nothing. */
 const renderPath = '/api/resume-document'
+/** A warm-up renders nothing, so it has its own limit and never uses the render limit. */
+const rendererWarmUpPath = '/api/resume-document-warm-up'
 
 /** The counters a request consumes, or none when its route is not limited. */
 export function readLimitedCounters({ method, pathname }) {
   if (method !== 'POST') return []
   if (pathname === renderPath) return ['renders']
+  if (pathname === rendererWarmUpPath) return ['renderer-warm-ups']
   if (pathname === preparationPath) return ['model-requests', 'preparations']
   if (modelBackedPaths.has(pathname)) return ['model-requests']
   return []
@@ -52,6 +59,7 @@ const clientLimits = {
   preparations: dailyLimits.dailyQuota,
   'model-requests': dailyLimits.modelRequestsPerClient,
   renders: dailyLimits.rendersPerClient,
+  'renderer-warm-ups': dailyLimits.rendererWarmUpsPerClient,
 }
 const dayKey = 'day'
 

@@ -16,6 +16,7 @@ import { renderTailoredResumeDocument } from '../../candidate-journey/tailored-r
 type RenderStage = 'launch' | 'layout' | 'photo' | 'print' | 'fonts' | 'pdf-reading' | 'page-size' | 'reading-order'
 type RenderProgress = { stage: RenderStage }
 type FailureDimensions = Readonly<{ stage: RenderStage; errorName?: string }>
+type RenderMetric = 'unavailable' | 'warm-up-unavailable' | 'browser-launch-milliseconds'
 
 /** Whether the browser is ready for the next render; a warm-up is never a render and carries no Candidate content. */
 export type RenderWarmUp = 'ready' | 'timeout' | 'unavailable'
@@ -241,7 +242,7 @@ function isLaunchTimeout(error: unknown) {
 }
 
 function logRenderMetric({ metric, value = 1, dimensions }: Readonly<{
-  metric: string; value?: number; dimensions?: FailureDimensions
+  metric: RenderMetric; value?: number; dimensions?: FailureDimensions
 }>) {
   console.info(JSON.stringify({ category: 'privacy-safe-resume-render', metric, value,
     ...(dimensions === undefined ? {} : { dimensions }) }))

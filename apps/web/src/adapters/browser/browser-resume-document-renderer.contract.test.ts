@@ -5,7 +5,7 @@ import { groupedResumeDocument, resumeContractRevision } from '@resume-tailoring
 import { describe, expect, it, vi } from 'vitest'
 
 import { failureResponse } from '../../api-failure'
-import { createBrowserResumeDocumentRenderer } from './browser-resume-document-renderer'
+import { createBrowserResumeDocumentRenderer, resumeDocumentWarmUpPath } from './browser-resume-document-renderer'
 
 describe('browser resume document renderer', () => {
   const transientFailures = [
@@ -54,7 +54,7 @@ describe('browser resume document renderer', () => {
 
     await vi.waitFor(() => { expect(requests()).toHaveLength(1) })
     const [path, init] = requests()[0] ?? expect.fail('Expected a warm-up request')
-    expect(path).toBe('/api/resume-document-warm-up')
+    expect(path).toBe(resumeDocumentWarmUpPath)
     expect(init).toMatchObject({ method: 'POST' })
     expect(init?.body).toBeUndefined()
   })

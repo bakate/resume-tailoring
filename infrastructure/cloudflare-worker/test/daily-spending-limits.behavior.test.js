@@ -161,6 +161,15 @@ describe('Daily spending limits at the edge', () => {
     await system.expectServedByOrigin()
   })
 
+  it('stops rendering browser warm-ups from one IP at their own limit', async () => {
+    const system = createSystemUnderTest()
+    await system.givenRendererWarmedUp({ clientIp: '198.51.100.1', count: dailyLimits.rendererWarmUpsPerClient })
+
+    await system.warmUpRenderer({ clientIp: '198.51.100.1' })
+
+    await system.expectRateLimitedUntilReset({ retryAfterSeconds: secondsUntilMidnight })
+  })
+
   it('counts no rendering browser warm-up against the render limit', async () => {
     const system = createSystemUnderTest()
     await system.givenRendererWarmedUp({ clientIp: '198.51.100.1', count: 8 })

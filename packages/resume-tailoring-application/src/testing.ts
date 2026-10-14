@@ -105,6 +105,11 @@ export function createFakeResumeSectionModels(overrides: Partial<ResumeSectionMo
   }
 }
 
+/** The values in order, without the repetitions of the value just before, so a test can read a sequence of steps. */
+export function dedupeConsecutive<TValue>(values: readonly TValue[]): TValue[] {
+  return values.filter((value, position) => position === 0 || value !== values[position - 1])
+}
+
 /** Lays out every draft on one page; export eligibility follows the draft's own content. */
 export function createFakeResumeDocumentRenderer(overrides: Partial<ResumeDocumentRenderer> = {}): ResumeDocumentRenderer {
   return {

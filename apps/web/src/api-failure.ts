@@ -57,7 +57,8 @@ export function failureResponse({ type, retryAfterSeconds, usage }: ApiFailure &
   }, { headers, status: apiFailureStatuses[type] })
 }
 
-const privateHeaders = {
+/** Headers that keep an API response out of every cache. */
+export const privateHeaders = {
   'Cache-Control': 'no-store, max-age=0',
   Pragma: 'no-cache',
 } as const

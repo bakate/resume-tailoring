@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { createCsrfMiddleware } from '@tanstack/react-start'
-import { failureResponse } from '../api-failure'
+import { failureResponse, privateHeaders } from '../api-failure'
 import { apiRequestBodyLimits, readJsonRequestBody } from '../api-request-body'
 import { createDemoAccessGuardResponse } from '../demo-access/demo-access-authorization'
 import { renderResumeDocument } from '../adapters/server/resume-document-renderer'
@@ -31,4 +31,3 @@ async function readRenderRequest({ request }: Readonly<{ request: Request }>) {
   return parsed.success ? { ok: true, value: parsed.data } as const : { ok: false, type: 'invalid-input' } as const
 }
 
-const privateHeaders = { 'Cache-Control': 'no-store, max-age=0', Pragma: 'no-cache' } as const

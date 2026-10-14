@@ -10,6 +10,8 @@ type RenderAttempt = Readonly<{ ok: true; result: ResumeRenderResult }>
   | Readonly<{ ok: false; category: RenderFailureCategory; apiFailure: ReadApiFailure }>
 type RendererDependencies = Readonly<{ request: typeof fetch; telemetry: PrivacySafeTelemetry; timeoutMilliseconds: number }>
 
+export const resumeDocumentWarmUpPath = '/api/resume-document-warm-up'
+
 const transientCategories: ReadonlySet<RenderFailureCategory> = new Set(['timeout', 'server', 'network'])
 /**
  * A render on a cold Lambda launches Chromium first, which takes about 25 s with the render; the warm-up launches it
@@ -34,7 +36,7 @@ export function createBrowserResumeDocumentRenderer({ request = fetch, telemetry
 function warmUpServerRenderer({ request, timeoutMilliseconds }: Readonly<{
   request: typeof fetch; timeoutMilliseconds: number
 }>) {
-  void request('/api/resume-document-warm-up', { method: 'POST', cache: 'no-store',
+  void request(resumeDocumentWarmUpPath, { method: 'POST', cache: 'no-store',
     signal: AbortSignal.timeout(timeoutMilliseconds) }).catch(() => undefined)
 }
 
