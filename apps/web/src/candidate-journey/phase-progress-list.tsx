@@ -1,5 +1,5 @@
 import { Group, SimpleGrid, Text } from '@mantine/core'
-import { IconCircleCheck, IconCircleDashed, IconLoader2 } from '@tabler/icons-react'
+import { IconCircleCheck, IconCircleDashed, IconCircleDot } from '@tabler/icons-react'
 
 import type { CandidateJourneyPhase } from '@resume-tailoring/application/candidate-journey'
 import type { Localization } from '../localization/localization'
@@ -9,13 +9,14 @@ import './phase-progress-list.css'
 
 const stateIcons = {
   done: IconCircleCheck,
-  current: IconLoader2,
+  current: IconCircleDot,
   upcoming: IconCircleDashed,
 } as const satisfies Record<PhaseProgressState, unknown>
 
 /**
  * The three Candidate Journey phases of a preparation, each with an icon for its state. The icon is decoration: the
- * state is also spoken, and the current phase is marked as the current step for assistive tech.
+ * state is also spoken, and the current phase is marked as the current step for assistive tech. The current phase
+ * holds still: the step under way, shown below, carries the only spinner of the panel.
  */
 export function PhaseProgressList({ activePhase, localization }: Readonly<{
   activePhase: CandidateJourneyPhase; localization: Localization

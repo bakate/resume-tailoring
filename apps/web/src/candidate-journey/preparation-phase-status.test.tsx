@@ -5,6 +5,7 @@ import type { PreparationProgress } from '@resume-tailoring/application/candidat
 import { locales } from '../localization/localization'
 import type { Locale } from '../localization/localization'
 import { renderLocalizedMarkup } from './localized-markup'
+import { readPreparationCompletion } from './phase-progress'
 import { PreparationPhaseStatus } from './preparation-phase-status'
 
 describe('Preparation phase status', () => {
@@ -51,6 +52,19 @@ describe('Preparation phase status', () => {
     const markup = renderStatus({ locale: 'en', progress })
 
     expect(markup).toContain('preparation-phase-status-count')
+  })
+
+  it.each([
+    ['en', 'Preparation progress'],
+    ['fr', 'Avancement de la préparation'],
+  ] as const)('shows how much of the preparation is done as a named progress bar in %s', (locale, label) => {
+    const progress = { phase: 'resume-sections', sections: [], sectionCount: { written: 4, total: 8 } } as const
+
+    const markup = renderStatus({ locale, progress })
+
+    expect(markup).toContain('role="progressbar"')
+    expect(markup).toContain(`aria-label="${label}"`)
+    expect(markup).toContain(`aria-valuenow="${String(readPreparationCompletion(progress))}"`)
   })
 
   it('leaves announcing the phase to the polite status region', () => {
