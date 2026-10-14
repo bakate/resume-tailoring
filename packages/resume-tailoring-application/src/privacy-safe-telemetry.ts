@@ -24,9 +24,18 @@ export const resumePreparationOutcomes = ['prepared', 'failed'] as const
 export const resumeRenderFailureCategories = [
   'timeout', 'server', 'network', 'access', 'schema', 'revision-mismatch', 'render',
 ] as const
+/**
+ * The timed phases of one preparation, in the order they run, then the wait from its start to the first PDF the
+ * Candidate can download. Resume Sections and coherence repeat when coherence sends sections back for rewriting.
+ */
+export const timedPreparationPhases = [
+  'intake', 'job-posting-extraction', 'match-evidence', 'resume-sections', 'coherence', 'overflow-reduction',
+  'first-downloadable-pdf',
+] as const
 /** Where an uncaught error surfaced; its message and stack are never reported, as they can quote Candidate content. */
 export const uncaughtErrorSources = ['render', 'error', 'unhandled-rejection'] as const
 
+export type TimedPreparationPhase = typeof timedPreparationPhases[number]
 export type MatchScoreBand = typeof matchScoreBands[number]
 export type UncaughtErrorSource = typeof uncaughtErrorSources[number]
 
@@ -72,6 +81,24 @@ export type PrivacySafeTelemetryEvent =
       name: 'resume-render-failed'
       category: typeof resumeRenderFailureCategories[number]
       retried: boolean
+    }>
+  /**
+   * One completed phase of one preparation. The preparation identifier is random, generated when the preparation starts
+   * and carried only by its own timings, so it links them to nothing else: not the Candidate, the session or the content.
+   */
+  | Readonly<{
+      name: 'preparation-phase-timed'
+      preparationId: string
+      phase: Exclude<TimedPreparationPhase, 'overflow-reduction'>
+      durationMilliseconds: number
+    }>
+  | Readonly<{
+      name: 'preparation-phase-timed'
+      preparationId: string
+      phase: 'overflow-reduction'
+      durationMilliseconds: number
+      /** How many times Overflow Reduction rendered the resume to measure it. */
+      renderCount: number
     }>
   | Readonly<{
       name: 'uncaught-error-reported'

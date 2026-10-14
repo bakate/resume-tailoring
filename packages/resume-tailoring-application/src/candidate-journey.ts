@@ -9,6 +9,9 @@ export type { ResumeCoherenceInput, ResumeCoherenceIssue, ResumeCoherenceIssueKi
 export { delayedFailureCauseTypes, failureCauseTypes, readRecovery, retiredFailureCauseTypes } from './failure-cause'
 export type { ExplainedFailure, FailureCause, Recovery } from './failure-cause'
 import { resumePreparationMachine } from './resume-preparation-machines'
+import type { ResumePreparationStep } from './resume-preparation-machines'
+import { completePreparationPhase, enterPreparationPhase, recordFirstDownloadablePdf, startPreparationTiming } from './preparation-timing'
+import type { PreparationTiming } from './preparation-timing'
 import { prepareCombinedIntake, publishResumePreparation, unavailable } from './combined-intake'
 import type { CombinedIntakeOutcome, CombinedIntakeRequest, PreparationPhase, PreparedResumeInputs } from './combined-intake'
 
@@ -101,6 +104,8 @@ type ProfileEnrichmentFailure =
   | 'match-evidence-unavailable'
 
 type CandidateJourneyContext = Readonly<{
+  /** The clock of the latest preparation until its first downloadable PDF; null once that is timed or it failed. */
+  preparationTiming: PreparationTiming | null
   resumeRendering: ResumeRenderingState | null
   resumeRenderSequence: number
   dependencies: CandidateJourneyDependencies
@@ -122,8 +127,9 @@ type ResumeContacts = Pick<TailoredResume, 'identity' | 'contactDetails'>
 type CandidateJourneyEvent =
   | Readonly<{ type: 'RENDER_RESUME_DOCUMENT'; input: ResumeRenderInput }>
   | Readonly<{ type: 'INVALIDATE_RESUME_INPUTS' }>
-  | Readonly<{ type: 'PREPARATION_PROGRESS'; phase: PreparationPhase; session: CandidateSession }>
+  | Readonly<{ type: 'PREPARATION_PROGRESS'; phase: PreparationPhase; session: CandidateSession; at: number }>
   | Readonly<{ type: 'RESUME_SECTIONS_PROGRESSED'; sections: readonly ResumeSectionSnapshot[] }>
+  | Readonly<{ type: 'RESUME_PREPARATION_STEP'; step: ResumePreparationStep; at: number }>
   | Readonly<{ type: 'SAVE_RESUME'; session: CandidateSession; baseRevision: string; correctionKind?: ResumeCorrectionKind }>
   | Readonly<{ type: 'REPORT_RESUME'; review: ResumeReviewState; baseRevision: string }>
   | Readonly<{ type: 'UPDATE_RESUME_CONTACTS'; contacts: ResumeContacts }>
@@ -462,16 +468,23 @@ function hasJobMatchConsent({ input, session }: Readonly<{
   })
 }
 
-/** Overflow Reduction of a just prepared Tailored Resume; null when it hides nothing or cannot measure the resume. */
-const fitPageBudget = fromPromise<CandidateSession | null, Readonly<{
+/**
+ * Overflow Reduction of a just prepared Tailored Resume, with the renders it used; null when it does not run. The
+ * reduced session is null when it hides nothing or cannot measure the resume.
+ */
+const fitPageBudget = fromPromise<Readonly<{ reduced: CandidateSession | null; renderCount: number }> | null, Readonly<{
   dependencies: CandidateJourneyDependencies; session: CandidateSession | null
 }>>(async ({ input: { dependencies, session } }) => {
   // The Page Budget belongs to a Tailored Resume: a Normalized Resume claims no relevance to rank its content by.
   if (session?.tailoredResume?.purpose !== 'tailored' || dependencies.resumeDocumentRenderer === undefined) return null
   const reduction = { resume: session.tailoredResume, editing: readResumeEditing({ session }) }
-  const reduced = await reduceToPageBudget({ reduction, today: dependencies.now(), assessLayout: assessRenderedLayout(dependencies),
+  let renderCount = 0
+  const assessLayout = assessRenderedLayout(dependencies)
+  const reduced = await reduceToPageBudget({ reduction, today: dependencies.now(),
+    assessLayout: (request) => { renderCount += 1; return assessLayout(request) },
     relevantFactIds: session.jobMatch?.analysis.relevantFactIds ?? [], photoDataUrl: session.resumePhoto?.dataUrl })
-  return reduced === reduction ? null : { ...session, tailoredResume: reduced.resume, resumeEditing: reduced.editing }
+  return { renderCount,
+    reduced: reduced === reduction ? null : { ...session, tailoredResume: reduced.resume, resumeEditing: reduced.editing } }
 })
 
 /** Reduction completes the preparation: the prepared revision stays, and the resume is not manually edited. */
@@ -581,6 +594,7 @@ const candidateJourneyMachine = setup({
 }).createMachine({
   context: ({ input }: Readonly<{ input: CandidateJourneyDependencies }>) => ({
     dependencies: input,
+    preparationTiming: null,
     resumeRendering: null, resumeRenderSequence: 0,
     preparationOutcome: null,
     preparationPhase: null,
@@ -605,6 +619,7 @@ const candidateJourneyMachine = setup({
             src: 'renderResumeDocument',
             input: ({ context }) => ({ dependencies: context.dependencies, request: context.resumeRendering?.request ?? null }),
             onDone: { target: 'idle', actions: assign({
+              preparationTiming: ({ context, event }) => timeFirstDownloadablePdf({ context, result: event.output }),
               resumeReview: ({ context, event }) => renderedResumeReview({ context, result: event.output }),
               resumeRendering: ({ context, event }) =>
               context.resumeRendering === null ? null : { ...context.resumeRendering,
@@ -633,7 +648,7 @@ const candidateJourneyMachine = setup({
             resumeRenderSequence: ({ context }) => context.resumeRenderSequence + 1,
           }),
         },
-        INVALIDATE_RESUME_INPUTS: { target: '.idle', actions: assign({ resumeRendering: null, session: ({ context }) => invalidateResumeInputs(context), resumeReview: emptyResumeReview }) },
+        INVALIDATE_RESUME_INPUTS: { target: '.idle', actions: assign({ preparationTiming: null, resumeRendering: null, session: ({ context }) => invalidateResumeInputs(context), resumeReview: emptyResumeReview }) },
         SAVE_RESUME: {
           target: '.idle',
           guard: ({ context, event }) => context.session !== null
@@ -702,14 +717,17 @@ const candidateJourneyMachine = setup({
     },
     generatingApplicationResume: {
       entry: assign({ resumeRendering: null, preparationOutcome: null, preparationPhase: null, preparedInputs: null, resumeReview: emptyResumeReview,
+        preparationTiming: ({ context }) => startPreparationTiming(context.dependencies),
         session: ({ context }) => context.session === null ? null
           : invalidateEditingRevision(context.session, context.dependencies.createIdentifier),
       }),
       after: { candidateSessionExpiration: { target: 'removingCandidateSession', actions: [recordSessionExpiration, assign({ notice: 'expired-session-discarded' })] } },
       on: { INVALIDATE_RESUME_INPUTS: { target: 'candidateSessionAvailable', actions: assign({
-        session: ({ context }) => invalidateResumeInputs(context), preparationPhase: null, preparationOutcome: null, preparedInputs: null, resumeReview: emptyResumeReview,
+        session: ({ context }) => invalidateResumeInputs(context), preparationPhase: null, preparationTiming: null, preparationOutcome: null, preparedInputs: null, resumeReview: emptyResumeReview,
       }) }, PREPARATION_PROGRESS: { actions: [({ context, event }) => { recordJourneyPhase({ context, phase: event.phase }) },
-        assign({ preparationPhase: ({ event }) => event.phase, session: ({ event }) => event.session })] },
+        assign({ preparationPhase: ({ event }) => event.phase, session: ({ event }) => event.session,
+          preparationTiming: ({ context, event }) => enterPreparationPhase({ timing: context.preparationTiming,
+            phase: timedIntakePhases[event.phase], clock: readTimingClock({ context, at: event.at }) }) })] },
         DELETE_CANDIDATE_SESSION: { target: 'removingCandidateSession', actions: [recordSessionDeletion, assign({ notice: 'deleted' })] },
       },
       initial: 'preparingInputs',
@@ -719,26 +737,34 @@ const candidateJourneyMachine = setup({
             src: 'generateApplicationResume',
             input: ({ context, event, self }) => ({ dependencies: context.dependencies, session: context.session,
               request: event.type === 'START_TAILORED_RESUME_PREPARATION' ? event : event.type === 'RESOLVE_CRITICAL_AMBIGUITY' ? { correction: event } : {},
-              onProgress: (phase: PreparationPhase, session: CandidateSession) => { self.send({ type: 'PREPARATION_PROGRESS', phase, session }) },
+              onProgress: (phase: PreparationPhase, session: CandidateSession) => {
+                self.send({ type: 'PREPARATION_PROGRESS', phase, session, at: context.dependencies.now() })
+              },
             }),
             onDone: [{
               guard: ({ event }) => event.output.status === 'inputs-prepared',
               target: 'preparingResume',
-              actions: assign(({ event }) => event.output.status === 'inputs-prepared'
-                ? { preparedInputs: event.output, session: event.output.session } : {}),
+              actions: assign(({ context, event }) => event.output.status === 'inputs-prepared'
+                ? { preparedInputs: event.output, session: event.output.session,
+                  preparationTiming: completePreparationPhase({ timing: context.preparationTiming, clock: readTimingClock({ context }) }) }
+                : {}),
             }, { target: '#candidate-journey.candidateSessionAvailable', actions: assign(({ context, event }) => ({
-              preparationPhase: null,
+              preparationPhase: null, preparationTiming: null,
               preparationOutcome: event.output.status === 'inputs-prepared' ? unavailable : event.output,
               session: event.output.session ?? context.session,
             })) }],
-            onError: { target: '#candidate-journey.candidateSessionAvailable', actions: assign({ preparationPhase: null, preparationOutcome: unavailable }) },
+            onError: { target: '#candidate-journey.candidateSessionAvailable',
+              actions: assign({ preparationPhase: null, preparationOutcome: unavailable, preparationTiming: null }) },
           },
         },
         preparingResume: {
           entry: [({ context }) => { recordJourneyPhase({ context, phase: 'tailored-resume-preparation' }) },
             assign({ preparationPhase: null })],
           on: { RESUME_SECTIONS_PROGRESSED: { actions: assign(({ context, event }) =>
-            saveResumeSectionsProgress({ context, sections: event.sections })) } },
+            saveResumeSectionsProgress({ context, sections: event.sections })) },
+          RESUME_PREPARATION_STEP: { actions: assign({ preparationTiming: ({ context, event }) => enterPreparationPhase({
+            timing: context.preparationTiming, phase: event.step === 'writing-sections' ? 'resume-sections' : 'coherence',
+            clock: readTimingClock({ context, at: event.at }) }) }) } },
           invoke: {
             src: 'resumePreparationMachine',
             input: ({ context }) => readResumePreparationInput(context),
@@ -746,10 +772,12 @@ const candidateJourneyMachine = setup({
               const outcome = context.preparedInputs === null ? unavailable : publishResumePreparation({
                 inputs: context.preparedInputs, dependencies: context.dependencies, outcome: event.output })
               return { preparationPhase: null, preparationOutcome: outcome, preparedInputs: null,
-                session: 'session' in outcome ? outcome.session ?? context.session : context.session }
+                session: 'session' in outcome ? outcome.session ?? context.session : context.session,
+                preparationTiming: outcome.status !== 'prepared' ? null : enterPreparationPhase({
+                  timing: context.preparationTiming, phase: 'overflow-reduction', clock: readTimingClock({ context }) }) }
             }) },
             onError: { target: '#candidate-journey.candidateSessionAvailable',
-              actions: assign({ preparationPhase: null, preparationOutcome: unavailable, preparedInputs: null }) },
+              actions: assign({ preparationPhase: null, preparationOutcome: unavailable, preparedInputs: null, preparationTiming: null }) },
           },
         },
         fittingPageBudget: {
@@ -757,9 +785,11 @@ const candidateJourneyMachine = setup({
             src: 'fitPageBudget',
             input: ({ context }) => ({ dependencies: context.dependencies,
               session: context.preparationOutcome?.status === 'prepared' ? context.session : null }),
-            onDone: { target: '#candidate-journey.candidateSessionAvailable', actions: assign(({ context, event }) =>
-              saveReducedResume({ context, reduced: event.output })) },
-            onError: { target: '#candidate-journey.candidateSessionAvailable' },
+            onDone: { target: '#candidate-journey.candidateSessionAvailable', actions: assign(({ context, event }) => ({
+              ...saveReducedResume({ context, reduced: event.output?.reduced ?? null }),
+              preparationTiming: completeOverflowReduction({ context, renderCount: event.output?.renderCount ?? null }) })) },
+            onError: { target: '#candidate-journey.candidateSessionAvailable',
+              actions: assign({ preparationTiming: ({ context }) => completeOverflowReduction({ context, renderCount: null }) }) },
           },
         },
       },
@@ -1293,4 +1323,32 @@ function renderedResumeReview({ context, result }: Readonly<{
     layout: { ...result.assessment.layout, revision: review.draft.revision },
     exportEligibility: { ...result.assessment.exportEligibility, revision: review.draft.revision },
   } }
+}
+
+const timedIntakePhases = {
+  'extracting-source': 'intake', 'extracting-posting': 'job-posting-extraction', matching: 'match-evidence',
+} as const satisfies Record<PreparationPhase, string>
+
+function readTimingClock({ context, at }: Readonly<{ context: CandidateJourneyContext; at?: number }>) {
+  const { dependencies } = context
+  return { now: () => at ?? dependencies.now(), record: (event: PrivacySafeTelemetryEvent) => { recordTelemetry({ dependencies, event }) } }
+}
+
+/** Overflow Reduction is timed only when it ran; the preparation's clock keeps running to its first downloadable PDF. */
+function completeOverflowReduction({ context, renderCount }: Readonly<{
+  context: CandidateJourneyContext; renderCount: number | null
+}>) {
+  const timing = context.preparationTiming
+  if (renderCount === null) return timing === null ? null : { ...timing, phase: null }
+  return completePreparationPhase({ timing, clock: readTimingClock({ context }), renderCount })
+}
+
+/** The preview shows a downloadable PDF once a render of the prepared resume is eligible for export. */
+function timeFirstDownloadablePdf({ context, result }: Readonly<{
+  context: CandidateJourneyContext; result: ResumeRenderResult | null
+}>) {
+  const timing = context.preparationTiming
+  if (timing === null || timing.phase !== null || result?.pdf == null
+    || result.assessment.exportEligibility.status !== 'eligible') return timing
+  return recordFirstDownloadablePdf({ timing, clock: readTimingClock({ context }) })
 }

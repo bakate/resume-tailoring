@@ -102,4 +102,59 @@ describe('privacy-safe analytics observability', () => {
     })
     expect(metric.dimensions).not.toHaveProperty('sessionId')
   })
+
+  it('writes a preparation phase timing with its random identifier, duration and render count', () => {
+    const writeEvent = vi.fn()
+
+    const result = recordPrivacySafeAnalytics({ value: overflowReductionTiming, writeEvent })
+
+    expect(result).toEqual({ ok: true })
+    expect(writeEvent).toHaveBeenCalledWith(overflowReductionTiming)
+  })
+
+  it.each([
+    ['a content field', { ...overflowReductionTiming, jobPostingText: 'Senior Frontend Engineer at Northwind' }],
+    ['content in place of the identifier', { ...overflowReductionTiming, preparationId: 'alex.morgan@example.com' }],
+    ['an Overflow Reduction without its render count', { name: 'preparation-phase-timed',
+      preparationId: overflowReductionTiming.preparationId, phase: 'overflow-reduction', durationMilliseconds: 4_200 }],
+    ['a render count on another phase', { ...overflowReductionTiming, phase: 'coherence' }],
+  ])('rejects a preparation phase timing with %s', (_case, value) => {
+    const writeEvent = vi.fn()
+
+    const result = recordPrivacySafeAnalytics({ value, writeEvent })
+
+    expect(result).toEqual({ ok: false })
+    expect(writeEvent).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['2026-10-12T01:00:00Z', 'peak'],
+    ['2026-10-13T03:59:59Z', 'peak'],
+    ['2026-10-14T04:00:00Z', 'off-peak'],
+    ['2026-10-15T05:59:59Z', 'off-peak'],
+    ['2026-10-16T06:00:00Z', 'peak'],
+    ['2026-10-16T09:59:59Z', 'peak'],
+    ['2026-10-16T10:00:00Z', 'off-peak'],
+    ['2026-10-12T00:59:59Z', 'off-peak'],
+    ['2026-10-17T07:00:00Z', 'off-peak'],
+    ['2026-10-18T02:00:00Z', 'off-peak'],
+  ])('marks a timing recorded at %s as DeepSeek %s', (recordedAt, window) => {
+    const metric = createPrivacySafeAggregateMetric(overflowReductionTiming, { recordedAt: Date.parse(recordedAt) })
+
+    expect(metric).toEqual({
+      category: 'privacy-safe-mvp-analytics',
+      metric: 'preparation-phase-timed',
+      value: 1,
+      dimensions: { preparationId: overflowReductionTiming.preparationId, phase: 'overflow-reduction',
+        durationMilliseconds: 4_200, renderCount: 3, deepSeekWindow: window },
+    })
+  })
 })
+
+const overflowReductionTiming = {
+  name: 'preparation-phase-timed',
+  preparationId: '3f0c9a52-7d1e-4b8a-9c3e-5a6b7c8d9e0f',
+  phase: 'overflow-reduction',
+  durationMilliseconds: 4_200,
+  renderCount: 3,
+} as const

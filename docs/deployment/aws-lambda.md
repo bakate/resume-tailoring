@@ -93,6 +93,40 @@ The PDF renderer was sized against a 100 s Cloudflare proxy limit. Cloudflare do
 been measured on this deployment. Right after switching to DeepSeek (BAK-168), confirm on the deployed Worker that a
 match evidence request answered after 100 s still reaches the browser; otherwise lower its deadline below 100 s.
 
+### Preparation phase timings
+
+Every preparation is timed phase by phase on real traffic (BAK-182). The browser sends one privacy-safe
+`preparation-phase-timed` event per completed phase to `/api/analytics`: intake, Job Posting extraction, Match
+Evidence, Resume Sections, coherence, Overflow Reduction (with the renders it used), then the time from the start of
+the preparation to its first downloadable PDF. Each carries its duration and a random preparation identifier, generated
+when the preparation starts and linked to nothing else. A failed phase is not timed. When coherence sends sections back
+for rewriting, Resume Sections and coherence are timed again. The server adds the DeepSeek pricing window the event
+arrived in (`peak`: 01:00–04:00 and 06:00–10:00 UTC on weekdays, otherwise `off-peak`) and writes it to the function's
+log group, kept seven days.
+
+Run this in CloudWatch Logs Insights on `/aws/lambda/honest-resume-demo`, over the last seven days:
+
+```text
+fields @timestamp
+| filter @message like /"metric":"preparation-phase-timed"/
+| parse @message /"phase":"(?<phase>[^"]+)"/
+| parse @message /"durationMilliseconds":(?<durationMilliseconds>\d+)/
+| parse @message /"renderCount":(?<renderCount>\d+)/
+| parse @message /"deepSeekWindow":"(?<deepSeekWindow>[^"]+)"/
+| stats count(*) as samples, pct(durationMilliseconds, 50) as p50, pct(durationMilliseconds, 95) as p95,
+  pct(renderCount, 50) as renders_p50 by phase, deepSeekWindow
+| sort phase, deepSeekWindow
+```
+
+Durations are in milliseconds. To follow one slow preparation, filter on its `preparationId`.
+
+The baseline the BAK-181 changes are measured against is the first production result of this query, recorded here
+once a week of traffic has been timed:
+
+| Phase | Window | Samples | p50 | p95 |
+| --- | --- | ---: | ---: | ---: |
+| _Pending the first production week after BAK-182 ships._ | | | | |
+
 ## Security headers
 
 The application sets its own `Content-Security-Policy`, `Referrer-Policy`, `X-Content-Type-Options`,
