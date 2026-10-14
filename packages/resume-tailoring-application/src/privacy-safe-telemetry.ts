@@ -29,7 +29,7 @@ export const resumeRenderFailureCategories = [
  * Candidate can download. Resume Sections and coherence repeat when coherence sends sections back for rewriting.
  */
 export const timedPreparationPhases = [
-  'intake', 'job-posting-extraction', 'match-evidence', 'resume-sections', 'coherence', 'overflow-reduction',
+  'source-intake', 'job-posting-extraction', 'match-evidence', 'resume-sections', 'coherence', 'overflow-reduction',
   'first-downloadable-pdf',
 ] as const
 /** Where an uncaught error surfaced; its message and stack are never reported, as they can quote Candidate content. */

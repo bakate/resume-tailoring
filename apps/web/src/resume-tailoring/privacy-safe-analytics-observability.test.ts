@@ -138,8 +138,10 @@ describe('privacy-safe analytics observability', () => {
     ['2026-10-12T00:59:59Z', 'off-peak'],
     ['2026-10-17T07:00:00Z', 'off-peak'],
     ['2026-10-18T02:00:00Z', 'off-peak'],
-  ])('marks a timing recorded at %s as DeepSeek %s', (recordedAt, window) => {
-    const metric = createPrivacySafeAggregateMetric(overflowReductionTiming, { recordedAt: Date.parse(recordedAt) })
+  ])('marks a phase started at %s as DeepSeek %s', (startedAt, window) => {
+    const recordedAt = Date.parse(startedAt) + overflowReductionTiming.durationMilliseconds
+
+    const metric = createPrivacySafeAggregateMetric(overflowReductionTiming, { recordedAt })
 
     expect(metric).toEqual({
       category: 'privacy-safe-mvp-analytics',

@@ -18,17 +18,18 @@ export function writePrivacySafeAnalyticsEvent(event: PrivacySafeAnalyticsEvent)
 }
 
 /**
- * A preparation phase timing also carries the DeepSeek pricing window it was recorded in, read from the server's clock
- * when it arrives, so provider load can be told apart from our own latency.
+ * A preparation phase timing also carries the DeepSeek pricing window its phase started in, so provider load can be
+ * told apart from our own latency. The start is read back from the server's clock: arrival less the duration.
  */
-export function createPrivacySafeAggregateMetric(event: PrivacySafeAnalyticsEvent, { recordedAt = Date.now() } = {}) {
+export function createPrivacySafeAggregateMetric(event: PrivacySafeAnalyticsEvent,
+  { recordedAt = Date.now() }: Readonly<{ recordedAt?: number }> = {}) {
   const { name: metric, ...dimensions } = event
   return {
     category: 'privacy-safe-mvp-analytics',
     metric,
     value: 1,
-    dimensions: metric === 'preparation-phase-timed'
-      ? { ...dimensions, deepSeekWindow: readDeepSeekPricingWindow(recordedAt) } : dimensions,
+    dimensions: event.name === 'preparation-phase-timed'
+      ? { ...dimensions, deepSeekWindow: readDeepSeekPricingWindow(recordedAt - event.durationMilliseconds) } : dimensions,
   } as const
 }
 

@@ -95,14 +95,24 @@ match evidence request answered after 100 s still reaches the browser; otherwise
 
 ### Preparation phase timings
 
-Every preparation is timed phase by phase on real traffic (BAK-182). The browser sends one privacy-safe
-`preparation-phase-timed` event per completed phase to `/api/analytics`: intake, Job Posting extraction, Match
-Evidence, Resume Sections, coherence, Overflow Reduction (with the renders it used), then the time from the start of
-the preparation to its first downloadable PDF. Each carries its duration and a random preparation identifier, generated
-when the preparation starts and linked to nothing else. A failed phase is not timed. When coherence sends sections back
-for rewriting, Resume Sections and coherence are timed again. The server adds the DeepSeek pricing window the event
-arrived in (`peak`: 01:00–04:00 and 06:00–10:00 UTC on weekdays, otherwise `off-peak`) and writes it to the function's
-log group, kept seven days.
+Every preparation is timed phase by phase on real traffic (BAK-182), as its Preparation Timing. The browser sends
+one privacy-safe `preparation-phase-timed` event per completed phase to `/api/analytics`: `source-intake`,
+`job-posting-extraction`, `match-evidence`, `resume-sections`, `coherence`, `overflow-reduction` (with the renders it
+used), then `first-downloadable-pdf`, the time from the start of the preparation to the first render the preview can
+offer for download. Each carries its duration and a random preparation identifier, generated when the preparation
+starts and linked to nothing else. The server adds the DeepSeek pricing window the phase started in (`peak`:
+01:00–04:00 and 06:00–10:00 UTC on weekdays, otherwise `off-peak`, read from the server's clock) and writes it to the
+function's log group, kept seven days.
+
+Read the numbers with these rules in mind:
+
+- A failed phase is not timed, and neither is the first PDF of a failed preparation.
+- When coherence sends sections back for rewriting, `resume-sections` and `coherence` are timed again, so a partial
+  rewrite is pooled with full writes.
+- `first-downloadable-pdf` is timed only for a preparation that extracted its Job Posting. A retry or a language
+  change reuses its inputs, and its shorter wait is not counted. It is not timed either once the Candidate changed the
+  resume first (an edit, contacts, a photo), since their own time is not the preparation's.
+- It ends when the render arrives, a moment before the preview has drawn the PDF pages.
 
 Run this in CloudWatch Logs Insights on `/aws/lambda/honest-resume-demo`, over the last seven days:
 
