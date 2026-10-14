@@ -27,8 +27,10 @@ export function ResumeSectionsPreview({ candidateJourney, localization }: Resume
   const { preparationProgress, session, session: { preparation } } = view
   if (preparation === undefined) return null
   const panel = { localization, naming: preparation, resumeLocale: readResumeLocale({ preparation, session }) }
-  if (preparationProgress !== null) return preparationProgress.sections.length === 0 ? null
-    : <ResumeSectionsPanel {...panel} sections={preparationProgress.sections} state="preparing" />
+  // Until the new preparation plans its sections, those a failed one kept stay on screen.
+  if (preparationProgress !== null && preparationProgress.sections.length > 0) {
+    return <ResumeSectionsPanel {...panel} sections={preparationProgress.sections} state="preparing" />
+  }
   const kept = readKeptSections(preparation)
   return kept.length === 0 ? null : <ResumeSectionsPanel {...panel} sections={kept} state="kept" />
 }
