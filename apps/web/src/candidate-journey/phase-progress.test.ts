@@ -44,12 +44,14 @@ describe('Preparation completion', () => {
   })
 
   it('moves forward with every Resume Section written, short of the coherence check', () => {
-    const progress = (written: number) => readPreparationCompletion({
-      phase: 'resume-sections', sections: [], sectionCount: { written, total: 8 } })
+    const writtenCounts = [0, 3, 7, 8]
+
+    const completions = writtenCounts.map((written) => readPreparationCompletion({
+      phase: 'resume-sections', sections: [], sectionCount: { written, total: 8 } }))
     const coherence = readPreparationCompletion({ phase: 'coherence', sections: [], sectionCount: { written: 8, total: 8 } })
 
-    expect(progress(0)).toBeLessThan(progress(3))
-    expect(progress(3)).toBeLessThan(progress(7))
-    expect(progress(8)).toBe(coherence)
+    expect(completions).toEqual([...completions].sort((left, right) => left - right))
+    expect(new Set(completions).size).toBe(writtenCounts.length)
+    expect(completions.at(-1)).toBe(coherence)
   })
 })
