@@ -1408,7 +1408,8 @@ class CandidateJourneyTestSystem {
   async givenHeldSkillsSectionReleased() {
     await this.expectSectionRevealedBesideTheSkillsPlaceholder()
     this.#releaseHeldSkills()
-    await expect(this.#page.getByRole('region', { name: 'Your resume is taking shape' })).toHaveCount(0)
+    // The validated sections stay, not final, while Overflow Reduction renders the pages to lay them out.
+    await expect(this.#page.getByRole('region', { name: 'Your resume is taking shape' })).toHaveCount(0, { timeout: 20_000 })
     await this.#showDocumentText()
     await expect(this.#page.frameLocator('iframe').getByText('React', { exact: false }).first()).toBeVisible()
   }

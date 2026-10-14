@@ -35,6 +35,15 @@ describe('Candidate Journey preparation progress', () => {
     system.expectEverySectionValidatedDuring(['coherence', 'overflow-reduction'])
   })
 
+  it('keeps laying out the pages exposed while the preview renders the first PDF', async () => {
+    const system = createSystemUnderTest({ render: 'held' })
+    await system.givenPreparedTailoredResume()
+
+    await system.startPreviewingTailoredResume()
+
+    system.expectLayingOutThePagesWithoutStandInSections()
+  })
+
   it('returns to no phase once the PDF is downloadable', async () => {
     const system = createSystemUnderTest()
     await system.givenPreparedTailoredResume()
@@ -75,8 +84,11 @@ type TestOptions = Readonly<{
    * fails every check.
    */
   coherence?: 'rewrite-first-experience-once' | 'timeout'
+  /** `held` never finishes the preview's render, so the test reads the view while it runs. */
+  render?: 'held'
 }>
 
+type Action = 'preparation' | 'preview' | 'held-preview'
 type OpenView = Extract<CandidateJourneyView, Readonly<{ status: 'candidate-session-open' }>>
 type PreparationProgress = NonNullable<OpenView['preparationProgress']>
 type ProgressPhase = PreparationProgress['phase']
@@ -87,6 +99,8 @@ class PreparationProgressSystem {
   readonly #observed: PreparationProgress[] = []
   #coherenceChecks = 0
   #lastRender: Awaited<ReturnType<CandidateJourney['renderResumeDocument']>> | null = null
+  #action: Action | null = null
+  #heldRenders = 0
 
   constructor(options: TestOptions) {
     this.#journey = createCandidateJourney({ dependencies: createFakeCandidateJourneyDependencies({
@@ -95,7 +109,12 @@ class PreparationProgressSystem {
         if (options.coherence === 'timeout') return Promise.resolve({ ok: false, error: { type: 'timeout' } })
         return Promise.resolve({ ok: true, value: this.#checkCoherence({ input, options }) })
       } }),
-      resumeDocumentRenderer: createFakeResumeDocumentRenderer(),
+      // Overflow Reduction renders during the preparation; only the preview's render is held.
+      resumeDocumentRenderer: createFakeResumeDocumentRenderer({ render: (request) => {
+        if (options.render !== 'held' || this.#action !== 'held-preview') return createFakeResumeDocumentRenderer().render(request)
+        this.#heldRenders += 1
+        return new Promise(() => undefined)
+      } }),
     }) })
     this.#journey.subscribe(() => {
       const view = this.#journey.readView()
@@ -119,6 +138,7 @@ class PreparationProgressSystem {
   }
 
   async prepareTailoredResume() {
+    this.#action = 'preparation'
     this.#observed.length = 0
     this.#journey.startTailoredResumePreparation({ sourceDocument: documentFromText(sourceDocumentText),
       jobPosting: documentFromText(structuredResumeJobMatch.jobPosting.originalContent) })
@@ -127,19 +147,35 @@ class PreparationProgressSystem {
   }
 
   async previewTailoredResume() {
+    this.#action = 'preview'
+    this.#lastRender = await this.#renderPreview()
+  }
+
+  async startPreviewingTailoredResume() {
+    this.#action = 'held-preview'
+    void this.#renderPreview()
+    await expect.poll(() => this.#heldRenders).toBe(1)
+  }
+
+  #renderPreview() {
     const view = this.#readOpenView()
     const document = view.session.tailoredResume ?? expect.fail('Expected a Tailored Resume')
-    this.#lastRender = await this.#journey.renderResumeDocument({ document,
-      unsupportedFieldIds: view.resumeReview?.unsupportedFieldIds ?? [] })
+    return this.#journey.renderResumeDocument({ document, unsupportedFieldIds: view.resumeReview?.unsupportedFieldIds ?? [] })
+  }
+
+  #expectAction(action: Action) {
+    if (this.#action !== action) expect.fail(`Perform the ${action} action before reading its outcome`)
   }
 
   expectPhasesExposedInOrder(phases: readonly ProgressPhase[]) {
+    this.#expectAction('preparation')
     const exposed = this.#observed.map(({ phase }) => phase)
       .filter((phase, index, all) => index === 0 || all[index - 1] !== phase)
     expect(exposed).toEqual(phases)
   }
 
   expectWrittenSectionsCountedOneByOneUpToTheTotal() {
+    this.#expectAction('preparation')
     // Writing starts by planning the sections, which only then are counted.
     const counts = this.#observedDuring('resume-sections').flatMap(({ sectionCount }) => sectionCount === null ? [] : [sectionCount])
     const total = counts[0]?.total ?? expect.fail('Expected Resume Sections to be written')
@@ -149,13 +185,17 @@ class PreparationProgressSystem {
   }
 
   expectNoSectionExposedBeforeWritingSections() {
-    const beforeWriting = this.#observed.slice(0, this.#observed.findIndex(({ phase }) => phase === 'resume-sections'))
+    this.#expectAction('preparation')
+    const writing = this.#observed.findIndex(({ phase }) => phase === 'resume-sections')
+    if (writing < 0) expect.fail('Expected Resume Sections to be written')
+    const beforeWriting = this.#observed.slice(0, writing)
     expect(beforeWriting.length).toBeGreaterThan(0)
     expect(beforeWriting.map(({ sections, sectionCount }) => ({ sections, sectionCount })))
       .toEqual(beforeWriting.map(() => ({ sections: [], sectionCount: null })))
   }
 
   expectEverySectionValidatedDuring(phases: readonly ProgressPhase[]) {
+    this.#expectAction('preparation')
     for (const phase of phases) {
       const during = this.#observedDuring(phase)
       expect(during.length, `Expected the ${phase} phase to be exposed`).toBeGreaterThan(0)
@@ -168,6 +208,7 @@ class PreparationProgressSystem {
   }
 
   expectFirstExperienceUnvalidatedWhenWritingResumesAfterCoherence() {
+    this.#expectAction('preparation')
     const firstCoherence = this.#observed.findIndex(({ phase }) => phase === 'coherence')
     const rewriting = this.#observed.slice(firstCoherence).find(({ phase }) => phase === 'resume-sections')
       ?? expect.fail('Expected Resume Sections to be written again after coherence')
@@ -177,15 +218,25 @@ class PreparationProgressSystem {
     expect(rewriting.sectionCount).toEqual({ written: rewriting.sections.length - 1, total: rewriting.sections.length })
   }
 
+  expectLayingOutThePagesWithoutStandInSections() {
+    this.#expectAction('held-preview')
+    expect(this.#readOpenView().preparationProgress).toEqual({ phase: 'overflow-reduction', sections: [], sectionCount: null })
+  }
+
   expectDownloadablePdf() {
+    this.#expectAction('preview')
     expect(this.#lastRender?.pdf).toBeInstanceOf(Uint8Array)
   }
 
   expectPreparationFailed() {
+    this.#expectAction('preparation')
     expect(this.#readOpenView().preparationOutcome).toMatchObject({ status: 'failed' })
   }
 
+  /** After a preparation that exposed its phases, or after the preview rendered the PDF it was laying out. */
   expectNoPhase() {
+    if (this.#action === null || this.#action === 'held-preview') expect.fail('Prepare or preview before reading the phase')
+    expect(this.#observed.length, 'Expected the preparation to expose its phases first').toBeGreaterThan(0)
     expect(this.#readOpenView().preparationProgress).toBeNull()
   }
 

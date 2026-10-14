@@ -1,12 +1,9 @@
-import { MantineProvider } from '@mantine/core'
-import type { ReactNode } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { preparationProgressPhases } from '@resume-tailoring/application/candidate-journey'
 import type { PreparationProgress } from '@resume-tailoring/application/candidate-journey'
-import type { Locale, Localization } from '../localization/localization'
-import { LocalizationProvider, useLocalization } from '../localization/localization'
+import type { Locale } from '../localization/localization'
+import { renderLocalizedMarkup } from './localized-markup'
 import { PreparationPhaseStatus } from './preparation-phase-status'
 
 const locales = ['en', 'fr'] as const satisfies readonly Locale[]
@@ -67,14 +64,7 @@ describe('Preparation phase status', () => {
 })
 
 function renderStatus({ locale, progress }: Readonly<{ locale: Locale; progress: PreparationProgress }>) {
-  return renderToStaticMarkup(<MantineProvider><LocalizationProvider renderedLocale={locale}>
-    <WithLocalization>{(localization) => <PreparationPhaseStatus {...{ localization, progress }} />}</WithLocalization>
-  </LocalizationProvider></MantineProvider>)
-}
-
-function WithLocalization({ children }: Readonly<{ children: (localization: Localization) => ReactNode }>) {
-  const localization = useLocalization()
-  return localization.ok ? children(localization.value) : null
+  return renderLocalizedMarkup({ locale, render: (localization) => <PreparationPhaseStatus {...{ localization, progress }} /> })
 }
 
 function readText(markup: string) {

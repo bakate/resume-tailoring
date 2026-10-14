@@ -180,7 +180,7 @@ const englishCatalog = {
   'preparationPhase.job-posting-extraction': 'Reading the job posting',
   'preparationPhase.match-evidence': 'Matching your experience with the job',
   'preparationPhase.resume-sections': 'Writing your resume sections',
-  'preparationPhase.coherence': 'Checking your resume reads as a whole',
+  'preparationPhase.coherence': 'Checking your resume is coherent',
   'preparationPhase.overflow-reduction': 'Laying out the pages',
   'preparationPhase.sectionCount': '{written} of {total} sections written',
   'resumeSections.notFinal': 'Not final',

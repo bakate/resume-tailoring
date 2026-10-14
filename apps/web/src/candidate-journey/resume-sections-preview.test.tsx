@@ -1,11 +1,8 @@
-import { MantineProvider } from '@mantine/core'
-import type { ReactNode } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import type { ResumeSectionSnapshot } from '@resume-tailoring/application/candidate-journey'
-import type { Locale, Localization } from '../localization/localization'
-import { LocalizationProvider, useLocalization } from '../localization/localization'
+import type { Locale } from '../localization/localization'
+import { renderLocalizedMarkup } from './localized-markup'
 import { ResumeSectionsPanel } from './resume-sections-preview'
 
 const validatedEducation: ResumeSectionSnapshot = { key: 'education', kind: 'education', attempt: 1, status: 'validated',
@@ -48,13 +45,6 @@ describe('Resume Sections preview', () => {
 function renderPanel({ locale, sections, state }: Readonly<{
   locale: Locale; sections: readonly ResumeSectionSnapshot[]; state: 'preparing' | 'kept'
 }>) {
-  return renderToStaticMarkup(<MantineProvider><LocalizationProvider renderedLocale={locale}>
-    <WithLocalization>{(localization) => <ResumeSectionsPanel {...{ localization, sections, state }}
-      naming={{ sourceIntake: null }} resumeLocale="en" />}</WithLocalization>
-  </LocalizationProvider></MantineProvider>).replaceAll('&#x27;', '\'')
-}
-
-function WithLocalization({ children }: Readonly<{ children: (localization: Localization) => ReactNode }>) {
-  const localization = useLocalization()
-  return localization.ok ? children(localization.value) : null
+  return renderLocalizedMarkup({ locale, render: (localization) => <ResumeSectionsPanel {...{ localization, sections, state }}
+    naming={{ sourceIntake: null }} resumeLocale="en" /> })
 }

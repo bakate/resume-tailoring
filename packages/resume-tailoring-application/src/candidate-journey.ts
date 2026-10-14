@@ -126,6 +126,8 @@ type CandidateJourneyContext = Readonly<{
    * published session no longer keeps them.
    */
   preparationSections: readonly ResumeSectionSnapshot[]
+  /** Whether the preview has yet to render the PDF of the resume the latest preparation laid out. */
+  awaitingPreparedPdf: boolean
   preparedInputs: PreparedResumeInputs | null
   resumeReview: ResumeReviewState
   jobMatchFailure: CandidateJourneyJobMatchFailure | null
@@ -616,6 +618,7 @@ const candidateJourneyMachine = setup({
     preparationPhase: null,
     preparationStep: null,
     preparationSections: [],
+    awaitingPreparedPdf: false,
     preparedInputs: null,
     resumeReview: emptyResumeReview,
     jobMatchFailure: null,
@@ -636,13 +639,13 @@ const candidateJourneyMachine = setup({
           invoke: {
             src: 'renderResumeDocument',
             input: ({ context }) => ({ dependencies: context.dependencies, request: context.resumeRendering?.request ?? null }),
-            onDone: { target: 'idle', actions: assign({
+            onDone: { target: 'idle', actions: assign({ awaitingPreparedPdf: false,
               preparationTiming: ({ context, event }) => timeFirstDownloadablePdf({ ...readTiming({ context }), result: event.output }),
               resumeReview: ({ context, event }) => renderedResumeReview({ context, result: event.output }),
               resumeRendering: ({ context, event }) =>
               context.resumeRendering === null ? null : { ...context.resumeRendering,
                 result: event.output ?? unavailableResumeRender(context.resumeRendering.request) } }) },
-            onError: { target: 'idle', actions: assign({ resumeRendering: ({ context }) =>
+            onError: { target: 'idle', actions: assign({ awaitingPreparedPdf: false, resumeRendering: ({ context }) =>
               context.resumeRendering === null ? null : { ...context.resumeRendering,
                 result: unavailableResumeRender(context.resumeRendering.request) } }) },
           },
@@ -734,7 +737,7 @@ const candidateJourneyMachine = setup({
       },
     },
     generatingApplicationResume: {
-      entry: assign({ resumeRendering: null, preparationOutcome: null, preparationPhase: null, preparationStep: null, preparationSections: [], preparedInputs: null, resumeReview: emptyResumeReview,
+      entry: assign({ resumeRendering: null, preparationOutcome: null, preparationPhase: null, preparationStep: null, preparationSections: [], awaitingPreparedPdf: false, preparedInputs: null, resumeReview: emptyResumeReview,
         preparationTiming: ({ context }) => startPreparationTiming(context.dependencies),
         session: ({ context }) => context.session === null ? null
           : invalidateEditingRevision(context.session, context.dependencies.createIdentifier),
@@ -802,10 +805,11 @@ const candidateJourneyMachine = setup({
             input: ({ context }) => ({ dependencies: context.dependencies,
               session: context.preparationOutcome?.status === 'prepared' ? context.session : null }),
             onDone: { target: '#candidate-journey.candidateSessionAvailable', actions: assign(({ context, event }) => ({
-              ...saveReducedResume({ context, reduced: event.output?.reduced ?? null }),
+              ...saveReducedResume({ context, reduced: event.output?.reduced ?? null }), awaitingPreparedPdf: isPrepared(context),
               preparationTiming: completeOverflowReduction({ ...readTiming({ context }), renderCount: event.output?.renderCount ?? null }) })) },
             onError: { target: '#candidate-journey.candidateSessionAvailable',
-              actions: assign({ preparationTiming: ({ context }) => completeOverflowReduction({ ...readTiming({ context }), renderCount: null }) }) },
+              actions: assign({ awaitingPreparedPdf: ({ context }) => isPrepared(context),
+                preparationTiming: ({ context }) => completeOverflowReduction({ ...readTiming({ context }), renderCount: null }) }) },
           },
         },
       },
@@ -1161,12 +1165,20 @@ function readOpenCandidateSessionView({ snapshot, session }: Readonly<{
   }
 }
 
+function isPrepared({ preparationOutcome }: CandidateJourneyContext) {
+  return preparationOutcome?.status === 'prepared'
+}
+
 /**
  * The phase of a running preparation, so the Candidate never waits without one: the intake reads the documents first,
- * planning belongs to writing the sections, and Overflow Reduction lays out the pages.
+ * planning belongs to writing the sections, and the pages are laid out until the preview renders their first PDF.
  */
 function readPreparationProgressView({ snapshot }: Readonly<{ snapshot: CandidateJourneySnapshot }>): PreparationProgress | null {
-  const { preparationPhase, preparationStep, preparationSections: sections } = snapshot.context
+  const { awaitingPreparedPdf, preparationPhase, preparationStep, preparationSections: sections } = snapshot.context
+  // The laid-out resume is in the preview, rendering: its sections no longer stand in for it.
+  if (awaitingPreparedPdf && snapshot.matches({ candidateSessionAvailable: 'rendering' })) {
+    return readPreparationProgress({ step: 'fitting-page-budget', sections: [] })
+  }
   if (snapshot.matches({ generatingApplicationResume: 'preparingInputs' })) {
     return readPreparationProgress({ step: preparationPhase ?? 'extracting-source', sections })
   }
