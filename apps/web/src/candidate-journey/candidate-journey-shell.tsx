@@ -26,13 +26,14 @@ import {
   useLocalization,
 } from '../localization/localization'
 import type { Localization } from '../localization/localization'
-import type { CandidateJourneyView, ValidatedResult } from '@resume-tailoring/application/candidate-journey'
+import type { CandidateJourneyView, PreparationProgressPhase, ValidatedResult } from '@resume-tailoring/application/candidate-journey'
 import type { ProcessingPolicy } from '@resume-tailoring/application/language-model-gateway'
 import { candidateJourneyPhases } from './candidate-journey-phases'
 import type { CandidateJourneyPhase } from './candidate-journey-phases'
 import { useCandidateJourney } from './use-candidate-journey'
 import { CombinedIntakeWorkspace } from './combined-intake-workspace'
 import { PhaseProgressList } from './phase-progress-list'
+import { PreparationPhaseStatus, readPreparationPhaseKey } from './preparation-phase-status'
 import { PrivacyStatement } from './processing-policy-notice'
 import { SourceIntakeWorkspace } from './source-intake-workspace'
 import type { CandidateJourneyController } from './use-candidate-journey'
@@ -132,10 +133,14 @@ type CandidateJourneyProps = LocalizationProps & Readonly<{ candidateJourney: Ca
  */
 function readActivePhase({ view }: CandidateJourneyController): CandidateJourneyPhase | null {
   if (view.status !== 'candidate-session-open') return null
-  if (view.preparationPhase === 'extracting-source') return 'source-intake'
-  if (view.preparationPhase !== null) return 'job-match'
-  return view.operation === 'preparing-tailored-resume' ? 'tailored-resume-preparation' : view.session.phase
+  return view.preparationProgress === null ? view.session.phase : journeyPhaseOfPreparation[view.preparationProgress.phase]
 }
+
+const journeyPhaseOfPreparation = {
+  'source-intake': 'source-intake', 'job-posting-extraction': 'job-match', 'match-evidence': 'job-match',
+  'resume-sections': 'tailored-resume-preparation', coherence: 'tailored-resume-preparation',
+  'overflow-reduction': 'tailored-resume-preparation',
+} as const satisfies Record<PreparationProgressPhase, CandidateJourneyPhase>
 
 /** Preparing and rendering the Tailored Resume are shown on `/resume`, not on the intake. */
 export function isResultOperation({ view }: CandidateJourneyController) {
@@ -314,10 +319,11 @@ LocalizationProps & Readonly<{
   const operation = candidateJourney.view.status === 'candidate-session-open'
     ? candidateJourney.view.operation
     : null
+  const preparing = candidateJourney.view.status === 'candidate-session-open' && candidateJourney.view.preparationProgress !== null
   // While a preparation runs, the phase is named as the progress list shows it.
   const phaseMessage = activePhaseDefinition === undefined || activePhaseDefinition === null ? null : formatJourneyMessage({
     template: localization.translate('candidateJourney.phaseAnnouncement'),
-    value: localization.translate(operation === 'preparing-tailored-resume'
+    value: localization.translate(preparing
       ? `phaseProgress.${activePhaseDefinition.id}` : activePhaseDefinition.titleKey),
     token: 'phase',
   })
@@ -340,14 +346,15 @@ export function CandidateJourneyProgress({ candidateJourney, localization }:
 LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) {
   if (candidateJourney.view.status !== 'candidate-session-open'
     || candidateJourney.view.operation === null) return null
-  const { operation } = candidateJourney.view
+  const { operation, preparationProgress } = candidateJourney.view
   const activePhase = readActivePhase(candidateJourney)
   return <Paper aria-busy="true" aria-describedby="candidate-journey-progress-description"
     aria-label={localization.translate('candidateJourney.progressLabel')}
     className="candidate-journey-progress" component="section" p={{ base: 'md', sm: 'lg' }} withBorder>
     <Stack gap="sm">
-      {operation === 'preparing-tailored-resume' && activePhase !== null
-        ? <PhaseProgressList {...{ activePhase, localization }} />
+      {activePhase !== null && preparationProgress !== null
+        ? <><PhaseProgressList {...{ activePhase, localization }} />
+          <PreparationPhaseStatus {...{ localization }} progress={preparationProgress} /></>
         : <Group gap="xs" wrap="nowrap"><IconLoader2 aria-hidden="true" className="progress-spinner" size={20} stroke={2} />
           <Text fw={700}>{localization.translate(readOperationKey({ candidateJourney, operation }))}</Text></Group>}
       <Text c="dimmed" id="candidate-journey-progress-description" size="sm">
@@ -360,8 +367,7 @@ LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) 
 /** A resume preparation names the step it has reached out of three; other operations only say how long they may take. */
 function readProgressDescription({ candidateJourney, localization }: CandidateJourneyProps) {
   const phase = readActivePhase(candidateJourney)
-  const preparing = candidateJourney.view.status === 'candidate-session-open'
-    && candidateJourney.view.operation === 'preparing-tailored-resume'
+  const preparing = candidateJourney.view.status === 'candidate-session-open' && candidateJourney.view.preparationProgress !== null
   if (!preparing || phase === null) return localization.translate('candidateJourney.progressDescription')
   return formatJourneyMessage({ template: localization.translate('candidateJourney.progressStep'), token: 'step',
     value: String(candidateJourneyPhases.findIndex(({ id }) => id === phase) + 1) })
@@ -396,12 +402,10 @@ function readOperationKey({ candidateJourney, operation }: Readonly<{
   candidateJourney: CandidateJourneyController; operation: CandidateJourneyOperation
 }>) {
   const { view } = candidateJourney
-  const phase = view.status === 'candidate-session-open' ? view.preparationPhase : null
-  const writingSections = view.status === 'candidate-session-open' && operation === 'preparing-tailored-resume'
-    && view.session.preparation?.status === 'pending' && view.session.preparation.sections !== undefined
-  if (phase === null) return writingSections ? 'combinedIntake.writing' : operationTranslationKeys[operation]
-  return ({ 'extracting-source': 'candidateJourney.operation.extractSourceProfile',
-    'extracting-posting': 'combinedIntake.extractingPosting', matching: 'combinedIntake.matching' } as const)[phase]
+  // A preparation names its phase, without the section count, so the polite region speaks only when the phase changes;
+  // that includes rendering the first PDF of the pages it laid out.
+  const progress = view.status === 'candidate-session-open' ? view.preparationProgress : null
+  return progress === null ? operationTranslationKeys[operation] : readPreparationPhaseKey(progress.phase)
 }
 
 const operationTranslationKeys: Readonly<Record<CandidateJourneyOperation, Parameters<

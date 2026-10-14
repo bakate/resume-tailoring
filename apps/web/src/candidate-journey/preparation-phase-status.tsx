@@ -1,0 +1,31 @@
+import { Group, Stack, Text } from '@mantine/core'
+import { IconLoader2 } from '@tabler/icons-react'
+
+import type { PreparationProgress, PreparationProgressPhase } from '@resume-tailoring/application/candidate-journey'
+import type { Localization } from '../localization/localization'
+import './preparation-phase-status.css'
+
+/** The translation key naming each preparation phase, which the polite status region also announces. */
+export function readPreparationPhaseKey(phase: PreparationProgressPhase) {
+  return `preparationPhase.${phase}` as const
+}
+
+/**
+ * The phase a preparation is in, with the Resume Sections written out of the total once they are planned. The count
+ * keeps its line before then, so the panel does not grow when it appears; the phase is announced elsewhere, politely.
+ */
+export function PreparationPhaseStatus({ localization, progress }: Readonly<{
+  localization: Localization; progress: PreparationProgress
+}>) {
+  const { sectionCount } = progress
+  return <Stack className="preparation-phase-status" gap={2}>
+    <Group gap="xs" wrap="nowrap">
+      <IconLoader2 aria-hidden="true" className="progress-spinner" size={20} stroke={2} />
+      <Text fw={700}>{localization.translate(readPreparationPhaseKey(progress.phase))}</Text>
+    </Group>
+    <Text c="dimmed" className="preparation-phase-status-count" size="sm">
+      {sectionCount === null ? ' ' : localization.translate('preparationPhase.sectionCount')
+        .replace('{written}', String(sectionCount.written)).replace('{total}', String(sectionCount.total))}
+    </Text>
+  </Stack>
+}

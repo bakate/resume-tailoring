@@ -1384,6 +1384,9 @@ class CandidateJourneyTestSystem {
     await expect(preview.getByRole('region', { name: 'Skills' })).not.toContainText('React')
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toHaveCount(0)
     await expect(this.#page.getByRole('button', { name: 'Check page count', exact: true })).toHaveCount(0)
+    // Validated sections are read-only and not final until coherence and the layout finish.
+    await expect(preview).toContainText('Not final')
+    await expect(preview.getByRole('textbox')).toHaveCount(0)
   }
 
   async expectFrenchSectionsRevealedBesideTheSkillsPlaceholder() {
@@ -1405,7 +1408,8 @@ class CandidateJourneyTestSystem {
   async givenHeldSkillsSectionReleased() {
     await this.expectSectionRevealedBesideTheSkillsPlaceholder()
     this.#releaseHeldSkills()
-    await expect(this.#page.getByRole('region', { name: 'Your resume is taking shape' })).toHaveCount(0)
+    // The validated sections stay, not final, while Overflow Reduction renders the pages to lay them out.
+    await expect(this.#page.getByRole('region', { name: 'Your resume is taking shape' })).toHaveCount(0, { timeout: 20_000 })
     await this.#showDocumentText()
     await expect(this.#page.frameLocator('iframe').getByText('React', { exact: false }).first()).toBeVisible()
   }
@@ -1438,6 +1442,9 @@ class CandidateJourneyTestSystem {
     await expect(progress.locator('[aria-current="step"]')).toHaveText('Writing your resume (in progress)')
     await expect(progress).not.toContainText('orchestration')
     await expect(this.#page.locator('.sr-only[role="status"]')).toContainText('Current step: Writing your resume.')
+    await expect(progress).toContainText('Writing your resume sections')
+    await expect(progress).toContainText(/\d+ of \d+ sections written/u)
+    await expect(this.#page.locator('.sr-only[role="status"]')).toContainText('Writing your resume sections')
   }
 
   async expectReadableSecondaryTextAndFocusRing() {

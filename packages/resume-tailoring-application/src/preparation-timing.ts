@@ -15,7 +15,7 @@ export type PreparationTiming = Readonly<{
 }>
 
 /** A phase timed from its own start; the first downloadable PDF is timed from the start of the preparation. */
-type RunningPhase = Exclude<TimedPreparationPhase, 'first-downloadable-pdf'>
+export type RunningPhase = Exclude<TimedPreparationPhase, 'first-downloadable-pdf'>
 
 type TimingClock = Readonly<{ now: () => number; record: (event: PrivacySafeTelemetryEvent) => void }>
 
@@ -25,6 +25,11 @@ const timedSteps = {
   'extracting-source': 'source-intake', 'extracting-posting': 'job-posting-extraction', matching: 'match-evidence',
   'writing-sections': 'resume-sections', 'checking-coherence': 'coherence',
 } as const satisfies Record<PreparationPhase | ResumePreparationStep, RunningPhase>
+
+/** The preparation phase a step of the combined intake or of the resume preparation belongs to. */
+export function readPreparationStepPhase(step: PreparationPhase | ResumePreparationStep): RunningPhase {
+  return timedSteps[step]
+}
 
 export function startPreparationTiming({ createIdentifier, now }: Readonly<{
   createIdentifier: () => string; now: () => number
@@ -36,7 +41,7 @@ export function startPreparationTiming({ createIdentifier, now }: Readonly<{
 export function enterPreparationStep({ timing, clock, step }: TimingUpdate & Readonly<{
   step: PreparationPhase | ResumePreparationStep
 }>): PreparationTiming | null {
-  return enterPhase({ timing, clock, phase: timedSteps[step] })
+  return enterPhase({ timing, clock, phase: readPreparationStepPhase(step) })
 }
 
 /** Records the phase of the last step as completed, then starts timing Overflow Reduction. */
