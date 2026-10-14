@@ -224,10 +224,13 @@ included, nested ones such as per-operation output token budgets too, against th
 `qualified-model-configurations.ts`. Changing any option makes the configuration unqualified until it is recorded
 again.
 
-`LANGUAGE_MODEL_PROVIDER` selects the one active Language Model Provider (only `openai` exists; it is
-the default when unset). Environment validation rejects a provider, a model or a reasoning effort that
-no Qualified Model Configuration backs, so the per-role `OPENAI_*` settings stay frozen at their
-qualified values. The active provider also determines the Processing Policy the landing serves.
+`LANGUAGE_MODEL_PROVIDER` selects the one active Language Model Provider, `deepseek` or `openai`. When
+it is unset, it is `deepseek`, the provider production runs on, so a local server behaves like
+production. The development server loads every Language Model setting from the repository's `.env`
+files, and `env.test.ts` fails if `env.ts` reads a setting it would not load. Environment validation
+rejects a provider, a model or a reasoning effort that no Qualified Model Configuration backs, so the
+per-role `DEEPSEEK_*` and `OPENAI_*` settings stay frozen at their qualified values. The active provider
+also determines the Processing Policy the landing serves.
 
 A refused selection never reaches production:
 

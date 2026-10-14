@@ -75,12 +75,13 @@ describe('Processing Policy derived from the active Language Model Provider', ()
   it('states the policy without the provider key, so the landing renders it wherever the key lives', () => {
     const policy = readActiveProcessingPolicy({ environment: {} })
 
-    expect(policy).toEqual(createProcessingPolicy({ provider: 'openai' }))
+    expect(policy).toEqual(createProcessingPolicy({ provider: 'deepseek' }))
   })
 
   it.each([
     { LANGUAGE_MODEL_PROVIDER: 'another-provider' },
-    { OPENAI_STRUCTURED_MODEL: 'unqualified-model' },
+    { LANGUAGE_MODEL_PROVIDER: 'openai', OPENAI_STRUCTURED_MODEL: 'unqualified-model' },
+    { DEEPSEEK_STRUCTURED_MODEL: 'unqualified-model' },
   ])('states no policy for a selection the server refuses: %o', (environment) => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
@@ -90,7 +91,7 @@ describe('Processing Policy derived from the active Language Model Provider', ()
   it('reports which setting it refused without its value', () => {
     const writeLog = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
-    readActiveProcessingPolicy({ environment: { OPENAI_WRITING_MODEL: 'private-unqualified-model' } })
+    readActiveProcessingPolicy({ environment: { LANGUAGE_MODEL_PROVIDER: 'openai', OPENAI_WRITING_MODEL: 'private-unqualified-model' } })
 
     const serializedLog = String(writeLog.mock.calls.at(0)?.at(0))
     expect(serializedLog).toContain('OPENAI_WRITING_MODEL')

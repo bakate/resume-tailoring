@@ -21,8 +21,9 @@ import type {
   OpenAiReasoningEffort,
 } from './language-model-configuration'
 
+/** DeepSeek is the provider production runs on (BAK-168), so a server started without a choice behaves like it. */
 const providerEnvironmentSchema = z.object({
-  LANGUAGE_MODEL_PROVIDER: z.enum(languageModelProviders).default('openai'),
+  LANGUAGE_MODEL_PROVIDER: z.enum(languageModelProviders).default('deepseek'),
 })
 
 /** Only the active provider's key is required: a deployment never holds the key of a provider it does not call. */

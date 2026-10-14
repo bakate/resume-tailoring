@@ -4,9 +4,10 @@ import { nitro } from 'nitro/vite'
 import { defineConfig, loadEnv } from 'vite'
 
 import { sourceDocumentBrowserSupportPolicy } from './src/resume-tailoring/source-document-browser-support.ts'
+import { serverEnvironmentFilePrefixes } from './src/server-environment-files.ts'
 
 export default defineConfig(({ mode }) => {
-  Object.assign(process.env, loadEnv(mode, '../..', ['LANGUAGE_MODEL_', 'OPENAI_']))
+  Object.assign(process.env, loadEnv(mode, '../..', [...serverEnvironmentFilePrefixes]))
 
   return {
     build: {

@@ -17,6 +17,8 @@ const environment = {
   DEMO_ORIGIN_SECRET: 'an-origin-secret-with-at-least-32-characters',
   DEMO_PUBLIC_HOSTNAME: 'resume-studio.example.workers.dev',
   DEMO_SESSION_SECRET: 'a-session-secret-with-at-least-32-characters',
+  // The stubbed provider answers in OpenAI's shape.
+  LANGUAGE_MODEL_PROVIDER: 'openai',
   OPENAI_API_KEY: 'sk-operator-key-that-signs-every-model-request',
   TURNSTILE_SECRET_KEY: 'turnstile-secret',
   TURNSTILE_SITE_KEY: 'turnstile-site-key',

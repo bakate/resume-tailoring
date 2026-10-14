@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { createOpenAiModelConfiguration } from './language-model-configuration'
+import { createDeepSeekModelConfiguration, createOpenAiModelConfiguration, languageModelProviders } from './language-model-configuration'
 import { readLanguageModelSelection, validateServerEnvironment } from './env'
+import { serverEnvironmentFilePrefixes } from './server-environment-files'
 
 const qualifiedStructured = createOpenAiModelConfiguration({ model: 'gpt-6-luna', reasoningEffort: 'low', role: 'structured' })
 const qualifiedWriting = createOpenAiModelConfiguration({ model: 'gpt-6-sol', reasoningEffort: 'medium', role: 'writing' })
+const openAi = { LANGUAGE_MODEL_PROVIDER: 'openai' }
 
 describe('server environment validation', () => {
   it('accepts the prequalified OpenAI configurations', () => {
@@ -30,10 +32,10 @@ describe('server environment validation', () => {
     })
   })
 
-  it('uses OpenAI and its evaluated configurations by default', () => {
+  it('uses DeepSeek, the provider production runs on, and its qualified configurations by default', () => {
     const result = validateServerEnvironment({
       environment: {
-        OPENAI_API_KEY: 'secret-key',
+        DEEPSEEK_API_KEY: 'secret-key',
       },
     })
 
@@ -41,9 +43,9 @@ describe('server environment validation', () => {
       ok: true,
       value: { languageModel: {
         apiKey: 'secret-key',
-        provider: 'openai',
-        structured: { active: qualifiedStructured },
-        writing: { active: qualifiedWriting },
+        provider: 'deepseek',
+        structured: { active: createDeepSeekModelConfiguration({ model: 'deepseek-flash', role: 'structured' }) },
+        writing: { active: createDeepSeekModelConfiguration({ model: 'deepseek-flash', role: 'writing' }) },
       } },
     })
   })
@@ -51,6 +53,7 @@ describe('server environment validation', () => {
   it('accepts fallbacks qualified on the live evaluations', () => {
     const result = validateServerEnvironment({
       environment: {
+        ...openAi,
         OPENAI_API_KEY: 'secret-key',
         OPENAI_STRUCTURED_FALLBACK_MODEL: 'gpt-6-luna',
         OPENAI_STRUCTURED_FALLBACK_REASONING_EFFORT: 'low',
@@ -80,7 +83,7 @@ describe('server environment validation', () => {
     { OPENAI_STRUCTURED_FALLBACK_MODEL: 'gpt-6-luna' },
   ])('rejects a fallback without same-suite qualification: %o', (fallbackEnvironment) => {
     const result = validateServerEnvironment({
-      environment: { OPENAI_API_KEY: 'secret-key', ...fallbackEnvironment },
+      environment: { ...openAi, OPENAI_API_KEY: 'secret-key', ...fallbackEnvironment },
     })
 
     expect(result.ok).toBe(false)
@@ -88,13 +91,14 @@ describe('server environment validation', () => {
 
   it.each([
     {},
-    { OPENAI_API_KEY: '' },
-    { OPENAI_API_KEY: '   ' },
-    { OPENAI_API_KEY: 'secret-key', OPENAI_STRUCTURED_MODEL: '' },
-    { OPENAI_API_KEY: 'secret-key', OPENAI_STRUCTURED_MODEL: 'gpt-6-sol' },
-    { OPENAI_API_KEY: 'secret-key', OPENAI_STRUCTURED_REASONING_EFFORT: 'extreme' },
-    { OPENAI_API_KEY: 'secret-key', OPENAI_WRITING_MODEL: 'unqualified-model' },
-    { OPENAI_API_KEY: 'secret-key', OPENAI_WRITING_REASONING_EFFORT: 'high' },
+    { ...openAi },
+    { ...openAi, OPENAI_API_KEY: '' },
+    { ...openAi, OPENAI_API_KEY: '   ' },
+    { ...openAi, OPENAI_API_KEY: 'secret-key', OPENAI_STRUCTURED_MODEL: '' },
+    { ...openAi, OPENAI_API_KEY: 'secret-key', OPENAI_STRUCTURED_MODEL: 'gpt-6-sol' },
+    { ...openAi, OPENAI_API_KEY: 'secret-key', OPENAI_STRUCTURED_REASONING_EFFORT: 'extreme' },
+    { ...openAi, OPENAI_API_KEY: 'secret-key', OPENAI_WRITING_MODEL: 'unqualified-model' },
+    { ...openAi, OPENAI_API_KEY: 'secret-key', OPENAI_WRITING_REASONING_EFFORT: 'high' },
     { OPENAI_API_KEY: 'secret-key', LANGUAGE_MODEL_PROVIDER: 'another-provider' },
     { OPENAI_API_KEY: 'secret-key', LANGUAGE_MODEL_PROVIDER: '' },
   ])('refuses a provider, model or effort without a Qualified Model Configuration: %o', (environment) => {
@@ -108,7 +112,7 @@ describe('server environment validation', () => {
 
   it('never names the key in a validation issue', () => {
     const result = validateServerEnvironment({
-      environment: { OPENAI_API_KEY: 'sk-private-operator-key', OPENAI_WRITING_MODEL: 'sk-private-operator-key' },
+      environment: { ...openAi, OPENAI_API_KEY: 'sk-private-operator-key', OPENAI_WRITING_MODEL: 'sk-private-operator-key' },
     })
 
     expect(JSON.stringify(result)).not.toContain('sk-private-operator-key')
@@ -153,7 +157,7 @@ describe('server environment validation with DeepSeek', () => {
 
 describe('Language Model selection', () => {
   it('validates the provider and its model settings without the provider key, so the landing never needs it', () => {
-    const selection = readLanguageModelSelection({ environment: {} })
+    const selection = readLanguageModelSelection({ environment: openAi })
 
     expect(selection).toEqual({ ok: true, value: {
       provider: 'openai', structured: { active: qualifiedStructured }, writing: { active: qualifiedWriting },
@@ -162,11 +166,31 @@ describe('Language Model selection', () => {
 
   it.each([
     { LANGUAGE_MODEL_PROVIDER: 'another-provider' },
-    { OPENAI_STRUCTURED_MODEL: 'unqualified-model' },
-    { OPENAI_WRITING_REASONING_EFFORT: 'high' },
+    { ...openAi, OPENAI_STRUCTURED_MODEL: 'unqualified-model' },
+    { ...openAi, OPENAI_WRITING_REASONING_EFFORT: 'high' },
+    { DEEPSEEK_WRITING_MODEL: 'unqualified-model' },
   ])('refuses a selection without a Qualified Model Configuration: %o', (environment) => {
     const selection = readLanguageModelSelection({ environment })
 
     expect(selection.ok).toBe(false)
+  })
+})
+
+describe('server settings in local .env files', () => {
+  it.each(languageModelProviders)('are all loaded by the development server for %s', (provider) => {
+    const readSettings = new Set<string>()
+    const environment = new Proxy<Record<string, unknown>>({ LANGUAGE_MODEL_PROVIDER: provider }, {
+      get: (target, name) => {
+        if (typeof name === 'string') readSettings.add(name)
+        return target[name as string]
+      },
+    })
+
+    validateServerEnvironment({ environment })
+
+    expect(readSettings.size).toBeGreaterThan(1)
+    for (const setting of readSettings) {
+      expect(serverEnvironmentFilePrefixes.some((prefix) => setting.startsWith(prefix)), setting).toBe(true)
+    }
   })
 })
