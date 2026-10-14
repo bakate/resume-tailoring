@@ -40,7 +40,7 @@ when the object deletes everything it holds.
 | Daily Quota | 8 | client network | `POST /api/explainable-job-posting-extraction` |
 | Global ceiling | 61 | all clients | the same request |
 | Technical ceiling | 530 | client network | every model-backed API route |
-| PDF renders | 200 | client network | `POST /api/resume-document` |
+| PDF renders | 200 | client network | `POST /api/resume-document`, and `POST /api/resume-document-fit` as one render |
 | Rendering browser warm-ups | 40 | client network | `POST /api/resume-document-warm-up` |
 
 Over the Daily Quota, the global ceiling or the technical ceiling, the Worker answers `429` with the
@@ -116,6 +116,17 @@ fields @timestamp
 | stats count(*) as samples, pct(value, 50) as p50, pct(value, 95) as p95 by metric, stage
 ```
 
+Fitting a Tailored Resume to its Page Budget is one request, `POST /api/resume-document-fit` (BAK-184). It runs the
+Overflow Reduction steps the application defines, laying each step out in the same browsing context and printing it
+as the export prints it. It first lays out the resume with every step applied: when even that takes more than one
+page, it runs no step that cannot reach one. Only the fitted layout is checked as a render is (fonts, A4 pages,
+reading order), and its PDF goes back with the reduced resume, so the preview shows it without rendering it again.
+Each fitting logs `page-budget-fit-milliseconds` and `page-budget-fit-layouts` in the query above. Locally, with the
+browser running, the anonymized real-sized resume (seven experiences) fits in 7 layouts and about 0.65 s, where the
+earlier separate renders took about 1.4 s each on Lambda. With a 25 s cold start, even ten times slower layouts end
+well within the browser's 90 s deadline, itself below the 100 s edge limit and the Lambda's 120 s timeout. The edge
+counts it as one render. Each layout keeps the render's own 15 s limits for layout and printing.
+
 When Resume Section writing starts, the browser sends one warm-up per preparation, with no body. The route answers
 once Chromium is running, because Lambda freezes the execution environment after a response. The first render of the
 preparation then usually finds the browser running, unless Lambda routes it to another execution environment.
@@ -124,8 +135,8 @@ preparation then usually finds the browser running, unless Lambda routes it to a
 
 Every preparation is timed phase by phase on real traffic (BAK-182), as its Preparation Timing. The browser sends
 one privacy-safe `preparation-phase-timed` event per completed phase to `/api/analytics`: `source-intake`,
-`job-posting-extraction`, `match-evidence`, `resume-sections`, `coherence`, `overflow-reduction` (with the renders it
-used), then `first-downloadable-pdf`, the time from the start of the preparation to the first render the preview can
+`job-posting-extraction`, `match-evidence`, `resume-sections`, `coherence`, `overflow-reduction` (with the layouts it measured as `renderCount`: since BAK-184 they are measured in one request
+counted as one render, so compare it with the earlier count of separate renders), then `first-downloadable-pdf`, the time from the start of the preparation to the first render the preview can
 offer for download. Each carries its duration and a random preparation identifier, generated when the preparation
 starts and linked to nothing else. The server adds the DeepSeek pricing window the phase started in (`peak`:
 01:00–04:00 and 06:00–10:00 UTC on weekdays, otherwise `off-peak`, read from the server's clock) and writes it to the

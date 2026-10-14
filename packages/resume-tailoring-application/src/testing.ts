@@ -9,6 +9,7 @@ import type { MatchEvidenceProposal } from './job-match'
 import type { ProcessingPolicy } from './language-model-gateway'
 import type { PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
 import { assessResumeExport } from './resume-export'
+import { fitToPageBudgetByRendering } from './overflow-reduction'
 import type { ResumeRenderRequest } from './resume-export'
 import { readGroupedResumeSection, structuredResumeJobMatch, structuredResumeSource } from './structured-resume-fixtures'
 import type { CandidateJourneyDependencies, CandidateSessionPersistence, CandidateSessionStorageResult,
@@ -110,10 +111,16 @@ export function dedupeConsecutive<TValue>(values: readonly TValue[]): TValue[] {
   return values.filter((value, position) => position === 0 || value !== values[position - 1])
 }
 
-/** Lays out every draft on one page; export eligibility follows the draft's own content. */
+/**
+ * Lays out every draft on one page; export eligibility follows the draft's own content. It fits the Page Budget with
+ * the shared Overflow Reduction steps, measuring each layout with its own `render`, overridden or not.
+ */
 export function createFakeResumeDocumentRenderer(overrides: Partial<ResumeDocumentRenderer> = {}): ResumeDocumentRenderer {
+  const render: ResumeDocumentRenderer['render'] = overrides.render
+    ?? ((request) => Promise.resolve({ assessment: assessOnePageLayout(request), pdf: new TextEncoder().encode('%PDF-') }))
   return {
-    render: (request) => Promise.resolve({ assessment: assessOnePageLayout(request), pdf: new TextEncoder().encode('%PDF-') }),
+    render,
+    fitToPageBudget: (request) => fitToPageBudgetByRendering({ request, render }),
     warmUp: () => undefined,
     ...overrides,
   }

@@ -5,6 +5,7 @@ import type { Locator, Page } from '@playwright/test'
 import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
 import type { ResumeCoherenceInput, ResumeFieldValidationInput, ResumeSectionWritingInput } from '@resume-tailoring/application/candidate-journey'
 import { routeResumeSectionModels, writeFixtureSection } from './resume-section-model-routes'
+import { resumeDocumentFitPath, resumeDocumentPath } from '../src/adapters/browser/browser-resume-document-renderer'
 
 test.describe('Candidate Journey preview-first preparation', () => {
   test('downloads the validated PDF shown by the active journey', async ({ page }) => {
@@ -581,6 +582,8 @@ test.describe('Candidate Journey preview-first preparation', () => {
   })
 })
 
+const renderingPaths = [resumeDocumentPath, resumeDocumentFitPath].map((path) => `**${path}`)
+
 function createSystemUnderTest({ page, scenario = 'normal' }: Readonly<{ page: Page; scenario?: Scenario }>) {
   return new CandidateJourneyTestSystem(page, scenario)
 }
@@ -998,15 +1001,18 @@ class CandidateJourneyTestSystem {
     await expect(this.#page.getByText('Resolve or confirm the unsupported professional changes before downloading.', { exact: true })).toBeVisible()
   }
 
+  /** Fitting the Page Budget fails too, so the preview renders the first PDF itself, and that render fails. */
   async givenRenderingFails() {
-    await this.#page.route('**/api/resume-document', (route) => route.fulfill({ status: 503,
-      json: { ok: false, error: { type: 'provider-unavailable' } } }))
+    for (const path of renderingPaths) {
+      await this.#page.route(path, (route) => route.fulfill({ status: 503,
+        json: { ok: false, error: { type: 'provider-unavailable' } } }))
+    }
   }
 
   async retryResumePreview() {
     const preview = this.#page.getByRole('region', { name: 'Preview and export' })
     await expect(preview.getByRole('alert')).toContainText('The writing service did not answer correctly.')
-    await this.#page.unroute('**/api/resume-document')
+    for (const path of renderingPaths) await this.#page.unroute(path)
     await preview.getByRole('button', { name: 'Try again', exact: true }).click()
   }
 

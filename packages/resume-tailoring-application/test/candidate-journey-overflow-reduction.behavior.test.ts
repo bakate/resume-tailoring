@@ -27,7 +27,8 @@ describe('Candidate Journey Overflow Reduction to the Page Budget', () => {
     await system.prepareTailoredResume()
 
     system.expectHiddenByReduction(['contoso achievement 2'])
-    system.expectRenderedPageCounts([2, 1])
+    // The resume with every step applied is measured first: it shows one page is reachable.
+    system.expectRenderedPageCounts([2, 1, 1])
   })
 
   it('then takes the Context Experience down to one line', async () => {
@@ -38,7 +39,7 @@ describe('Candidate Journey Overflow Reduction to the Page Budget', () => {
 
     system.expectHiddenByReduction(['contoso achievement 2', 'Lyon', 'Contoso store team', 'contoso achievement 1'])
     system.expectContextExperienceOnOneLine()
-    system.expectRenderedPageCounts([2, 2, 1])
+    system.expectRenderedPageCounts([2, 1, 2, 1])
   })
 
   it('then reduces the Projects, then the Skills, to those the Match Analysis found relevant', async () => {
@@ -49,7 +50,7 @@ describe('Candidate Journey Overflow Reduction to the Page Budget', () => {
 
     system.expectHiddenByReduction(['contoso achievement 2', 'Lyon', 'Contoso store team', 'contoso achievement 1',
       'Inventory spreadsheet', 'Excel'])
-    system.expectRenderedPageCounts([2, 2, 2, 2, 1])
+    system.expectRenderedPageCounts([2, 1, 2, 2, 2, 1])
   })
 
   it('then hides one achievement at a time from the Relevant Experience with the most achievements per year', async () => {
@@ -82,9 +83,11 @@ describe('Candidate Journey Overflow Reduction to the Page Budget', () => {
 
     // The full resume takes three pages; the first step brings it to two, and no later step reaches one.
     system.expectHiddenByReduction(['contoso achievement 2'])
+    // Every step applied still takes two pages, so no step after the first two-page result runs.
+    system.expectRenderedPageCounts([3, 2, 2])
   })
 
-  it('keeps a two-page resume unchanged when no step reaches one page', async () => {
+  it('keeps a two-page resume unchanged without running a step when no step reaches one page', async () => {
     const system = createSystemUnderTest({ linesPerPage: Math.ceil(fullResumeLines / 2) })
     await system.givenMatchedCandidateSession()
 
@@ -92,9 +95,10 @@ describe('Candidate Journey Overflow Reduction to the Page Budget', () => {
 
     system.expectNoHiddenContent()
     system.expectAchievementCounts({ tailspin: 6, litware: 4, contoso: 2 })
+    system.expectRenderedPageCounts([2, 2])
   })
 
-  it('leaves the resume unchanged when every step still exceeds two pages', async () => {
+  it('leaves the resume unchanged without running a step when every step still exceeds two pages', async () => {
     const system = createSystemUnderTest({ linesPerPage: 5 })
     await system.givenMatchedCandidateSession()
 
@@ -102,6 +106,7 @@ describe('Candidate Journey Overflow Reduction to the Page Budget', () => {
 
     system.expectNoHiddenContent()
     system.expectAchievementCounts({ tailspin: 6, litware: 4, contoso: 2 })
+    system.expectRenderedPageCounts([6, 4])
   })
 
   it('keeps the existing overflow outcome for a resume that exceeds two pages after every step', async () => {

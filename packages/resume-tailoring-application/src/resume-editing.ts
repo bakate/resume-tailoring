@@ -7,7 +7,8 @@ import type { ProfessionalResumeDocument, ResumeDocumentReview,
 import { assessResumeExport } from './resume-export'
 import { readResumeFields, updateResumeField } from './resume-field-editing'
 import type { CandidateFact } from '@resume-tailoring/domain/source-intake'
-import type { ResumeClaimModelFailure, ResumeDocumentPorts } from './ports'
+import type { ResumeClaimModelFailure, ResumeDocumentPorts, ResumeDocumentRenderer } from './ports'
+import type { FittedResumeRendering } from './resume-rendering-state'
 import { verifyResumeField } from './resume-claim-verification'
 
 export type ResumeReview = ResumeDocumentReview & Readonly<{
@@ -29,7 +30,11 @@ export type ResumeEditingAccess = Readonly<{
   hasConsent: () => boolean
   createIdentifier: () => string
   ports: Partial<ResumeDocumentPorts>
-  save: (request: Readonly<{ session: CandidateSession; baseRevision: string; correctionKind?: ResumeCorrectionKind }>) => void
+  /** The renderer's Page Budget fitting; absent without a renderer. */
+  fitToPageBudget?: ResumeDocumentRenderer['fitToPageBudget']
+  /** Saves a changed resume; a fitted rendering of it lets the preview show its PDF without rendering it again. */
+  save: (request: Readonly<{ session: CandidateSession; baseRevision: string; correctionKind?: ResumeCorrectionKind
+    fittedRendering?: FittedResumeRendering }>) => void
   report: (request: Readonly<{ baseRevision: string; review: ResumeReviewState }>) => void
 }>
 

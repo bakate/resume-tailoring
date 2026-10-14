@@ -1,5 +1,7 @@
-import { assessResumeExport, unavailableResumeRender } from '@resume-tailoring/application/candidate-journey'
-import type { ResumeRenderRequest, ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
+import { assessResumeExport, fitToPageBudget, unavailableResumeRender,
+  unfittedPageBudget } from '@resume-tailoring/application/candidate-journey'
+import type { PageBudgetFit, PageBudgetFitRequest, ResumeRenderRequest,
+  ResumeRenderResult } from '@resume-tailoring/application/candidate-journey'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 // The server bundle inlines pdfjs without its worker file, so its fake worker cannot load it by relative path.
 // Importing the worker sets globalThis.pdfjsWorker, which pdfjs uses in place of that import.
@@ -16,7 +18,10 @@ import { renderTailoredResumeDocument } from '../../candidate-journey/tailored-r
 type RenderStage = 'launch' | 'layout' | 'photo' | 'print' | 'fonts' | 'pdf-reading' | 'page-size' | 'reading-order'
 type RenderProgress = { stage: RenderStage }
 type FailureDimensions = Readonly<{ stage: RenderStage; errorName?: string }>
-type RenderMetric = 'unavailable' | 'warm-up-unavailable' | 'browser-launch-milliseconds'
+type RenderMetric = 'unavailable' | 'warm-up-unavailable' | 'browser-launch-milliseconds' | 'page-budget-fit-milliseconds'
+  | 'page-budget-fit-layouts'
+/** One printed layout, kept so the fitted one is validated and returned without printing it again. */
+type PrintedLayout = Readonly<{ pageCount: number; pdf: Uint8Array; expectedText: readonly string[] }>
 
 /** Whether the browser is ready for the next render; a warm-up is never a render and carries no Candidate content. */
 export type RenderWarmUp = 'ready' | 'timeout' | 'unavailable'
@@ -122,6 +127,7 @@ async function launchWithin({ launch, timeoutMilliseconds }: Readonly<{
 export function createResumeDocumentRenderer({ browser }: Readonly<{ browser: RenderingBrowser }>) {
   return {
     render: (request: ResumeRenderRequest) => renderInIsolation({ browser, request }),
+    fitToPageBudget: (request: PageBudgetFitRequest) => fitInIsolation({ browser, request }),
     warmUp: () => warmUpBrowser({ browser }),
   }
 }
@@ -130,6 +136,10 @@ const resumeDocumentRenderer = createResumeDocumentRenderer({ browser: createRen
 
 export function renderResumeDocument(request: ResumeRenderRequest): Promise<ResumeRenderResult> {
   return resumeDocumentRenderer.render(request)
+}
+
+export function fitResumeDocumentToPageBudget(request: PageBudgetFitRequest): Promise<PageBudgetFit> {
+  return resumeDocumentRenderer.fitToPageBudget(request)
 }
 
 export function warmUpResumeDocumentRenderer(): Promise<RenderWarmUp> {
@@ -158,24 +168,89 @@ async function warmUpBrowser({ browser }: Readonly<{ browser: RenderingBrowser }
   }
 }
 
+/**
+ * Fits the resume to its Page Budget on one page of one browsing context: the shared Overflow Reduction steps run here,
+ * each layout printed by Chromium as the export prints it, and only the fitted layout is validated as a render is. On the
+ * real-sized resume a layout takes a fraction of a second once the browser runs, so the fitting ends well within the
+ * browser's 90 s deadline: the measured duration and layout count are logged with each fitting.
+ */
+async function fitInIsolation({ browser, request }: Readonly<{
+  browser: RenderingBrowser; request: PageBudgetFitRequest
+}>): Promise<PageBudgetFit> {
+  const progress: RenderProgress = { stage: 'launch' }
+  const renderRequest = { draft: request.draft, unsupportedFieldIds: [], photoDataUrl: request.photoDataUrl }
+  const startedAt = performance.now()
+  try {
+    return await browser.withIsolatedPage(async (page) => {
+      await preparePrintPage({ page, progress })
+      // Why the latest layout could not be measured, so an unmeasured resume reports where it stopped.
+      const latestFailure: { current: Readonly<{ stage: RenderStage; error?: unknown }> } = { current: { stage: 'layout' } }
+      const fitted = await fitToPageBudget({ request, measure: async (draft) => {
+        try {
+          const printed = await printLayout({ page, progress, request: { ...renderRequest, draft } })
+          if (printed === null) { latestFailure.current = { stage: 'photo' }; return null }
+          progress.stage = 'pdf-reading'
+          return { ...printed, pageCount: await countPdfPages({ pdf: printed.pdf }) }
+        } catch (error) {
+          latestFailure.current = { stage: progress.stage, error }
+          return null
+        }
+      } })
+      logRenderMetric({ metric: 'page-budget-fit-milliseconds', value: Math.round(performance.now() - startedAt) })
+      logRenderMetric({ metric: 'page-budget-fit-layouts', value: fitted.measurementCount })
+      const fittedRequest = { ...renderRequest, draft: { ...request.draft, document: fitted.document } }
+      const render = fitted.measurement === null
+        ? unavailableRender({ request: fittedRequest, ...latestFailure.current })
+        : await validateRenderedDocument({ ...fitted.measurement, progress, request: fittedRequest })
+      return { document: fitted.document, hiddenFields: fitted.hiddenFields, render, renderCount: fitted.measurementCount }
+    })
+  } catch (error) {
+    return { ...unfittedPageBudget({ request }), render: unavailableRender({ request: renderRequest, stage: progress.stage, error }) }
+  }
+}
+
 async function renderDocumentPages({ page, progress, request }: Readonly<{
   page: Page; progress: RenderProgress; request: ResumeRenderRequest
 }>) {
+  await preparePrintPage({ page, progress })
+  const printed = await printLayout({ page, progress, request })
+  if (printed === null) return unavailableRender({ request, stage: 'photo' })
+  return validateRenderedDocument({ ...printed, progress, request })
+}
+
+/** The page loads nothing but the document's own data URLs, and lays it out for print. */
+async function preparePrintPage({ page, progress }: Readonly<{ page: Page; progress: RenderProgress }>) {
   progress.stage = 'layout'
   await page.setRequestInterception(true)
   page.on('request', (resource) => { void (resource.url().startsWith('data:')
     ? resource.continue() : resource.abort()).catch(() => undefined) })
   await page.emulateMediaType('print')
+}
+
+/** Prints the document as the export does; null when its photo cannot be shown. */
+async function printLayout({ page, progress, request }: Readonly<{
+  page: Page; progress: RenderProgress; request: ResumeRenderRequest
+}>): Promise<Omit<PrintedLayout, 'pageCount'> | null> {
+  progress.stage = 'layout'
   await page.setContent(renderTailoredResumeDocument({ tailoredResume: request.draft.document,
     photoDataUrl: request.photoDataUrl }), { waitUntil: 'load', timeout: 15_000 })
   await page.evaluate(() => document.fonts.ready)
   const imagesLoaded = await page.evaluate(() => Array.from(document.images).every((image) =>
     image.complete && image.naturalWidth > 0))
-  if (!imagesLoaded) return unavailableRender({ request, stage: 'photo' })
+  if (!imagesLoaded) return null
   const expectedText = await readDocumentText({ page })
   progress.stage = 'print'
   const pdf = await page.pdf({ format: 'A4', preferCSSPageSize: true, printBackground: true, timeout: 15_000 })
-  return validateRenderedDocument({ expectedText, pdf, progress, request })
+  return { pdf, expectedText }
+}
+
+async function countPdfPages({ pdf }: Readonly<{ pdf: Uint8Array }>) {
+  const loading = getDocument({ data: pdf.slice(), useSystemFonts: false })
+  try {
+    return (await loading.promise).numPages
+  } finally {
+    await loading.destroy()
+  }
 }
 
 async function readDocumentText({ page }: Readonly<{ page: Page }>) {

@@ -20,7 +20,7 @@ export const dailyLimits = {
   preparationsOverall: Math.floor(dailyBudgetUsd / peakCostPerTailoredResumeUsd),
   /** Model-backed requests per client network: eight journeys with edits stay under 500, so it only stops loops. */
   modelRequestsPerClient: 530,
-  /** PDF renders per client network: one per saved edit. */
+  /** PDF renders per client network: one per saved edit, and one per Page Budget fitting. */
   rendersPerClient: 200,
   /**
    * Rendering browser warm-ups per client network: one per preparation, and each can hold a Lambda until Chromium
@@ -41,14 +41,18 @@ const modelBackedPaths = new Set([
   '/api/resume-section-validation',
   '/api/resume-document-coherence',
 ])
-const renderPath = '/api/resume-document'
+/**
+ * Fitting a Tailored Resume to its Page Budget measures many layouts in one request, and counts as the one render it
+ * returns, so fitting never exhausts the allowance meant for the Candidate's edits.
+ */
+const renderPaths = new Set(['/api/resume-document', '/api/resume-document-fit'])
 /** A warm-up renders nothing, so it has its own limit and never uses the render limit. */
 const rendererWarmUpPath = '/api/resume-document-warm-up'
 
 /** The counters a request consumes, or none when its route is not limited. */
 export function readLimitedCounters({ method, pathname }) {
   if (method !== 'POST') return []
-  if (pathname === renderPath) return ['renders']
+  if (renderPaths.has(pathname)) return ['renders']
   if (pathname === rendererWarmUpPath) return ['renderer-warm-ups']
   if (pathname === preparationPath) return ['model-requests', 'preparations']
   if (modelBackedPaths.has(pathname)) return ['model-requests']

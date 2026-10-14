@@ -202,6 +202,12 @@ const resumeFieldLocationSchema = z.discriminatedUnion('kind', [
     fieldName: z.enum(['category', 'items']) }),
 ])
 
+/** One piece of Hidden Content, with who hid it; content hidden before origins were kept was hidden by the Candidate. */
+export const hiddenResumeFieldSchema = z.strictObject({
+  field: tailoredResumeFieldSchema, location: resumeFieldLocationSchema,
+  origin: z.enum(hiddenContentOrigins).default('candidate'),
+})
+
 export const candidateSessionSchema = z.strictObject({
   preparedResumeStatus: z.enum(['current', 'outdated']).optional(),
   preparedResumeRevision: z.string().optional(),
@@ -209,10 +215,8 @@ export const candidateSessionSchema = z.strictObject({
   resumeFactLocations: z.array(z.strictObject({ factId: candidateFactIdSchema, location: resumeFieldLocationSchema })).optional(),
   resumeEditing: z.strictObject({ revision: z.string().min(1), manuallyEdited: z.boolean(),
     unsupportedFieldIds: z.array(z.string()),
-    hiddenExperiences: tailoredResumeSchema.shape.experiences.optional(), hiddenFields: z.array(z.strictObject({
-      field: tailoredResumeFieldSchema, location: resumeFieldLocationSchema,
-      origin: z.enum(hiddenContentOrigins).default('candidate'),
-    })), restoredFieldIds: z.array(z.string()).optional() }).optional(),
+    hiddenExperiences: tailoredResumeSchema.shape.experiences.optional(), hiddenFields: z.array(hiddenResumeFieldSchema),
+    restoredFieldIds: z.array(z.string()).optional() }).optional(),
   expiresAt: z.number().int().positive(),
   jobMatch: jobMatchSchema.nullable(),
   phase: z.enum(candidateJourneyPhases),

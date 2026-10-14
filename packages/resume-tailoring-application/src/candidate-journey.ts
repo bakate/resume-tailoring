@@ -33,14 +33,17 @@ export type { ResumeFieldEdit, ResumeReviewOperation } from './resume-editing'
 import type { ResumeSectionChange } from './structured-resume-contract'
 import { assign, createActor, fromPromise, setup, waitFor } from 'xstate'
 import type { AnyActorRef, SnapshotFrom } from 'xstate'
-import { prepareResumeRendering, staleResumeRendering, validateResumeRendering } from './resume-rendering-state'
-import { reduceToPageBudget, shortenResume } from './overflow-reduction'
-import type { ResumeRenderingState } from './resume-rendering-state'
+import { matchesFittedRendering, prepareResumeRendering, reuseFittedRendering, staleResumeRendering,
+  validateResumeRendering } from './resume-rendering-state'
+import { fitSessionResume, shortenResume } from './overflow-reduction'
+import type { FittedResumeRendering, ResumeRenderingState } from './resume-rendering-state'
 
 import { unavailableResumeRender } from './resume-export'
 import type { ResumeRenderInput, ResumeRenderRequest, ResumeRenderResult } from './resume-export'
 
 export { assessResumeExport, unavailableResumeRender } from './resume-export'
+export { fitToPageBudget, fitToPageBudgetByRendering, unfittedPageBudget } from './overflow-reduction'
+export type { PageBudgetFit, PageBudgetFitRequest, PageMeasurement } from './overflow-reduction'
 export type { ResumeRenderInput, ResumeRenderRequest, ResumeRenderResult } from './resume-export'
 
 
@@ -116,6 +119,8 @@ type CandidateJourneyContext = Readonly<{
   preparationTiming: PreparationTiming | null
   resumeRendering: ResumeRenderingState | null
   resumeRenderSequence: number
+  /** The render the latest Page Budget fitting returned, which the preview shows rather than rendering it again. */
+  fittedRendering: FittedResumeRendering | null
   dependencies: CandidateJourneyDependencies
   preparationOutcome: CombinedIntakeOutcome | null
   preparationPhase: PreparationPhase | null
@@ -147,7 +152,8 @@ type CandidateJourneyEvent =
   | Readonly<{ type: 'PREPARATION_PROGRESS'; phase: PreparationPhase; session: CandidateSession; at: number }>
   | Readonly<{ type: 'RESUME_SECTIONS_PROGRESSED'; sections: readonly ResumeSectionSnapshot[] }>
   | Readonly<{ type: 'RESUME_PREPARATION_STEP'; step: ResumePreparationStep; at: number }>
-  | Readonly<{ type: 'SAVE_RESUME'; session: CandidateSession; baseRevision: string; correctionKind?: ResumeCorrectionKind }>
+  | Readonly<{ type: 'SAVE_RESUME'; session: CandidateSession; baseRevision: string; correctionKind?: ResumeCorrectionKind
+    fittedRendering?: FittedResumeRendering }>
   | Readonly<{ type: 'REPORT_RESUME'; review: ResumeReviewState; baseRevision: string }>
   | Readonly<{ type: 'UPDATE_RESUME_CONTACTS'; contacts: ResumeContacts }>
   | Readonly<{ type: 'UPDATE_RESUME_PHOTO'; photo: ResumePhoto | null }>
@@ -487,22 +493,21 @@ function hasJobMatchConsent({ input, session }: Readonly<{
 }
 
 /**
- * Overflow Reduction of a just prepared Tailored Resume, with the renders it used; null when it does not run. The
- * reduced session is null when it hides nothing or cannot measure the resume.
+ * Overflow Reduction of a just prepared Tailored Resume in one renderer operation, with the layouts it measured and the
+ * render it returned; null when it does not run. The reduced session is null when it hides nothing.
  */
-const fitPageBudget = fromPromise<Readonly<{ reduced: CandidateSession | null; renderCount: number }> | null, Readonly<{
+const fitPageBudget = fromPromise<Readonly<{
+  reduced: CandidateSession | null; renderCount: number; fittedRendering: FittedResumeRendering
+}> | null, Readonly<{
   dependencies: CandidateJourneyDependencies; session: CandidateSession | null
 }>>(async ({ input: { dependencies, session } }) => {
   // The Page Budget belongs to a Tailored Resume: a Normalized Resume claims no relevance to rank its content by.
   if (session?.tailoredResume?.purpose !== 'tailored' || dependencies.resumeDocumentRenderer === undefined) return null
-  const reduction = { resume: session.tailoredResume, editing: readResumeEditing({ session }) }
-  let renderCount = 0
-  const assessLayout = assessRenderedLayout(dependencies)
-  const reduced = await reduceToPageBudget({ reduction, today: dependencies.now(),
-    assessLayout: (request) => { renderCount += 1; return assessLayout(request) },
-    relevantFactIds: session.jobMatch?.analysis.relevantFactIds ?? [], photoDataUrl: session.resumePhoto?.dataUrl })
-  return { renderCount,
-    reduced: reduced === reduction ? null : { ...session, tailoredResume: reduced.resume, resumeEditing: reduced.editing } }
+  const { reduction, rendering, renderCount } = await fitSessionResume({ session, document: session.tailoredResume,
+    fitToPageBudget: dependencies.resumeDocumentRenderer.fitToPageBudget, today: dependencies.now(),
+    photoDataUrl: session.resumePhoto?.dataUrl, releasesRestoredContent: false })
+  return { renderCount, fittedRendering: rendering,
+    reduced: reduction === null ? null : { ...session, tailoredResume: reduction.document, resumeEditing: reduction.editing } }
 })
 
 /** Reduction completes the preparation: the prepared revision stays, and the resume is not manually edited. */
@@ -613,7 +618,7 @@ const candidateJourneyMachine = setup({
   context: ({ input }: Readonly<{ input: CandidateJourneyDependencies }>) => ({
     dependencies: input,
     preparationTiming: null,
-    resumeRendering: null, resumeRenderSequence: 0,
+    resumeRendering: null, resumeRenderSequence: 0, fittedRendering: null,
     preparationOutcome: null,
     preparationPhase: null,
     preparationStep: 'extracting-source',
@@ -658,18 +663,30 @@ const candidateJourneyMachine = setup({
         },
       },
       on: {
-        RENDER_RESUME_DOCUMENT: {
+        RENDER_RESUME_DOCUMENT: [{
+          // The fitted PDF of this very document is the render: the preview shows it without rendering it again.
+          guard: ({ context, event }) => context.session?.preparedResumeStatus !== 'outdated'
+            && matchesFittedRendering({ input: event.input, fitted: context.fittedRendering }),
+          target: '.idle',
+          actions: assign(({ context, event }) => {
+            const rendering = prepareNextRendering({ context, input: event.input })
+            const { fittedRendering } = context
+            if (fittedRendering === null) return {}
+            const result = reuseFittedRendering({ rendering, fitted: fittedRendering })
+            const renderedContext = { ...context, resumeRendering: rendering }
+            return { resumeRendering: { ...rendering, result }, resumeRenderSequence: rendering.sequence, awaitingPreparedPdf: false,
+              preparationTiming: timeFirstDownloadablePdf({ ...readTiming({ context }), result }),
+              resumeReview: renderedResumeReview({ context: renderedContext, result }) }
+          }),
+        }, {
           guard: ({ context }) => context.session?.preparedResumeStatus !== 'outdated',
           target: '.rendering', reenter: true,
-          actions: assign({
-            resumeRendering: ({ context, event }) => prepareResumeRendering({
-              input: event.input, previous: context.resumeRendering, sequence: context.resumeRenderSequence + 1,
-              revision: `${context.session?.sessionId ?? 'absent'}:${context.dependencies.createIdentifier()}:${String(context.resumeRenderSequence + 1)}`,
-            }),
-            resumeRenderSequence: ({ context }) => context.resumeRenderSequence + 1,
+          actions: assign(({ context, event }) => {
+            const rendering = prepareNextRendering({ context, input: event.input })
+            return { resumeRendering: rendering, resumeRenderSequence: rendering.sequence }
           }),
-        },
-        INVALIDATE_RESUME_INPUTS: { target: '.idle', actions: assign({ preparationTiming: null, resumeRendering: null, session: ({ context }) => invalidateResumeInputs(context), resumeReview: emptyResumeReview }) },
+        }],
+        INVALIDATE_RESUME_INPUTS: { target: '.idle', actions: assign({ preparationTiming: null, resumeRendering: null, fittedRendering: null, session: ({ context }) => invalidateResumeInputs(context), resumeReview: emptyResumeReview }) },
         SAVE_RESUME: {
           target: '.idle',
           guard: ({ context, event }) => context.session !== null
@@ -679,7 +696,8 @@ const candidateJourneyMachine = setup({
             if (result.ok && event.baseRevision !== readResumeEditing({ session: result.value }).revision) {
               recordResumeCorrection({ dependencies: context.dependencies, kind: event.correctionKind ?? 'resume-claim-edit' })
             }
-            return result.ok ? { session: result.value, resumeReview: emptyResumeReview, resumeRendering: null, preparationTiming: null }
+            return result.ok ? { session: result.value, resumeReview: emptyResumeReview, resumeRendering: null, preparationTiming: null,
+              fittedRendering: event.fittedRendering ?? null }
               : { resumeRendering: null, resumeReview: { ...emptyResumeReview, failure: unavailableResumeResult } }
           }),
         },
@@ -737,7 +755,7 @@ const candidateJourneyMachine = setup({
       },
     },
     generatingApplicationResume: {
-      entry: assign({ resumeRendering: null, preparationOutcome: null, preparationPhase: null, preparationStep: 'extracting-source', preparationSections: [], awaitingPreparedPdf: false, preparedInputs: null, resumeReview: emptyResumeReview,
+      entry: assign({ resumeRendering: null, fittedRendering: null, preparationOutcome: null, preparationPhase: null, preparationStep: 'extracting-source', preparationSections: [], awaitingPreparedPdf: false, preparedInputs: null, resumeReview: emptyResumeReview,
         preparationTiming: ({ context }) => startPreparationTiming(context.dependencies),
         session: ({ context }) => context.session === null ? null
           : invalidateEditingRevision(context.session, context.dependencies.createIdentifier),
@@ -809,6 +827,7 @@ const candidateJourneyMachine = setup({
               session: context.preparationOutcome?.status === 'prepared' ? context.session : null }),
             onDone: { target: '#candidate-journey.candidateSessionAvailable', actions: assign(({ context, event }) => ({
               ...saveReducedResume({ context, reduced: event.output?.reduced ?? null }), awaitingPreparedPdf: isPrepared(context),
+              fittedRendering: event.output?.fittedRendering ?? null,
               preparationTiming: completeOverflowReduction({ ...readTiming({ context }), renderCount: event.output?.renderCount ?? null }) })) },
             onError: { target: '#candidate-journey.candidateSessionAvailable',
               actions: assign({ awaitingPreparedPdf: ({ context }) => isPrepared(context),
@@ -1054,6 +1073,7 @@ export function createCandidateJourney({ dependencies }: Readonly<{
     get ports() { return { ...dependencies.resumeDocumentPorts,
       assessLayout: dependencies.resumeDocumentPorts?.assessLayout ?? assessRenderedLayout(dependencies),
     } },
+    fitToPageBudget: dependencies.resumeDocumentRenderer?.fitToPageBudget,
     readReview: () => view.status === 'candidate-session-open' ? view.resumeReview : null,
     readSession: () => actor.getSnapshot().matches('candidateSessionAvailable')
       && view.status === 'candidate-session-open' ? view.session : null,
@@ -1250,6 +1270,13 @@ export type {
   ResumeProposalDecision, ResumeProposalDecisionOutcome, ResumeSectionChange, ResumeSectionChangeOutcome,
 } from './structured-resume-contract'
 
+
+/** The rendering a preview request starts: the same revision as the previous one for the same content. */
+function prepareNextRendering({ context, input }: Readonly<{ context: CandidateJourneyContext; input: ResumeRenderInput }>) {
+  const sequence = context.resumeRenderSequence + 1
+  return prepareResumeRendering({ input, previous: context.resumeRendering, sequence,
+    revision: `${context.session?.sessionId ?? 'absent'}:${context.dependencies.createIdentifier()}:${String(sequence)}` })
+}
 
 /** Measures a draft with the real renderer, as its export would lay it out. */
 function assessRenderedLayout(dependencies: CandidateJourneyDependencies) {
