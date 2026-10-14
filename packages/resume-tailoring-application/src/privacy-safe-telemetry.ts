@@ -32,10 +32,16 @@ export const timedPreparationPhases = [
   'source-intake', 'job-posting-extraction', 'match-evidence', 'resume-sections', 'coherence', 'overflow-reduction',
   'first-downloadable-pdf',
 ] as const
+/**
+ * Whether Overflow Reduction kept the fit started while coherence checked the document, or discarded one because a
+ * coherence check of the preparation removed fields or sent sections back.
+ */
+export const speculativeFitOutcomes = ['kept', 'discarded'] as const
 /** Where an uncaught error surfaced; its message and stack are never reported, as they can quote Candidate content. */
 export const uncaughtErrorSources = ['render', 'error', 'unhandled-rejection'] as const
 
 export type TimedPreparationPhase = typeof timedPreparationPhases[number]
+export type SpeculativeFitOutcome = typeof speculativeFitOutcomes[number]
 export type MatchScoreBand = typeof matchScoreBands[number]
 export type UncaughtErrorSource = typeof uncaughtErrorSources[number]
 
@@ -97,8 +103,9 @@ export type PrivacySafeTelemetryEvent =
       preparationId: string
       phase: 'overflow-reduction'
       durationMilliseconds: number
-      /** How many times Overflow Reduction rendered the resume to measure it. */
+      /** How many times the fit the Candidate got rendered the resume to measure it. */
       renderCount: number
+      speculativeFit: SpeculativeFitOutcome
     }>
   | Readonly<{
       name: 'uncaught-error-reported'

@@ -1,5 +1,5 @@
 import type { PreparationPhase } from './combined-intake'
-import type { PrivacySafeTelemetryEvent, TimedPreparationPhase } from './privacy-safe-telemetry'
+import type { PrivacySafeTelemetryEvent, SpeculativeFitOutcome, TimedPreparationPhase } from './privacy-safe-telemetry'
 import type { ResumeRenderResult } from './resume-export'
 import type { ResumePreparationStep } from './resume-preparation-machines'
 
@@ -58,16 +58,17 @@ export function completePreparationStep({ timing, clock }: TimingUpdate): Prepar
 }
 
 /**
- * Records Overflow Reduction with the renders it used; without a render count it did not run and is not timed. The
- * preparation is still timed to its first downloadable PDF.
+ * Records Overflow Reduction with the renders it used and whether the fit started during the coherence check was kept;
+ * without a render count it did not run and is not timed. It is timed from the end of the coherence check, so a kept
+ * fit times only the wait it left. The preparation is still timed to its first downloadable PDF.
  */
-export function completeOverflowReduction({ timing, clock, renderCount }: TimingUpdate & Readonly<{
-  renderCount: number | null
+export function completeOverflowReduction({ timing, clock, renderCount, speculativeFit }: TimingUpdate & Readonly<{
+  renderCount: number | null; speculativeFit: SpeculativeFitOutcome
 }>): PreparationTiming | null {
   if (timing?.running?.phase !== 'overflow-reduction') return timing
   const { preparationId, running: { startedAt } } = timing
   if (renderCount !== null) clock.record({ name: 'preparation-phase-timed', preparationId, phase: 'overflow-reduction',
-    durationMilliseconds: elapsedSince({ clock, startedAt }), renderCount })
+    durationMilliseconds: elapsedSince({ clock, startedAt }), renderCount, speculativeFit })
   return { ...timing, running: null }
 }
 

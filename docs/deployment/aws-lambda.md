@@ -136,7 +136,7 @@ preparation then usually finds the browser running, unless Lambda routes it to a
 Every preparation is timed phase by phase on real traffic (BAK-182), as its Preparation Timing. The browser sends
 one privacy-safe `preparation-phase-timed` event per completed phase to `/api/analytics`: `source-intake`,
 `job-posting-extraction`, `match-evidence`, `resume-sections`, `coherence`, `overflow-reduction` (with the layouts it measured as `renderCount`: since BAK-184 they are measured in one request
-counted as one render, so compare it with the earlier count of separate renders), then `first-downloadable-pdf`, the time from the start of the preparation to the first render the preview can
+counted as one render, so compare it with the earlier count of separate renders; and, since BAK-185, `speculativeFit`: `kept` when the fit started during the coherence check was used, `discarded` when a coherence check removed fields or sent sections back, so a fit was thrown away), then `first-downloadable-pdf`, the time from the start of the preparation to the first render the preview can
 offer for download. Each carries its duration and a random preparation identifier, generated when the preparation
 starts and linked to nothing else. The server adds the DeepSeek pricing window the phase started in (`peak`:
 01:00–04:00 and 06:00–10:00 UTC on weekdays, otherwise `off-peak`, read from the server's clock) and writes it to the
@@ -151,6 +151,12 @@ Read the numbers with these rules in mind:
   change reuses its inputs, and its shorter wait is not counted. It is not timed either once the Candidate changed the
   resume first (an edit, contacts, a photo), since their own time is not the preparation's.
 - It ends when the render arrives, a moment before the preview has drawn the PDF pages.
+- Since BAK-185, Overflow Reduction starts while coherence runs, and `overflow-reduction` times only the wait left
+  once coherence has answered: close to zero when the fit is `kept`. After a rewrite it is `discarded` even though
+  the fit of the rewritten document, started during the second check, may leave little wait. Its `renderCount` is
+  the fit the Candidate got; each discarded fit cost one more render against the per-network limit of 200 a day, at
+  most three for one preparation. The wait from the Resume Sections validated
+  to the first PDF is the last `coherence`, then `overflow-reduction`, then the preview's render.
 
 Run this in CloudWatch Logs Insights on `/aws/lambda/honest-resume-demo`, over the last seven days:
 
@@ -166,9 +172,18 @@ fields @timestamp
 | sort phase, deepSeekWindow
 ```
 
-Durations are in milliseconds. To follow one slow preparation, filter on its `preparationId`.
+Durations are in milliseconds. To follow one slow preparation, filter on its `preparationId`. To read how often coherence discards the speculative fit, and the wait each leaves:
 
-The baseline the BAK-181 changes are measured against is the first production result of this query, recorded here
+```text
+fields @timestamp
+| filter @message like /"metric":"preparation-phase-timed"/ and @message like /"phase":"overflow-reduction"/
+| parse @message /"speculativeFit":"(?<speculativeFit>[^"]+)"/
+| parse @message /"durationMilliseconds":(?<durationMilliseconds>\d+)/
+| stats count(*) as samples, pct(durationMilliseconds, 50) as p50, pct(durationMilliseconds, 95) as p95
+  by speculativeFit
+```
+
+The baseline the BAK-181 changes are measured against is the first production result of the phase query above, recorded here
 once a week of traffic has been timed:
 
 | Phase | Window | Samples | p50 | p95 |

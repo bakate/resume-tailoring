@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { correctionKinds, journeyPhases, matchScoreBands, resumePreparationOutcomes, resumeRenderFailureCategories, resumeSectionKinds, resumeSectionOutcomes, timedPreparationPhases, uncaughtErrorSources } from '@resume-tailoring/application/privacy-safe-telemetry'
+import { correctionKinds, journeyPhases, matchScoreBands, resumePreparationOutcomes, resumeRenderFailureCategories, resumeSectionKinds, resumeSectionOutcomes, speculativeFitOutcomes, timedPreparationPhases, uncaughtErrorSources } from '@resume-tailoring/application/privacy-safe-telemetry'
 import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/privacy-safe-telemetry'
 
 const matchScoreBandSchema = z.enum(matchScoreBands)
@@ -64,6 +64,7 @@ export const privacySafeAnalyticsEventSchema = z.discriminatedUnion('name', [
       phase: z.literal('overflow-reduction'),
       durationMilliseconds: metricCountSchema,
       renderCount: metricCountSchema,
+      speculativeFit: z.enum(speculativeFitOutcomes),
     }),
   ]),
   z.strictObject({

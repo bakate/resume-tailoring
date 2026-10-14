@@ -148,7 +148,7 @@ describe('privacy-safe analytics observability', () => {
       metric: 'preparation-phase-timed',
       value: 1,
       dimensions: { preparationId: overflowReductionTiming.preparationId, phase: 'overflow-reduction',
-        durationMilliseconds: 4_200, renderCount: 3, deepSeekWindow: window },
+        durationMilliseconds: 4_200, renderCount: 3, speculativeFit: 'kept', deepSeekWindow: window },
     })
   })
 })
@@ -159,4 +159,5 @@ const overflowReductionTiming = {
   phase: 'overflow-reduction',
   durationMilliseconds: 4_200,
   renderCount: 3,
+  speculativeFit: 'kept',
 } as const

@@ -161,18 +161,36 @@ function publishDocument({ context, outcome }: Readonly<{
   if (outcome?.status !== 'prepared') return outcome?.status === 'failed'
     ? failPreparation({ context, detail: outcome.reason, recovery: outcome.recovery, cause: outcome.cause }) : failPreparation({ context, detail: 'unavailable' })
   if (outcome.revision !== context.preparation.revision) return failPreparation({ context, detail: 'stale-result' })
-  const sourceIntake = context.preparation.sourceIntake
-  if (sourceIntake === null) return failPreparation({ context, detail: 'unavailable' })
-  const session = settlePublishedPreparation({ session: { ...context.session, sourceIntake, jobMatch: context.preparation.jobMatch,
-    phase: 'tailored-resume-preparation', preparedResumeStatus: 'current', preparedResumeRevision: outcome.revision,
-    preparation: { ...context.preparation, status: 'prepared' },
-    resumeEditing: { revision: outcome.revision, hiddenFields: [], unsupportedFieldIds: [], manuallyEdited: false },
-    resumeFactLocations: context.session.resumeFactLocations?.filter(({ factId }) => sourceIntake.candidateFacts.some(({ id }) => id === factId)),
-    tailoredResume: { ...outcome.document, ...localResumeContacts({ sourceIntake, session: context.session }) } } })
+  const session = readPublishedSession({ session: context.session, preparation: context.preparation, outcome })
+  if (session === null) return failPreparation({ context, detail: 'unavailable' })
   if (!canPublish(context)) return unavailable
   const saved = context.dependencies.persistence.save({ session })
   return saved.ok ? { status: 'prepared', revision: outcome.revision, session }
     : failPreparation({ context, detail: 'candidate-session-storage-unavailable' })
+}
+
+/**
+ * The session a preparation would publish with this document, without saving it, so its Page Budget can be fitted
+ * while the coherence check may still change the document. Null when it cannot be published.
+ */
+export function readSpeculativeSession({ inputs, outcome }: Readonly<{
+  inputs: PreparedResumeInputs; outcome: Extract<ResumePreparationOutcome, { status: 'prepared' }>
+}>): CandidateSession | null {
+  return outcome.revision !== inputs.preparation.revision ? null
+    : readPublishedSession({ session: inputs.session, preparation: inputs.preparation, outcome })
+}
+
+function readPublishedSession({ session, preparation, outcome }: Readonly<{
+  session: CandidateSession; preparation: ResumePreparation; outcome: Extract<ResumePreparationOutcome, { status: 'prepared' }>
+}>): CandidateSession | null {
+  const { sourceIntake } = preparation
+  if (sourceIntake === null) return null
+  return settlePublishedPreparation({ session: { ...session, sourceIntake, jobMatch: preparation.jobMatch,
+    phase: 'tailored-resume-preparation', preparedResumeStatus: 'current', preparedResumeRevision: outcome.revision,
+    preparation: { ...preparation, status: 'prepared' },
+    resumeEditing: { revision: outcome.revision, hiddenFields: [], unsupportedFieldIds: [], manuallyEdited: false },
+    resumeFactLocations: session.resumeFactLocations?.filter(({ factId }) => sourceIntake.candidateFacts.some(({ id }) => id === factId)),
+    tailoredResume: { ...outcome.document, ...localResumeContacts({ sourceIntake, session }) } } })
 }
 
 function localResumeContacts({ sourceIntake, session }: Readonly<{ sourceIntake: SourceIntake; session: CandidateSession }>) {
