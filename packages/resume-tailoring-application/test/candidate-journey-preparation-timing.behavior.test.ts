@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { assessResumeExport, createCandidateJourney } from '@resume-tailoring/application/candidate-journey'
 import type { CandidateJourney, ResumeCoherenceInput, ResumeRenderRequest } from '@resume-tailoring/application/candidate-journey'
-import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/privacy-safe-telemetry'
+import type { PrivacySafeTelemetryEvent, SpeculativeFitOutcome } from '@resume-tailoring/application/privacy-safe-telemetry'
 import { readGroupedResumeSection, structuredResumeJobMatch } from '@resume-tailoring/application/structured-resume-fixtures'
 import { createFakeCandidateJourneyDependencies, createFakeJobPostingExtractor, createFakeMatchEvidenceMatcher,
   createFakeResumeDocumentRenderer, createFakeResumeSectionModels, createFakeSourceProfileExtractor,
@@ -37,6 +37,33 @@ describe('Candidate Journey Preparation Timing', () => {
     await system.prepareTailoredResume()
 
     system.expectOverflowReductionRenderCountOfTheRenderer()
+  })
+
+  it('records Overflow Reduction as keeping the fit started during a coherence check that changed nothing', async () => {
+    const system = createSystemUnderTest()
+    await system.givenConsentedSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectOverflowReductionWithSpeculativeFit('kept')
+  })
+
+  it('records Overflow Reduction as discarding the fit started during a coherence check that removed a field', async () => {
+    const system = createSystemUnderTest({ coherence: 'redundant-project' })
+    await system.givenConsentedSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectOverflowReductionWithSpeculativeFit('discarded')
+  })
+
+  it('records Overflow Reduction as discarding the fit started during a coherence check that sent a section back', async () => {
+    const system = createSystemUnderTest({ coherence: 'rewrite-once' })
+    await system.givenConsentedSession()
+
+    await system.prepareTailoredResume()
+
+    system.expectOverflowReductionWithSpeculativeFit('discarded')
   })
 
   it('times Resume Sections and coherence again when coherence sends sections back for rewriting', async () => {
@@ -93,8 +120,11 @@ type TestOptions = Readonly<{
   layout?: 'two-pages'
   /** `unavailable` fails the first render the preview asks for. */
   firstPreview?: 'unavailable'
-  /** `rewrite-once` finds the first experience's role mixed up on the first check only. */
-  coherence?: 'rewrite-once'
+  /**
+   * `rewrite-once` finds the first experience's role mixed up on the first check only; `redundant-project` finds the
+   * first project redundant, which removes it.
+   */
+  coherence?: 'rewrite-once' | 'redundant-project'
 }>
 
 type PhaseTiming = Extract<PrivacySafeTelemetryEvent, Readonly<{ name: 'preparation-phase-timed' }>>
@@ -111,6 +141,8 @@ class PreparationTimingSystem {
   #fittingRenderCount = 0
   #previewRenderCount = 0
   #coherenceCheckCount = 0
+  /** Whether the latest coherence check answered; layouts measured before it count in the coherence wait. */
+  #coherenceAnswered = false
   #eventsBeforeAction: number | null = null
 
   constructor(options: TestOptions) {
@@ -131,6 +163,7 @@ class PreparationTimingSystem {
       } },
       resumeSectionModels: createFakeResumeSectionModels({
         writeSection: ({ section }) => {
+          this.#coherenceAnswered = false
           this.#advance('resume-sections', 400)
           return Promise.resolve({ ok: true, value: readGroupedResumeSection(section) })
         },
@@ -138,10 +171,14 @@ class PreparationTimingSystem {
           this.#advance('resume-sections', 50)
           return Promise.resolve({ ok: true, value: { fields: fields.map(({ id }) => ({ fieldId: id, supported: true })) } })
         },
+        // The answer arrives after a task, as a model call does: the fit started meanwhile has measured every layout.
         checkCoherence: (input) => {
           this.#advance('coherence', 5_500)
           this.#coherenceCheckCount += 1
-          return Promise.resolve({ ok: true, value: this.#checkCoherence({ input, options }) })
+          return new Promise((resolve) => { setTimeout(() => {
+            this.#coherenceAnswered = true
+            resolve({ ok: true, value: this.#checkCoherence({ input, options }) })
+          }, 0) })
         },
       }),
       resumeDocumentRenderer: createFakeResumeDocumentRenderer({ render: (request) => this.#render({ request, options }) }),
@@ -206,9 +243,11 @@ class PreparationTimingSystem {
     expect(new Set(this.#timingsOfLatestPreparation().map(({ preparationId }) => preparationId)).size).toBe(1)
   }
 
+  /** The fit kept from the coherence check measured its layouts during the check, leaving no wait after it. */
   expectLatestPreparationDurationsOfTheFakeClock() {
     expect(Object.fromEntries(this.#timingsOfLatestPreparation().map(({ phase, durationMilliseconds }) =>
       [phase, durationMilliseconds]))).toEqual({
+      'overflow-reduction': 0,
       ...Object.fromEntries(this.#expectedDurations),
       'first-downloadable-pdf': this.#clock - this.#preparationStartedAt,
     })
@@ -239,6 +278,11 @@ class PreparationTimingSystem {
     expect(timing).toMatchObject({ renderCount: this.#fittingRenderCount })
   }
 
+  expectOverflowReductionWithSpeculativeFit(speculativeFit: SpeculativeFitOutcome) {
+    expect(this.#timingsAfterAction().filter(({ phase }) => phase === 'overflow-reduction'))
+      .toMatchObject([{ speculativeFit }])
+  }
+
   expectFirstDownloadablePdfTimedSinceThePreparationStarted() {
     expect(this.#timingsOfLatestPreparation().filter(({ phase }) => phase === 'first-downloadable-pdf'))
       .toMatchObject([{ durationMilliseconds: this.#clock - this.#preparationStartedAt }])
@@ -266,6 +310,10 @@ class PreparationTimingSystem {
 
   #checkCoherence({ input, options }: Readonly<{ input: ResumeCoherenceInput; options: TestOptions }>) {
     const coherent = { coherent: true, languageMatches: true, issues: [] }
+    const project = input.document.sections.flatMap((section) => section.section === 'projects' ? section.fields : [])[0]
+    if (options.coherence === 'redundant-project' && project !== undefined) {
+      return { ...coherent, coherent: false, issues: [{ fieldId: project.id, kind: 'redundant' as const }] }
+    }
     const role = input.document.experiences[0]?.role
     if (options.coherence !== 'rewrite-once' || this.#coherenceCheckCount > 1 || role == null) return coherent
     return { ...coherent, coherent: false, issues: [{ fieldId: role.id, kind: 'mixed-association' as const }] }
@@ -273,7 +321,8 @@ class PreparationTimingSystem {
 
   #render({ request, options }: Readonly<{ request: ResumeRenderRequest; options: TestOptions }>) {
     const previewing = this.#phase === 'first-downloadable-pdf'
-    this.#advance(previewing ? 'first-downloadable-pdf' : 'overflow-reduction', 700)
+    // A layout measured before coherence answers is part of the coherence wait.
+    this.#advance(previewing ? 'first-downloadable-pdf' : this.#coherenceAnswered ? 'overflow-reduction' : 'coherence', 700)
     if (previewing) this.#previewRenderCount += 1
     else this.#fittingRenderCount += 1
     if (previewing && options.firstPreview === 'unavailable' && this.#previewRenderCount === 1) {

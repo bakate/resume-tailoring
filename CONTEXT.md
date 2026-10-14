@@ -209,7 +209,7 @@ The page count a Tailored Resume aims for: one page by default, two when the Rel
 _Avoid_: Page limit, length setting
 
 **Overflow Reduction**:
-The fixed, deterministic sequence of steps that turns content into Hidden Content until the Tailored Resume fits its Page Budget, without calling a language model. It runs once a Tailored Resume is prepared, and again when the Candidate asks to shorten a resume that overflows its Page Budget.
+The fixed, deterministic sequence of steps that turns content into Hidden Content until the Tailored Resume fits its Page Budget, without calling a language model. It runs once a Tailored Resume is prepared, and again when the Candidate asks to shorten a resume that overflows its Page Budget. A preparation starts it on the assembled document while the coherence check runs, and keeps that result only when coherence changes nothing; otherwise it runs again on the document coherence accepted.
 _Avoid_: Auto-shortening, condensation, trimming
 
 **Hidden Content**:

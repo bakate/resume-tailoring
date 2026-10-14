@@ -9,7 +9,7 @@ export type { ResumeCoherenceInput, ResumeCoherenceIssue, ResumeCoherenceIssueKi
 export { delayedFailureCauseTypes, failureCauseTypes, readRecovery, retiredFailureCauseTypes } from './failure-cause'
 export type { ExplainedFailure, FailureCause, Recovery } from './failure-cause'
 import { resumePreparationMachine } from './resume-preparation-machines'
-import type { ResumePreparationStep } from './resume-preparation-machines'
+import type { ResumePreparationStepReport } from './resume-preparation-machines'
 import { completeOverflowReduction, completePreparationStep, enterOverflowReduction, enterPreparationStep, startPreparationTiming,
   timeFirstDownloadablePdf } from './preparation-timing'
 import type { PreparationTiming } from './preparation-timing'
@@ -17,10 +17,10 @@ import { readPreparationProgress } from './preparation-progress'
 import type { PreparationProgress, PreparationProgressStep } from './preparation-progress'
 export { preparationProgressPhases } from './preparation-progress'
 export type { PreparationProgress, PreparationProgressPhase } from './preparation-progress'
-import { prepareCombinedIntake, publishResumePreparation, unavailable } from './combined-intake'
+import { prepareCombinedIntake, publishResumePreparation, readSpeculativeSession, unavailable } from './combined-intake'
 import type { CombinedIntakeOutcome, CombinedIntakeRequest, PreparationPhase, PreparedResumeInputs } from './combined-intake'
 
-import type { MatchScoreBand, PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
+import type { MatchScoreBand, PrivacySafeTelemetryEvent, SpeculativeFitOutcome } from './privacy-safe-telemetry'
 import type { ResumeCorrectionKind } from './resume-editing'
 import { assessResumeLayout, proposeResumeCondensation, acceptResumeCondensation, rejectResumeCondensation } from './resume-condensation'
 import type { ResumeProposalDecision } from './structured-resume-contract'
@@ -31,7 +31,7 @@ import { applyValidatedSectionChange, changedResumeSession, editResumeField, edi
 import type { ResumeEditingAccess, ResumeFieldEdit, ResumeReview, ResumeReviewState } from './resume-editing'
 export type { ResumeFieldEdit, ResumeReviewOperation } from './resume-editing'
 import type { ResumeSectionChange } from './structured-resume-contract'
-import { assign, createActor, fromPromise, setup, waitFor } from 'xstate'
+import { assign, createActor, enqueueActions, fromPromise, setup, stopChild, waitFor } from 'xstate'
 import type { AnyActorRef, SnapshotFrom } from 'xstate'
 import { matchesFittedRendering, prepareResumeRendering, reuseFittedRendering, staleResumeRendering,
   validateResumeRendering } from './resume-rendering-state'
@@ -121,6 +121,8 @@ type CandidateJourneyContext = Readonly<{
   resumeRenderSequence: number
   /** The render the latest Page Budget fitting returned, which the preview shows rather than rendering it again. */
   fittedRendering: FittedResumeRendering | null
+  /** The Page Budget fitting of the document the coherence check is checking; null when none runs or is kept. */
+  speculativeFit: SpeculativeFit | null
   dependencies: CandidateJourneyDependencies
   preparationOutcome: CombinedIntakeOutcome | null
   preparationPhase: PreparationPhase | null
@@ -151,7 +153,8 @@ type CandidateJourneyEvent =
   | Readonly<{ type: 'INVALIDATE_RESUME_INPUTS' }>
   | Readonly<{ type: 'PREPARATION_PROGRESS'; phase: PreparationPhase; session: CandidateSession; at: number }>
   | Readonly<{ type: 'RESUME_SECTIONS_PROGRESSED'; sections: readonly ResumeSectionSnapshot[] }>
-  | Readonly<{ type: 'RESUME_PREPARATION_STEP'; step: ResumePreparationStep; at: number }>
+  | ResumePreparationStepReport
+  | Readonly<{ type: typeof speculativeFitDone; output: SpeculativeFitOutput }>
   | Readonly<{ type: 'SAVE_RESUME'; session: CandidateSession; baseRevision: string; correctionKind?: ResumeCorrectionKind
     fittedRendering?: FittedResumeRendering }>
   | Readonly<{ type: 'REPORT_RESUME'; review: ResumeReviewState; baseRevision: string }>
@@ -494,27 +497,91 @@ function hasJobMatchConsent({ input, session }: Readonly<{
 
 /**
  * Overflow Reduction of a just prepared Tailored Resume in one renderer operation, with the layouts it measured and the
- * render it returned; null when it does not run. The reduced session is null when it hides nothing.
+ * render it returned; null when it does not run. The reduction is null when it hides nothing.
  */
-const fitPageBudget = fromPromise<Readonly<{
-  reduced: CandidateSession | null; renderCount: number; fittedRendering: FittedResumeRendering
-}> | null, Readonly<{
-  dependencies: CandidateJourneyDependencies; session: CandidateSession | null
-}>>(async ({ input: { dependencies, session } }) => {
+type PageBudgetFitOutput = Awaited<ReturnType<typeof fitSessionResume>> | null
+
+type PageBudgetFitInput = Readonly<{ dependencies: CandidateJourneyDependencies; session: CandidateSession | null }>
+
+async function fitPreparedResume({ dependencies, session }: PageBudgetFitInput): Promise<PageBudgetFitOutput> {
   // The Page Budget belongs to a Tailored Resume: a Normalized Resume claims no relevance to rank its content by.
   if (session?.tailoredResume?.purpose !== 'tailored' || dependencies.resumeDocumentRenderer === undefined) return null
-  const { reduction, rendering, renderCount } = await fitSessionResume({ session, document: session.tailoredResume,
+  return fitSessionResume({ session, document: session.tailoredResume,
     fitToPageBudget: dependencies.resumeDocumentRenderer.fitToPageBudget, today: dependencies.now(),
     photoDataUrl: session.resumePhoto?.dataUrl, releasesRestoredContent: false })
-  return { renderCount, fittedRendering: rendering,
-    reduced: reduction === null ? null : { ...session, tailoredResume: reduction.document, resumeEditing: reduction.editing } }
-})
+}
+
+const fitPageBudget = fromPromise<PageBudgetFitOutput, PageBudgetFitInput>(({ input }) => fitPreparedResume(input))
+
+/**
+ * The fitting of the session a preparation would publish if coherence changed nothing. It is kept only when the
+ * published session has the same resume, editing state and photo, so a kept fit is the fit the preparation would run.
+ */
+type SpeculativeFit = Readonly<{
+  session: CandidateSession
+  /** Whether it replaces the fit of a document an earlier coherence check of this preparation sent back. */
+  replacesDiscarded: boolean
+}> & (Readonly<{ status: 'running' }> | Readonly<{ status: 'finished'; output: PageBudgetFitOutput }>)
+
+/** The output names the session it fitted, so a fitting started for an earlier coherence check is never taken for this one. */
+type SpeculativeFitOutput = Readonly<{ session: CandidateSession; output: PageBudgetFitOutput }>
+
+const speculativeFitId = 'speculative-page-budget-fit'
+const speculativeFitDone = `xstate.done.actor.${speculativeFitId}` as const
+const speculativeFitError = `xstate.error.actor.${speculativeFitId}` as const
+
+const fitPageBudgetSpeculatively = fromPromise<SpeculativeFitOutput, Readonly<{
+  dependencies: CandidateJourneyDependencies; session: CandidateSession
+}>>(async ({ input }) => ({ session: input.session, output: await fitPreparedResume(input) }))
+
+/** The session the preparation publishes when the coherence check now running changes nothing; null when none can be published. */
+function readCheckedSession({ context, event }: Readonly<{
+  context: CandidateJourneyContext; event: Extract<ResumePreparationStepReport, { step: 'checking-coherence' }>
+}>): CandidateSession | null {
+  return context.preparedInputs === null ? null
+    : readSpeculativeSession({ inputs: context.preparedInputs, outcome: event.checked })
+}
+
+function readSpeculativeFitResult({ context, result }: Readonly<{
+  context: CandidateJourneyContext; result: SpeculativeFitOutput
+}>): SpeculativeFit | null {
+  const { speculativeFit } = context
+  return speculativeFit?.session !== result.session ? speculativeFit
+    : { ...speculativeFit, status: 'finished', output: result.output }
+}
+
+/** The speculative fit when the preparation published the very session it fitted; null when coherence changed it. */
+function readKeptSpeculativeFit(context: CandidateJourneyContext): SpeculativeFit | null {
+  const { speculativeFit, session } = context
+  return isPrepared(context) && speculativeFit !== null && session !== null
+    && readFitInputs(speculativeFit.session) === readFitInputs(session) ? speculativeFit : null
+}
+
+/** A preparation that discarded a speculative fit for any coherence check counts as discarding it. */
+function readSpeculativeFitOutcome(kept: SpeculativeFit | null): SpeculativeFitOutcome {
+  return kept === null || kept.replacesDiscarded ? 'discarded' : 'kept'
+}
+
+function readFitInputs({ tailoredResume, resumeEditing, resumePhoto }: CandidateSession) {
+  return JSON.stringify({ tailoredResume, resumeEditing, photoDataUrl: resumePhoto?.dataUrl })
+}
+
+/** Ends the preparation with its fitted resume, timing Overflow Reduction with whether the speculative fit was kept. */
+function completePageBudgetFit({ context, output, speculativeFitOutcome }: Readonly<{
+  context: CandidateJourneyContext; output: PageBudgetFitOutput; speculativeFitOutcome: SpeculativeFitOutcome
+}>): Partial<CandidateJourneyContext> {
+  return { ...saveReducedResume({ context, reduction: output?.reduction ?? null }), awaitingPreparedPdf: isPrepared(context),
+    fittedRendering: output?.rendering ?? null, speculativeFit: null,
+    preparationTiming: completeOverflowReduction({ ...readTiming({ context }), renderCount: output?.renderCount ?? null,
+      speculativeFit: speculativeFitOutcome }) }
+}
 
 /** Reduction completes the preparation: the prepared revision stays, and the resume is not manually edited. */
-function saveReducedResume({ context, reduced }: Readonly<{
-  context: CandidateJourneyContext; reduced: CandidateSession | null
+function saveReducedResume({ context, reduction }: Readonly<{
+  context: CandidateJourneyContext; reduction: NonNullable<PageBudgetFitOutput>['reduction']
 }>): Partial<CandidateJourneyContext> {
-  if (reduced === null || context.preparationOutcome?.status !== 'prepared') return {}
+  if (reduction === null || context.session === null || context.preparationOutcome?.status !== 'prepared') return {}
+  const reduced = { ...context.session, tailoredResume: reduction.document, resumeEditing: reduction.editing }
   // The unreduced resume is already saved: when this save fails, the Candidate keeps it and the overflow outcome applies.
   const saved = context.dependencies.persistence.save({ session: reduced })
   return saved.ok ? { session: saved.value, preparationOutcome: { ...context.preparationOutcome, session: saved.value } } : {}
@@ -594,6 +661,7 @@ const candidateJourneyMachine = setup({
     generateApplicationResume,
     resumePreparationMachine,
     fitPageBudget,
+    fitPageBudgetSpeculatively,
     renderResumeDocument,
     confirmProfileEnrichment,
     deleteCandidateSession,
@@ -618,7 +686,7 @@ const candidateJourneyMachine = setup({
   context: ({ input }: Readonly<{ input: CandidateJourneyDependencies }>) => ({
     dependencies: input,
     preparationTiming: null,
-    resumeRendering: null, resumeRenderSequence: 0, fittedRendering: null,
+    resumeRendering: null, resumeRenderSequence: 0, fittedRendering: null, speculativeFit: null,
     preparationOutcome: null,
     preparationPhase: null,
     preparationStep: 'extracting-source',
@@ -755,13 +823,18 @@ const candidateJourneyMachine = setup({
       },
     },
     generatingApplicationResume: {
-      entry: assign({ resumeRendering: null, fittedRendering: null, preparationOutcome: null, preparationPhase: null, preparationStep: 'extracting-source', preparationSections: [], awaitingPreparedPdf: false, preparedInputs: null, resumeReview: emptyResumeReview,
+      entry: assign({ resumeRendering: null, fittedRendering: null, speculativeFit: null, preparationOutcome: null, preparationPhase: null, preparationStep: 'extracting-source', preparationSections: [], awaitingPreparedPdf: false, preparedInputs: null, resumeReview: emptyResumeReview,
         preparationTiming: ({ context }) => startPreparationTiming(context.dependencies),
         session: ({ context }) => context.session === null ? null
           : invalidateEditingRevision(context.session, context.dependencies.createIdentifier),
       }),
+      // Whatever ends the preparation ends its speculative fit: only the fitting step keeps its result.
+      exit: stopChild(speculativeFitId),
       after: { candidateSessionExpiration: { target: 'removingCandidateSession', actions: [recordSessionExpiration, assign({ notice: 'expired-session-discarded' })] } },
-      on: { INVALIDATE_RESUME_INPUTS: { target: 'candidateSessionAvailable', actions: assign({
+      on: { [speculativeFitDone]: { actions: assign({ speculativeFit: ({ context, event }) =>
+        readSpeculativeFitResult({ context, result: event.output }) }) },
+      [speculativeFitError]: { actions: assign({ speculativeFit: null }) },
+      INVALIDATE_RESUME_INPUTS: { target: 'candidateSessionAvailable', actions: assign({
         session: ({ context }) => invalidateResumeInputs(context), preparationPhase: null, preparationTiming: null, preparationOutcome: null, preparedInputs: null, resumeReview: emptyResumeReview,
       }) }, PREPARATION_PROGRESS: { actions: [({ context, event }) => { recordJourneyPhase({ context, phase: event.phase }) },
         assign({ preparationPhase: ({ event }) => event.phase, preparationStep: ({ event }) => event.phase, session: ({ event }) => event.session,
@@ -803,8 +876,18 @@ const candidateJourneyMachine = setup({
             assign({ preparationPhase: null, preparationStep: 'writing-sections' })],
           on: { RESUME_SECTIONS_PROGRESSED: { actions: assign(({ context, event }) => ({ preparationSections: event.sections,
             ...saveResumeSectionsProgress({ context, sections: event.sections }) })) },
-          RESUME_PREPARATION_STEP: { actions: assign({ preparationStep: ({ event }) => event.step, preparationTiming: ({ context, event }) =>
-            enterPreparationStep({ ...readTiming({ context, at: event.at }), step: event.step }) }) } },
+          RESUME_PREPARATION_STEP: { actions: [assign({ preparationStep: ({ event }) => event.step, preparationTiming: ({ context, event }) =>
+            enterPreparationStep({ ...readTiming({ context, at: event.at }), step: event.step }) }),
+          // Each coherence check fits the document it checks, replacing the fit of the document an earlier check sent back.
+          enqueueActions(({ context, event, enqueue }) => {
+            if (event.step !== 'checking-coherence') return
+            enqueue.stopChild(speculativeFitId)
+            const session = readCheckedSession({ context, event })
+            enqueue.assign({ speculativeFit: session === null ? null
+              : { session, status: 'running', replacesDiscarded: context.speculativeFit !== null } })
+            if (session !== null) enqueue.spawnChild('fitPageBudgetSpeculatively', { id: speculativeFitId,
+              input: { dependencies: context.dependencies, session } })
+          })] } },
           invoke: {
             src: 'resumePreparationMachine',
             input: ({ context }) => readResumePreparationInput(context),
@@ -821,17 +904,39 @@ const candidateJourneyMachine = setup({
         },
         fittingPageBudget: {
           entry: assign({ preparationStep: 'fitting-page-budget' }),
-          invoke: {
-            src: 'fitPageBudget',
-            input: ({ context }) => ({ dependencies: context.dependencies,
-              session: context.preparationOutcome?.status === 'prepared' ? context.session : null }),
-            onDone: { target: '#candidate-journey.candidateSessionAvailable', actions: assign(({ context, event }) => ({
-              ...saveReducedResume({ context, reduced: event.output?.reduced ?? null }), awaitingPreparedPdf: isPrepared(context),
-              fittedRendering: event.output?.fittedRendering ?? null,
-              preparationTiming: completeOverflowReduction({ ...readTiming({ context }), renderCount: event.output?.renderCount ?? null }) })) },
-            onError: { target: '#candidate-journey.candidateSessionAvailable',
-              actions: assign({ awaitingPreparedPdf: ({ context }) => isPrepared(context),
-                preparationTiming: ({ context }) => completeOverflowReduction({ ...readTiming({ context }), renderCount: null }) }) },
+          initial: 'choosingFit',
+          states: {
+            // The speculative fit is kept when coherence published the session it fits, finished or still running.
+            choosingFit: {
+              always: [{
+                guard: ({ context }) => readKeptSpeculativeFit(context)?.status === 'finished',
+                target: '#candidate-journey.candidateSessionAvailable',
+                actions: assign(({ context }) => {
+                  const kept = readKeptSpeculativeFit(context)
+                  return completePageBudgetFit({ context, speculativeFitOutcome: readSpeculativeFitOutcome(kept),
+                    output: kept?.status === 'finished' ? kept.output : null })
+                }),
+              }, { guard: ({ context }) => readKeptSpeculativeFit(context) !== null, target: 'awaitingSpeculativeFit' },
+              { target: 'fitting', actions: [stopChild(speculativeFitId), assign({ speculativeFit: null })] }],
+            },
+            awaitingSpeculativeFit: {
+              on: { [speculativeFitDone]: { target: '#candidate-journey.candidateSessionAvailable',
+                guard: ({ context, event }) => event.output.session === readKeptSpeculativeFit(context)?.session,
+                actions: assign(({ context, event }) => completePageBudgetFit({ context, output: event.output.output,
+                  speculativeFitOutcome: readSpeculativeFitOutcome(readKeptSpeculativeFit(context)) })) },
+              [speculativeFitError]: { target: 'fitting', actions: assign({ speculativeFit: null }) } },
+            },
+            fitting: {
+              invoke: {
+                src: 'fitPageBudget',
+                input: ({ context }) => ({ dependencies: context.dependencies,
+                  session: context.preparationOutcome?.status === 'prepared' ? context.session : null }),
+                onDone: { target: '#candidate-journey.candidateSessionAvailable', actions: assign(({ context, event }) =>
+                  completePageBudgetFit({ context, output: event.output, speculativeFitOutcome: 'discarded' })) },
+                onError: { target: '#candidate-journey.candidateSessionAvailable',
+                  actions: assign(({ context }) => completePageBudgetFit({ context, output: null, speculativeFitOutcome: 'discarded' })) },
+              },
+            },
           },
         },
       },

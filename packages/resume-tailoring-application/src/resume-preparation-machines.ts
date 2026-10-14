@@ -487,6 +487,14 @@ function unavailableFailure({ cause, recovery }: ExplainedFailure): ResumeOperat
 /** A step of the preparation the Candidate Journey times: writing the Resume Sections, then checking their coherence. */
 export type ResumePreparationStep = 'writing-sections' | 'checking-coherence'
 
+/**
+ * A step the preparation started, reported with its own start. Checking coherence carries the document it checks:
+ * the preparation outcome it becomes when the check changes nothing.
+ */
+export type ResumePreparationStepReport = Readonly<{ type: 'RESUME_PREPARATION_STEP'; at: number }> & (
+  | Readonly<{ step: 'writing-sections' }>
+  | Readonly<{ step: 'checking-coherence'; checked: Extract<ResumePreparationOutcome, { status: 'prepared' }> }>)
+
 type ResumePreparationEvent =
   | Readonly<{ type: 'SECTION_PROGRESSED'; key: string; status: SectionProgressStatus; attempt: number }>
   | Readonly<{ type: 'SECTION_FINISHED'; result: ResumeSectionResult }>
@@ -576,7 +584,11 @@ export const resumePreparationMachine = setup({
     // The step carries its own start, so the Journey times it whenever it handles the report.
     reportStepStarted: enqueueActions(({ context, self, enqueue }, step: ResumePreparationStep) => {
       if (self._parent === undefined) return
-      enqueue.sendParent({ type: 'RESUME_PREPARATION_STEP', step, at: context.now() })
+      const report: ResumePreparationStepReport = step === 'writing-sections'
+        ? { type: 'RESUME_PREPARATION_STEP', step, at: context.now() }
+        : { type: 'RESUME_PREPARATION_STEP', step, at: context.now(), checked: { status: 'prepared',
+          revision: context.revision, document: assembleDocument(context).document } }
+      enqueue.sendParent(report)
     }),
     spawnQueuedSections: enqueueActions(({ context, enqueue }) => {
       const running = context.startedKeys.length - context.results.length
