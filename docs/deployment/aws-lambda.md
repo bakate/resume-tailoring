@@ -93,6 +93,50 @@ The PDF renderer was sized against a 100 s Cloudflare proxy limit. Cloudflare do
 been measured on this deployment. Right after switching to DeepSeek (BAK-168), confirm on the deployed Worker that a
 match evidence request answered after 100 s still reaches the browser; otherwise lower its deadline below 100 s.
 
+### Preparation phase timings
+
+Every preparation is timed phase by phase on real traffic (BAK-182), as its Preparation Timing. The browser sends
+one privacy-safe `preparation-phase-timed` event per completed phase to `/api/analytics`: `source-intake`,
+`job-posting-extraction`, `match-evidence`, `resume-sections`, `coherence`, `overflow-reduction` (with the renders it
+used), then `first-downloadable-pdf`, the time from the start of the preparation to the first render the preview can
+offer for download. Each carries its duration and a random preparation identifier, generated when the preparation
+starts and linked to nothing else. The server adds the DeepSeek pricing window the phase started in (`peak`:
+01:00–04:00 and 06:00–10:00 UTC on weekdays, otherwise `off-peak`, read from the server's clock) and writes it to the
+function's log group, kept seven days.
+
+Read the numbers with these rules in mind:
+
+- A failed phase is not timed, and neither is the first PDF of a failed preparation.
+- When coherence sends sections back for rewriting, `resume-sections` and `coherence` are timed again, so a partial
+  rewrite is pooled with full writes.
+- `first-downloadable-pdf` is timed only for a preparation that extracted its Job Posting. A retry or a language
+  change reuses its inputs, and its shorter wait is not counted. It is not timed either once the Candidate changed the
+  resume first (an edit, contacts, a photo), since their own time is not the preparation's.
+- It ends when the render arrives, a moment before the preview has drawn the PDF pages.
+
+Run this in CloudWatch Logs Insights on `/aws/lambda/honest-resume-demo`, over the last seven days:
+
+```text
+fields @timestamp
+| filter @message like /"metric":"preparation-phase-timed"/
+| parse @message /"phase":"(?<phase>[^"]+)"/
+| parse @message /"durationMilliseconds":(?<durationMilliseconds>\d+)/
+| parse @message /"renderCount":(?<renderCount>\d+)/
+| parse @message /"deepSeekWindow":"(?<deepSeekWindow>[^"]+)"/
+| stats count(*) as samples, pct(durationMilliseconds, 50) as p50, pct(durationMilliseconds, 95) as p95,
+  pct(renderCount, 50) as renders_p50 by phase, deepSeekWindow
+| sort phase, deepSeekWindow
+```
+
+Durations are in milliseconds. To follow one slow preparation, filter on its `preparationId`.
+
+The baseline the BAK-181 changes are measured against is the first production result of this query, recorded here
+once a week of traffic has been timed:
+
+| Phase | Window | Samples | p50 | p95 |
+| --- | --- | ---: | ---: | ---: |
+| _Pending the first production week after BAK-182 ships._ | | | | |
+
 ## Security headers
 
 The application sets its own `Content-Security-Policy`, `Referrer-Policy`, `X-Content-Type-Options`,

@@ -484,6 +484,9 @@ function unavailableFailure({ cause, recovery }: ExplainedFailure): ResumeOperat
   return { status: 'failed', reason: 'unavailable', cause, recovery }
 }
 
+/** A step of the preparation the Candidate Journey times: writing the Resume Sections, then checking their coherence. */
+export type ResumePreparationStep = 'writing-sections' | 'checking-coherence'
+
 type ResumePreparationEvent =
   | Readonly<{ type: 'SECTION_PROGRESSED'; key: string; status: SectionProgressStatus; attempt: number }>
   | Readonly<{ type: 'SECTION_FINISHED'; result: ResumeSectionResult }>
@@ -570,6 +573,11 @@ export const resumePreparationMachine = setup({
       if (self._parent === undefined) return
       enqueue.sendParent({ type: 'RESUME_SECTIONS_PROGRESSED', sections: context.sections })
     }),
+    // The step carries its own start, so the Journey times it whenever it handles the report.
+    reportStepStarted: enqueueActions(({ context, self, enqueue }, step: ResumePreparationStep) => {
+      if (self._parent === undefined) return
+      enqueue.sendParent({ type: 'RESUME_PREPARATION_STEP', step, at: context.now() })
+    }),
     spawnQueuedSections: enqueueActions(({ context, enqueue }) => {
       const running = context.startedKeys.length - context.results.length
       const queued = context.plan.filter(({ key }) => !context.startedKeys.includes(key))
@@ -600,7 +608,7 @@ export const resumePreparationMachine = setup({
       always: { target: 'writingSections' },
     },
     writingSections: {
-      entry: 'spawnQueuedSections',
+      entry: [{ type: 'reportStepStarted', params: 'writing-sections' }, 'spawnQueuedSections'],
       on: {
         SECTION_PROGRESSED: { actions: [assign({ sections: readProgressedSections }), 'reportSectionsProgressed'] },
         SECTION_FINISHED: { actions: [
@@ -616,6 +624,7 @@ export const resumePreparationMachine = setup({
       ],
     },
     checkingCoherence: {
+      entry: { type: 'reportStepStarted', params: 'checking-coherence' },
       invoke: {
         src: 'checkDocumentCoherence',
         input: ({ context }) => ({ models: context.models, context }),

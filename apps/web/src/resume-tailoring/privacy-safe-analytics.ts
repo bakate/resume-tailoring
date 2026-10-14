@@ -1,10 +1,12 @@
 import { z } from 'zod'
 
-import { correctionKinds, journeyPhases, matchScoreBands, resumePreparationOutcomes, resumeRenderFailureCategories, resumeSectionKinds, resumeSectionOutcomes, uncaughtErrorSources } from '@resume-tailoring/application/privacy-safe-telemetry'
+import { correctionKinds, journeyPhases, matchScoreBands, resumePreparationOutcomes, resumeRenderFailureCategories, resumeSectionKinds, resumeSectionOutcomes, timedPreparationPhases, uncaughtErrorSources } from '@resume-tailoring/application/privacy-safe-telemetry'
 import type { PrivacySafeTelemetryEvent } from '@resume-tailoring/application/privacy-safe-telemetry'
 
 const matchScoreBandSchema = z.enum(matchScoreBands)
 const metricCountSchema = z.number().int().min(0).max(10_000_000)
+/** A random UUID, so no Candidate content can travel in place of the preparation identifier. */
+const preparationIdSchema = z.uuid()
 
 export const privacySafeAnalyticsEventSchema = z.discriminatedUnion('name', [
   z.strictObject({ name: z.literal('resume-tailoring-opened') }),
@@ -49,6 +51,21 @@ export const privacySafeAnalyticsEventSchema = z.discriminatedUnion('name', [
     category: z.enum(resumeRenderFailureCategories),
     retried: z.boolean(),
   }),
+  z.discriminatedUnion('phase', [
+    z.strictObject({
+      name: z.literal('preparation-phase-timed'),
+      preparationId: preparationIdSchema,
+      phase: z.enum(timedPreparationPhases).exclude(['overflow-reduction']),
+      durationMilliseconds: metricCountSchema,
+    }),
+    z.strictObject({
+      name: z.literal('preparation-phase-timed'),
+      preparationId: preparationIdSchema,
+      phase: z.literal('overflow-reduction'),
+      durationMilliseconds: metricCountSchema,
+      renderCount: metricCountSchema,
+    }),
+  ]),
   z.strictObject({
     name: z.literal('uncaught-error-reported'),
     source: z.enum(uncaughtErrorSources),

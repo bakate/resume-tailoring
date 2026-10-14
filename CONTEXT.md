@@ -230,6 +230,10 @@ _Avoid_: Edit history, Candidate activity log
 The operational event recorded after a validated Tailored Resume PDF has been created and handed to the browser for download.
 _Avoid_: Stored resume, tracked document
 
+**Preparation Timing**:
+The privacy-safe duration of each phase of one Tailored Resume preparation, from Source Intake to its first downloadable PDF, tied together only by a random preparation identifier generated when the preparation starts. The identifier is never derived from or linked to the Candidate, the Candidate Session, the client network or the content.
+_Avoid_: Trace, session timing, Candidate latency profile
+
 **MVP Outcome Analytics**:
 Aggregate counters for Candidate Journey progression, Outcome Feedback, Correction Activity, and Successful Downloads, optionally grouped by Match Band without Candidate identifiers or Candidate content.
 _Avoid_: Candidate analytics, profile analytics
