@@ -33,6 +33,7 @@ import type { CandidateJourneyPhase } from './candidate-journey-phases'
 import { useCandidateJourney } from './use-candidate-journey'
 import { CombinedIntakeWorkspace } from './combined-intake-workspace'
 import { PhaseProgressList } from './phase-progress-list'
+import { PreparationPhaseStatus, readPreparationPhaseKey } from './preparation-phase-status'
 import { PrivacyStatement } from './processing-policy-notice'
 import { SourceIntakeWorkspace } from './source-intake-workspace'
 import type { CandidateJourneyController } from './use-candidate-journey'
@@ -132,8 +133,9 @@ type CandidateJourneyProps = LocalizationProps & Readonly<{ candidateJourney: Ca
  */
 function readActivePhase({ view }: CandidateJourneyController): CandidateJourneyPhase | null {
   if (view.status !== 'candidate-session-open') return null
-  if (view.preparationPhase === 'extracting-source') return 'source-intake'
-  if (view.preparationPhase !== null) return 'job-match'
+  const phase = view.preparationProgress?.phase
+  if (phase === 'source-intake') return 'source-intake'
+  if (phase === 'job-posting-extraction' || phase === 'match-evidence') return 'job-match'
   return view.operation === 'preparing-tailored-resume' ? 'tailored-resume-preparation' : view.session.phase
 }
 
@@ -340,14 +342,15 @@ export function CandidateJourneyProgress({ candidateJourney, localization }:
 LocalizationProps & Readonly<{ candidateJourney: CandidateJourneyController }>) {
   if (candidateJourney.view.status !== 'candidate-session-open'
     || candidateJourney.view.operation === null) return null
-  const { operation } = candidateJourney.view
+  const { operation, preparationProgress } = candidateJourney.view
   const activePhase = readActivePhase(candidateJourney)
   return <Paper aria-busy="true" aria-describedby="candidate-journey-progress-description"
     aria-label={localization.translate('candidateJourney.progressLabel')}
     className="candidate-journey-progress" component="section" p={{ base: 'md', sm: 'lg' }} withBorder>
     <Stack gap="sm">
-      {operation === 'preparing-tailored-resume' && activePhase !== null
-        ? <PhaseProgressList {...{ activePhase, localization }} />
+      {operation === 'preparing-tailored-resume' && activePhase !== null && preparationProgress !== null
+        ? <><PhaseProgressList {...{ activePhase, localization }} />
+          <PreparationPhaseStatus {...{ localization }} progress={preparationProgress} /></>
         : <Group gap="xs" wrap="nowrap"><IconLoader2 aria-hidden="true" className="progress-spinner" size={20} stroke={2} />
           <Text fw={700}>{localization.translate(readOperationKey({ candidateJourney, operation }))}</Text></Group>}
       <Text c="dimmed" id="candidate-journey-progress-description" size="sm">
@@ -396,12 +399,9 @@ function readOperationKey({ candidateJourney, operation }: Readonly<{
   candidateJourney: CandidateJourneyController; operation: CandidateJourneyOperation
 }>) {
   const { view } = candidateJourney
-  const phase = view.status === 'candidate-session-open' ? view.preparationPhase : null
-  const writingSections = view.status === 'candidate-session-open' && operation === 'preparing-tailored-resume'
-    && view.session.preparation?.status === 'pending' && view.session.preparation.sections !== undefined
-  if (phase === null) return writingSections ? 'combinedIntake.writing' : operationTranslationKeys[operation]
-  return ({ 'extracting-source': 'candidateJourney.operation.extractSourceProfile',
-    'extracting-posting': 'combinedIntake.extractingPosting', matching: 'combinedIntake.matching' } as const)[phase]
+  // A preparation names its phase, without the section count, so the polite region speaks only when the phase changes.
+  const progress = view.status === 'candidate-session-open' && operation === 'preparing-tailored-resume' ? view.preparationProgress : null
+  return progress === null ? operationTranslationKeys[operation] : readPreparationPhaseKey(progress.phase)
 }
 
 const operationTranslationKeys: Readonly<Record<CandidateJourneyOperation, Parameters<

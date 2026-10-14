@@ -1384,6 +1384,9 @@ class CandidateJourneyTestSystem {
     await expect(preview.getByRole('region', { name: 'Skills' })).not.toContainText('React')
     await expect(this.#page.getByRole('button', { name: 'Download PDF', exact: true })).toHaveCount(0)
     await expect(this.#page.getByRole('button', { name: 'Check page count', exact: true })).toHaveCount(0)
+    // Validated sections are read-only and not final until coherence and the layout finish.
+    await expect(preview).toContainText('Not final')
+    await expect(preview.getByRole('textbox')).toHaveCount(0)
   }
 
   async expectFrenchSectionsRevealedBesideTheSkillsPlaceholder() {
@@ -1438,6 +1441,9 @@ class CandidateJourneyTestSystem {
     await expect(progress.locator('[aria-current="step"]')).toHaveText('Writing your resume (in progress)')
     await expect(progress).not.toContainText('orchestration')
     await expect(this.#page.locator('.sr-only[role="status"]')).toContainText('Current step: Writing your resume.')
+    await expect(progress).toContainText('Writing your resume sections')
+    await expect(progress).toContainText(/\d+ of \d+ sections written/u)
+    await expect(this.#page.locator('.sr-only[role="status"]')).toContainText('Writing your resume sections')
   }
 
   async expectReadableSecondaryTextAndFocusRing() {

@@ -1,4 +1,4 @@
-import { Anchor, Group, List, Paper, Skeleton, Stack, Text, Title } from '@mantine/core'
+import { Anchor, Badge, Group, List, Paper, Skeleton, Stack, Text, Title } from '@mantine/core'
 import type { CandidateSession, ResumeSectionSnapshot } from '@resume-tailoring/application/candidate-journey'
 import type { ResumeSectionContent, ResumeSectionKind } from '@resume-tailoring/application/candidate-journey'
 import { isCopiedFromSource } from '@resume-tailoring/application/candidate-journey'
@@ -14,22 +14,48 @@ type ResumeSectionsPreviewProps = Readonly<{
   candidateJourney: ReturnType<typeof useCandidateJourney>; localization: Localization
 }>
 type ResumePreparation = NonNullable<CandidateSession['preparation']>
+/** What names an experience whose section has no text yet. */
+type SectionNaming = Pick<ResumePreparation, 'sourceIntake'>
 
-/** Reveals each Resume Section once validated, with a placeholder for the others; export waits for the full preview. */
+/**
+ * While a preparation runs, reveals each Resume Section once validated, with a placeholder for the others; after a
+ * failure or an interruption, only the validated sections it kept. Export waits for the full preview.
+ */
 export function ResumeSectionsPreview({ candidateJourney, localization }: ResumeSectionsPreviewProps) {
   const { view } = candidateJourney
-  const preparation = view.status === 'candidate-session-open' ? view.session.preparation : undefined
-  if (preparation === undefined || !shouldRevealPreparingSections(preparation)) return null
-  const pending = preparation.status === 'pending'
-  return <Paper aria-busy={pending} aria-labelledby="resume-sections-preview-title" component="section"
+  if (view.status !== 'candidate-session-open') return null
+  const preparation = view.session.preparation
+  const resumeLocale = preparation === undefined ? 'en' : readResumeLocale({ preparation, session: view.session })
+  const progressing = view.preparationProgress?.sections ?? []
+  if (progressing.length > 0) return <ResumeSectionsPanel {...{ localization, resumeLocale }} naming={preparation ?? { sourceIntake: null }}
+    sections={progressing} state="preparing" />
+  if (preparation === undefined || !shouldRevealKeptSections(preparation)) return null
+  return <ResumeSectionsPanel {...{ localization, resumeLocale }} naming={preparation} sections={preparation.sections ?? []} state="kept" />
+}
+
+/**
+ * Validated sections are read-only. While preparing they are marked as not final: coherence may still send one back
+ * for rewriting and the layout may still hide content. Placeholders hold each section's place, so arrivals stay in order.
+ */
+export function ResumeSectionsPanel({ localization, naming, resumeLocale, sections, state }: Readonly<{
+  localization: Localization; naming: SectionNaming; resumeLocale: 'en' | 'fr'
+  sections: readonly ResumeSectionSnapshot[]; state: 'preparing' | 'kept'
+}>) {
+  const preparing = state === 'preparing'
+  return <Paper aria-busy={preparing} aria-labelledby="resume-sections-preview-title" component="section"
+    aria-describedby={preparing ? 'resume-sections-preview-not-final' : undefined}
     p={{ base: 'md', sm: 'xl' }} shadow="xs" withBorder>
     <Stack gap="lg">
-      <div><Title id="resume-sections-preview-title" order={2}>
-        {localization.translate(pending ? 'resumeSections.title' : 'resumeSections.keptTitle')}</Title>
-        <Text c="dimmed">{localization.translate(pending ? 'resumeSections.description' : 'resumeSections.keptDescription')}</Text></div>
+      <div><Group gap="sm" wrap="wrap"><Title id="resume-sections-preview-title" order={2}>
+        {localization.translate(preparing ? 'resumeSections.title' : 'resumeSections.keptTitle')}</Title>
+        {preparing ? <Badge color="informative" variant="light">
+          {localization.translate('resumeSections.notFinal')}</Badge> : null}</Group>
+        <Text c="dimmed">{localization.translate(preparing ? 'resumeSections.description' : 'resumeSections.keptDescription')}</Text>
+        {preparing ? <Text c="dimmed" id="resume-sections-preview-not-final" size="sm">
+          {localization.translate('resumeSections.notFinalDescription')}</Text> : null}</div>
       <Stack className="resume-sections-preview-list" component="ol" gap="lg">
-        {groupSections(preparation.sections ?? []).map((group) => <li key={group[0].key}>
-          <ResumeSectionGroupPreview {...{ localization, group, preparation }} resumeLocale={readResumeLocale(preparation)} /></li>)}
+        {groupSections(sections).map((group) => <li key={group[0].key}>
+          <ResumeSectionGroupPreview {...{ localization, group, naming, resumeLocale }} /></li>)}
       </Stack>
     </Stack>
   </Paper>
@@ -39,14 +65,14 @@ export function ResumeSectionsPreview({ candidateJourney, localization }: Resume
 export function FailedSectionsSummary({ candidateJourney, localization }: ResumeSectionsPreviewProps) {
   const { view } = candidateJourney
   const preparation = view.status === 'candidate-session-open' ? view.session.preparation : undefined
-  if (preparation === undefined || !shouldRevealPreparingSections(preparation)) return null
+  if (preparation === undefined || !shouldRevealKeptSections(preparation)) return null
   const failed = (preparation.sections ?? []).filter(({ status }) => status === 'failed')
   if (failed.length === 0) return null
   return <Stack gap={4}>
     <Text size="sm">{localization.translate('resumeSections.failedSummary')}</Text>
     <List size="sm">{failed.map((section) => <List.Item key={section.key}>
       <Anchor href={`#${readSectionAnchor(section)}`} onClick={(event) => { event.preventDefault(); focusSection(section) }}>
-        {readSectionName({ localization, preparation, section })}</Anchor></List.Item>)}</List>
+        {readSectionName({ localization, naming: preparation, section })}</Anchor></List.Item>)}</List>
   </Stack>
 }
 
@@ -61,20 +87,19 @@ function readSectionAnchor({ key }: ResumeSectionSnapshot) {
 }
 
 /** An experience is named by its role and organization from the Source Profile, since a failed section has no text. */
-function readSectionName({ localization, preparation, section }: Readonly<{
-  localization: Localization; preparation: ResumePreparation; section: ResumeSectionSnapshot
+function readSectionName({ localization, naming, section }: Readonly<{
+  localization: Localization; naming: SectionNaming; section: ResumeSectionSnapshot
 }>) {
   const label = localization.translate(`resumeReview.section.${sectionLabelKeys[section.kind]}`)
   const index = /^experiences\.(\d+)$/u.exec(section.key)?.[1]
-  const experience = index === undefined ? undefined : preparation.sourceIntake?.sourceProfile.experiences[Number(index)]
+  const experience = index === undefined ? undefined : naming.sourceIntake?.sourceProfile.experiences[Number(index)]
   const name = [experience?.role, experience?.organization].filter(Boolean).join(' – ')
   return name.length === 0 ? label
     : localization.translate('resumeSections.namedSection').replace('{section}', label).replace('{name}', name)
 }
 
-// Placeholders alone are useful while writing; after a failure or interruption only validated text is worth keeping on screen.
-function shouldRevealPreparingSections({ sections = [], status }: ResumePreparation) {
-  if (status === 'pending') return sections.length > 0
+// After a failure or an interruption only validated text is worth keeping on screen.
+function shouldRevealKeptSections({ sections = [], status }: ResumePreparation) {
   return (status === 'failed' || status === 'interrupted') && sections.some((section) => section.status === 'validated')
 }
 
@@ -91,30 +116,34 @@ function groupSections(sections: readonly ResumeSectionSnapshot[]): readonly Res
   }, [])
 }
 
-// Headings follow the resume language like the final document; status messages follow the interface language.
-function readResumeLocale(preparation: ResumePreparation) {
-  return preparation.locale ?? inferTailoredResumeLocale({ content: preparation.jobMatch?.jobPosting.originalContent ?? '' })
+/**
+ * Headings follow the resume language like the final document; status messages follow the interface language. Once
+ * published, the preparation no longer keeps its Job Match: the session's is the same one.
+ */
+function readResumeLocale({ preparation, session }: Readonly<{ preparation: ResumePreparation; session: CandidateSession }>) {
+  const jobMatch = preparation.jobMatch ?? session.jobMatch
+  return preparation.locale ?? inferTailoredResumeLocale({ content: jobMatch?.jobPosting.originalContent ?? '' })
 }
 
-function ResumeSectionGroupPreview({ group, localization, preparation, resumeLocale }: Readonly<{
-  group: ResumeSectionGroup; localization: Localization; preparation: ResumePreparation; resumeLocale: 'en' | 'fr'
+function ResumeSectionGroupPreview({ group, localization, naming, resumeLocale }: Readonly<{
+  group: ResumeSectionGroup; localization: Localization; naming: SectionNaming; resumeLocale: 'en' | 'fr'
 }>) {
   const heading = readResumeHeading({ key: sectionHeadingKeys[group[0].kind], locale: resumeLocale })
   return <Stack aria-label={heading} component="section" gap="xs">
     <Title order={3} size="h4">{heading}</Title>
-    {group.map((section) => <ResumeSectionPreview key={section.key} {...{ localization, preparation, section }} />)}
+    {group.map((section) => <ResumeSectionPreview key={section.key} {...{ localization, naming, section }} />)}
   </Stack>
 }
 
-function ResumeSectionPreview({ localization, preparation, section }: Readonly<{
-  localization: Localization; preparation: ResumePreparation; section: ResumeSectionSnapshot
+function ResumeSectionPreview({ localization, naming, section }: Readonly<{
+  localization: Localization; naming: SectionNaming; section: ResumeSectionSnapshot
 }>) {
   if (section.status === 'validated') return <Stack gap={4}>
     <ValidatedSectionContent content={section.content} />
     {isCopiedFromSource(section.content) ? <CopiedNotice localization={localization} /> : null}
   </Stack>
   if (section.status === 'failed') {
-    const name = readSectionName({ localization, preparation, section })
+    const name = readSectionName({ localization, naming, section })
     // Focusable so the failure summary's link can lead the Candidate here.
     return <Stack aria-label={name} id={readSectionAnchor(section)} role="group" tabIndex={-1}>
       <Text c="caution.8" fw={600}>{localization.translate('resumeSections.failed').replace('{section}', name)}</Text>

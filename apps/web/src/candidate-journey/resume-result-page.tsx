@@ -39,8 +39,10 @@ function ResumeResult({ localization }: Readonly<{ localization: Localization }>
       onRetry={() => { candidateJourney.startTailoredResumePreparation({ purpose }) }}
       onNormalized={() => { candidateJourney.startTailoredResumePreparation({ purpose: 'normalized' }) }} />
     <ResumeSectionsPreview {...{ candidateJourney, localization }} />
-    <TailoredResumeWorkspace {...{ candidateJourney, localization }} onChangeJobPosting={() => {
-      candidateJourney.changeJobPosting(); toDocuments() }} />
+    {/* While the pages are laid out, the resume is not final yet: its validated sections stand in for the preview. */}
+    {view.preparationProgress?.phase === 'overflow-reduction' ? null
+      : <TailoredResumeWorkspace {...{ candidateJourney, localization }} onChangeJobPosting={() => {
+        candidateJourney.changeJobPosting(); toDocuments() }} />}
   </>
 }
 
