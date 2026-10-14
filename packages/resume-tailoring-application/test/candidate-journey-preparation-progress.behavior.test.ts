@@ -35,7 +35,7 @@ describe('Candidate Journey preparation progress', () => {
     system.expectEverySectionValidatedDuring(['coherence', 'overflow-reduction'])
   })
 
-  it('keeps laying out the pages exposed while the preview renders the first PDF', async () => {
+  it('keeps laying out the pages exposed while the preview renders a first PDF the fitting could not render', async () => {
     const system = createSystemUnderTest({ render: 'held' })
     await system.givenPreparedTailoredResume()
 
@@ -84,7 +84,10 @@ type TestOptions = Readonly<{
    * fails every check.
    */
   coherence?: 'rewrite-first-experience-once' | 'timeout'
-  /** `held` never finishes the preview's render, so the test reads the view while it runs. */
+  /**
+   * `held` fails every render of the Page Budget fitting, so the preview renders the first PDF itself, and never
+   * finishes the preview's render, so the test reads the view while it runs.
+   */
   render?: 'held'
 }>
 
@@ -111,7 +114,8 @@ class PreparationProgressSystem {
       } }),
       // Overflow Reduction renders during the preparation; only the preview's render is held.
       resumeDocumentRenderer: createFakeResumeDocumentRenderer({ render: (request) => {
-        if (options.render !== 'held' || this.#action !== 'held-preview') return createFakeResumeDocumentRenderer().render(request)
+        if (options.render !== 'held') return createFakeResumeDocumentRenderer().render(request)
+        if (this.#action !== 'held-preview') return Promise.reject(new Error('Renderer unavailable'))
         this.#heldRenders += 1
         return new Promise(() => undefined)
       } }),

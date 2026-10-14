@@ -1,4 +1,10 @@
-import { groupedResumeDocument, resumeContractRevision } from '@resume-tailoring/application/structured-resume-fixtures'
+import { fitToPageBudgetByRendering } from '@resume-tailoring/application/candidate-journey'
+import type { PageBudgetFitRequest } from '@resume-tailoring/application/candidate-journey'
+import { prepareResumeSections } from '@resume-tailoring/application/resume-preparation'
+import { groupedResumeDocument, resumeContractRevision,
+  writeResumeSectionFromFacts } from '@resume-tailoring/application/structured-resume-fixtures'
+import type { TailoredResume } from '@resume-tailoring/application/tailored-resume'
+import { createFakeResumeSectionModels } from '@resume-tailoring/application/testing'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
@@ -7,6 +13,7 @@ import { describe, expect, it, onTestFinished, vi } from 'vitest'
 
 import { createRenderingBrowser, createResumeDocumentRenderer, launchChromium,
   renderResumeDocument } from './resume-document-renderer'
+import { realSizedResumeFixture } from '../../model-evaluation/real-sized-resume-corpus'
 
 describe('structured resume PDF rendering boundary', () => {
   it('renders the current grouped document as selectable A4 pages with embedded fonts', async () => {
@@ -229,7 +236,75 @@ describe('reused rendering browser', () => {
   })
 })
 
+describe('Page Budget fitting in one rendering operation', () => {
+  it.each([['the real-sized resume', readRealSizedFitRequest], ['an already one-page resume', readOnePageFitRequest]] as const)(
+    'reduces %s as the shared Overflow Reduction steps do, rendering each layout in full', async (_case, readRequest) => {
+      const rendering = createLaunchRecordingRenderer()
+      const request = await readRequest()
+      // The shared steps, each layout measured by a complete render of its own, as before one operation fitted.
+      const expected = await fitToPageBudgetByRendering({ request, render: rendering.renderer.render })
+
+      const fit = await rendering.renderer.fitToPageBudget(request)
+
+      expect({ document: fit.document, hiddenFields: fit.hiddenFields })
+        .toEqual({ document: expected.document, hiddenFields: expected.hiddenFields })
+      expect(fit.render.assessment.layout).toEqual(expected.render.assessment.layout)
+      expect(fit.render.assessment.exportEligibility.status).toBe('eligible')
+      expect(await readPdfText(fit.render.pdf ?? expect.fail('Expected the fitted PDF')))
+        .toContain(fit.document.experiences[0]?.role?.text)
+      expect(rendering.browsers).toHaveLength(1)
+    }, 120_000)
+
+  it('stops without running a step when one page is out of reach, keeping the resume unchanged', async () => {
+    const rendering = createLaunchRecordingRenderer()
+    // Every project cites a relevant fact, so no step hides one: even every step applied overflows two pages.
+    const request = { ...fitRequestFor(denseRequest({ count: 55 }).draft.document),
+      relevantFactIds: ['source-fact-projects-0-name-0'] }
+
+    const fit = await rendering.renderer.fitToPageBudget(request)
+
+    expect(fit.renderCount, 'The resume as it is, then with every step applied').toBe(2)
+    expect(fit.hiddenFields).toEqual([])
+    expect(fit.document).toEqual(request.draft.document)
+    expect(fit.render.assessment.layout).toMatchObject({ status: 'overflow' })
+    expect(fit.render.pdf).not.toBeNull()
+  }, 60_000)
+
+  it('answers an unreadable photo with an unavailable render and the resume unchanged', async () => {
+    const rendering = createLaunchRecordingRenderer()
+    const request = { ...await readRealSizedFitRequest(), photoDataUrl: 'data:image/png;base64,YnJva2Vu' }
+
+    const fit = await rendering.renderer.fitToPageBudget(request)
+
+    expect(fit.render.assessment.layout).toEqual({ status: 'unavailable', revision: request.draft.revision })
+    expect(fit.hiddenFields).toEqual([])
+    expect(fit.document).toEqual(request.draft.document)
+  }, 60_000)
+})
+
 const simpleRequest = { draft: { document: groupedResumeDocument, revision: resumeContractRevision }, unsupportedFieldIds: [] }
+
+const fittingToday = Date.UTC(2026, 9, 14)
+
+function fitRequestFor(document: TailoredResume): PageBudgetFitRequest {
+  return { draft: { document, revision: 'fitting' }, restoredFieldIds: [], relevantFactIds: [], today: fittingToday,
+    releasesRestoredContent: false }
+}
+
+function readOnePageFitRequest() {
+  return Promise.resolve(fitRequestFor(groupedResumeDocument))
+}
+
+/** The anonymized real-sized resume, written section by section verbatim from its Candidate Facts. */
+async function readRealSizedFitRequest(): Promise<PageBudgetFitRequest> {
+  const { request } = realSizedResumeFixture
+  const prepared = await prepareResumeSections({ request, revision: 'fitting', now: Date.now, recordTelemetry: () => undefined,
+    models: createFakeResumeSectionModels({ writeSection: (input) => Promise.resolve({ ok: true,
+      value: writeResumeSectionFromFacts(input) }) }) })
+  if (prepared.status !== 'prepared') return expect.fail(`Expected the real-sized resume prepared, got ${prepared.status}`)
+  return { ...fitRequestFor({ ...prepared.document, identity: groupedResumeDocument.identity,
+    contactDetails: groupedResumeDocument.contactDetails }), relevantFactIds: request.jobMatch.analysis.relevantFactIds }
+}
 
 /** A renderer of its own whose launches are kept, so a case can count them and every browser closes after it. */
 function createLaunchRecordingRenderer() {

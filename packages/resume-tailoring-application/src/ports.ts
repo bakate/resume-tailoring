@@ -12,6 +12,7 @@ import type { PrivacySafeTelemetryEvent } from './privacy-safe-telemetry'
 import type { ProposedResumeClaim, ResumeClaimValidationFeedback, ResumeClaimWritingInputs } from './resume-claims'
 import type { ReadApiFailure } from './api-failure'
 import type { ResumeRenderRequest, ResumeRenderResult } from './resume-export'
+import type { PageBudgetFit, PageBudgetFitRequest } from './overflow-reduction'
 import type { ResumeCoherenceInput, ResumeDocumentCoherence, ResumeFieldValidation, ResumeFieldValidationInput,
   ResumeSectionContent, ResumeSectionModelResult, ResumeSectionWritingInput } from './resume-sections'
 import type { SourceDocument, SourceDocumentFailure, StructuredSourceProfileExtraction } from './source-intake'
@@ -186,6 +187,12 @@ export type ResumeClaimSemanticValidator = Readonly<{
 
 export type ResumeDocumentRenderer = Readonly<{
   render: (request: ResumeRenderRequest) => Promise<ResumeRenderResult>
+  /**
+   * Fits a Tailored Resume to its Page Budget in one operation: runs the shared Overflow Reduction steps, measuring each
+   * layout with the real renderer, and returns the reduced resume, the fields it hid, and its render with the final PDF.
+   * It counts as one render, whatever the number of layouts it measured.
+   */
+  fitToPageBudget: (request: PageBudgetFitRequest) => Promise<PageBudgetFit>
   /**
    * Readies the renderer for the first render of a preparation, without waiting for it and without any Candidate
    * content. It is not a render: it counts against no render allowance, and its failure only leaves a render cold.

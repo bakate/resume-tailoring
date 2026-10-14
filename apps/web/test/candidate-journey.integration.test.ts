@@ -3,7 +3,7 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { expect, test } from './content-security-policy'
 import type { Page, Request } from '@playwright/test'
 import { structuredResumeJobMatch, structuredResumeSource } from '@resume-tailoring/application/structured-resume-fixtures'
-import { resumeDocumentWarmUpPath as rendererWarmUpPath } from '../src/adapters/browser/browser-resume-document-renderer'
+import { resumeDocumentFitPath, resumeDocumentPath, resumeDocumentWarmUpPath as rendererWarmUpPath } from '../src/adapters/browser/browser-resume-document-renderer'
 import { routeResumeSectionModels, writeFixtureSection } from './resume-section-model-routes'
 
 test.describe('Candidate Journey integration qualification', () => {
@@ -681,7 +681,7 @@ class CandidateJourneyIntegrationSystem {
     await expect(this.#editor().getByRole('status').filter({ hasText: 'Resume updated.' })).toBeVisible()
   }
 
-  #renderRequests() { return this.#modelRequests.filter((path) => path === '/api/resume-document').length }
+  #renderRequests() { return this.#modelRequests.filter((path) => path === resumeDocumentPath).length }
 
   #renderRequestsSinceAction() { return this.#renderRequests() - this.#rendersBeforeAction }
 
@@ -1268,7 +1268,8 @@ class CandidateJourneyIntegrationSystem {
     const path = new URL(request.url()).pathname
     if (path.startsWith('/api/')) this.#modelRequests.push(path)
     if (path === rendererWarmUpPath) this.#rendererWarmUpBodies.push(request.postData())
-    if (path.startsWith('/api/') && path !== '/api/resume-document' && path !== '/api/analytics') {
+    // Renders carry the whole resume, name included, to the renderer: only model requests must leave the name out.
+    if (path.startsWith('/api/') && path !== resumeDocumentPath && path !== resumeDocumentFitPath && path !== '/api/analytics') {
       this.#modelRequestBodies.push(request.postData() ?? '')
     }
   }

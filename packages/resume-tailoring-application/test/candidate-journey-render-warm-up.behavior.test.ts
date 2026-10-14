@@ -80,6 +80,10 @@ class RendererWarmUpSystem {
           this.#steps.push('render')
           return renderer.render(request)
         },
+        fitToPageBudget: (request) => {
+          this.#steps.push('render')
+          return renderer.fitToPageBudget(request)
+        },
         warmUp: (...warmUpArguments: unknown[]) => {
           this.#steps.push('renderer-warm-up')
           this.#warmUpArguments.push(warmUpArguments)

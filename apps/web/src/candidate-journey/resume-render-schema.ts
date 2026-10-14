@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { candidateSessionSchema } from './candidate-session'
+import { candidateSessionSchema, hiddenResumeFieldSchema } from './candidate-session'
 
 export const resumeRenderRequestSchema = z.strictObject({
   draft: z.strictObject({
@@ -9,6 +9,15 @@ export const resumeRenderRequestSchema = z.strictObject({
   unsupportedFieldIds: z.array(z.string().min(1)),
   photoDataUrl: z.string().max(2_000_000)
     .regex(/^data:image\/(?:jpeg|png|webp);base64,[a-zA-Z0-9+/]+=*$/u).optional(),
+})
+
+export const pageBudgetFitRequestSchema = z.strictObject({
+  draft: resumeRenderRequestSchema.shape.draft,
+  photoDataUrl: resumeRenderRequestSchema.shape.photoDataUrl,
+  restoredFieldIds: z.array(z.string().min(1)),
+  relevantFactIds: z.array(z.string().min(1)),
+  today: z.number().int().nonnegative(),
+  releasesRestoredContent: z.boolean(),
 })
 
 const revision = z.string()
@@ -27,4 +36,11 @@ export const resumeRenderResponseSchema = z.strictObject({
     ]),
   }),
   pdf: z.base64().transform((pdf) => Uint8Array.from(atob(pdf), (value) => value.charCodeAt(0))).nullable(),
+})
+
+export const pageBudgetFitResponseSchema = z.strictObject({
+  document: resumeRenderRequestSchema.shape.draft.shape.document,
+  hiddenFields: z.array(hiddenResumeFieldSchema.extend({ origin: z.literal('overflow-reduction') })),
+  render: resumeRenderResponseSchema,
+  renderCount: z.number().int().nonnegative(),
 })

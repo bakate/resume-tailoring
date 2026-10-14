@@ -1,11 +1,12 @@
 import { assessResumeExport, unavailableResumeRender } from '@resume-tailoring/application/candidate-journey'
-import type { ResumeRenderRequest } from '@resume-tailoring/application/candidate-journey'
+import type { PageBudgetFitRequest, ResumeRenderRequest } from '@resume-tailoring/application/candidate-journey'
 import { createRecordingTelemetry } from '@resume-tailoring/application/testing'
 import { groupedResumeDocument, resumeContractRevision } from '@resume-tailoring/application/structured-resume-fixtures'
 import { describe, expect, it, vi } from 'vitest'
 
 import { failureResponse } from '../../api-failure'
-import { createBrowserResumeDocumentRenderer, resumeDocumentWarmUpPath } from './browser-resume-document-renderer'
+import { createBrowserResumeDocumentRenderer, resumeDocumentFitPath,
+  resumeDocumentWarmUpPath } from './browser-resume-document-renderer'
 
 describe('browser resume document renderer', () => {
   const transientFailures = [
@@ -47,6 +48,29 @@ describe('browser resume document renderer', () => {
     expect(telemetry).toEqual([{ name: 'resume-render-failed', category, retried: false }])
   })
 
+  it('fits the Page Budget in one request to its own route, reading the fitted resume and its PDF', async () => {
+    const { fitToPageBudget, requests } = rendererAnswering([() => Response.json(fittedBody)])
+
+    const fit = await fitToPageBudget(fitRequest)
+
+    const [path, init] = requests()[0] ?? expect.fail('Expected a fitting request')
+    expect(path).toBe(resumeDocumentFitPath)
+    expect(JSON.parse(init?.body as string)).toEqual(fitRequest)
+    expect(fit).toEqual({ ...fittedBody, render: { ...fittedBody.render, pdf: new TextEncoder().encode('%PDF') } })
+  })
+
+  it('leaves the resume unchanged and unmeasured when the server cannot fit it after one retry', async () => {
+    const failure = () => failureResponse({ type: 'timeout' })
+    const { fitToPageBudget, telemetry, calls } = rendererAnswering([failure, failure])
+
+    const fit = await fitToPageBudget(fitRequest)
+
+    expect(fit).toEqual({ document: fitRequest.draft.document, hiddenFields: [], renderCount: 0,
+      render: unavailableResumeRender(renderRequest, { type: 'timeout' }) })
+    expect(calls()).toBe(2)
+    expect(telemetry).toEqual([{ name: 'resume-render-failed', category: 'timeout', retried: true }])
+  })
+
   it('warms the server renderer up with a request of its own that carries no content', async () => {
     const { warmUp, requests } = rendererAnswering([() => new Response(null, { status: 204 })])
 
@@ -84,6 +108,15 @@ function measuredBody({ revision = resumeContractRevision }: Readonly<{ revision
     assessment: assessResumeExport({ ...renderRequest, draft, layout: { status: 'fits', pageCount: 1, revision } }) }
 }
 
+const fitRequest: PageBudgetFitRequest = { draft: renderRequest.draft, restoredFieldIds: [], relevantFactIds: [],
+  today: Date.UTC(2026, 9, 14), releasesRestoredContent: false }
+
+const [hiddenProject] = groupedResumeDocument.sections.flatMap((section) => section.section === 'projects' ? section.fields : [])
+const fittedBody = { document: { ...groupedResumeDocument, sections: groupedResumeDocument.sections.filter(({ section }) =>
+  section !== 'projects') }, renderCount: 3, render: measuredBody(),
+hiddenFields: [{ field: hiddenProject, location: { kind: 'section', section: 'projects', fieldId: hiddenProject?.id },
+  origin: 'overflow-reduction' }] }
+
 function measuredResponse() {
   return Response.json(measuredBody())
 }
@@ -99,6 +132,6 @@ function rendererAnswering(answers: readonly Answer[]) {
   })
   const renderer = createBrowserResumeDocumentRenderer({ request, timeoutMilliseconds: 20,
     telemetry })
-  return { render: renderer.render, warmUp: renderer.warmUp, telemetry: telemetry.events,
+  return { render: renderer.render, fitToPageBudget: renderer.fitToPageBudget, warmUp: renderer.warmUp, telemetry: telemetry.events,
     calls: () => request.mock.calls.length, requests: () => request.mock.calls }
 }

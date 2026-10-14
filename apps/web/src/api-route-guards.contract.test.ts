@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createDemoAccessCookie } from './demo-access/demo-access-session'
 import { Route as AnalyticsRoute } from './routes/api.analytics'
+import { Route as ResumeDocumentFitRoute } from './routes/api.resume-document-fit'
 import { Route as ResumeDocumentWarmUpRoute } from './routes/api.resume-document-warm-up'
 import { Route as ResumeSectionWritingRoute } from './routes/api.resume-section-writing'
 
@@ -55,6 +56,15 @@ describe('API route guards', () => {
 
     expect(response.status).toBe(401)
     await expect(response.json()).resolves.toEqual({ ok: false, error: { type: 'demo-access-required' } })
+  })
+
+  it('rejects a Page Budget fitting without demo access before reading its content', async () => {
+    const request = createRequest({ body: {}, headers: originHeaders })
+
+    const response = await postTo(ResumeDocumentFitRoute, request)
+
+    expect(response.status).toBe(401)
+    expect(request.bodyUsed).toBe(false)
   })
 
   it('rejects an oversized model request from its declared length before reading it', async () => {
