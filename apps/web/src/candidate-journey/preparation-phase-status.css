@@ -1,3 +1,5 @@
+/* Set apart from the three phases above, as the detail of the one under way. */
+.preparation-phase-status { border-top: 1px solid var(--mantine-color-default-border); padding-top: var(--mantine-spacing-sm); }
 .preparation-phase-status svg { flex-shrink: 0; }
 /* Digits keep their width as the count grows, so the line never reflows. */
 .preparation-phase-status-count { font-variant-numeric: tabular-nums; }

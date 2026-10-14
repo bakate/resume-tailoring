@@ -21,6 +21,7 @@ h1{font-size:25pt}h2{font-size:14pt}h3{font-size:11pt;margin:0}
 h1,h2,h3{break-after:avoid}.experience-heading{break-inside:avoid;break-after:avoid}.resume-experience{break-inside:avoid}
 header p,address{margin:2mm 0 0;font-style:normal}
 section{margin-top:4mm}article,.skill-group{margin-top:3mm}
+.skill-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(80mm,1fr));column-gap:8mm}.skill-group{break-inside:avoid}
 article p,.skill-group p{margin:1mm 0 0}
 .experience-organization{font-weight:600}.experience-dates{color:#505760;font-size:10pt;display:flex;justify-content:space-between;gap:12pt}.experience-location{text-align:right}
 .experience-line{display:flex;align-items:baseline;gap:4pt}.experience-role{font-weight:600}.experience-line .experience-organization{font-weight:400}.experience-line .experience-dates{margin-left:auto;padding-left:8pt;white-space:nowrap}
